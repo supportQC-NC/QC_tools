@@ -1,0 +1,442 @@
+/* src/screens/user/UserPreparationCommande.css */
+
+/* ===== BASE ===== */
+.prep-cmd-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 8px;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.prep-cmd-screen * {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Loading / Empty / Placeholder */
+.prep-cmd-loading,
+.prep-cmd-empty,
+.prep-cmd-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  width: 100%;
+}
+
+.prep-cmd-empty svg,
+.prep-cmd-placeholder svg {
+  font-size: 48px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* ===== HEADER ===== */
+.prep-cmd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.prep-cmd-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.prep-cmd-header h1 svg {
+  color: #8b5cf6;
+}
+
+/* Message */
+.prep-cmd-message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  width: 100%;
+}
+
+.prep-cmd-message.success {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.prep-cmd-message.error {
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.prep-cmd-message.warning {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+
+/* ===== SELECT COMMANDE SECTION ===== */
+.prep-cmd-select-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.select-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 30px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-align: center;
+  width: 100%;
+  max-width: 500px;
+}
+
+.select-icon {
+  font-size: 48px;
+  color: #8b5cf6;
+  opacity: 0.8;
+}
+
+.select-card h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.select-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.select-hint strong {
+  color: #8b5cf6;
+}
+
+.select-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.select-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 13px;
+  width: 100%;
+}
+
+.select-dropdown-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 0 14px;
+  transition: border-color 0.2s;
+}
+
+.select-dropdown-wrapper:focus-within {
+  border-color: #8b5cf6;
+}
+
+.select-dropdown-wrapper > svg:first-child {
+  color: #8b5cf6;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.select-commande {
+  flex: 1;
+  appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 14px 10px;
+  cursor: pointer;
+  min-width: 0;
+  width: 100%;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* ===== CONTENT ===== */
+.prep-cmd-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  width: 100%;
+}
+
+/* ===== COMMANDE BANNER (prep variant) ===== */
+.commande-banner.prep {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.1),
+    rgba(139, 92, 246, 0.05)
+  );
+  border: 1px solid #8b5cf6;
+}
+
+.commande-banner.prep .banner-numcde svg {
+  color: #8b5cf6;
+}
+
+.commande-banner.prep .numcde-value {
+  color: #8b5cf6;
+}
+
+/* ===== PROGRESSION (inherits from ctrl-cmd, overrides color) ===== */
+.prep-cmd-screen .progression-fill {
+  background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+}
+
+.prep-cmd-screen .progression-pct {
+  color: #8b5cf6;
+}
+
+.prep-cmd-screen .stat-prog {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+}
+
+/* ===== LIGNES RESTANTES ===== */
+.lignes-restantes-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.lignes-restantes-section .section-toggle svg:first-child {
+  color: #8b5cf6;
+}
+
+.lignes-restantes-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.ligne-restante {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.lr-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lr-nart {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.lr-design {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lr-qte span {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* All done */
+.all-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.all-done svg {
+  font-size: 20px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .prep-cmd-screen {
+    padding: 10px 6px;
+  }
+
+  .prep-cmd-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .prep-cmd-header h1 {
+    font-size: 16px;
+    justify-content: center;
+  }
+
+  .select-card {
+    padding: 24px 16px;
+  }
+
+  .commande-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-change-cmd {
+    justify-content: center;
+  }
+
+  .progression-stats {
+    justify-content: center;
+  }
+
+  .ligne-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .scan-form {
+    flex-direction: column;
+  }
+
+  .scan-form button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .prep-cmd-screen {
+    padding: 8px 4px;
+    gap: 8px;
+  }
+
+  .select-card {
+    padding: 20px 12px;
+  }
+
+  .select-icon {
+    font-size: 36px;
+  }
+
+  .select-card h2 {
+    font-size: 14px;
+  }
+
+  .banner-numcde .numcde-value {
+    font-size: 16px;
+  }
+
+  .progression-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .progression-pct {
+    text-align: center;
+  }
+
+  .lignes-restantes-list {
+    max-height: 180px;
+  }
+
+  .lr-design {
+    display: none;
+  }
+
+  .section-toggle {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  .inventaire-actions {
+    flex-direction: column;
+  }
+
+  .btn-cancel-inv {
+    width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  .select-card {
+    padding: 16px 10px;
+  }
+
+  .prep-cmd-header h1 {
+    font-size: 14px;
+  }
+
+  .select-commande {
+    font-size: 12px;
+  }
+}

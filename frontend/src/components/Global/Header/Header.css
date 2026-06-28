@@ -1,0 +1,232 @@
+/* src/components/Global/Header/Header.css */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 3vh;
+  min-height: 36px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+ 
+}
+
+/* ===== Header Left (hamburger + logo) ===== */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo a {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* ===== Bouton Hamburger ===== */
+.header-hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.header-hamburger:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.header-hamburger:active {
+  transform: scale(0.95);
+}
+
+/* État quand la sidebar est collapsed */
+.header-hamburger.collapsed {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.header-hamburger.collapsed:hover {
+  background: var(--accent-hover, #3b8eea);
+}
+
+/* ===== Header Right ===== */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.header-profile:hover {
+  background: var(--bg-tertiary);
+}
+
+.header-avatar {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.header-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.header-username {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.header-role {
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.header-role.role-admin {
+  color: var(--danger);
+}
+
+.header-role.role-user {
+  color: var(--accent);
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-logout svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 107, 107, 0.15);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-logout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== Responsive Tablette ===== */
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    min-height: 44px;
+    height: auto;
+  }
+
+  .header-left {
+    gap: 10px;
+  }
+
+  .header-logo a {
+    font-size: 14px;
+  }
+
+  .header-hamburger {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+}
+
+/* ===== Responsive Mobile ===== */
+@media (max-width: 600px) {
+  .header-user-info {
+    display: none;
+  }
+
+  .header-profile {
+    padding: 4px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+}
+
+/* ===== Très petit écran (scanners) ===== */
+@media (max-width: 400px) {
+  .header {
+    padding: 0 8px;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
+  .header-hamburger {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+
+  .header-logo a {
+    font-size: 13px;
+  }
+
+  .header-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .btn-logout {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn-logout svg {
+    width: 16px;
+    height: 16px;
+  }
+}

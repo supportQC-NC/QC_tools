@@ -1,0 +1,17 @@
+/* src/components/Global/Footer/Footer.css */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 3vh;
+  min-height: 24px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.footer-separator {
+  color: var(--border);
+}

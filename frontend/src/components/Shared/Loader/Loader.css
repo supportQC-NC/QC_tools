@@ -1,0 +1,237 @@
+/* src/components/shared/Loader/Loader.css */
+
+/* =============================================
+   LOADER CONTAINER
+   ============================================= */
+.loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.loader-fullscreen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--bg-primary-rgb, 13, 17, 23), 0.9);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+}
+
+/* =============================================
+   SPINNER
+   ============================================= */
+.loader-spinner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loader-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--accent);
+  animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+.loader-ring:nth-child(1) {
+  width: 40px;
+  height: 40px;
+  animation-delay: -0.45s;
+}
+
+.loader-ring:nth-child(2) {
+  width: 32px;
+  height: 32px;
+  border-top-color: var(--accent);
+  opacity: 0.8;
+  animation-delay: -0.3s;
+}
+
+.loader-ring:nth-child(3) {
+  width: 24px;
+  height: 24px;
+  border-top-color: var(--accent);
+  opacity: 0.6;
+  animation-delay: -0.15s;
+}
+
+/* =============================================
+   SIZES
+   ============================================= */
+/* Small */
+.loader-small .loader-ring:nth-child(1) {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+.loader-small .loader-ring:nth-child(2) {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+.loader-small .loader-ring:nth-child(3) {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+}
+
+.loader-small .loader-text {
+  font-size: 11px;
+}
+
+/* Large */
+.loader-large .loader-ring:nth-child(1) {
+  width: 56px;
+  height: 56px;
+  border-width: 4px;
+}
+
+.loader-large .loader-ring:nth-child(2) {
+  width: 44px;
+  height: 44px;
+  border-width: 4px;
+}
+
+.loader-large .loader-ring:nth-child(3) {
+  width: 32px;
+  height: 32px;
+  border-width: 4px;
+}
+
+.loader-large .loader-text {
+  font-size: 14px;
+}
+
+/* =============================================
+   TEXT
+   ============================================= */
+.loader-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+  margin-top: 8px;
+}
+
+/* =============================================
+   ANIMATION
+   ============================================= */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* =============================================
+   INLINE LOADER (pour boutons)
+   ============================================= */
+.loader-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loader-inline .loader-spinner {
+  width: 16px;
+  height: 16px;
+}
+
+.loader-inline .loader-ring {
+  border-width: 2px;
+}
+
+.loader-inline .loader-ring:nth-child(1) {
+  width: 16px;
+  height: 16px;
+}
+
+.loader-inline .loader-ring:nth-child(2) {
+  width: 12px;
+  height: 12px;
+}
+
+.loader-inline .loader-ring:nth-child(3) {
+  width: 8px;
+  height: 8px;
+}
+
+/* =============================================
+   ALTERNATIVE: DOTS LOADER
+   ============================================= */
+.loader-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.loader-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: bounce 1.4s ease-in-out infinite both;
+}
+
+.loader-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loader-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.loader-dot:nth-child(3) {
+  animation-delay: 0s;
+}
+
+@keyframes bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* =============================================
+   ALTERNATIVE: PULSE LOADER
+   ============================================= */
+.loader-pulse {
+  width: 40px;
+  height: 40px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+}

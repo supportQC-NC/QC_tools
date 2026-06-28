@@ -1,0 +1,380 @@
+/* ==========================================================================
+   Admin Proformas Screen - Same design system as Commandes
+   Accent color: teal/cyan (#14b8a6) instead of amber (#f59e0b)
+   ========================================================================== */
+
+/* Page Container */
+.admin-proformas-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== HEADER ========== */
+.admin-proformas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.proformas-icon {
+  background: linear-gradient(135deg, #14b8a6, #0d9488) !important;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3) !important;
+}
+
+/* ========== MAIN CONTENT LAYOUT ========== */
+.admin-proformas-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ========== MAIN AREA ========== */
+.proformas-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ========== TABLE ========== */
+.proformas-table-container {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.proformas-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.proformas-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.proformas-table th {
+  padding: 0.875rem 1rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+  border-bottom: 2px solid #14b8a6;
+  white-space: nowrap;
+}
+
+.proformas-table th.text-right {
+  text-align: right;
+}
+
+.proformas-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: middle;
+}
+
+.proformas-table tbody tr {
+  transition: var(--admin-transition);
+}
+
+.proformas-table tbody tr:hover {
+  background: var(--admin-bg-hover);
+}
+
+/* Row variants by état */
+.proformas-table tbody tr.row-etat-info {
+  border-left: 3px solid var(--admin-info);
+}
+
+.proformas-table tbody tr.row-etat-success {
+  border-left: 3px solid var(--admin-success);
+}
+
+.proformas-table tbody tr.row-etat-muted {
+  border-left: 3px solid var(--admin-text-muted);
+}
+
+/* Link style for NUMFACT */
+.proforma-numfact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: "Monaco", "Consolas", monospace;
+  font-weight: 700;
+  color: #14b8a6;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  margin: -0.25rem -0.5rem;
+  border-radius: var(--admin-radius-xs);
+  transition: var(--admin-transition);
+}
+
+.proforma-numfact-link:hover {
+  background: #14b8a6;
+  color: #000;
+}
+
+.proforma-numfact-link .link-icon {
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: var(--admin-transition);
+}
+
+.proforma-numfact-link:hover .link-icon {
+  opacity: 1;
+}
+
+/* Tiers badge */
+.tiers-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-xs);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text-secondary);
+}
+
+/* Repres badge */
+.repres-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-xs);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text-secondary);
+}
+
+/* Nom text */
+.nom-text {
+  font-size: 0.85rem;
+  color: var(--admin-text);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* Texte / Objet */
+.texte-text {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* Date value */
+.admin-proformas-page .date-value {
+  font-size: 0.85rem;
+  color: var(--admin-text-secondary);
+}
+
+/* Montant value */
+.admin-proformas-page .montant-value {
+  font-weight: 700;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text);
+}
+
+/* État badge - overrides for proforma accent */
+.admin-proformas-page .etat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.admin-proformas-page .etat-badge.large {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
+.admin-proformas-page .etat-muted {
+  background: rgba(100, 100, 120, 0.2);
+  color: var(--admin-text-muted);
+  border: 1px solid var(--admin-border);
+}
+
+.admin-proformas-page .etat-info {
+  background: var(--admin-info-light);
+  color: var(--admin-info);
+  border: 1px solid var(--admin-info);
+}
+
+.admin-proformas-page .etat-success {
+  background: var(--admin-success-light);
+  color: var(--admin-success);
+  border: 1px solid var(--admin-success);
+}
+
+/* Actions */
+.admin-proformas-page .btn-detail {
+  background: transparent;
+  border: 1px solid #14b8a6 !important;
+  color: #14b8a6 !important;
+  text-decoration: none;
+}
+
+.admin-proformas-page .btn-detail:hover {
+  background: #14b8a6 !important;
+  color: #000 !important;
+}
+
+/* ========== MODAL ========== */
+.proforma-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+  backdrop-filter: blur(8px);
+}
+
+.proforma-modal {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  width: 100%;
+  max-width: 750px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--admin-shadow-lg);
+}
+
+.proforma-modal .modal-numfact {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.85rem;
+  color: #14b8a6;
+  font-weight: 700;
+}
+
+/* Montants grid in modal */
+.admin-proformas-page .montants-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.admin-proformas-page .montant-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--admin-bg);
+  border-radius: var(--admin-radius-sm);
+  text-align: center;
+}
+
+.admin-proformas-page .montant-item.main {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), transparent);
+  border: 1px solid #14b8a6;
+}
+
+.admin-proformas-page .montant-item.main span:last-child {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #14b8a6;
+}
+
+.admin-proformas-page .montant-item label {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.admin-proformas-page .montant-item span:last-child {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+/* Mailing lines */
+.mailing-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mailing-line {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--admin-text-secondary);
+  padding: 0.375rem 0.75rem;
+  background: var(--admin-bg-tertiary);
+  border-radius: var(--admin-radius-xs);
+  line-height: 1.4;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1200px) {
+  .proformas-table .col-texte,
+  .proformas-table .col-datchant {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-proformas-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .proformas-table .col-nom,
+  .proformas-table .col-repres {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .proformas-table .col-montant,
+  .proformas-table .col-etat {
+    display: none;
+  }
+
+  .admin-proformas-page .pagination-bar {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .admin-proformas-page .btn-page span {
+    display: none;
+  }
+}

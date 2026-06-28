@@ -1,0 +1,406 @@
+/* http://meyerweb.com/eric/tools/css/reset/ 
+   v2.0 | 20110126
+   License: none (public domain)
+*/
+
+html,
+body,
+div,
+span,
+applet,
+object,
+iframe,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+pre,
+a,
+abbr,
+acronym,
+address,
+big,
+cite,
+code,
+del,
+dfn,
+em,
+img,
+ins,
+kbd,
+q,
+s,
+samp,
+small,
+strike,
+strong,
+sub,
+sup,
+tt,
+var,
+b,
+u,
+i,
+center,
+dl,
+dt,
+dd,
+ol,
+ul,
+li,
+fieldset,
+form,
+label,
+legend,
+table,
+caption,
+tbody,
+tfoot,
+thead,
+tr,
+th,
+td,
+article,
+aside,
+canvas,
+details,
+embed,
+figure,
+figcaption,
+footer,
+header,
+hgroup,
+menu,
+nav,
+output,
+ruby,
+section,
+summary,
+time,
+mark,
+audio,
+video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+}
+/* HTML5 display-role reset for older browsers */
+article,
+aside,
+details,
+figcaption,
+figure,
+footer,
+header,
+hgroup,
+menu,
+nav,
+section {
+  display: block;
+}
+body {
+  line-height: 1;
+}
+ol,
+ul {
+  list-style: none;
+}
+blockquote,
+q {
+  quotes: none;
+}
+blockquote:before,
+blockquote:after,
+q:before,
+q:after {
+  content: "";
+  content: none;
+}
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* ============================================================================ 
+   STOP RESET 
+   ============================================================================ */
+
+/* ============================================================================ 
+   BASE STYLES - QC TOOLS
+   ============================================================================ */
+
+:root {
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-tertiary: #252540;
+  --text-primary: #eeeeee;
+  --text-secondary: #aaaaaa;
+  --text-muted: #666666;
+  --accent: #4da6ff;
+  --accent-hover: #3d8bd9;
+  --border: #333333;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #ff6b6b;
+
+  /* Variables pour le layout mobile */
+  --sidebar-toggle-size: 44px;
+  --sidebar-toggle-margin: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 12px;
+}
+
+body {
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ============================================================================ 
+   LAYOUT
+   ============================================================================ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height pour mobile */
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  height: 94vh;
+  position: relative; /* Pour le positionnement de la sidebar mobile */
+}
+
+.main-content {
+  flex: 1;
+  padding: 16x;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* Permet au contenu de rétrécir correctement */
+  margin-top: 10px;
+}
+
+.container {
+  flex: 1;
+  padding: 16px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ============================================================================ 
+   LAYOUT - RESPONSIVE MOBILE (Sidebar collapsible)
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .app-body {
+    /* La sidebar est en position fixed/overlay, donc le body prend 100% */
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 6vh); /* Ajuster si vous avez un header */
+    min-height: calc(100dvh - 6vh);
+  }
+
+  .main-content {
+    /* Contenu prend toute la largeur */
+    width: 100%;
+    /* Padding top pour le bouton hamburger */
+    padding-top: calc(
+      var(--sidebar-toggle-size) + var(--sidebar-toggle-margin) + 16px
+    );
+    padding-left: 12px;
+    padding-right: 12px;
+    /* Hauteur automatique */
+    min-height: calc(100vh - 6vh);
+    min-height: calc(100dvh - 6vh);
+  }
+
+  .container {
+    padding: 12px;
+  }
+}
+
+/* ============================================================================ 
+   LAYOUT - TRÈS PETIT ÉCRAN (scanners)
+   ============================================================================ */
+
+@media (max-width: 480px) {
+  :root {
+    --sidebar-toggle-size: 40px;
+    --sidebar-toggle-margin: 8px;
+  }
+
+  .main-content {
+    padding: 8px;
+    padding-top: calc(
+      var(--sidebar-toggle-size) + var(--sidebar-toggle-margin) + 12px
+    );
+  }
+
+  .container {
+    padding: 7px;
+  }
+
+  /* Réduire la taille de police sur très petit écran */
+  html {
+    font-size: 11px;
+  }
+}
+
+/* ============================================================================ 
+   UTILITIES
+   ============================================================================ */
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.text-warning {
+  color: var(--warning);
+}
+
+.text-danger {
+  color: var(--danger);
+}
+
+/* Classe utilitaire pour masquer sur mobile */
+.hide-mobile {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Classe utilitaire pour afficher uniquement sur mobile */
+.show-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .show-mobile {
+    display: block !important;
+  }
+}
+
+/* ============================================================================ 
+   SCROLLBAR (optionnel, style pro)
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ============================================================================ 
+   FORMULAIRES - Optimisation tactile mobile
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Taille minimum pour les éléments tactiles (44px recommandé par Apple) */
+  button,
+  .btn,
+  input[type="submit"],
+  input[type="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Inputs plus grands sur mobile pour éviter le zoom iOS */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px; /* Empêche le zoom auto sur iOS */
+    min-height: 44px;
+    padding: 12px;
+  }
+}
+
+/* ============================================================================ 
+   SAFE AREA (pour les téléphones avec encoche)
+   ============================================================================ */
+
+@supports (padding: max(0px)) {
+  .main-content {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

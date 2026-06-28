@@ -1,0 +1,659 @@
+/* ==========================================================================
+   Admin Meilleures Ventes Screen - Top Sales View
+   SCOPED STYLES - Variables CSS pour éviter les conflits
+   ========================================================================== */
+
+/* Page Container with scoped CSS variables */
+.admin-meilleures-ventes-page {
+  --amv-bg: #0a0a0f;
+  --amv-bg-secondary: #12121a;
+  --amv-bg-tertiary: #1a1a25;
+  --amv-bg-hover: #22222e;
+  --amv-border: #2a2a3a;
+  --amv-text: #f0f0f5;
+  --amv-text-secondary: #a0a0b0;
+  --amv-text-muted: #606070;
+  --amv-primary: #6366f1;
+  --amv-primary-light: #818cf8;
+  --amv-primary-dark: #4f46e5;
+  --amv-primary-glow: rgba(99, 102, 241, 0.3);
+  --amv-success: #10b981;
+  --amv-success-light: rgba(16, 185, 129, 0.15);
+  --amv-warning: #f59e0b;
+  --amv-warning-light: rgba(245, 158, 11, 0.15);
+  --amv-danger: #ef4444;
+  --amv-danger-light: rgba(239, 68, 68, 0.15);
+  --amv-info: #3b82f6;
+  --amv-info-light: rgba(59, 130, 246, 0.15);
+  --amv-encde: #8b5cf6;
+  --amv-encde-light: rgba(139, 92, 246, 0.15);
+  --amv-radius: 12px;
+  --amv-radius-sm: 8px;
+  --amv-radius-xs: 4px;
+  --amv-transition: all 0.2s ease;
+
+  min-height: 100vh;
+  background: var(--amv-bg);
+  color: var(--amv-text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== LOADING & EMPTY STATES ========== */
+.admin-meilleures-ventes-page .loading-state,
+.admin-meilleures-ventes-page .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 60vh;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.admin-meilleures-ventes-page .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--amv-border);
+  border-top-color: var(--amv-primary);
+  border-radius: 50%;
+  animation: amv-spin 0.8s linear infinite;
+}
+
+@keyframes amv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-meilleures-ventes-page .spinning {
+  animation: amv-spin 1s linear infinite;
+}
+
+.admin-meilleures-ventes-page .empty-icon {
+  font-size: 4rem;
+  color: var(--amv-primary);
+  opacity: 0.6;
+}
+
+.admin-meilleures-ventes-page .empty-state h2 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.admin-meilleures-ventes-page .empty-state p {
+  color: var(--amv-text-muted);
+}
+
+/* ========== HEADER ========== */
+.admin-meilleures-ventes-page .meilleures-ventes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: var(--amv-bg-secondary);
+  border-bottom: 1px solid var(--amv-border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-meilleures-ventes-page .header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-meilleures-ventes-page .btn-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--amv-bg-tertiary);
+  border: 1px solid var(--amv-border);
+  border-radius: var(--amv-radius-sm);
+  color: var(--amv-text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: var(--amv-transition);
+}
+
+.admin-meilleures-ventes-page .btn-back:hover {
+  background: var(--amv-primary);
+  border-color: var(--amv-primary);
+  color: white;
+}
+
+.admin-meilleures-ventes-page .header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-meilleures-ventes-page .header-title h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.admin-meilleures-ventes-page .title-icon {
+  color: var(--amv-primary);
+}
+
+.admin-meilleures-ventes-page .subtitle {
+  font-size: 0.8rem;
+  color: var(--amv-text-muted);
+  margin-left: 2rem;
+}
+
+.admin-meilleures-ventes-page .header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-meilleures-ventes-page .entreprise-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--amv-bg-tertiary);
+  border: 1px solid var(--amv-border);
+  border-radius: var(--amv-radius);
+  padding: 0.625rem 1rem;
+  min-width: 300px;
+}
+
+.admin-meilleures-ventes-page .entreprise-selector:focus-within {
+  border-color: var(--amv-primary);
+  box-shadow: 0 0 0 3px var(--amv-primary-glow);
+}
+
+.admin-meilleures-ventes-page .selector-icon {
+  font-size: 1.25rem;
+  color: var(--amv-primary);
+  margin-right: 0.75rem;
+}
+
+.admin-meilleures-ventes-page .entreprise-selector select {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--amv-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding-right: 2rem;
+  flex: 1;
+  cursor: pointer;
+}
+
+.admin-meilleures-ventes-page .entreprise-selector select:focus {
+  outline: none;
+}
+
+.admin-meilleures-ventes-page .selector-arrow {
+  position: absolute;
+  right: 1rem;
+  color: var(--amv-text-muted);
+  pointer-events: none;
+}
+
+.admin-meilleures-ventes-page .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-meilleures-ventes-page .btn-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--amv-bg-tertiary);
+  border: 1px solid var(--amv-border);
+  border-radius: var(--amv-radius-sm);
+  color: var(--amv-text-secondary);
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: var(--amv-transition);
+}
+
+.admin-meilleures-ventes-page .btn-action:hover {
+  background: var(--amv-primary);
+  border-color: var(--amv-primary);
+  color: white;
+}
+
+.admin-meilleures-ventes-page .btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-meilleures-ventes-page .btn-action svg.active {
+  color: var(--amv-primary);
+}
+
+/* ========== FILTERS PANEL ========== */
+.admin-meilleures-ventes-page .filters-panel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--amv-bg-tertiary);
+  border-bottom: 1px solid var(--amv-border);
+  animation: amv-slideDown 0.3s ease;
+}
+
+@keyframes amv-slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-meilleures-ventes-page .filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-meilleures-ventes-page .filter-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--amv-text-secondary);
+  white-space: nowrap;
+}
+
+.admin-meilleures-ventes-page .filter-group select {
+  padding: 0.5rem 0.75rem;
+  background: var(--amv-bg-secondary);
+  border: 1px solid var(--amv-border);
+  border-radius: var(--amv-radius-sm);
+  color: var(--amv-text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: var(--amv-transition);
+}
+
+.admin-meilleures-ventes-page .filter-group select:focus {
+  outline: none;
+  border-color: var(--amv-primary);
+  box-shadow: 0 0 0 3px var(--amv-primary-glow);
+}
+
+.admin-meilleures-ventes-page .btn-reset-filters {
+  margin-left: auto;
+  padding: 0.5rem 1rem;
+  background: var(--amv-danger-light);
+  border: 1px solid var(--amv-danger);
+  border-radius: var(--amv-radius-sm);
+  color: var(--amv-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--amv-transition);
+}
+
+.admin-meilleures-ventes-page .btn-reset-filters:hover {
+  background: var(--amv-danger);
+  color: white;
+}
+
+/* ========== CONTENT ========== */
+.admin-meilleures-ventes-page .meilleures-ventes-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+/* ========== STATS SUMMARY ========== */
+.admin-meilleures-ventes-page .stats-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-meilleures-ventes-page .stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--amv-bg-secondary);
+  border: 1px solid var(--amv-border);
+  border-radius: var(--amv-radius);
+  transition: var(--amv-transition);
+}
+
+.admin-meilleures-ventes-page .stat-card:hover {
+  border-color: var(--amv-primary);
+  transform: translateY(-2px);
+}
+
+.admin-meilleures-ventes-page .stat-icon {
+  font-size: 2.5rem;
+  color: var(--amv-primary);
+  opacity: 0.8;
+}
+
+.admin-meilleures-ventes-page .stat-icon.success {
+  color: var(--amv-success);
+}
+
+.admin-meilleures-ventes-page .stat-icon.warning {
+  color: var(--amv-warning);
+}
+
+.admin-meilleures-ventes-page .stat-icon.info {
+  color: var(--amv-info);
+}
+
+.admin-meilleures-ventes-page .stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-meilleures-ventes-page .stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--amv-text);
+}
+
+.admin-meilleures-ventes-page .stat-label {
+  font-size: 0.75rem;
+  color: var(--amv-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ========== TABLE ========== */
+.admin-meilleures-ventes-page .table-container {
+  background: var(--amv-bg-secondary);
+  border: 1px solid var(--amv-border);
+  border-radius: var(--amv-radius);
+  overflow: hidden;
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table thead {
+  background: var(--amv-bg-tertiary);
+  border-bottom: 2px solid var(--amv-border);
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table th {
+  padding: 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--amv-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table th svg {
+  margin-left: 0.375rem;
+  vertical-align: middle;
+  font-size: 0.875rem;
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table tbody tr {
+  border-bottom: 1px solid var(--amv-border);
+  transition: var(--amv-transition);
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table tbody tr.clickable-row {
+  cursor: pointer;
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table tbody tr:hover {
+  background: var(--amv-bg-hover);
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table tbody tr:active {
+  background: var(--amv-bg-tertiary);
+}
+
+.admin-meilleures-ventes-page .meilleures-ventes-table td {
+  padding: 1rem;
+}
+
+/* Column Styles */
+.admin-meilleures-ventes-page .col-rank {
+  width: 60px;
+  text-align: center;
+}
+
+.admin-meilleures-ventes-page .rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--amv-primary-light);
+  color: white;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.admin-meilleures-ventes-page .col-photo {
+  width: 80px;
+}
+
+.admin-meilleures-ventes-page .photo-cell {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--amv-radius-sm);
+  overflow: hidden;
+  background: var(--amv-bg-tertiary);
+}
+
+.admin-meilleures-ventes-page .photo-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-meilleures-ventes-page .no-photo-mini {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  background: var(--amv-bg-tertiary);
+  border-radius: var(--amv-radius-sm);
+  color: var(--amv-text-muted);
+  font-size: 1.5rem;
+}
+
+.admin-meilleures-ventes-page .col-nart {
+  width: 120px;
+}
+
+.admin-meilleures-ventes-page .col-nart code {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.875rem;
+  color: var(--amv-primary-light);
+  background: var(--amv-bg-tertiary);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--amv-radius-xs);
+}
+
+.admin-meilleures-ventes-page .col-designation {
+  min-width: 250px;
+  max-width: 400px;
+}
+
+.admin-meilleures-ventes-page .designation-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-meilleures-ventes-page .design-main {
+  font-weight: 600;
+  color: var(--amv-text);
+  line-height: 1.3;
+}
+
+.admin-meilleures-ventes-page .design-sub {
+  font-size: 0.8rem;
+  color: var(--amv-text-secondary);
+  line-height: 1.2;
+}
+
+.admin-meilleures-ventes-page .col-fournisseur {
+  min-width: 120px;
+  color: var(--amv-text-secondary);
+}
+
+.admin-meilleures-ventes-page .col-ventes,
+.admin-meilleures-ventes-page .col-ruptures,
+.admin-meilleures-ventes-page .col-stock,
+.admin-meilleures-ventes-page .col-encde {
+  text-align: center;
+  width: 100px;
+}
+
+.admin-meilleures-ventes-page .col-prix {
+  text-align: right;
+  width: 120px;
+  font-weight: 600;
+}
+
+.admin-meilleures-ventes-page .value-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.admin-meilleures-ventes-page .value-badge.success {
+  background: var(--amv-success-light);
+  color: var(--amv-success);
+}
+
+.admin-meilleures-ventes-page .value-badge.warning {
+  background: var(--amv-warning-light);
+  color: var(--amv-warning);
+}
+
+.admin-meilleures-ventes-page .value-badge.danger {
+  background: var(--amv-danger-light);
+  color: var(--amv-danger);
+}
+
+.admin-meilleures-ventes-page .value-badge.info {
+  background: var(--amv-info-light);
+  color: var(--amv-info);
+}
+
+.admin-meilleures-ventes-page .value-badge.encde {
+  background: var(--amv-encde-light);
+  color: var(--amv-encde);
+}
+
+.admin-meilleures-ventes-page .value-badge.ok {
+  background: var(--amv-success-light);
+  color: var(--amv-success);
+}
+
+.admin-meilleures-ventes-page .text-muted {
+  color: var(--amv-text-muted);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1200px) {
+  .admin-meilleures-ventes-page .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-meilleures-ventes-page .meilleures-ventes-header {
+    flex-direction: column;
+  }
+
+  .admin-meilleures-ventes-page .header-center {
+    width: 100%;
+  }
+
+  .admin-meilleures-ventes-page .entreprise-selector {
+    width: 100%;
+  }
+
+  .admin-meilleures-ventes-page .stats-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-meilleures-ventes-page .table-container {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-meilleures-ventes-page .meilleures-ventes-content {
+    padding: 1rem;
+  }
+
+  .admin-meilleures-ventes-page .filters-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-meilleures-ventes-page .btn-reset-filters {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .admin-meilleures-ventes-page .subtitle {
+    margin-left: 0;
+  }
+
+  .admin-meilleures-ventes-page .col-photo,
+  .admin-meilleures-ventes-page .col-fournisseur {
+    display: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .admin-meilleures-ventes-page {
+    background: white;
+    color: black;
+  }
+
+  .admin-meilleures-ventes-page .meilleures-ventes-header,
+  .admin-meilleures-ventes-page .filters-panel,
+  .admin-meilleures-ventes-page .btn-action,
+  .admin-meilleures-ventes-page .btn-back {
+    display: none;
+  }
+
+  .admin-meilleures-ventes-page .meilleures-ventes-content {
+    padding: 0;
+  }
+}

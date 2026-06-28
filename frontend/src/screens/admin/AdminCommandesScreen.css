@@ -1,0 +1,435 @@
+/* ==========================================================================
+   Admin Commandes Screen - Same design system as Articles
+   ========================================================================== */
+
+/* Page Container */
+.admin-commandes-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== HEADER ========== */
+.admin-commandes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.commandes-icon {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3) !important;
+}
+
+/* ========== MAIN CONTENT LAYOUT ========== */
+.admin-commandes-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ========== MAIN AREA ========== */
+.commandes-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ========== TABLE ========== */
+.commandes-table-container {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+}
+
+.commandes-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.commandes-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.commandes-table th {
+  padding: 0.875rem 1rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+  border-bottom: 2px solid #f59e0b;
+  white-space: nowrap;
+}
+
+.commandes-table th.text-right {
+  text-align: right;
+}
+
+.commandes-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: middle;
+}
+
+.commandes-table tbody tr {
+  transition: var(--admin-transition);
+}
+
+.commandes-table tbody tr:hover {
+  background: var(--admin-bg-hover);
+}
+
+/* Row variants by état */
+.commandes-table tbody tr.row-etat-info {
+  border-left: 3px solid var(--admin-info);
+}
+
+.commandes-table tbody tr.row-etat-warning {
+  border-left: 3px solid var(--admin-warning);
+}
+
+.commandes-table tbody tr.row-etat-success {
+  border-left: 3px solid var(--admin-success);
+}
+
+.commandes-table tbody tr.row-etat-closed {
+  border-left: 3px solid var(--admin-text-muted);
+  opacity: 0.7;
+}
+
+/* Link style for NUMCDE */
+.commande-numcde-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: "Monaco", "Consolas", monospace;
+  font-weight: 700;
+  color: #f59e0b;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  margin: -0.25rem -0.5rem;
+  border-radius: var(--admin-radius-xs);
+  transition: var(--admin-transition);
+}
+
+.commande-numcde-link:hover {
+  background: #f59e0b;
+  color: #000;
+}
+
+.commande-numcde-link .link-icon {
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: var(--admin-transition);
+}
+
+.commande-numcde-link:hover .link-icon {
+  opacity: 1;
+}
+
+/* Fourn badge */
+.fourn-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-xs);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text-secondary);
+}
+
+/* Date value */
+.date-value {
+  font-size: 0.85rem;
+  color: var(--admin-text-secondary);
+}
+
+/* Bateau */
+.bateau-value {
+  font-size: 0.85rem;
+  color: var(--admin-text-secondary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* Observation */
+.observ-text {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* État badge */
+.etat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.etat-badge.large {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
+.etat-muted {
+  background: rgba(100, 100, 120, 0.2);
+  color: var(--admin-text-muted);
+  border: 1px solid var(--admin-border);
+}
+
+.etat-info {
+  background: var(--admin-info-light);
+  color: var(--admin-info);
+  border: 1px solid var(--admin-info);
+}
+
+.etat-warning {
+  background: var(--admin-warning-light);
+  color: var(--admin-warning);
+  border: 1px solid var(--admin-warning);
+}
+
+.etat-success {
+  background: var(--admin-success-light);
+  color: var(--admin-success);
+  border: 1px solid var(--admin-success);
+}
+
+.etat-closed {
+  background: rgba(100, 100, 120, 0.15);
+  color: var(--admin-text-muted);
+  border: 1px solid var(--admin-border);
+}
+
+/* Lignes count */
+.lignes-value {
+  font-weight: 600;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text-secondary);
+}
+
+/* Total value */
+.total-value {
+  font-weight: 700;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text);
+}
+
+/* Badges commande */
+.badge-verrou {
+  background: var(--admin-danger);
+  color: white;
+}
+
+.badge-facture {
+  background: var(--admin-success);
+  color: white;
+}
+
+.badge-groupage {
+  background: var(--admin-info);
+  color: white;
+}
+
+/* Actions group */
+.actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.btn-detail {
+  background: transparent;
+  border: 1px solid #f59e0b !important;
+  color: #f59e0b !important;
+  text-decoration: none;
+}
+
+.btn-detail:hover {
+  background: #f59e0b !important;
+  color: #000 !important;
+}
+
+/* ========== MODAL ========== */
+.commande-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+  backdrop-filter: blur(8px);
+}
+
+.commande-modal {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  width: 100%;
+  max-width: 750px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--admin-shadow-lg);
+}
+
+.modal-numcde {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.85rem;
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.modal-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.modal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.modal-badge.verrou {
+  background: var(--admin-danger);
+  color: white;
+}
+
+.modal-badge.groupage {
+  background: var(--admin-info);
+  color: white;
+}
+
+/* Montants grid in modal */
+.montants-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.montant-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--admin-bg);
+  border-radius: var(--admin-radius-sm);
+  text-align: center;
+}
+
+.montant-item.main {
+  grid-column: span 3;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), transparent);
+  border: 1px solid #f59e0b;
+}
+
+.montant-item.main span:last-child {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.montant-item label {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.montant-item span:last-child {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1200px) {
+  .commandes-table .col-observ,
+  .commandes-table .col-arrivee {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-commandes-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .commandes-table .col-bateau,
+  .commandes-table .col-total,
+  .commandes-table .col-statuts {
+    display: none;
+  }
+
+  .montants-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .montant-item.main {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .commandes-table .col-lignes,
+  .commandes-table .col-etat {
+    display: none;
+  }
+
+  .pagination-bar {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .btn-page span {
+    display: none;
+  }
+}

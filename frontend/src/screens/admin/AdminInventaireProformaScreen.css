@@ -1,0 +1,607 @@
+/* src/screens/admin/AdminInventaireProformaScreen.css */
+.admin-invproforma {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.admin-invproforma-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-invproforma-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-invproforma-header h1 svg {
+  color: #8b5cf6;
+}
+
+.admin-invproforma-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.select-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.select-with-icon svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.select-with-icon select,
+.select-with-icon input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 220px;
+  cursor: pointer;
+}
+
+.select-with-icon input {
+  cursor: text;
+}
+
+.select-with-icon select:disabled,
+.select-with-icon input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.client-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #8b5cf6;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #7c4ef0;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-invproforma-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.admin-invproforma-placeholder svg {
+  font-size: 40px;
+  color: #8b5cf6;
+  opacity: 0.6;
+}
+
+.admin-loading {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.admin-invproforma-summary {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-invproforma-summary strong {
+  color: #8b5cf6;
+}
+
+/* Liste scrollable des groupes */
+.admin-invproforma-list {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.proforma-group {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.proforma-group-bar {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.proforma-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.btn-fiche {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 0 14px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: #8b5cf6;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-fiche:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.btn-fiche:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.proforma-group-header:hover {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.proforma-group-header svg {
+  color: #8b5cf6;
+  flex-shrink: 0;
+}
+
+.proforma-numfact {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Observation (proforma.TEXTE) affichée dans l'entête */
+.proforma-obs {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.proforma-nb {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.proforma-total-ecart {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.proforma-total-ecart + .proforma-nb {
+  margin-left: 14px;
+}
+
+.col-nl {
+  width: 70px;
+}
+
+.col-qte,
+.col-stock,
+.col-ecart {
+  width: 100px;
+  text-align: center;
+}
+
+.col-ecartval {
+  width: 130px;
+  text-align: center;
+}
+
+.num-cell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Écart compté − théorique */
+.ecart-pos {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.ecart-neg {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.ecart-zero {
+  color: var(--text-muted);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-table thead th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.admin-table tbody td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.col-nart {
+  width: 120px;
+}
+
+.mono {
+  font-family: "Courier New", monospace;
+  white-space: nowrap;
+}
+
+.desig-cell {
+  color: var(--text-primary);
+}
+
+/* Lignes commentaire (NART vide ou « ! ») */
+.row-comment td {
+  color: var(--text-muted);
+  font-style: italic;
+  background: rgba(139, 92, 246, 0.03);
+}
+
+@media (max-width: 720px) {
+  .select-with-icon select {
+    min-width: 0;
+  }
+}
+
+/* Barre de filtre de date */
+.invproforma-datebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.invproforma-datebar > svg {
+  color: var(--text-muted);
+}
+
+.invproforma-datebar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.invproforma-datebar input[type="date"] {
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.invproforma-datebar input[type="date"]:disabled {
+  opacity: 0.5;
+}
+
+.btn-clear-date {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-clear-date:hover:not(:disabled) {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.btn-clear-date:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Barre du document d'inventaire (regroupement + seuil + impression) */
+.invproforma-docbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.invproforma-docbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.invproforma-docbar select,
+.invproforma-docbar input[type="number"] {
+  padding: 7px 9px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.invproforma-docbar input[type="number"] {
+  width: 140px;
+}
+
+.invproforma-docbar .btn-primary {
+  white-space: nowrap;
+}
+
+/* Bouton export Excel */
+.btn-excel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #1d6f42;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-excel:hover:not(:disabled) {
+  background: #19613a;
+}
+
+.btn-excel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Badge "bipé sur N proformas" (détail au survol) */
+.bip-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: help;
+  white-space: nowrap;
+}
+
+/* Case à cocher d'inclusion de proforma */
+.proforma-check {
+  flex-shrink: 0;
+  margin-left: 12px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+.proforma-group.excluded {
+  opacity: 0.5;
+}
+
+.proforma-group.excluded .proforma-numfact {
+  text-decoration: line-through;
+}
+
+/* Compteurs d'anomalies par proforma (XX / D) */
+.proforma-flags {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.proforma-flags + .proforma-nb {
+  margin-left: 14px;
+}
+
+.flag-xx,
+.flag-d {
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.flag-xx {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.flag-d {
+  background: rgba(245, 158, 11, 0.18);
+  color: #d97706;
+}
+
+/* Total des écarts à côté des boutons */
+.docbar-total {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.docbar-total strong {
+  font-size: 14px;
+}
+
+/* Colonne ATT + surlignage des lignes XX / D dans le tableau */
+.col-att-screen {
+  width: 56px;
+  text-align: center;
+}
+
+.att-cell {
+  text-align: center;
+  font-weight: 700;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.att-xx {
+  color: #ef4444;
+}
+
+.att-d {
+  color: #d97706;
+}
+
+.admin-table tr.row-xx td {
+  background: rgba(239, 68, 68, 0.22) !important;
+}
+
+.admin-table tr.row-xx td:first-child {
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.admin-table tr.row-d td {
+  background: rgba(245, 158, 11, 0.22) !important;
+}
+
+.admin-table tr.row-d td:first-child {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+.admin-table tr.row-xx:hover td,
+.admin-table tr.row-d:hover td {
+  filter: brightness(1.15);
+}

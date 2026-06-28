@@ -1,0 +1,1103 @@
+/* ==========================================================================
+   Admin Proforma Detail Screen
+   Accent color: teal/cyan (#14b8a6)
+   ========================================================================== */
+
+.proforma-detail-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Loading / Error */
+.proforma-detail-page .detail-loading,
+.proforma-detail-page .detail-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+  color: var(--admin-text-muted);
+}
+
+.proforma-detail-page .detail-error {
+  color: var(--admin-danger);
+}
+
+.proforma-detail-page .detail-error h2 {
+  margin: 0;
+  color: var(--admin-text);
+}
+
+.proforma-detail-page .error-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.proforma-detail-page .btn-retry,
+.proforma-detail-page .btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .btn-retry {
+  background: var(--admin-primary);
+  border: none;
+  color: white;
+}
+
+.proforma-detail-page .btn-retry:hover {
+  background: var(--admin-primary-dark);
+}
+
+.proforma-detail-page .btn-back {
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-secondary);
+}
+
+.proforma-detail-page .btn-back:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+
+/* ========== TOP BAR ========== */
+.proforma-detail-page .detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.proforma-detail-page .btn-back-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .btn-back-list:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+  border-color: var(--admin-border-light);
+}
+
+.proforma-detail-page .topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.proforma-detail-page .nav-current {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  font-family: "Monaco", "Consolas", monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #14b8a6;
+}
+
+.proforma-detail-page .nav-current svg {
+  font-size: 1.1rem;
+}
+
+.proforma-detail-page .topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.proforma-detail-page .query-time {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+  font-family: "Monaco", "Consolas", monospace;
+}
+
+/* ========== EXPORT BUTTONS ========== */
+.btn-export-excel,
+.btn-export-dat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+
+.btn-export-excel {
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  border: 1px solid #14b8a6;
+  color: #fff;
+}
+
+.btn-export-excel:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-export-dat {
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+  border: 1px solid #8b5cf6;
+  color: #fff;
+}
+
+.btn-export-dat:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6d28d9, #7c3aed);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-export-excel:disabled,
+.btn-export-dat:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-export-excel svg,
+.btn-export-dat svg {
+  font-size: 1rem;
+}
+
+/* ========== DAT PANEL ========== */
+.dat-panel {
+  background: var(--admin-bg-secondary);
+  border-bottom: 2px solid #8b5cf6;
+  padding: 0;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { max-height: 0; opacity: 0; }
+  to { max-height: 200px; opacity: 1; }
+}
+
+.dat-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1.5rem;
+  background: rgba(139, 92, 246, 0.1);
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.btn-close-dat {
+  background: transparent;
+  border: none;
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: var(--admin-transition);
+}
+
+.btn-close-dat:hover {
+  color: var(--admin-danger);
+}
+
+.dat-panel-body {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.dat-filename-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 280px;
+}
+
+.dat-filename-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+}
+
+.dat-filename-group input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text);
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.85rem;
+  outline: none;
+  transition: var(--admin-transition);
+}
+
+.dat-filename-group input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.btn-dat-reset-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.btn-dat-reset-name:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+
+.dat-panel-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-dat-download,
+.btn-dat-server {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+
+.btn-dat-download {
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+  border: 1px solid #8b5cf6;
+  color: #fff;
+}
+
+.btn-dat-download:hover:not(:disabled) {
+  background: linear-gradient(135deg, #6d28d9, #7c3aed);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-dat-server {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  border: 1px solid #f59e0b;
+  color: #000;
+}
+
+.btn-dat-server:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b45309, #d97706);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-dat-download:disabled,
+.btn-dat-server:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-dat-download svg,
+.btn-dat-server svg {
+  font-size: 1rem;
+}
+
+/* ========== DAT MESSAGE BANNER ========== */
+.dat-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dat-message-success {
+  background: rgba(16, 185, 129, 0.15);
+  border-bottom: 2px solid var(--admin-success);
+  color: var(--admin-success);
+}
+
+.dat-message-error {
+  background: rgba(239, 68, 68, 0.15);
+  border-bottom: 2px solid var(--admin-danger);
+  color: var(--admin-danger);
+}
+
+.dat-message .dat-path {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.dat-message button {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.7;
+  transition: var(--admin-transition);
+}
+
+.dat-message button:hover {
+  opacity: 1;
+}
+
+/* ========== REFRESH BUTTON ========== */
+.proforma-detail-page .btn-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .btn-refresh:hover {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #000;
+}
+
+/* ========== CONTENT ========== */
+.proforma-detail-page .detail-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ========== HEADER CARD ========== */
+.proforma-detail-page .detail-header-card {
+  background: rgb(48, 47, 48);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1.5rem;
+  border-top: 3px solid #14b8a6;
+}
+
+.proforma-detail-page .header-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.proforma-detail-page .header-card-title {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.numfact-display {
+  display: flex;
+  flex-direction: column;
+}
+
+.numfact-label {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.numfact-value {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #14b8a6;
+  line-height: 1;
+}
+
+/* Info Grid */
+.proforma-detail-page .header-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.proforma-detail-page .info-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem;
+  background: var(--admin-bg-tertiary);
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+}
+
+.proforma-detail-page .info-card-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--admin-bg);
+  border-radius: var(--admin-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  color: #14b8a6;
+  flex-shrink: 0;
+}
+
+.proforma-detail-page .info-card-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.proforma-detail-page .info-card-content label {
+  font-size: 0.65rem;
+  color: #0d6b61;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 800;
+}
+
+.proforma-detail-page .info-card-content span {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Observations */
+.proforma-detail-page .header-observ {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: rgba(20, 184, 166, 0.1);
+  border: 1px solid #14b8a6;
+  border-radius: var(--admin-radius-sm);
+}
+
+.proforma-detail-page .observ-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #14b8a6;
+  text-transform: uppercase;
+}
+
+.proforma-detail-page .header-observ p {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--admin-text);
+  line-height: 1.5;
+}
+
+/* ========== MONTANTS CARDS ========== */
+.proforma-detail-page .montants-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.875rem;
+}
+
+.proforma-detail-page .montant-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.25rem 1rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  text-align: center;
+}
+
+.proforma-detail-page .montant-card.main {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.15), var(--admin-bg-secondary));
+  border-color: #14b8a6;
+}
+
+.proforma-detail-page .montant-card.calculated {
+  background: linear-gradient(135deg, var(--admin-info-light), var(--admin-bg-secondary));
+  border-color: var(--admin-info);
+}
+
+.proforma-detail-page .montant-label {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.proforma-detail-page .montant-card .montant-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  font-family: "Monaco", "Consolas", monospace;
+}
+
+.proforma-detail-page .montant-card.main .montant-value {
+  color: #14b8a6;
+  font-size: 1.5rem;
+}
+
+.proforma-detail-page .montant-card.calculated .montant-value {
+  color: var(--admin-info);
+}
+
+/* ========== MAILING CARD ========== */
+.mailing-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1.25rem;
+}
+
+.mailing-card h3 {
+  margin: 0 0 0.875rem;
+  font-size: 0.95rem;
+  color: var(--admin-text);
+}
+
+.proforma-detail-page .mailing-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.proforma-detail-page .mailing-line {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--admin-text-secondary);
+  padding: 0.375rem 0.75rem;
+  background: var(--admin-bg-tertiary);
+  border-radius: var(--admin-radius-xs);
+  line-height: 1.4;
+}
+
+/* ========== DETAIL LINES SECTION ========== */
+.proforma-detail-page .detail-lines-section {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  overflow: hidden;
+}
+
+.proforma-detail-page .lines-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-tertiary);
+  border-bottom: 1px solid var(--admin-border);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.proforma-detail-page .lines-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--admin-text);
+}
+
+.proforma-detail-page .lines-header h2 svg {
+  color: #14b8a6;
+  font-size: 1.25rem;
+}
+
+.proforma-detail-page .lines-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  background: var(--admin-bg);
+  padding: 0.2rem 0.625rem;
+  border-radius: 50px;
+}
+
+.proforma-detail-page .lines-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.proforma-detail-page .lines-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .lines-search:focus-within {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
+}
+
+.proforma-detail-page .lines-search svg {
+  color: var(--admin-text-muted);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.proforma-detail-page .lines-search input {
+  background: transparent;
+  border: none;
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  min-width: 200px;
+  outline: none;
+}
+
+.proforma-detail-page .lines-search input::placeholder {
+  color: var(--admin-text-muted);
+}
+
+.proforma-detail-page .btn-clear-search {
+  background: transparent;
+  border: none;
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  font-size: 0.875rem;
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .btn-clear-search:hover {
+  color: var(--admin-danger);
+}
+
+.lines-filter-type {
+  padding: 0.5rem 0.875rem;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.lines-filter-type:focus {
+  outline: none;
+  border-color: #14b8a6;
+}
+
+/* Lines Summary */
+.proforma-detail-page .lines-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: var(--admin-bg-tertiary);
+  border-bottom: 1px solid var(--admin-border);
+  flex-wrap: wrap;
+}
+
+.proforma-detail-page .summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--admin-bg);
+  border-radius: var(--admin-radius-xs);
+  min-width: 100px;
+}
+
+.proforma-detail-page .summary-item label {
+  font-size: 0.6rem;
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
+.proforma-detail-page .summary-item span {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text);
+}
+
+.proforma-detail-page .summary-item span.highlight {
+  color: #14b8a6;
+}
+
+/* Lines Table */
+.proforma-detail-page .lines-table-container {
+  overflow-x: auto;
+}
+
+.proforma-detail-page .lines-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.825rem;
+}
+
+.proforma-detail-page .lines-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.proforma-detail-page .lines-table th {
+  padding: 0.75rem 0.875rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  font-weight: 600;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: left;
+  border-bottom: 2px solid #14b8a6;
+  white-space: nowrap;
+}
+
+.proforma-detail-page .lines-table th.text-right {
+  text-align: right;
+}
+
+.proforma-detail-page .lines-table td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: middle;
+}
+
+.proforma-detail-page .lines-table tbody tr {
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .lines-table tbody tr:hover {
+  background: var(--admin-bg-hover);
+}
+
+.proforma-detail-page .lines-table tbody tr.row-comment {
+  background: rgba(100, 100, 120, 0.08);
+}
+
+.proforma-detail-page .lines-table tbody tr.row-comment:hover {
+  background: rgba(100, 100, 120, 0.15);
+}
+
+/* Type badge */
+.type-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+}
+
+.type-badge.article {
+  background: #14b8a6;
+  color: #000;
+}
+
+.type-badge.comment {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  border: 1px solid var(--admin-border);
+}
+
+.nart-comment {
+  color: var(--admin-text-muted);
+  font-size: 0.8rem;
+}
+
+.comment-text {
+  font-style: italic;
+  color: var(--admin-text-muted) !important;
+  max-width: none !important;
+}
+
+/* Cell styles */
+.proforma-detail-page .nl-value {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+
+.proforma-detail-page .nart-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: "Monaco", "Consolas", monospace;
+  font-weight: 700;
+  color: var(--admin-primary-light);
+  font-size: 0.8rem;
+  text-decoration: none;
+  padding: 0.2rem 0.375rem;
+  margin: -0.2rem -0.375rem;
+  border-radius: var(--admin-radius-xs);
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .nart-link:hover {
+  background: var(--admin-primary);
+  color: white;
+}
+
+.proforma-detail-page .nart-link .link-icon {
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .nart-link:hover .link-icon {
+  opacity: 1;
+}
+
+.proforma-detail-page .design-text {
+  color: var(--admin-text);
+  font-size: 0.825rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.proforma-detail-page .qte-value {
+  font-weight: 600;
+  font-family: "Monaco", "Consolas", monospace;
+  color: var(--admin-text);
+}
+
+.remise-value {
+  font-weight: 600;
+  color: var(--admin-warning);
+  font-size: 0.8rem;
+}
+
+.proforma-detail-page .montant-cell {
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+.numserie-text {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+  font-family: "Monaco", "Consolas", monospace;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.proforma-detail-page .btn-view-article {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-xs);
+  color: var(--admin-text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: var(--admin-transition);
+}
+
+.proforma-detail-page .btn-view-article:hover {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #000;
+}
+
+/* État badges */
+.proforma-detail-page .etat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.proforma-detail-page .etat-badge.large {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+}
+
+.proforma-detail-page .etat-muted {
+  background: rgba(100, 100, 120, 0.2);
+  color: var(--admin-text-muted);
+  border: 1px solid var(--admin-border);
+}
+
+.proforma-detail-page .etat-info {
+  background: var(--admin-info-light);
+  color: var(--admin-info);
+  border: 1px solid var(--admin-info);
+}
+
+.proforma-detail-page .etat-success {
+  background: var(--admin-success-light);
+  color: var(--admin-success);
+  border: 1px solid var(--admin-success);
+}
+
+/* Table empty */
+.proforma-detail-page .table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+
+.proforma-detail-page .table-empty svg {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.5;
+}
+
+.proforma-detail-page .table-empty h3 {
+  margin: 0 0 0.5rem;
+  color: var(--admin-text);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1200px) {
+  .proforma-detail-page .header-info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .proforma-detail-page .lines-table .col-numserie,
+  .proforma-detail-page .lines-table .col-dtva,
+  .proforma-detail-page .lines-table .col-pourc {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .proforma-detail-page .detail-content {
+    padding: 1rem;
+  }
+  .proforma-detail-page .detail-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .proforma-detail-page .topbar-nav {
+    justify-content: center;
+  }
+  .proforma-detail-page .topbar-meta {
+    justify-content: center;
+  }
+  .proforma-detail-page .header-info-grid {
+    grid-template-columns: 1fr;
+  }
+  .proforma-detail-page .montants-cards {
+    grid-template-columns: 1fr;
+  }
+  .proforma-detail-page .lines-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .proforma-detail-page .lines-controls {
+    flex-direction: column;
+  }
+  .proforma-detail-page .lines-search input {
+    min-width: auto;
+    width: 100%;
+  }
+  .proforma-detail-page .lines-table .col-pvttc,
+  .proforma-detail-page .lines-table .col-pvte {
+    display: none;
+  }
+  .btn-export-excel span,
+  .btn-export-dat span {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .numfact-value {
+    font-size: 1.5rem;
+  }
+  .proforma-detail-page .lines-table .col-nl,
+  .proforma-detail-page .lines-table .col-type,
+  .proforma-detail-page .lines-table .col-actions {
+    display: none;
+  }
+  .proforma-detail-page .lines-summary {
+    gap: 0.375rem;
+  }
+  .proforma-detail-page .summary-item {
+    min-width: 80px;
+    padding: 0.375rem 0.625rem;
+  }
+}
