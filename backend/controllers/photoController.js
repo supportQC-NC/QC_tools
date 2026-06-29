@@ -10,13 +10,42 @@ import Entreprise from "../models/EntrepriseModel.js";
 const SUPPORTED_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "bmp"];
 
 /**
- * Récupère le chemin photos depuis la BDD pour une entreprise
+ * Mapping prod : trigramme -> sous-dossier photos local (sous PHOTOS_BASE_PATH).
+ * En prod, les photos sont synchronisées localement sur le VPS :
+ *   \\192.168.0.250\Rcommun\STOCK\photos    -> <PHOTOS_BASE_PATH>/photos    (QC)
+ *   \\192.168.0.250\Rcommun\STOCK\photo_LD  -> <PHOTOS_BASE_PATH>/photo_LD  (LD)
+ * Ajouter ici toute nouvelle entité disposant de photos.
+ */
+const PHOTOS_DOSSIER_PAR_TRIGRAMME = {
+  QC: "photos",
+  LD: "photo_LD",
+};
+
+/**
+ * Récupère le chemin photos pour une entreprise.
+ * - En prod (PHOTOS_BASE_PATH défini) : <PHOTOS_BASE_PATH>/<dossier> selon le
+ *   trigramme (mapping ci-dessus). Indépendant de la valeur en base.
+ * - En dev (PHOTOS_BASE_PATH non défini) : valeur cheminPhotos stockée en base.
  * @param {string} trigramme - Trigramme de l'entreprise
  * @returns {Promise<string|null>} - Chemin photos ou null
  */
 const getPhotoPathForEntreprise = async (trigramme) => {
+  const trig = String(trigramme || "").toUpperCase();
+
+  // Prod : chemin local piloté par PHOTOS_BASE_PATH + mapping par trigramme
+  const photosBase = process.env.PHOTOS_BASE_PATH;
+  if (photosBase) {
+    const dossier = PHOTOS_DOSSIER_PAR_TRIGRAMME[trig];
+    if (!dossier) {
+      // Pas de photos configurées pour cette entité
+      return null;
+    }
+    return path.join(photosBase, dossier);
+  }
+
+  // Dev : on lit la valeur stockée en base (comportement d'origine)
   const entreprise = await Entreprise.findOne({
-    trigramme: trigramme.toUpperCase(),
+    trigramme: trig,
     isActive: true,
   });
 
