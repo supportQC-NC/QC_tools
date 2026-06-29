@@ -40,11 +40,13 @@ const nomFichierZone = (zoneCode) =>
 
 /**
  * Détermine le dossier de dépôt du .DAT :
- *  - en prod (RCOMMON_COLLECT_PATH défini), le montage prime : on ignore le
- *    dossierDat de session s'il est en chemin Windows (\\...), car les "\"
- *    cassent l'écriture sous Linux. Dépôt dans "<parent>/inventaire_<annee>".
+ *  - en prod (RCOMMON_STOCK_ROOT défini) : on dépose dans le dossier d'export
+ *    PROPRE À L'ENTREPRISE (cheminExportInventaire, déjà traduit par le getter
+ *    du modèle vers le montage Linux : collect_sec, collect_sec_aw, ...). On
+ *    ignore alors un dossierDat de session stocké en chemin Windows (\\...),
+ *    car les "\" cassent l'écriture sous Linux.
  *  - en dev (env non défini) : si une session est active → son dossierDat,
- *    sinon repli sur "<parent de cheminExportInventaire>/inventaire_<annee>".
+ *    sinon repli sur le cheminExportInventaire de l'entreprise.
  * Crée le dossier si nécessaire.
  */
 const resoudreDossierDepot = async (entreprise) => {
@@ -53,11 +55,11 @@ const resoudreDossierDepot = async (entreprise) => {
     statut: "actif",
   });
 
-  const collectEnv = process.env.RCOMMON_COLLECT_PATH;
+  const enProd = !!process.env.RCOMMON_STOCK_ROOT;
 
   // En dev uniquement : le dossier de session (chemin Windows) reste prioritaire.
   if (
-    !collectEnv &&
+    !enProd &&
     session &&
     session.dossierDat &&
     session.dossierDat.trim()
@@ -69,17 +71,11 @@ const resoudreDossierDepot = async (entreprise) => {
     };
   }
 
-  // Repli : dossier "inventaire_<annee>" au même niveau que l'export réappro.
-  // En prod, base = RCOMMON_COLLECT_PATH (le montage), donc le dépôt est
-  // "<parent>/inventaire_<annee>" sous /mnt/rcommun/STOCK.
-  const base =
-    collectEnv ||
-    entreprise.cheminExportInventaire ||
-    "/mnt/rcommun/STOCK/collect_sec";
-  const annee = new Date().getFullYear();
-  const dossier = path.join(path.dirname(base), `inventaire_${annee}`);
+  // Réappro ET inventaire déposent dans le MÊME dossier collect_xxx de l'entité.
+  const dossier =
+    entreprise.cheminExportInventaire || "/mnt/rcommun/STOCK/collect_sec";
 
-  return { dossier, mode: "annee", session: session || null };
+  return { dossier, mode: enProd ? "entite" : "annee", session: session || null };
 };
 
 /**

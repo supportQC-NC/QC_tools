@@ -460,13 +460,14 @@ const exportReappro = asyncHandler(async (req, res) => {
   const nomFichier = `stock.dat reappro ${nomReappro.trim().replace(/[^a-zA-Z0-9_\- ]/g, "_")}`;
 
   // Chemin de destination :
-  // En prod, le montage prime : RCOMMON_COLLECT_PATH écrase tout chemin Windows
-  // envoyé par le front (cheminDestination) ou stocké en base. En dev (env non
-  // défini), on garde le comportement d'origine (cheminDestination Windows).
+  // On utilise le chemin d'export PROPRE À L'ENTREPRISE. En prod, le getter du
+  // modèle l'a déjà traduit vers le montage Linux en gardant son dossier
+  // collect_xxx (collect_sec, collect_sec_aw, collect_AVB, ...). On le met en
+  // premier pour qu'en prod le chemin Windows envoyé par le front
+  // (cheminDestination) ne soit jamais utilisé.
   let cheminExport =
-    process.env.RCOMMON_COLLECT_PATH ||
-    cheminDestination?.trim() ||
     reappro.entreprise.cheminExportInventaire ||
+    cheminDestination?.trim() ||
     "/mnt/rcommun/STOCK/collect_sec";
 
   // Vérifier et créer le dossier
