@@ -1,11 +1,10 @@
 // backend/server.js
+import "./loadEnv.js"; // ⬅️ DOIT rester la toute première ligne (charge dotenv avant tout)
 import path from "path";
 import express from "express";
-import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import fs from "fs";
-dotenv.config();
 
 import connectDB from "./config/db.js";
 
@@ -134,7 +133,7 @@ app.use("/api/clients", clientRoutes);
 // FRONTEND (production) — servi par Express pour une SEULE origine
 // (indispensable derrière le tunnel : cookie JWT sameSite=strict OK,
 //  pas de CORS, BASE_URL="" côté front fonctionne tel quel).
-// Définir FRONTEND_BUILD_PATH = chemin absolu du build CRA sur l'Ubuntu.
+// Définir FRONTEND_BUILD_PATH = chemin absolu du build CRA.
 // ==========================================
 if (process.env.NODE_ENV === "production") {
   const buildPath =
