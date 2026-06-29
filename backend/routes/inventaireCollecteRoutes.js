@@ -10,6 +10,7 @@ import {
   updateLigneCollecte,
   deleteLigneCollecte,
   exportCollecte,
+  getRecapZones,
   deleteCollecte,
 } from "../controllers/inventaireCollecteController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -19,6 +20,8 @@ const router = express.Router();
 // Routes littérales d'abord, puis routes paramétrées
 router.route("/resoudre-zone").post(protect, resoudreZone);
 router.route("/en-cours/:entrepriseId").get(protect, getCollectesEnCours);
+// Récap de la session active, regroupé par zone (avec écarts)
+router.route("/recap-zones/:entrepriseId").get(protect, getRecapZones);
 router.route("/").post(protect, createCollecte);
 
 router.route("/:id").get(protect, getCollecteById).delete(protect, deleteCollecte);

@@ -609,6 +609,174 @@ const exportCollecte = asyncHandler(async (req, res) => {
 });
 
 // ===========================================
+// RÉCAP PAR ZONE (session active) + ÉCARTS
+// ===========================================
+/**
+ * @desc    Récapitulatif de la session d'inventaire ACTIVE, regroupé par zone.
+ *          Pour chaque article bipé : écart = quantité bipée − stock théorique
+ *          (stock théorique = S1+S2+S3+S4+S5 lu dans le DBF via le cache).
+ *          Un même article bipé dans plusieurs zones est compté par zone.
+ * @route   GET /api/inventaires-collecte/recap-zones/:entrepriseId
+ * @access  Private/Admin
+ */
+const getRecapZones = asyncHandler(async (req, res) => {
+  const { entrepriseId } = req.params;
+
+  const entreprise = await Entreprise.findById(entrepriseId);
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  // Session d'inventaire active (peut ne pas exister : on renvoie alors une
+  // structure vide mais valide).
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
+  // Collectes de la session active. Si aucune session, on prend les collectes
+  // non rattachées à une session archivée (sécurité : on borne par session si
+  // elle existe).
+  const filtreCollecte = { entreprise: entreprise._id };
+  if (session) {
+    filtreCollecte.session = session._id;
+  } else {
+    filtreCollecte.session = null;
+  }
+
+  const collectes = await InventaireCollecte.find(filtreCollecte).sort({
+    zoneCode: 1,
+    updatedAt: 1,
+  });
+
+  // Pré-charge le cache article (lecture O(1) ensuite). Tolérant aux erreurs.
+  try {
+    await articleCacheService.preload(entreprise);
+  } catch (e) {
+    // on continue : findByNart rechargera au besoin
+  }
+
+  // Stock théorique d'un article (S1..S5) via NART puis repli GENCOD.
+  const getStockTheorique = async (nart, gencod) => {
+    let record = null;
+    if (nart && String(nart).trim()) {
+      record = await articleCacheService.findByNart(
+        entreprise,
+        String(nart).trim(),
+      );
+    }
+    if (!record && gencod && String(gencod).trim()) {
+      record = await articleCacheService.findByCode(
+        entreprise,
+        String(gencod).trim(),
+      );
+    }
+    if (!record) return { stock: 0, trouve: false };
+    return { stock: articleCacheService.calculateStockTotal(record), trouve: true };
+  };
+
+  // Regroupement par zone
+  const zonesMap = new Map();
+
+  for (const collecte of collectes) {
+    const code = collecte.zoneCode || "(sans zone)";
+    if (!zonesMap.has(code)) {
+      zonesMap.set(code, {
+        zoneCode: code,
+        zoneLibelle: collecte.zoneLibelle || "",
+        zoneType: collecte.zoneType || "",
+        lignes: [],
+      });
+    }
+    const zoneEntry = zonesMap.get(code);
+
+    for (const ligne of collecte.lignes) {
+      const { stock, trouve } = await getStockTheorique(
+        ligne.nart,
+        ligne.gencod,
+      );
+      const qteBipee = parseFloat(ligne.quantite) || 0;
+      const ecart = qteBipee - stock;
+
+      // Cumul si le même article (nart) revient dans la même zone
+      const existante = zoneEntry.lignes.find(
+        (l) => l.nart === ligne.nart && l.gencod === (ligne.gencod || ""),
+      );
+      if (existante) {
+        existante.qteBipee += qteBipee;
+        existante.ecart = existante.qteBipee - existante.stockTheorique;
+      } else {
+        zoneEntry.lignes.push({
+          nart: ligne.nart,
+          gencod: ligne.gencod || "",
+          designation: ligne.designation || "",
+          qteBipee,
+          stockTheorique: stock,
+          ecart,
+          articleTrouve: trouve,
+          isRenvoi: !!ligne.isRenvoi,
+          isUnknown: !!ligne.isUnknown,
+        });
+      }
+    }
+  }
+
+  // Mise en forme + totaux par zone
+  const zones = Array.from(zonesMap.values()).map((z) => {
+    const totalQteBipee = z.lignes.reduce((s, l) => s + l.qteBipee, 0);
+    const totalStockTheorique = z.lignes.reduce(
+      (s, l) => s + l.stockTheorique,
+      0,
+    );
+    const totalEcart = z.lignes.reduce((s, l) => s + l.ecart, 0);
+    const nbEcarts = z.lignes.filter((l) => l.ecart !== 0).length;
+    return {
+      ...z,
+      totalArticles: z.lignes.length,
+      totalQteBipee,
+      totalStockTheorique,
+      totalEcart,
+      nbEcarts,
+    };
+  });
+
+  // Totaux globaux
+  const totaux = zones.reduce(
+    (acc, z) => {
+      acc.totalArticles += z.totalArticles;
+      acc.totalQteBipee += z.totalQteBipee;
+      acc.totalStockTheorique += z.totalStockTheorique;
+      acc.totalEcart += z.totalEcart;
+      acc.nbEcarts += z.nbEcarts;
+      return acc;
+    },
+    {
+      totalZones: zones.length,
+      totalArticles: 0,
+      totalQteBipee: 0,
+      totalStockTheorique: 0,
+      totalEcart: 0,
+      nbEcarts: 0,
+    },
+  );
+
+  res.json({
+    entreprise: {
+      _id: entreprise._id,
+      trigramme: entreprise.trigramme,
+      nomComplet: entreprise.nomComplet,
+      nomDossierDBF: entreprise.nomDossierDBF,
+    },
+    session: session
+      ? { _id: session._id, nom: session.nom, statut: session.statut }
+      : null,
+    zones,
+    totaux,
+  });
+});
+
+// ===========================================
 // ANNULER UNE COLLECTE
 // ===========================================
 /**
@@ -641,5 +809,6 @@ export {
   updateLigneCollecte,
   deleteLigneCollecte,
   exportCollecte,
+  getRecapZones,
   deleteCollecte,
 };
