@@ -40,8 +40,11 @@ const nomFichierZone = (zoneCode) =>
 
 /**
  * Détermine le dossier de dépôt du .DAT :
- *  - si une session d'inventaire est active → son dossier (impression auto des fiches)
- *  - sinon → repli sur "<parent de cheminExportInventaire>\inventaire_<annee>\"
+ *  - en prod (RCOMMON_COLLECT_PATH défini), le montage prime : on ignore le
+ *    dossierDat de session s'il est en chemin Windows (\\...), car les "\"
+ *    cassent l'écriture sous Linux. Dépôt dans "<parent>/inventaire_<annee>".
+ *  - en dev (env non défini) : si une session est active → son dossierDat,
+ *    sinon repli sur "<parent de cheminExportInventaire>/inventaire_<annee>".
  * Crée le dossier si nécessaire.
  */
 const resoudreDossierDepot = async (entreprise) => {
@@ -50,7 +53,15 @@ const resoudreDossierDepot = async (entreprise) => {
     statut: "actif",
   });
 
-  if (session && session.dossierDat && session.dossierDat.trim()) {
+  const collectEnv = process.env.RCOMMON_COLLECT_PATH;
+
+  // En dev uniquement : le dossier de session (chemin Windows) reste prioritaire.
+  if (
+    !collectEnv &&
+    session &&
+    session.dossierDat &&
+    session.dossierDat.trim()
+  ) {
     return {
       dossier: session.dossierDat.trim(),
       mode: "session",
@@ -58,14 +69,17 @@ const resoudreDossierDepot = async (entreprise) => {
     };
   }
 
-  // Repli : dossier "inventaire_<annee>" au même niveau que l'export réappro
+  // Repli : dossier "inventaire_<annee>" au même niveau que l'export réappro.
+  // En prod, base = RCOMMON_COLLECT_PATH (le montage), donc le dépôt est
+  // "<parent>/inventaire_<annee>" sous /mnt/rcommun/STOCK.
   const base =
+    collectEnv ||
     entreprise.cheminExportInventaire ||
-    "\\\\192.168.0.250\\Rcommun\\STOCK\\collect_sec";
+    "/mnt/rcommun/STOCK/collect_sec";
   const annee = new Date().getFullYear();
   const dossier = path.join(path.dirname(base), `inventaire_${annee}`);
 
-  return { dossier, mode: "annee", session: null };
+  return { dossier, mode: "annee", session: session || null };
 };
 
 /**
@@ -547,7 +561,7 @@ const exportCollecte = asyncHandler(async (req, res) => {
   const contenu = genererContenuFichier(collecte.lignes);
   const nomFichier = nomFichierZone(collecte.zoneCode);
 
-  // Dossier de dépôt (session active prioritaire, sinon inventaire_<annee>)
+  // Dossier de dépôt (en prod : montage ; en dev : session active sinon repli)
   const { dossier, mode, session } = await resoudreDossierDepot(
     collecte.entreprise,
   );
