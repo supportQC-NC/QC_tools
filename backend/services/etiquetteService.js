@@ -189,7 +189,70 @@ class RL {
 
 const drawLogo = (rl, logoBuf, x, y) => {
   if (!logoBuf) return;
-  try { rl.drawImage(logoBuf, x + 10, y - 90, 80, 80); } catch { /* ignore */ }
+  try {
+    rl.drawImage(logoBuf, x + 10, y - 90, 80, 80);
+  } catch (e) {
+    console.warn(
+      `[etiquettes] Logo non dessiné (pdfkit n'accepte que PNG/JPEG) : ${e.message}`,
+    );
+  }
+};
+
+// pdfkit n'accepte que PNG / JPEG : on vérifie la signature du fichier.
+const isPngOrJpeg = (buf) => {
+  if (!buf || buf.length < 4) return false;
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true; // PNG
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true; // JPEG
+  return false;
+};
+
+/**
+ * Résout et lit le logo de l'entreprise (PNG/JPEG). Renvoie un Buffer ou null.
+ * Gère :
+ *  - dev Windows : chemin UNC lu tel quel,
+ *  - prod Linux (RCOMMON_STOCK_ROOT défini) : traduction du chemin UNC vers le
+ *    point de montage en CONSERVANT les sous-dossiers après "STOCK".
+ * Écrit un message explicite dans les logs si le logo est ignoré.
+ */
+const resolveLogoBuffer = (entreprise) => {
+  const raw = entreprise && entreprise.cheminLogoEtiquettes;
+  const p = raw == null ? "" : String(raw).trim();
+  if (!p) return null; // aucun logo configuré → silencieux
+
+  const candidates = [p]; // tel quel (Windows / chemin Linux direct)
+  const root = process.env.RCOMMON_STOCK_ROOT;
+  if (root) {
+    const r = root.replace(/[\\/]+$/, "");
+    const segs = p.split(/[\\/]+/).filter(Boolean);
+    const iStock = segs.findIndex((s) => s.toUpperCase() === "STOCK");
+    if (iStock >= 0 && iStock < segs.length - 1) {
+      candidates.push(`${r}/${segs.slice(iStock + 1).join("/")}`); // sous-dossiers conservés
+    }
+    if (segs.length) candidates.push(`${r}/${segs[segs.length - 1]}`); // dernier segment
+  }
+
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) {
+        const buf = fs.readFileSync(c);
+        if (!isPngOrJpeg(buf)) {
+          console.warn(
+            `[etiquettes] Logo "${c}" ignoré : format non supporté (PNG ou JPEG requis).`,
+          );
+          return null;
+        }
+        return buf;
+      }
+    } catch {
+      /* candidat suivant */
+    }
+  }
+
+  console.warn(
+    `[etiquettes] Logo introuvable/illisible. Chemin configuré : "${p}". ` +
+      `Candidats testés : ${candidates.join(" | ")}`,
+  );
+  return null;
 };
 
 // ----------------------------------------------------------------------------
@@ -360,15 +423,20 @@ const drawSansPrixOne = (rl, record, logoBuf) => {
     rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
   }
 
-  y -= 250;
+  y -= 200;
 
-  rl.setFont("Helvetica-Bold", 40);
+  // NART bien visible (centré)
+  rl.setFont("Helvetica-Bold", 30);
   rl.setFillColorRGB(0, 0, 0);
+  rl.drawCentredString(x + labelW / 2, y - 30, safe(record.NART) || "N/A");
+
+  // Désignation agrandie
+  rl.setFont("Helvetica-Bold", 56);
   let product = safe(record.DESIGN || "Produit sans nom").replace(/\*/g, "");
   product = product.replace(/\s+/g, " ").trim();
-  const wrapped = wrapText(product, 30);
-  let yp = y - 40;
-  for (const line of wrapped) { rl.drawCentredString(x + labelW / 2, yp, line); yp -= 60; }
+  const wrapped = wrapText(product, 21);
+  let yp = y - 95;
+  for (const line of wrapped) { rl.drawCentredString(x + labelW / 2, yp, line); yp -= 66; }
 };
 
 const drawNormalOne = (rl, record, logoBuf) => {
@@ -499,12 +567,8 @@ export const genererEtiquettesPDF = async ({ type, format, articles, entreprise,
   const stream = fs.createWriteStream(outPath);
   doc.pipe(stream);
 
-  // Logo entreprise (optionnel) — ignoré si non lisible
-  let logoBuf = null;
-  const logoPath = entreprise && entreprise.cheminLogoEtiquettes;
-  if (logoPath) {
-    try { if (fs.existsSync(logoPath)) logoBuf = fs.readFileSync(logoPath); } catch { logoBuf = null; }
-  }
+  // Logo entreprise (optionnel) — résolu + tracé dans les logs si ignoré
+  const logoBuf = resolveLogoBuffer(entreprise);
 
   const rl = new RL(doc);
   if (isStandard) {

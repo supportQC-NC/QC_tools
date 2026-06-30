@@ -131,23 +131,23 @@ export const moduleMenuStructure = [
         path: "/articles",
         icon: HiSearch,
       },
-      {
-        moduleKey: "proforma",
-        label: "Recherche Proforma",
-        path: "/proformas",
-        icon: HiSearch,
-      },
-      {
-        moduleKey: "reapro",
-        label: "Réappro",
-        path: "/reappro",
-        icon: HiRefresh,
-      },
+      // {
+      //   moduleKey: "proforma",
+      //   label: "Recherche Proforma",
+      //   path: "/proformas",
+      //   icon: HiSearch,
+      // },
+      // {
+      //   moduleKey: "reapro",
+      //   label: "Réappro",
+      //   path: "/reappro",
+      //   icon: HiRefresh,
+      // },
     ],
   },
   {
     type: "subgroup",
-    label: "Inventaires",
+    label: "Inventaire Zones",
     icon: HiClipboardList,
     collapsible: true,
     items: [
@@ -172,14 +172,22 @@ export const moduleMenuStructure = [
         icon: HiDocumentReport,
       },
       {
-        label: "Inventaire Proforma",
-        path: "/admin/inventaire-proforma",
-        icon: HiDocumentReport,
-      },
-      {
         label: "Récap par zone",
         path: "/admin/recap-zones",
         icon: HiViewGrid,
+      },
+    ],
+  },
+  {
+    type: "subgroup",
+    label: "Inventaire proforma",
+    icon: HiDocumentReport,
+    collapsible: true,
+    items: [
+      {
+        label: "Inventaire Proforma",
+        path: "/admin/inventaire-proforma",
+        icon: HiDocumentReport,
       },
     ],
   },
