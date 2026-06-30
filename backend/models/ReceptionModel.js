@@ -26,6 +26,7 @@ const ligneCommandeSchema = new mongoose.Schema(
     refer: { type: String, default: "" }, // référence fournisseur
     gencod: { type: String, default: "" }, // gencode de référence (base article) si résolu
     qteCommandee: { type: Number, default: 0 }, // QTE de cmdetail
+    estNouveau: { type: Boolean, default: false }, // nouveauté (V1..V12 tous = 0)
   },
   { _id: false },
 );

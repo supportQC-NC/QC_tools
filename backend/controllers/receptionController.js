@@ -144,6 +144,35 @@ const suivreChaineRenvois = async (entreprise, article) => {
   };
 };
 
+// Lecture robuste d'un champ DBF (insensible à la casse / aux espaces de clés).
+const lireChamp = (rec, ...names) => {
+  if (!rec) return undefined;
+  for (const name of names) {
+    if (rec[name] !== undefined) return rec[name];
+  }
+  const targets = names.map((n) => n.toUpperCase());
+  for (const k of Object.keys(rec)) {
+    if (targets.includes(k.toUpperCase().trim())) return rec[k];
+  }
+  return undefined;
+};
+
+// Nouveauté : un article est une nouveauté si V1..V12 sont TOUS = 0.
+// (On exige qu'au moins un champ V soit présent pour éviter de tout signaler
+//  lorsque ces colonnes n'existent pas dans le DBF.)
+const estArticleNouveau = (art) => {
+  if (!art) return false;
+  let auMoinsUnPresent = false;
+  for (let i = 1; i <= 12; i++) {
+    const v = lireChamp(art, `V${i}`, `V${String(i).padStart(2, "0")}`);
+    if (v !== undefined) {
+      auMoinsUnPresent = true;
+      if ((parseFloat(v) || 0) !== 0) return false;
+    }
+  }
+  return auMoinsUnPresent;
+};
+
 // Construit le payload "articleInfo" à partir d'un record article résolu.
 const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
   const stocksLabels = entreprise.mappingEntrepots || {
@@ -164,6 +193,7 @@ const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
       stocksLabels,
       reserv: 0,
       enReservation: false,
+      estNouveau: false,
       isUnknown: true,
       isRenvoi: false,
       articleOriginal: null,
@@ -173,10 +203,23 @@ const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
   }
 
   const a = resultatRenvoi.articleFinal;
-  // Réservations : champ article.RESERV (tolérant à quelques variantes de nom).
-  const reservRaw =
-    a.RESERV ?? a.RESERVE ?? a.RESERVED ?? a.RESA ?? a.RESERVQTE ?? 0;
-  const reserv = parseFloat(reservRaw) || 0;
+  // Réservations : champ article.RESERV.
+  // Lecture robuste : on cherche la clé sans dépendre de la casse/espaces
+  // exposées par dbffile (RESERV, et variantes éventuelles).
+  const getField = (rec, ...names) => {
+    if (!rec) return undefined;
+    for (const name of names) {
+      if (rec[name] !== undefined) return rec[name];
+    }
+    const targets = names.map((n) => n.toUpperCase());
+    for (const k of Object.keys(rec)) {
+      if (targets.includes(k.toUpperCase().trim())) return rec[k];
+    }
+    return undefined;
+  };
+  const reserv =
+    parseFloat(getField(a, "RESERV", "RESERVE", "RESERVED", "RESA", "RESERVQTE")) ||
+    0;
   return {
     nart: a.NART ? a.NART.trim() : code,
     gencod: a.GENCOD ? a.GENCOD.trim() : "",
@@ -185,6 +228,7 @@ const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
     fourn: a.FOURN !== undefined && a.FOURN !== null ? a.FOURN : null,
     reserv, // article.RESERV (nombre de réservations)
     enReservation: reserv > 0,
+    estNouveau: estArticleNouveau(a), // V1..V12 tous = 0
     stocks: {
       S1: parseFloat(a.S1) || 0,
       S2: parseFloat(a.S2) || 0,
@@ -244,6 +288,7 @@ const computeAnalyse = (reception) => {
         qteValidee: c.qteValidee,
         enReservation: !!c.enReservation,
         nbReservations: c.nbReservations || 0,
+        estNouveau: !!c.estNouveau,
         ecart: qteRetenue - qteCommandee,
       };
     })
@@ -499,9 +544,11 @@ const createReception = asyncHandler(async (req, res) => {
     if (estCommentaire(ligne)) continue;
     const nart = safeTrim(ligne.NART);
     let gencod = "";
+    let estNouveau = false;
     try {
       const art = await articleCacheService.findByNart(entreprise, nart);
       if (art && art.GENCOD) gencod = art.GENCOD.trim();
+      estNouveau = estArticleNouveau(art);
     } catch {
       /* ignore */
     }
@@ -512,6 +559,7 @@ const createReception = asyncHandler(async (req, res) => {
       refer: safeTrim(ligne.REFER),
       gencod,
       qteCommandee: parseFloat(ligne.QTE) || 0,
+      estNouveau,
     });
   }
   lignesCommande.sort((a, b) => a.nl - b.nl);
@@ -689,12 +737,30 @@ const scanArticle = asyncHandler(async (req, res) => {
       ? "reconnu_dans_commande"
       : "reconnu_hors_commande";
 
+  // --- Diagnostic réservation (temporaire) ---
+  const _af = resultatRenvoi?.articleFinal;
+  const _reservKeys = _af
+    ? Object.keys(_af).filter((k) => /reserv|resa/i.test(k))
+    : [];
+  const _debugReserv = {
+    reserv: articleInfo.reserv,
+    clesReserv: _reservKeys,
+    valeursReserv: _reservKeys.map((k) => _af[k]),
+    toutesLesCles: _af ? Object.keys(_af) : [],
+  };
+  console.log(
+    `[RECEPTION scan] code=${codeTrim} nart=${articleInfo.nart} ` +
+      `reserv=${articleInfo.reserv} clesReserv=${JSON.stringify(_reservKeys)} ` +
+      `valeurs=${JSON.stringify(_debugReserv.valeursReserv)}`,
+  );
+
   res.json({
     receptionId: reception._id,
     statut,
     dansCommande,
     gencodeScanne: codeTrim,
     articleInfo,
+    _debugReserv,
     _queryTime: `${Date.now() - startTime}ms`,
   });
 });
@@ -812,6 +878,7 @@ const addComptage = asyncHandler(async (req, res) => {
     trouveEnPhaseFinale,
     enReservation,
     nbReservations,
+    estNouveau,
   } = req.body;
 
   const reception = await loadReceptionOwned(req.params.id, req, res);
@@ -866,6 +933,7 @@ const addComptage = asyncHandler(async (req, res) => {
       stocksSnapshot: stocks || { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 },
       enReservation: !!enReservation,
       nbReservations: parseInt(nbReservations, 10) || 0,
+      estNouveau: !!estNouveau,
       trouveEnPhaseFinale: !!trouveEnPhaseFinale,
     });
     comptage = reception.comptages[reception.comptages.length - 1];

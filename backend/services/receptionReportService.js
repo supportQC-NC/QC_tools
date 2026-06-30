@@ -116,6 +116,9 @@ export const construireLignesRapport = (reception) => {
       qteBip: qteComptee,
       qteVal: qteValidee,
       ecart,
+      ecartType: ecart > 0 ? "surplus" : ecart < 0 ? "manquant" : "",
+      nouv: (l.estNouveau || c?.estNouveau) ? "OUI" : "",
+      estNouveau: !!(l.estNouveau || c?.estNouveau),
       gencodeNouveau: c?.nouveauGencode?.gencode || "",
       enDefaut: ecart !== 0,
       section: "commande",
@@ -138,6 +141,8 @@ export const construireLignesRapport = (reception) => {
         qteBip: c.qteComptee,
         qteVal,
         ecart: "",
+        nouv: c.estNouveau ? "OUI" : "",
+        estNouveau: !!c.estNouveau,
         gencodeNouveau: c.nouveauGencode?.gencode || c.gencodeScanne || "",
         enDefaut: c.isInconnu,
         section: "hors",
@@ -161,13 +166,14 @@ export const construireLignesRapport = (reception) => {
 const COLS = [
   { key: "n", label: "N°", w: 24, align: "center" },
   { key: "code", label: "CODE", w: 50, align: "left" },
-  { key: "designation", label: "DÉSIGNATION", w: 150, align: "left" },
-  { key: "gencode", label: "GENCODE", w: 78, align: "left" },
+  { key: "designation", label: "DÉSIGNATION", w: 132, align: "left" },
+  { key: "gencode", label: "GENCODE", w: 72, align: "left" },
   { key: "qteCmd", label: "CMD", w: 38, align: "center" },
   { key: "qteBip", label: "BIP", w: 38, align: "center" },
   { key: "qteVal", label: "VAL", w: 38, align: "center" },
   { key: "ecart", label: "ÉCART", w: 38, align: "center" },
-  { key: "gencodeNouveau", label: "GENCODE NOUV.", w: 81, align: "left" },
+  { key: "nouv", label: "NOUV.", w: 30, align: "center" },
+  { key: "gencodeNouveau", label: "GENCODE NOUV.", w: 75, align: "left" },
 ];
 
 /** Tronque un texte avec … pour qu'il tienne dans maxWidth (police courante). */
@@ -299,21 +305,43 @@ export const ecrirePDFReception = async ({
 
     let x = left;
 
-    // Ligne en défaut (écart / inconnu) : fond gris (N&B-friendly)
+    // Ligne en défaut : teinte selon le type (surplus / manquant / autre).
+    // Couleurs claires -> restent lisibles, et impriment toutes en gris clair en N&B.
     if (r.enDefaut) {
+      const fill =
+        r.ecartType === "surplus"
+          ? "#dbe7f5" // bleu clair = surplus
+          : r.ecartType === "manquant"
+            ? "#f3dede" // rouge clair = manquant
+            : "#e6e6e6"; // gris clair = inconnu / autre
       doc.save();
-      doc.rect(left, y, tableWidth, rowH).fill("#d9d9d9");
+      doc.rect(left, y, tableWidth, rowH).fill(fill);
       doc.restore();
     }
 
     doc.strokeColor("#999");
     COLS.forEach((c) => {
       doc.rect(x, y, c.w, rowH).stroke();
-      const raw =
+
+      let raw =
         r[c.key] === null || r[c.key] === undefined ? "" : String(r[c.key]);
+      let color = "#000";
+
+      // Colonne ÉCART : signe explicite (+/-) et couleur (lisible à l'écran,
+      // le signe restant la distinction fiable en impression N&B).
+      if (c.key === "ecart" && typeof r.ecart === "number" && r.ecart !== 0) {
+        raw = r.ecart > 0 ? `+${r.ecart}` : String(r.ecart);
+        color = r.ecart > 0 ? "#1f6feb" : "#c0392b";
+      }
+
+      // Colonne NOUV. : "OUI" en orange si nouveauté.
+      if (c.key === "nouv" && r.estNouveau) {
+        color = "#b9770e";
+      }
+
       const val = fitText(doc, raw, c.w - 4);
       doc
-        .fillColor("#000")
+        .fillColor(color)
         .text(val, x + 2, y + 5, {
           width: c.w - 4,
           align: c.align,
@@ -324,8 +352,32 @@ export const ecrirePDFReception = async ({
     y += rowH;
   });
 
+  // ---- Légende ----
+  y += 8;
+  if (y > doc.page.height - margin - 90) {
+    doc.addPage();
+    y = margin;
+  }
+  doc
+    .fillColor("#000")
+    .font("Helvetica")
+    .fontSize(7.5)
+    .text("Légende écart :  ", left, y, { continued: true })
+    .fillColor("#1f6feb")
+    .text("+N = surplus", { continued: true })
+    .fillColor("#000")
+    .text("   |   ", { continued: true })
+    .fillColor("#c0392b")
+    .text("-N = manquant", { continued: true })
+    .fillColor("#000")
+    .text("   |   ", { continued: true })
+    .fillColor("#b9770e")
+    .text("NOUV. = nouveauté (V1..V12 = 0)", { continued: true })
+    .fillColor("#000")
+    .text("   |   lignes grisées = écart à traiter / gencode inconnu");
+
   // ---- Commentaire ----
-  y += 12;
+  y += 16;
   if (y > doc.page.height - margin - 60) {
     doc.addPage();
     y = margin;
