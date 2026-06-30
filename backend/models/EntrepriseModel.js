@@ -93,6 +93,13 @@ const entrepriseSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Chemin du LOGO utilisé sur les étiquettes pleine page (module etiquettes).
+    // Chemin lisible par le serveur (UNC en dev Windows, chemin Linux en prod).
+    // Lu tel quel ; si vide ou illisible, aucun logo n'est dessiné.
+    cheminLogoEtiquettes: {
+      type: String,
+      default: "",
+    },
     // Mapping des noms d'entrepôts (S1, S2, S3, S4, S5)
     mappingEntrepots: {
       S1: { type: String, default: "Magasin" },

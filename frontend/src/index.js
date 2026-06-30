@@ -30,6 +30,7 @@ import AdminInventaireProgressionScreen from "./screens/admin/AdminInventairePro
 import AdminFichesControleScreen from "./screens/admin/AdminFichesControleScreen";
 import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
+import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
@@ -74,6 +75,7 @@ const router = createBrowserRouter(
           path="/preparation-commandes"
           element={<UserPreparationCommande />}
         />
+        <Route path="/etiquettes" element={<AdminEtiquettesScreen />} />
       </Route>
 
       <Route element={<AdminRoute />}>

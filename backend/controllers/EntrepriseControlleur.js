@@ -60,6 +60,9 @@ const createEntreprise = asyncHandler(async (req, res) => {
     cheminExportInventaire,
     mappingEntrepots,
     mappingEtatsCommande,
+    cheminRapportReception,
+    emailsRapportReception,
+    cheminLogoEtiquettes,
   } = req.body;
 
   // Vérifier si le dossier DBF existe déjà
@@ -98,6 +101,19 @@ const createEntreprise = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   };
 
+  // Champs réception (rapport de contrôle commande)
+  if (cheminRapportReception !== undefined) {
+    entrepriseData.cheminRapportReception = cheminRapportReception;
+  }
+  if (Array.isArray(emailsRapportReception)) {
+    entrepriseData.emailsRapportReception = emailsRapportReception
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  if (cheminLogoEtiquettes !== undefined) {
+    entrepriseData.cheminLogoEtiquettes = cheminLogoEtiquettes;
+  }
+
   // Ajouter le mapping des états si fourni
   if (mappingEtatsCommande) {
     entrepriseData.mappingEtatsCommande = mappingEtatsCommande;
@@ -130,6 +146,9 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     mappingEntrepots,
     mappingEtatsCommande,
     isActive,
+    cheminRapportReception,
+    emailsRapportReception,
+    cheminLogoEtiquettes,
   } = req.body;
 
   // Vérifier unicité du dossier DBF si modifié
@@ -186,6 +205,19 @@ const updateEntreprise = asyncHandler(async (req, res) => {
   }
 
   entreprise.isActive = isActive !== undefined ? isActive : entreprise.isActive;
+
+  // Champs réception (rapport de contrôle commande)
+  if (cheminRapportReception !== undefined) {
+    entreprise.cheminRapportReception = cheminRapportReception;
+  }
+  if (Array.isArray(emailsRapportReception)) {
+    entreprise.emailsRapportReception = emailsRapportReception
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  if (cheminLogoEtiquettes !== undefined) {
+    entreprise.cheminLogoEtiquettes = cheminLogoEtiquettes;
+  }
 
   const updatedEntreprise = await entreprise.save();
 

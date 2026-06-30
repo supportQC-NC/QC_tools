@@ -24,6 +24,7 @@ import commandeRoutes from "./routes/commandeRoutes.js";
 import controleCommandeRoutes from "./routes/controleCommandeRoutes.js";
 // ========== ROUTES RÉCEPTION DE MARCHANDISES ==========
 import receptionRoutes from "./routes/receptionRoutes.js";
+import etiquetteRoutes from "./routes/etiquetteRoutes.js";
 // ========== ROUTES ZONES (INVENTAIRE) ==========
 import zoneRoutes from "./routes/zoneRoutes.js";
 // ========== ROUTES INVENTAIRE ZONES (PROGRESSION) ==========
@@ -128,6 +129,7 @@ app.use("/api/factures", factureRoutes );
 app.use("/api/proformas", proformaRoutes);
 // ========== ROUTES INVENTAIRE PROFORMA (admin, lecture) ==========
 app.use("/api/inventaire-proforma", inventaireProformaRoutes);
+app.use("/api/etiquettes", etiquetteRoutes);
 // ========== ROUTES FOURNISSEURS ==========
 app.use("/api/fournisseurs", fournissRoutes);
 app.use("/api/clients", clientRoutes);

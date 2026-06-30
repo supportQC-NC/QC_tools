@@ -19,6 +19,7 @@ const moduleConfig = {
   prep_commande: "PREPA Commandes",
   ctrl_info_produit: "CTRL Infos Produit",
   releve: "Releve Prix",
+  etiquettes: "Générateur d'étiquettes",
 };
 
 const modules = Object.keys(moduleConfig);

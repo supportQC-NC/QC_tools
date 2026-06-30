@@ -263,21 +263,3 @@
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
-
-/* Sélecteur de format (A4 entier / demi A4) */
-.etiq-format {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-
-.etiq-format-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-right: 4px;
-}

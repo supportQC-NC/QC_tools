@@ -20,6 +20,7 @@ import {
   HiDatabase,
   HiFolder,
   HiTemplate,
+  HiTag,
 } from "react-icons/hi";
 
 // =============================================
@@ -222,6 +223,20 @@ export const moduleMenuStructure = [
       },
     ],
   },
+  {
+    type: "subgroup",
+    label: "Étiquettes",
+    icon: HiTag,
+    collapsible: true,
+    items: [
+      {
+        moduleKey: "etiquettes",
+        label: "Générateur d'étiquettes",
+        path: "/etiquettes",
+        icon: HiTag,
+      },
+    ],
+  },
 ];
 
 // Ancienne structure plate pour compatibilité (moduleMenus)
@@ -260,6 +275,11 @@ export const moduleMenus = {
     label: "Releve Prix",
     path: "/releve",
     icon: HiCurrencyDollar,
+  },
+  etiquettes: {
+    label: "Générateur d'étiquettes",
+    path: "/etiquettes",
+    icon: HiTag,
   },
 };
 

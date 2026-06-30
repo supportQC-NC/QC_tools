@@ -6,6 +6,7 @@ import {
   HiFolder,
   HiDatabase,
   HiClipboardList,
+  HiMail,
 } from "react-icons/hi";
 import {
   useCreateEntrepriseMutation,
@@ -45,6 +46,10 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       S5: "S5",
     },
     mappingEtatsCommande: { ...DEFAULT_ETATS_COMMANDE },
+    cheminRapportReception:
+      "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
+    emailsRapportReception: [],
+    cheminLogoEtiquettes: "",
     isActive: true,
   });
 
@@ -85,6 +90,15 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           S5: entreprise.mappingEntrepots?.S5 || "S5",
         },
         mappingEtatsCommande: etatsFromEntreprise,
+        cheminRapportReception:
+          entreprise.cheminRapportReception ||
+          "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
+        emailsRapportReception: Array.isArray(
+          entreprise.emailsRapportReception,
+        )
+          ? entreprise.emailsRapportReception
+          : [],
+        cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
         isActive: entreprise.isActive ?? true,
       });
     }
@@ -135,6 +149,14 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     }));
   };
 
+  // Emails du rapport réception : édition multi-lignes (1 email par ligne)
+  const handleEmailsChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      emailsRapportReception: e.target.value.split("\n"),
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -145,11 +167,18 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       return;
     }
 
+    // Normalisation des emails (accepte retours ligne, virgules, points-virgules)
+    const emails = (formData.emailsRapportReception || [])
+      .flatMap((l) => String(l).split(/[,;]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const payload = { ...formData, emailsRapportReception: emails };
+
     try {
       if (isEdit) {
-        await updateEntreprise({ id: entreprise._id, ...formData }).unwrap();
+        await updateEntreprise({ id: entreprise._id, ...payload }).unwrap();
       } else {
-        await createEntreprise(formData).unwrap();
+        await createEntreprise(payload).unwrap();
       }
       onClose();
     } catch (err) {
@@ -195,6 +224,12 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
             onClick={() => setActiveTab("etats")}
           >
             <HiClipboardList /> États Commande
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "reception" ? "active" : ""}`}
+            onClick={() => setActiveTab("reception")}
+          >
+            <HiMail /> Réception
           </button>
         </div>
 
@@ -319,6 +354,23 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                   Dossier où seront déposés les fichiers .dat d'inventaire
                 </span>
               </div>
+
+              <div className="form-group">
+                <label>
+                  <HiFolder /> Logo étiquettes (optionnel)
+                </label>
+                <input
+                  type="text"
+                  name="cheminLogoEtiquettes"
+                  value={formData.cheminLogoEtiquettes}
+                  onChange={handleChange}
+                  placeholder="\\192.168.0.250\Rcommun\STOCK\logo.png"
+                />
+                <span className="input-hint">
+                  Chemin complet du fichier image (PNG/JPG) affiché sur les
+                  étiquettes pleine page. Laisser vide pour aucun logo.
+                </span>
+              </div>
             </>
           )}
 
@@ -425,6 +477,50 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                     />
                   </div>
                 ))}
+              </div>
+            </>
+          )}
+
+          {/* Tab Réception */}
+          {activeTab === "reception" && (
+            <>
+              <p className="tab-description">
+                Paramètres du rapport de contrôle commande (réception de
+                marchandises) : dossier d'enregistrement du PDF et destinataires
+                de l'email.
+              </p>
+
+              <div className="form-group">
+                <label>
+                  <HiFolder /> Dossier d'enregistrement du rapport
+                </label>
+                <input
+                  type="text"
+                  name="cheminRapportReception"
+                  value={formData.cheminRapportReception}
+                  onChange={handleChange}
+                  placeholder="\\192.168.0.250\Rcommun\STOCK\controle commande"
+                />
+                <span className="input-hint">
+                  Dossier réseau (RCOMMUN) où le PDF du rapport sera déposé.
+                </span>
+              </div>
+
+              <div className="form-group">
+                <label>
+                  <HiMail /> Emails destinataires du rapport
+                </label>
+                <textarea
+                  name="emailsRapportReception"
+                  rows={5}
+                  value={(formData.emailsRapportReception || []).join("\n")}
+                  onChange={handleEmailsChange}
+                  placeholder={"achats@exemple.com\nresponsable@exemple.com"}
+                />
+                <span className="input-hint">
+                  Un email par ligne (les virgules et points-virgules sont aussi
+                  acceptés). Le rapport PDF leur sera envoyé en pièce jointe.
+                </span>
               </div>
             </>
           )}
