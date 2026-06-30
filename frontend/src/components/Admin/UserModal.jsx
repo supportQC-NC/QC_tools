@@ -8,13 +8,14 @@ import {
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import "./UserModal.css";
 
-// Définition des modules alignée avec menuConfig.js
+// Définition des modules alignée avec menuConfig.js et le modèle Permission
 const moduleConfig = {
   stock: "Recherche Article",
   inventaire: "Inventaire",
   reapro: "Reapro",
-  proformas: "Proformats",
+  proforma: "Proformas",
   ctr_commande: "CTRL Commandes",
+  reception: "Réception marchandises",
   prep_commande: "PREPA Commandes",
   ctrl_info_produit: "CTRL Infos Produit",
   releve: "Releve Prix",

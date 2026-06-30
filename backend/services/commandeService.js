@@ -15,6 +15,9 @@ class CommandeCacheService {
     this.cacheDetail = new Map();
     // Durée de validité du cache (5 minutes par défaut)
     this.cacheTTL = 5 * 60 * 1000;
+    // Filet de sécurité : au-delà de ce délai, revalidation en arrière-plan
+    // (non bloquante) même si mtime/taille n'ont pas changé.
+    this.revalidateAfter = 30 * 60 * 1000;
     // Locks pour éviter les chargements multiples simultanés
     this.loadingLocksRef = new Map();
     this.loadingLocksDetail = new Map();
@@ -87,6 +90,32 @@ class CommandeCacheService {
     }
 
     return true;
+  }
+
+  /**
+   * État de fraîcheur du cache : "fresh" | "stale" | "missing".
+   * - missing : aucun cache -> chargement synchrone obligatoire
+   * - fresh   : fichier inchangé (mtime + taille) -> on sert le cache
+   * - stale   : fichier modifié (ou filet de sécurité) -> on sert le cache
+   *             et on recharge en arrière-plan (stale-while-revalidate)
+   */
+  cacheFreshness(cacheEntry, dbfPath) {
+    if (!cacheEntry) return "missing";
+    let stats;
+    try {
+      stats = fs.statSync(dbfPath);
+    } catch {
+      return "fresh"; // chemin momentanément inaccessible : servir le cache
+    }
+    const mtimeChanged =
+      stats.mtime.getTime() !== cacheEntry.lastModified.getTime();
+    const sizeChanged =
+      cacheEntry.dbfInfo && typeof cacheEntry.dbfInfo.fileSize === "number"
+        ? stats.size !== cacheEntry.dbfInfo.fileSize
+        : false;
+    if (mtimeChanged || sizeChanged) return "stale";
+    if (Date.now() - cacheEntry.loadedAt > this.revalidateAfter) return "stale";
+    return "fresh";
   }
 
   // =============================================
@@ -280,12 +309,27 @@ class CommandeCacheService {
       "cmdref.dbf",
     );
 
-    // Vérifier le cache
     const cached = this.cacheRef.get(cacheKey);
-    if (this.isCacheValid(cached, dbfPath)) {
+    const freshness = this.cacheFreshness(cached, dbfPath);
+    if (freshness === "fresh") return cached;
+    if (freshness === "stale") {
+      // stale-while-revalidate : on sert le cache et on recharge en fond.
+      if (!this.loadingLocksRef.has(cacheKey)) {
+        this._loadRef(entreprise, cacheKey, dbfPath).catch((e) =>
+          console.error(
+            `[CommandeCache] Revalidation cmdref échouée ${cacheKey}: ${e.message}`,
+          ),
+        );
+      }
       return cached;
     }
+    return this._loadRef(entreprise, cacheKey, dbfPath);
+  }
 
+  /**
+   * Chargement effectif cmdref.dbf (protégé par lock anti-concurrence).
+   */
+  async _loadRef(entreprise, cacheKey, dbfPath) {
     // Éviter les chargements multiples simultanés
     if (this.loadingLocksRef.has(cacheKey)) {
       await this.loadingLocksRef.get(cacheKey);
@@ -346,12 +390,26 @@ class CommandeCacheService {
       "cmdetail.dbf",
     );
 
-    // Vérifier le cache
     const cached = this.cacheDetail.get(cacheKey);
-    if (this.isCacheValid(cached, dbfPath)) {
+    const freshness = this.cacheFreshness(cached, dbfPath);
+    if (freshness === "fresh") return cached;
+    if (freshness === "stale") {
+      if (!this.loadingLocksDetail.has(cacheKey)) {
+        this._loadDetail(entreprise, cacheKey, dbfPath).catch((e) =>
+          console.error(
+            `[CommandeCache] Revalidation cmdetail échouée ${cacheKey}: ${e.message}`,
+          ),
+        );
+      }
       return cached;
     }
+    return this._loadDetail(entreprise, cacheKey, dbfPath);
+  }
 
+  /**
+   * Chargement effectif cmdetail.dbf (protégé par lock anti-concurrence).
+   */
+  async _loadDetail(entreprise, cacheKey, dbfPath) {
     // Éviter les chargements multiples simultanés
     if (this.loadingLocksDetail.has(cacheKey)) {
       await this.loadingLocksDetail.get(cacheKey);

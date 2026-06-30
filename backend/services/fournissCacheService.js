@@ -11,6 +11,7 @@ class FournissCacheService {
   constructor() {
     this.cache = new Map();
     this.cacheTTL = 10 * 60 * 1000; // Cache plus long (10 min) car change moins souvent
+    this.revalidateAfter = 60 * 60 * 1000; // filet de sécurité (1h) revalidation de fond
     this.loadingLocks = new Map();
   }
 
@@ -87,6 +88,28 @@ class FournissCacheService {
     }
   }
 
+  /**
+   * État de fraîcheur : "fresh" | "stale" | "missing" (mtime + taille).
+   */
+  cacheFreshness(cacheEntry, dbfPath) {
+    if (!cacheEntry) return "missing";
+    let stats;
+    try {
+      stats = fs.statSync(dbfPath);
+    } catch {
+      return "fresh"; // chemin momentanément inaccessible : servir le cache
+    }
+    const mtimeChanged =
+      stats.mtime.getTime() !== cacheEntry.lastModified.getTime();
+    const sizeChanged =
+      cacheEntry.dbfInfo && typeof cacheEntry.dbfInfo.fileSize === "number"
+        ? stats.size !== cacheEntry.dbfInfo.fileSize
+        : false;
+    if (mtimeChanged || sizeChanged) return "stale";
+    if (Date.now() - cacheEntry.loadedAt > this.revalidateAfter) return "stale";
+    return "fresh";
+  }
+
   async getFournisseurs(entreprise) {
     const cacheKey = entreprise.nomDossierDBF;
     const dbfPath = path.join(
@@ -96,10 +119,22 @@ class FournissCacheService {
     );
 
     const cached = this.cache.get(cacheKey);
-    if (this.isCacheValid(cached, dbfPath)) {
+    const freshness = this.cacheFreshness(cached, dbfPath);
+    if (freshness === "fresh") return cached;
+    if (freshness === "stale") {
+      if (!this.loadingLocks.has(cacheKey)) {
+        this._loadFournisseurs(entreprise, cacheKey, dbfPath).catch((e) =>
+          console.error(
+            `[FournissCache] Revalidation échouée ${cacheKey}: ${e.message}`
+          )
+        );
+      }
       return cached;
     }
+    return this._loadFournisseurs(entreprise, cacheKey, dbfPath);
+  }
 
+  async _loadFournisseurs(entreprise, cacheKey, dbfPath) {
     if (this.loadingLocks.has(cacheKey)) {
       await this.loadingLocks.get(cacheKey);
       return this.cache.get(cacheKey);
