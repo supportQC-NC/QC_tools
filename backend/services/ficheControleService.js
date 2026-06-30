@@ -233,7 +233,7 @@ const fitText = (doc, text, maxWidth) => {
  * Écrit le PDF de la fiche de contrôle.
  * @returns Promise<void>
  */
-export const ecrirePDF = async ({ header, rows, outPath }) => {
+export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
   const mod = await import("pdfkit").catch(() => {
     throw new Error(
       "Module 'pdfkit' introuvable. Lancez : npm i pdfkit (backend).",
@@ -367,7 +367,8 @@ export const ecrirePDF = async ({ header, rows, outPath }) => {
     .text("LÉGENDE :", left + 4, y + 6, { continued: true })
     .font("Helvetica")
     .text(
-      "   D = Doublon | A = Attention requise (stock > qté ou article non trouvé) | XX = Quantité excédentaire | Lignes rouges = Contrôle prioritaire",
+      legende ||
+        "   D = Doublon | A = Attention requise (stock > qté ou article non trouvé) | XX = Quantité excédentaire | Lignes rouges = Contrôle prioritaire",
     );
 
   doc.end();

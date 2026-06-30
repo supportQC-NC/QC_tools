@@ -20,6 +20,13 @@ import { setSelectedEntreprise } from "../../slices/inventaireSelectionSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminInventaireProformaScreen.css";
 
+// Formate une date ISO "AAAA-MM-JJ" en "JJ/MM/AAAA" (vide si absente)
+const fmtDateFr = (iso) => {
+  if (!iso) return "";
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso);
+};
+
 const AdminInventaireProformaScreen = () => {
   const dispatch = useDispatch();
   const persistedEntreprise = useSelector(
@@ -383,6 +390,11 @@ const AdminInventaireProformaScreen = () => {
                       <span className="proforma-numfact">
                         Proforma {g.numfact}
                       </span>
+                      {g.datfact ? (
+                        <span className="proforma-date" title="Date de création (DATFACT)">
+                          {fmtDateFr(g.datfact)}
+                        </span>
+                      ) : null}
                       {g.texte ? (
                         <span className="proforma-obs" title={g.texte}>
                           {g.texte}

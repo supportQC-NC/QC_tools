@@ -242,6 +242,17 @@
   white-space: nowrap;
 }
 
+/* Date de création (proforma.DATFACT) affichée à côté du numéro */
+.proforma-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-muted, rgba(127, 127, 127, 0.12));
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 /* Observation (proforma.TEXTE) affichée dans l'entête */
 .proforma-obs {
   flex: 1;

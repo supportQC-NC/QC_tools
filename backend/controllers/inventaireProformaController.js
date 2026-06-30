@@ -147,9 +147,10 @@ const getByTiers = asyncHandler(async (req, res) => {
   const dFin = inputDate(req.query.dateFin);
   if (dFin) dFin.setHours(23, 59, 59, 999);
 
-  // 1) Entêtes du tiers → NUMFACT + NOM + TEXTE (observation)
+  // 1) Entêtes du tiers → NUMFACT + NOM + TEXTE (observation) + DATFACT
   const numfactsSet = new Set();
   const texteByNumfact = new Map();
+  const datfactByNumfact = new Map(); // NUMFACT -> "AAAA-MM-JJ"
   let nom = "";
   for (const h of cache.proformaRecords) {
     if (!matchTiers(h.TIERS)) continue;
@@ -164,6 +165,15 @@ const getByTiers = asyncHandler(async (req, res) => {
     if (nf) {
       numfactsSet.add(nf);
       if (!texteByNumfact.has(nf)) texteByNumfact.set(nf, safeTrim(h.TEXTE));
+      if (!datfactByNumfact.has(nf)) {
+        const df = recDate(h.DATFACT);
+        datfactByNumfact.set(
+          nf,
+          df
+            ? `${df.getFullYear()}-${String(df.getMonth() + 1).padStart(2, "0")}-${String(df.getDate()).padStart(2, "0")}`
+            : "",
+        );
+      }
     }
     if (!nom) nom = safeTrim(h.NOM);
   }
@@ -256,6 +266,7 @@ const getByTiers = asyncHandler(async (req, res) => {
     groupes.push({
       numfact,
       texte: texteByNumfact.get(numfact) || "",
+      datfact: datfactByNumfact.get(numfact) || "",
       nbLignes: lignes.length,
       lignes,
     });
@@ -356,9 +367,7 @@ const genererFicheControle = asyncHandler(async (req, res) => {
   const rows = entries.map((e, i) => {
     const flags = [];
     if (counts.get(e.dupKey) > 1) flags.push("D");
-    if (e.nonTrouve) flags.push("A");
-    else if (e.qte > e.stock) flags.push("XX");
-    else if (e.stock > e.qte) flags.push("A");
+    if (!e.nonTrouve && e.qte > e.stock) flags.push("XX");
 
     return {
       n: i + 1,
@@ -387,7 +396,13 @@ const genererFicheControle = asyncHandler(async (req, res) => {
     `fiche_proforma_${numfact.replace(/[^\w-]+/g, "_")}_${Date.now()}.pdf`,
   );
 
-  await ecrirePDF({ header, rows, outPath: tmp });
+  await ecrirePDF({
+    header,
+    rows,
+    outPath: tmp,
+    legende:
+      "   D = Doublon | XX = Quantité excédentaire | Lignes rouges = Contrôle prioritaire",
+  });
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
