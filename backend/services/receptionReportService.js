@@ -80,10 +80,11 @@ export const construireLignesRapport = (reception) => {
   const lignesCommande = reception.lignesCommande || [];
   const comptages = reception.comptages || [];
 
-  // Index des comptages "dans la commande" par NART
+  // Index des comptages "dans la commande" par NART (clé normalisée)
+  const normNart = (s) => String(s || "").trim().toUpperCase();
   const comptageByNart = new Map();
   comptages.forEach((c) => {
-    if (c.nart && !c.isInconnu) comptageByNart.set(c.nart, c);
+    if (c.nart && !c.isInconnu) comptageByNart.set(normNart(c.nart), c);
   });
 
   const rows = [];
@@ -94,7 +95,7 @@ export const construireLignesRapport = (reception) => {
   // --- Détail des articles de la commande (ordre commande) ---
   lignesCommande.forEach((l) => {
     n += 1;
-    const c = comptageByNart.get(l.nart);
+    const c = comptageByNart.get(normNart(l.nart));
     const qteComptee = c ? c.qteComptee : 0;
     const qteValidee = c
       ? c.qteValidee != null
@@ -162,9 +163,9 @@ const COLS = [
   { key: "code", label: "CODE", w: 50, align: "left" },
   { key: "designation", label: "DÉSIGNATION", w: 150, align: "left" },
   { key: "gencode", label: "GENCODE", w: 78, align: "left" },
-  { key: "qteCmd", label: "QTÉ CMD", w: 38, align: "center" },
-  { key: "qteBip", label: "QTÉ BIP", w: 38, align: "center" },
-  { key: "qteVal", label: "QTÉ VAL", w: 38, align: "center" },
+  { key: "qteCmd", label: "CMD", w: 38, align: "center" },
+  { key: "qteBip", label: "BIP", w: 38, align: "center" },
+  { key: "qteVal", label: "VAL", w: 38, align: "center" },
   { key: "ecart", label: "ÉCART", w: 38, align: "center" },
   { key: "gencodeNouveau", label: "GENCODE NOUV.", w: 81, align: "left" },
 ];
@@ -243,7 +244,7 @@ export const ecrirePDFReception = async ({
   drawInfo(colB, halfW, "Fournisseur", header.fournisseur);
   y += infoH;
   drawInfo(left, halfW, "Arrivée", header.arrivee);
-  drawInfo(colB, halfW, "Bateau / Logistique", header.bateau);
+  drawInfo(colB, halfW, "Bateau", header.bateau);
   y += infoH;
   drawInfo(left, halfW, "Date contrôle", header.dateControle);
   drawInfo(colB, halfW, "Opérateur", header.operateur);
@@ -256,7 +257,7 @@ export const ecrirePDFReception = async ({
     doc.rect(left, y, tableWidth, rowH).fillAndStroke("#e8e8e8", "#000");
     doc.fillColor("#000").font("Helvetica-Bold").fontSize(7.5);
     COLS.forEach((c) => {
-      doc.text(c.label, x + 2, y + 5, { width: c.w - 4, align: c.align });
+      doc.text(c.label, x + 2, y + 5, { width: c.w - 4, align: c.align, lineBreak: false });
       x += c.w;
     });
     y += rowH;

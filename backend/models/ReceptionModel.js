@@ -80,6 +80,7 @@ const comptageSchema = new mongoose.Schema(
 
     // Signalements (placeholders : règle de détection à définir ultérieurement).
     enReservation: { type: Boolean, default: false },
+    nbReservations: { type: Number, default: 0 }, // article.RESERV (nb de réservations)
     estNouveau: { type: Boolean, default: false },
 
     // Stocks au moment du scan (historique).

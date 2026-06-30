@@ -162,6 +162,8 @@ const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
       refer: "",
       stocks: { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 },
       stocksLabels,
+      reserv: 0,
+      enReservation: false,
       isUnknown: true,
       isRenvoi: false,
       articleOriginal: null,
@@ -171,12 +173,15 @@ const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
   }
 
   const a = resultatRenvoi.articleFinal;
+  const reserv = parseFloat(a.RESERV) || 0;
   return {
     nart: a.NART ? a.NART.trim() : code,
     gencod: a.GENCOD ? a.GENCOD.trim() : "",
     designation: a.DESIGN ? a.DESIGN.trim() : "",
     refer: a.REFER ? a.REFER.trim() : "",
     fourn: a.FOURN !== undefined && a.FOURN !== null ? a.FOURN : null,
+    reserv, // article.RESERV (nombre de réservations)
+    enReservation: reserv > 0,
     stocks: {
       S1: parseFloat(a.S1) || 0,
       S2: parseFloat(a.S2) || 0,
@@ -234,6 +239,8 @@ const computeAnalyse = (reception) => {
         qteCommandee,
         qteComptee: c.qteComptee,
         qteValidee: c.qteValidee,
+        enReservation: !!c.enReservation,
+        nbReservations: c.nbReservations || 0,
         ecart: qteRetenue - qteCommandee,
       };
     })
@@ -800,6 +807,8 @@ const addComptage = asyncHandler(async (req, res) => {
     nouveauGencode,
     stocks,
     trouveEnPhaseFinale,
+    enReservation,
+    nbReservations,
   } = req.body;
 
   const reception = await loadReceptionOwned(req.params.id, req, res);
@@ -837,6 +846,7 @@ const addComptage = asyncHandler(async (req, res) => {
     if (nouveauGencode && !existing.nouveauGencode) {
       existing.nouveauGencode = nouveauGencode;
     }
+    reception.markModified("comptages");
     comptage = existing;
   } else {
     reception.comptages.push({
@@ -851,6 +861,8 @@ const addComptage = asyncHandler(async (req, res) => {
       isInconnu: !!isInconnu,
       nouveauGencode: nouveauGencode || null,
       stocksSnapshot: stocks || { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 },
+      enReservation: !!enReservation,
+      nbReservations: parseInt(nbReservations, 10) || 0,
       trouveEnPhaseFinale: !!trouveEnPhaseFinale,
     });
     comptage = reception.comptages[reception.comptages.length - 1];
@@ -909,6 +921,7 @@ const updateComptage = asyncHandler(async (req, res) => {
 
   comptage.qteComptee = q;
   comptage.scannedAt = new Date();
+  reception.markModified("comptages");
   reception.recalcTotaux();
   await reception.save();
 
@@ -999,6 +1012,7 @@ const validerEcart = asyncHandler(async (req, res) => {
 
   comptage.qteValidee = q;
   comptage.validatedAt = new Date();
+  reception.markModified("comptages");
   await reception.save();
 
   res.json(reception);
