@@ -488,6 +488,53 @@ const drawNormalOne = (rl, record, logoBuf) => {
   if (klText) { rl.setFont("Helvetica-Bold", 15); rl.drawCentredString(x + labelW / 2, yp - 10, klText); }
 };
 
+// Étiquette INVENTAIRE : REF + NART en gros, désignation en gros, grande case
+// vide « Quantité : » à remplir au stylo. Compatible A4 et demi A4.
+const drawInventaireOne = (rl, record, logoBuf) => {
+  const W = rl.W;
+  const H = rl.H;
+  const x = 0;
+  const y = H;
+
+  rl.rect(x, y - H, W, H); // cadre
+
+  // Logo optionnel en haut à droite (n'empiète pas sur REF/NART)
+  if (logoBuf) {
+    try { rl.drawImage(logoBuf, W - 110, y - 100, 80, 80); } catch { /* ignore */ }
+  }
+
+  // REF + NART (en gros, en haut à gauche)
+  rl.setFillColorRGB(0, 0, 0);
+  rl.setFont("Helvetica", 18);
+  rl.drawString(x + 40, y - 52, "REF");
+  rl.setFont("Helvetica-Bold", 60);
+  rl.drawString(x + 110, y - 70, safe(record.NART) || "N/A");
+
+  // Désignation (en GROS, centrée)
+  rl.setFont("Helvetica-Bold", 48);
+  let product = safe(record.DESIGN || "Produit sans désignation")
+    .replace(/\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const wrapped = wrapText(product, 23);
+  let yp = y - 165;
+  for (const line of wrapped.slice(0, 3)) {
+    rl.drawCentredString(W / 2, yp, line);
+    yp -= 58;
+  }
+
+  // « Quantité : » + grande case vide pour écriture manuelle
+  const boxW = 400;
+  const boxH = 170;
+  const boxX = 270;
+  const boxY = 45;
+  rl.setFont("Helvetica-Bold", 28);
+  rl.drawString(boxX - 190, boxY + boxH / 2 - 12, "Quantité :");
+  rl.setLineWidth(2);
+  rl.setStrokeColorRGB(0, 0, 0);
+  rl.rect(boxX, boxY, boxW, boxH);
+};
+
 // Table des dessinateurs "un article" par type pleine page
 const ONE_DRAWERS = {
   promo: (rl, r, logo) =>
@@ -501,6 +548,7 @@ const ONE_DRAWERS = {
       (x) => `Du ${fmtPromoDate(x.DPROMOD)} Jusqu'à épuisement du stock.`),
   sans_prix: drawSansPrixOne,
   normal: drawNormalOne,
+  inventaire: drawInventaireOne,
 };
 
 // ----------------------------------------------------------------------------
@@ -540,7 +588,7 @@ const drawDemi = (rl, doc, records, logoBuf, drawOne) => {
 };
 
 export const TYPES_ETIQUETTES = [
-  "standard", "promo", "solde", "destockage", "sans_prix", "normal",
+  "standard", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire",
 ];
 
 /**

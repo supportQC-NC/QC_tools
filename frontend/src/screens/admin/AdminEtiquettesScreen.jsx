@@ -43,6 +43,11 @@ const LABEL_TYPES = [
     title: "📋 Normal",
     desc: "Pleine page A4 avec prix et code-barres.",
   },
+  {
+    type: "inventaire",
+    title: "🔢 Inventaire",
+    desc: "NART et désignation en gros + grande case « Quantité » à remplir au stylo (A4 / demi A4).",
+  },
 ];
 
 const AdminEtiquettesScreen = () => {
