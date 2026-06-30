@@ -30,6 +30,7 @@ import AdminInventaireProgressionScreen from "./screens/admin/AdminInventairePro
 import AdminFichesControleScreen from "./screens/admin/AdminFichesControleScreen";
 import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
+import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
@@ -96,6 +97,10 @@ const router = createBrowserRouter(
         <Route
           path="/admin/inventaire-proforma"
           element={<AdminInventaireProformaScreen />}
+        />
+        <Route
+          path="/admin/recap-zones"
+          element={<AdminRecapZonesScreen />}
         />
         <Route path="/admin/reappros" element={<AdminReapprosScreen />} />
         <Route path="/admin/proformas" element={<AdminProformasScreen />} />

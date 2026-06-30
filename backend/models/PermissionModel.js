@@ -45,6 +45,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Réception de marchandises (contrôle sans réappro)
+      reception: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // PREPA Commandes
       prep_commande: {
         read: { type: Boolean, default: false },

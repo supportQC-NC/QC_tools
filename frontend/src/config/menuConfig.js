@@ -175,6 +175,11 @@ export const moduleMenuStructure = [
         path: "/admin/inventaire-proforma",
         icon: HiDocumentReport,
       },
+      {
+        label: "Récap par zone",
+        path: "/admin/recap-zones",
+        icon: HiViewGrid,
+      },
     ],
   },
   {

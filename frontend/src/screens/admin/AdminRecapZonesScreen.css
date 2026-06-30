@@ -1,0 +1,597 @@
+/* src/screens/admin/AdminRecapZonesScreen.css */
+
+.admin-recap-zones-page {
+  --rz-bg: #0a0a0f;
+  --rz-bg-secondary: #12121a;
+  --rz-bg-tertiary: #1a1a25;
+  --rz-bg-hover: #22222e;
+  --rz-border: #2a2a3a;
+  --rz-text: #f0f0f5;
+  --rz-text-secondary: #a0a0b0;
+  --rz-text-muted: #606070;
+  --rz-primary: #6366f1;
+  --rz-primary-dark: #4f46e5;
+  --rz-primary-glow: rgba(99, 102, 241, 0.3);
+  --rz-success: #10b981;
+  --rz-danger: #ef4444;
+  --rz-warning: #f59e0b;
+  --rz-radius: 12px;
+  --rz-radius-sm: 8px;
+  --rz-transition: all 0.2s ease;
+
+  min-height: 100vh;
+  background: var(--rz-bg);
+  color: var(--rz-text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== HEADER ========== */
+.admin-recap-zones-page .recap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--rz-bg-secondary);
+  border-bottom: 1px solid var(--rz-border);
+  flex-wrap: wrap;
+}
+
+.admin-recap-zones-page .header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-recap-zones-page .header-title h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.admin-recap-zones-page .title-icon {
+  color: var(--rz-primary);
+  font-size: 1.4rem;
+}
+
+.admin-recap-zones-page .header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-recap-zones-page .entreprise-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--rz-bg-tertiary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius);
+  padding: 0.5rem 0.75rem;
+  min-width: 320px;
+}
+
+.admin-recap-zones-page .entreprise-selector:focus-within {
+  border-color: var(--rz-primary);
+  box-shadow: 0 0 0 3px var(--rz-primary-glow);
+}
+
+.admin-recap-zones-page .entreprise-selector select {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--rz-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  flex: 1;
+  cursor: pointer;
+  outline: none;
+}
+
+.admin-recap-zones-page .entreprise-selector select option {
+  background: var(--rz-bg-secondary);
+  color: var(--rz-text);
+}
+
+.admin-recap-zones-page .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-recap-zones-page .btn-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--rz-bg-tertiary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius-sm);
+  color: var(--rz-text-secondary);
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: var(--rz-transition);
+}
+
+.admin-recap-zones-page .btn-action:hover:not(:disabled) {
+  background: var(--rz-primary);
+  border-color: var(--rz-primary);
+  color: white;
+}
+
+.admin-recap-zones-page .btn-action.primary {
+  background: var(--rz-primary);
+  border-color: var(--rz-primary);
+  color: white;
+}
+
+.admin-recap-zones-page .btn-action.primary:hover:not(:disabled) {
+  background: var(--rz-primary-dark);
+}
+
+.admin-recap-zones-page .btn-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ========== CONTENT ========== */
+.admin-recap-zones-page .recap-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+/* États vides / chargement / erreur */
+.admin-recap-zones-page .empty-state,
+.admin-recap-zones-page .loading-state,
+.admin-recap-zones-page .error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  gap: 0.75rem;
+  text-align: center;
+  color: var(--rz-text-secondary);
+}
+
+.admin-recap-zones-page .empty-state.small {
+  min-height: 30vh;
+}
+
+.admin-recap-zones-page .empty-icon,
+.admin-recap-zones-page .error-icon {
+  font-size: 3.5rem;
+  color: var(--rz-primary);
+  opacity: 0.6;
+}
+
+.admin-recap-zones-page .error-icon {
+  color: var(--rz-danger);
+}
+
+.admin-recap-zones-page .error-state button {
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--rz-primary);
+  border: none;
+  border-radius: var(--rz-radius-sm);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-recap-zones-page .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--rz-border);
+  border-top-color: var(--rz-primary);
+  border-radius: 50%;
+  animation: rz-spin 0.8s linear infinite;
+}
+
+@keyframes rz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-recap-zones-page .spinning {
+  animation: rz-spin 1s linear infinite;
+}
+
+/* ========== TOTAUX ========== */
+.admin-recap-zones-page .totaux-bar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-recap-zones-page .totaux-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.9rem 0.5rem;
+  background: var(--rz-bg-secondary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius-sm);
+}
+
+.admin-recap-zones-page .totaux-card.highlight {
+  border-color: var(--rz-primary);
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.12),
+    var(--rz-bg-secondary)
+  );
+}
+
+.admin-recap-zones-page .t-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--rz-text-muted);
+}
+
+.admin-recap-zones-page .t-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--rz-text);
+}
+
+/* couleurs écart */
+.admin-recap-zones-page .ecart-positif {
+  color: var(--rz-success) !important;
+}
+.admin-recap-zones-page .ecart-negatif {
+  color: var(--rz-danger) !important;
+}
+.admin-recap-zones-page .ecart-nul {
+  color: var(--rz-text-muted) !important;
+}
+
+/* ========== OUTILS ========== */
+.admin-recap-zones-page .tools-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-recap-zones-page .search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 260px;
+  background: var(--rz-bg-tertiary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius-sm);
+  padding: 0.5rem 0.75rem;
+}
+
+.admin-recap-zones-page .search-box:focus-within {
+  border-color: var(--rz-primary);
+}
+
+.admin-recap-zones-page .search-icon {
+  color: var(--rz-text-muted);
+  margin-right: 0.5rem;
+}
+
+.admin-recap-zones-page .search-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--rz-text);
+  font-size: 0.9rem;
+}
+
+.admin-recap-zones-page .clear-search {
+  background: none;
+  border: none;
+  color: var(--rz-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.admin-recap-zones-page .filter-group,
+.admin-recap-zones-page .expand-group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.admin-recap-zones-page .filter-group button,
+.admin-recap-zones-page .expand-group button {
+  padding: 0.5rem 0.9rem;
+  background: var(--rz-bg-tertiary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius-sm);
+  color: var(--rz-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--rz-transition);
+}
+
+.admin-recap-zones-page .filter-group button:hover,
+.admin-recap-zones-page .expand-group button:hover {
+  background: var(--rz-bg-hover);
+  color: var(--rz-text);
+}
+
+.admin-recap-zones-page .filter-group button.active {
+  background: var(--rz-primary);
+  border-color: var(--rz-primary);
+  color: white;
+}
+
+/* ========== ZONES ========== */
+.admin-recap-zones-page .zones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-recap-zones-page .zone-card {
+  background: var(--rz-bg-secondary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius);
+  overflow: hidden;
+}
+
+.admin-recap-zones-page .zone-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--rz-text);
+  cursor: pointer;
+  text-align: left;
+  transition: var(--rz-transition);
+  flex-wrap: wrap;
+}
+
+.admin-recap-zones-page .zone-head:hover {
+  background: var(--rz-bg-hover);
+}
+
+.admin-recap-zones-page .zone-toggle {
+  display: flex;
+  align-items: center;
+  color: var(--rz-primary);
+  font-size: 1.2rem;
+}
+
+.admin-recap-zones-page .zone-code {
+  font-family: "Monaco", "Consolas", monospace;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--rz-primary);
+}
+
+.admin-recap-zones-page .zone-libelle {
+  color: var(--rz-text-secondary);
+  font-size: 0.9rem;
+}
+
+.admin-recap-zones-page .zone-stats {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-recap-zones-page .zs {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
+  background: var(--rz-bg-tertiary);
+  border: 1px solid var(--rz-border);
+  border-radius: 50px;
+  color: var(--rz-text-secondary);
+  white-space: nowrap;
+}
+
+.admin-recap-zones-page .zs.ecart {
+  font-weight: 700;
+}
+
+.admin-recap-zones-page .zs.badge-ecart {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--rz-warning);
+  color: var(--rz-warning);
+  font-weight: 700;
+}
+
+/* corps zone : table */
+.admin-recap-zones-page .zone-body {
+  border-top: 1px solid var(--rz-border);
+  overflow-x: auto;
+}
+
+.admin-recap-zones-page .lignes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.admin-recap-zones-page .lignes-table th,
+.admin-recap-zones-page .lignes-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--rz-border);
+}
+
+.admin-recap-zones-page .lignes-table th {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--rz-text-muted);
+  background: var(--rz-bg);
+  position: sticky;
+  top: 0;
+}
+
+.admin-recap-zones-page .lignes-table th.num,
+.admin-recap-zones-page .lignes-table td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-recap-zones-page .lignes-table td.mono {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.8rem;
+}
+
+.admin-recap-zones-page .lignes-table td.design {
+  color: var(--rz-text-secondary);
+  max-width: 360px;
+}
+
+.admin-recap-zones-page .lignes-table tbody tr:hover {
+  background: var(--rz-bg-hover);
+}
+
+.admin-recap-zones-page .lignes-table tfoot td {
+  font-weight: 700;
+  color: var(--rz-text);
+  background: var(--rz-bg);
+  border-top: 2px solid var(--rz-border);
+}
+
+/* tags désignation */
+.admin-recap-zones-page .tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.admin-recap-zones-page .tag.renvoi {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.admin-recap-zones-page .tag.unknown {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--rz-danger);
+}
+
+.admin-recap-zones-page .tag.absent {
+  background: rgba(96, 96, 112, 0.2);
+  color: var(--rz-text-muted);
+}
+
+/* en-tête de zone + bouton PDF à droite */
+.admin-recap-zones-page .zone-head-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.admin-recap-zones-page .zone-head-row .zone-head {
+  flex: 1;
+}
+
+.admin-recap-zones-page .btn-pdf-zone {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 1rem;
+  background: var(--rz-bg-tertiary);
+  border: none;
+  border-left: 1px solid var(--rz-border);
+  color: var(--rz-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--rz-transition);
+}
+
+.admin-recap-zones-page .btn-pdf-zone:hover {
+  background: var(--rz-danger);
+  color: white;
+}
+
+.admin-recap-zones-page .btn-pdf-zone svg {
+  font-size: 1.1rem;
+}
+
+/* champ seuil pour l'export */
+.admin-recap-zones-page .seuil-box {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  background: var(--rz-bg-tertiary);
+  border: 1px solid var(--rz-border);
+  border-radius: var(--rz-radius-sm);
+}
+
+.admin-recap-zones-page .seuil-box label {
+  font-size: 0.75rem;
+  color: var(--rz-text-muted);
+  white-space: nowrap;
+}
+
+.admin-recap-zones-page .seuil-box input {
+  width: 90px;
+  background: var(--rz-bg);
+  border: 1px solid var(--rz-border);
+  border-radius: 4px;
+  color: var(--rz-text);
+  font-size: 0.85rem;
+  padding: 0.25rem 0.4rem;
+  outline: none;
+}
+
+.admin-recap-zones-page .seuil-box input:focus {
+  border-color: var(--rz-primary);
+}
+
+.admin-recap-zones-page .seuil-unit {
+  font-size: 0.75rem;
+  color: var(--rz-text-muted);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1100px) {
+  .admin-recap-zones-page .totaux-bar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-recap-zones-page .recap-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-recap-zones-page .entreprise-selector {
+    min-width: 0;
+    width: 100%;
+  }
+  .admin-recap-zones-page .header-actions {
+    justify-content: flex-end;
+  }
+  .admin-recap-zones-page .totaux-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .admin-recap-zones-page .zone-stats {
+    width: 100%;
+    margin-left: 0;
+  }
+}

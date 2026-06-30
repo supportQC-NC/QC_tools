@@ -5,8 +5,13 @@ import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import Zone from "../models/ZoneModel.js";
 import articleCacheService from "../services/articleService.js";
+import {
+  construireLignes,
+  ecrirePDF,
+} from "../services/ficheControleService.js";
 import path from "path";
 import fs from "fs";
+import os from "os";
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -657,8 +662,9 @@ const getRecapZones = asyncHandler(async (req, res) => {
     // on continue : findByNart rechargera au besoin
   }
 
-  // Stock théorique d'un article (S1..S5) via NART puis repli GENCOD.
-  const getStockTheorique = async (nart, gencod) => {
+  // Infos article (stock S1..S5, prix d'achat PACHAT, fournisseur FOURN)
+  // via NART puis repli GENCOD.
+  const getInfosArticle = async (nart, gencod) => {
     let record = null;
     if (nart && String(nart).trim()) {
       record = await articleCacheService.findByNart(
@@ -672,8 +678,15 @@ const getRecapZones = asyncHandler(async (req, res) => {
         String(gencod).trim(),
       );
     }
-    if (!record) return { stock: 0, trouve: false };
-    return { stock: articleCacheService.calculateStockTotal(record), trouve: true };
+    if (!record) {
+      return { stock: 0, prixAchat: 0, fourn: "", trouve: false };
+    }
+    return {
+      stock: articleCacheService.calculateStockTotal(record),
+      prixAchat: parseFloat(record.PACHAT) || 0,
+      fourn: (record.FOURN ? String(record.FOURN) : "").trim(),
+      trouve: true,
+    };
   };
 
   // Regroupement par zone
@@ -692,12 +705,13 @@ const getRecapZones = asyncHandler(async (req, res) => {
     const zoneEntry = zonesMap.get(code);
 
     for (const ligne of collecte.lignes) {
-      const { stock, trouve } = await getStockTheorique(
+      const { stock, prixAchat, fourn, trouve } = await getInfosArticle(
         ligne.nart,
         ligne.gencod,
       );
       const qteBipee = parseFloat(ligne.quantite) || 0;
       const ecart = qteBipee - stock;
+      const ecartXpf = ecart * prixAchat;
 
       // Cumul si le même article (nart) revient dans la même zone
       const existante = zoneEntry.lignes.find(
@@ -706,6 +720,7 @@ const getRecapZones = asyncHandler(async (req, res) => {
       if (existante) {
         existante.qteBipee += qteBipee;
         existante.ecart = existante.qteBipee - existante.stockTheorique;
+        existante.ecartXpf = existante.ecart * existante.prixAchat;
       } else {
         zoneEntry.lignes.push({
           nart: ligne.nart,
@@ -714,6 +729,9 @@ const getRecapZones = asyncHandler(async (req, res) => {
           qteBipee,
           stockTheorique: stock,
           ecart,
+          prixAchat,
+          ecartXpf,
+          fourn,
           articleTrouve: trouve,
           isRenvoi: !!ligne.isRenvoi,
           isUnknown: !!ligne.isUnknown,
@@ -730,6 +748,7 @@ const getRecapZones = asyncHandler(async (req, res) => {
       0,
     );
     const totalEcart = z.lignes.reduce((s, l) => s + l.ecart, 0);
+    const totalEcartXpf = z.lignes.reduce((s, l) => s + l.ecartXpf, 0);
     const nbEcarts = z.lignes.filter((l) => l.ecart !== 0).length;
     return {
       ...z,
@@ -737,9 +756,44 @@ const getRecapZones = asyncHandler(async (req, res) => {
       totalQteBipee,
       totalStockTheorique,
       totalEcart,
+      totalEcartXpf,
       nbEcarts,
     };
   });
+
+  // Regroupement alternatif PAR FOURNISSEUR (toutes zones confondues).
+  // Chaque ligne garde une référence à sa zone d'origine.
+  const fournMap = new Map();
+  zones.forEach((z) => {
+    z.lignes.forEach((l) => {
+      const code = l.fourn || "(sans fournisseur)";
+      if (!fournMap.has(code)) {
+        fournMap.set(code, { fourn: code, lignes: [] });
+      }
+      fournMap.get(code).lignes.push({ ...l, zoneCode: z.zoneCode });
+    });
+  });
+  const fournisseurs = Array.from(fournMap.values())
+    .map((f) => {
+      const totalQteBipee = f.lignes.reduce((s, l) => s + l.qteBipee, 0);
+      const totalStockTheorique = f.lignes.reduce(
+        (s, l) => s + l.stockTheorique,
+        0,
+      );
+      const totalEcart = f.lignes.reduce((s, l) => s + l.ecart, 0);
+      const totalEcartXpf = f.lignes.reduce((s, l) => s + l.ecartXpf, 0);
+      const nbEcarts = f.lignes.filter((l) => l.ecart !== 0).length;
+      return {
+        ...f,
+        totalArticles: f.lignes.length,
+        totalQteBipee,
+        totalStockTheorique,
+        totalEcart,
+        totalEcartXpf,
+        nbEcarts,
+      };
+    })
+    .sort((a, b) => a.fourn.localeCompare(b.fourn));
 
   // Totaux globaux
   const totaux = zones.reduce(
@@ -748,15 +802,18 @@ const getRecapZones = asyncHandler(async (req, res) => {
       acc.totalQteBipee += z.totalQteBipee;
       acc.totalStockTheorique += z.totalStockTheorique;
       acc.totalEcart += z.totalEcart;
+      acc.totalEcartXpf += z.totalEcartXpf;
       acc.nbEcarts += z.nbEcarts;
       return acc;
     },
     {
       totalZones: zones.length,
+      totalFournisseurs: fournisseurs.length,
       totalArticles: 0,
       totalQteBipee: 0,
       totalStockTheorique: 0,
       totalEcart: 0,
+      totalEcartXpf: 0,
       nbEcarts: 0,
     },
   );
@@ -772,7 +829,110 @@ const getRecapZones = asyncHandler(async (req, res) => {
       ? { _id: session._id, nom: session.nom, statut: session.statut }
       : null,
     zones,
+    fournisseurs,
     totaux,
+  });
+});
+
+// Nettoie un code zone pour en faire un nom de fichier valide.
+const sanitizeFileName = (s) =>
+  String(s || "zone").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60);
+
+// ===========================================
+// PDF RÉCAP D'UNE ZONE (même moteur que la feuille de contrôle)
+// ===========================================
+/**
+ * @desc    Génère le PDF "fiche de contrôle" d'UNE zone de la session active.
+ *          Réutilise ficheControleService (construireLignes + ecrirePDF) pour
+ *          un rendu IDENTIQUE aux fiches de contrôle. Une zone à la fois.
+ * @route   GET /api/inventaires-collecte/recap-zones/:entrepriseId/pdf
+ * @query   zoneCode (obligatoire)
+ * @access  Private/Admin
+ */
+const getRecapZonePdf = asyncHandler(async (req, res) => {
+  const { entrepriseId } = req.params;
+  const { zoneCode } = req.query;
+
+  if (!zoneCode) {
+    res.status(400);
+    throw new Error("Paramètre zoneCode obligatoire.");
+  }
+
+  const entreprise = await Entreprise.findById(entrepriseId);
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
+  const filtreCollecte = {
+    entreprise: entreprise._id,
+    session: session ? session._id : null,
+    zoneCode,
+  };
+
+  const collectes = await InventaireCollecte.find(filtreCollecte).sort({
+    updatedAt: 1,
+  });
+
+  if (!collectes.length) {
+    res.status(404);
+    throw new Error("Aucune collecte pour cette zone.");
+  }
+
+  try {
+    await articleCacheService.preload(entreprise);
+  } catch (e) {
+    // tolérant
+  }
+
+  // Lignes au format attendu par construireLignes ({ code, quantite }).
+  const lignesDat = [];
+  let zoneLibelle = "";
+  let zoneType = "";
+  for (const collecte of collectes) {
+    zoneLibelle = zoneLibelle || collecte.zoneLibelle || "";
+    zoneType = zoneType || collecte.zoneType || "";
+    for (const ligne of collecte.lignes) {
+      lignesDat.push({
+        code: ligne.gencod || ligne.nart || "",
+        quantite: parseFloat(ligne.quantite) || 0,
+      });
+    }
+  }
+
+  const { rows } = await construireLignes(entreprise, lignesDat);
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "recap-zone-"));
+  const outPath = path.join(
+    tmpDir,
+    `fiche_${sanitizeFileName(zoneCode)}.pdf`,
+  );
+
+  await ecrirePDF({
+    header: {
+      zoneCode,
+      zoneType,
+      zoneLibelle,
+      date: new Date(),
+    },
+    rows,
+    outPath,
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="fiche_zone_${sanitizeFileName(zoneCode)}.pdf"`,
+  );
+  const stream = fs.createReadStream(outPath);
+  stream.pipe(res);
+  stream.on("close", () => {
+    fs.rm(tmpDir, { recursive: true, force: true }, () => {});
   });
 });
 
@@ -810,5 +970,6 @@ export {
   deleteLigneCollecte,
   exportCollecte,
   getRecapZones,
+  getRecapZonePdf,
   deleteCollecte,
 };

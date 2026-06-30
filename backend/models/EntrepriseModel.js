@@ -12,10 +12,14 @@ import path from "path";
 //       mais sous la racine Linux montée. Aucune migration en base nécessaire.
 const DEFAULT_BASE = "\\\\serveur\\Bases";
 const DEFAULT_COLLECT = "\\\\192.168.0.250\\Rcommun\\STOCK\\collect_sec";
+// Dossier commun où sont déposés les rapports PDF de réception (controle commande).
+const DEFAULT_RAPPORT_RECEPTION =
+  "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande";
 
 // Traduit un chemin d'export stocké (UNC Windows) vers le montage Linux,
-// en conservant le DERNIER segment (le dossier collect_xxx propre à l'entreprise).
+// en conservant le DERNIER segment (le dossier propre à l'entreprise / au module).
 //   "\\192.168.0.250\Rcommun\STOCK\collect_sec_aw"  ->  "<root>/collect_sec_aw"
+//   "\\192.168.0.250\Rcommun\STOCK\controle commande" -> "<root>/controle commande"
 // En dev (RCOMMON_STOCK_ROOT non défini) : renvoie la valeur stockée inchangée.
 const traduireCheminExport = (v) => {
   const root = process.env.RCOMMON_STOCK_ROOT;
@@ -75,6 +79,19 @@ const entrepriseSchema = new mongoose.Schema(
       type: String,
       default: DEFAULT_COLLECT,
       get: (v) => traduireCheminExport(v),
+    },
+    // Chemin de dépôt des RAPPORTS PDF de RÉCEPTION (module reception) — Rcommun.
+    // Traduit comme cheminExportInventaire (garde le dernier segment "controle commande").
+    cheminRapportReception: {
+      type: String,
+      default: DEFAULT_RAPPORT_RECEPTION,
+      get: (v) => traduireCheminExport(v),
+    },
+    // Destinataires de l'EMAIL D'ALERTE du rapport de réception (réservé à ce rapport).
+    // Liste d'adresses email (service Achats, chef de dépôt, ...).
+    emailsRapportReception: {
+      type: [String],
+      default: [],
     },
     // Mapping des noms d'entrepôts (S1, S2, S3, S4, S5)
     mappingEntrepots: {

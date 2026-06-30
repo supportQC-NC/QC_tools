@@ -22,6 +22,8 @@ import releveRoutes from "./routes/releveRoutes.js";
 import commandeRoutes from "./routes/commandeRoutes.js";
 // ========== ROUTES CONTRÔLE COMMANDES ==========
 import controleCommandeRoutes from "./routes/controleCommandeRoutes.js";
+// ========== ROUTES RÉCEPTION DE MARCHANDISES ==========
+import receptionRoutes from "./routes/receptionRoutes.js";
 // ========== ROUTES ZONES (INVENTAIRE) ==========
 import zoneRoutes from "./routes/zoneRoutes.js";
 // ========== ROUTES INVENTAIRE ZONES (PROGRESSION) ==========
@@ -108,6 +110,8 @@ app.use("/api/releves", releveRoutes);
 app.use("/api/commandes", commandeRoutes);
 // ========== ROUTES CONTRÔLE COMMANDES ==========
 app.use("/api/controle-commandes", controleCommandeRoutes);
+// ========== ROUTES RÉCEPTION DE MARCHANDISES ==========
+app.use("/api/receptions", receptionRoutes);
 // ========== ROUTES ZONES (INVENTAIRE) ==========
 app.use("/api/zones", zoneRoutes);
 // ========== ROUTES INVENTAIRE ZONES (PROGRESSION) ==========
