@@ -312,6 +312,13 @@ const AdminFactureDetailScreen = () => {
         ["CHEQUE", safeTrim(facture.CHEQUE)],
         ["ACOMPTE", safeTrim(facture.ACOMPTE)],
         ["ETAT", facture.ETAT ?? ""],
+        [
+          "ETAT (Libellé)",
+          entrepriseData?.mappingEtatsFacture?.[facture.ETAT] ||
+            (facture.ETAT != null && facture.ETAT !== ""
+              ? `État ${facture.ETAT}`
+              : ""),
+        ],
         ["HEURE", safeTrim(facture.HEURE)],
         ["AP", safeTrim(facture.AP)],
         ["EXTIERS", facture.EXTIERS ?? ""],
@@ -438,7 +445,7 @@ const AdminFactureDetailScreen = () => {
     } finally {
       setIsExporting(false);
     }
-  }, [facture, lignes, nomDossierDBF]);
+  }, [facture, lignes, nomDossierDBF, entrepriseData]);
 
   // === LOADING ===
   if (isLoading) {
@@ -633,6 +640,18 @@ const AdminFactureDetailScreen = () => {
               <div className="info-card-content">
                 <label>Bon commande</label>
                 <span>{safeTrim(facture.BONCDE) || "-"}</span>
+              </div>
+            </div>
+            <div className="info-card">
+              <div className="info-card-icon"><HiClipboardList /></div>
+              <div className="info-card-content">
+                <label>État</label>
+                <span>
+                  {entrepriseData?.mappingEtatsFacture?.[facture.ETAT] ||
+                    (facture.ETAT != null && facture.ETAT !== ""
+                      ? `État ${facture.ETAT}`
+                      : "-")}
+                </span>
               </div>
             </div>
             <div className="info-card">

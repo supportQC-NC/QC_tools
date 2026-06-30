@@ -7,11 +7,16 @@ import {
   HiDatabase,
   HiClipboardList,
   HiMail,
+  HiUserGroup,
+  HiPlus,
+  HiTrash,
+  HiSearch,
 } from "react-icons/hi";
 import {
   useCreateEntrepriseMutation,
   useUpdateEntrepriseMutation,
 } from "../../slices/entrepriseApiSlice";
+import { BASE_URL } from "../../constants";
 import "./EntrepriseModal.css";
 
 const DEFAULT_ETATS_COMMANDE = {
@@ -46,15 +51,20 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       S5: "S5",
     },
     mappingEtatsCommande: { ...DEFAULT_ETATS_COMMANDE },
+    mappingEtatsFacture: {},
+    mappingEtatsProforma: {},
     cheminRapportReception:
       "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
     emailsRapportReception: [],
     cheminLogoEtiquettes: "",
+    vendeurs: [],
     isActive: true,
   });
 
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("general");
+  const [detecting, setDetecting] = useState(false);
+  const [vendeursMsg, setVendeursMsg] = useState("");
 
   const [createEntreprise, { isLoading: isCreating }] =
     useCreateEntrepriseMutation();
@@ -69,6 +79,20 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
         const mapping = entreprise.mappingEtatsCommande;
         Object.keys(mapping).forEach((key) => {
           etatsFromEntreprise[key] = mapping[key];
+        });
+      }
+
+      // États facture / proforma (libellés libres, défaut vide)
+      const factureFromEnt = {};
+      if (entreprise.mappingEtatsFacture) {
+        Object.entries(entreprise.mappingEtatsFacture).forEach(([k, v]) => {
+          factureFromEnt[k] = v;
+        });
+      }
+      const proformaFromEnt = {};
+      if (entreprise.mappingEtatsProforma) {
+        Object.entries(entreprise.mappingEtatsProforma).forEach(([k, v]) => {
+          proformaFromEnt[k] = v;
         });
       }
 
@@ -90,6 +114,8 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           S5: entreprise.mappingEntrepots?.S5 || "S5",
         },
         mappingEtatsCommande: etatsFromEntreprise,
+        mappingEtatsFacture: factureFromEnt,
+        mappingEtatsProforma: proformaFromEnt,
         cheminRapportReception:
           entreprise.cheminRapportReception ||
           "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
@@ -99,6 +125,15 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           ? entreprise.emailsRapportReception
           : [],
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
+        vendeurs: Array.isArray(entreprise.vendeurs)
+          ? entreprise.vendeurs.map((v) => ({
+              code: v.code || "",
+              nom: v.nom || "",
+              prenom: v.prenom || "",
+              email: v.email || "",
+              type: v.type || "vendeur",
+            }))
+          : [],
         isActive: entreprise.isActive ?? true,
       });
     }
@@ -142,6 +177,20 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     }));
   };
 
+  const handleEtatFactureChange = (key, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      mappingEtatsFacture: { ...prev.mappingEtatsFacture, [key]: value },
+    }));
+  };
+
+  const handleEtatProformaChange = (key, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      mappingEtatsProforma: { ...prev.mappingEtatsProforma, [key]: value },
+    }));
+  };
+
   const handleResetEtats = () => {
     setFormData((prev) => ({
       ...prev,
@@ -155,6 +204,84 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       ...prev,
       emailsRapportReception: e.target.value.split("\n"),
     }));
+  };
+
+  // ---- Vendeurs (codes REPRES) ----
+  const addVendeur = () => {
+    setFormData((prev) => ({
+      ...prev,
+      vendeurs: [
+        ...prev.vendeurs,
+        { code: "", nom: "", prenom: "", email: "", type: "vendeur" },
+      ],
+    }));
+  };
+
+  const updateVendeur = (index, field, value) => {
+    setFormData((prev) => {
+      const vendeurs = [...prev.vendeurs];
+      const val =
+        field === "code" ? value.replace(/\D/g, "").slice(0, 2) : value;
+      vendeurs[index] = { ...vendeurs[index], [field]: val };
+      return { ...prev, vendeurs };
+    });
+  };
+
+  const removeVendeur = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      vendeurs: prev.vendeurs.filter((_, i) => i !== index),
+    }));
+  };
+
+  // Auto-détection des codes vendeurs depuis facture.REPRES
+  const detecterVendeurs = async () => {
+    if (!formData.nomDossierDBF.trim()) {
+      setVendeursMsg("Renseignez d'abord le « Nom dossier DBF ».");
+      return;
+    }
+    setDetecting(true);
+    setVendeursMsg("");
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/entreprises/${formData.nomDossierDBF.trim()}/representants`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.message || "Échec de la détection");
+      }
+      const data = await res.json();
+      const existants = new Set(
+        formData.vendeurs.map((v) => String(v.code).trim()),
+      );
+      const aAjouter = (data.representants || [])
+        .filter((r) => !existants.has(String(r.code).trim()))
+        .map((r) => ({
+          code: r.code,
+          nom: "",
+          prenom: "",
+          email: "",
+          type: "vendeur",
+        }));
+      if (aAjouter.length === 0) {
+        setVendeursMsg("Aucun nouveau code trouvé dans les factures.");
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          vendeurs: [...prev.vendeurs, ...aAjouter].sort((a, b) =>
+            String(a.code).localeCompare(String(b.code)),
+          ),
+        }));
+        setVendeursMsg(
+          `${aAjouter.length} code(s) ajouté(s) depuis les factures.`,
+        );
+      }
+    } catch (e) {
+      setVendeursMsg(e.message);
+    } finally {
+      setDetecting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -226,10 +353,28 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
             <HiClipboardList /> États Commande
           </button>
           <button
+            className={`tab-btn ${activeTab === "etatsFacture" ? "active" : ""}`}
+            onClick={() => setActiveTab("etatsFacture")}
+          >
+            <HiClipboardList /> États Facture
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "etatsProforma" ? "active" : ""}`}
+            onClick={() => setActiveTab("etatsProforma")}
+          >
+            <HiClipboardList /> États Proforma
+          </button>
+          <button
             className={`tab-btn ${activeTab === "reception" ? "active" : ""}`}
             onClick={() => setActiveTab("reception")}
           >
             <HiMail /> Réception
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "vendeurs" ? "active" : ""}`}
+            onClick={() => setActiveTab("vendeurs")}
+          >
+            <HiUserGroup /> Vendeurs
           </button>
         </div>
 
@@ -481,6 +626,62 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
             </>
           )}
 
+          {/* Tab États Facture */}
+          {activeTab === "etatsFacture" && (
+            <>
+              <p className="tab-description">
+                Définissez les libellés des états de facture (codes 0 à 9) pour
+                cette entreprise. Ces libellés seront affichés dans les écrans
+                Factures. Laissez vide un code non utilisé.
+              </p>
+              <div className="etats-grid">
+                {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
+                  <div className="form-group etat-field" key={key}>
+                    <label>
+                      <span className="etat-key">État {key}</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.mappingEtatsFacture[key] || ""}
+                      onChange={(e) =>
+                        handleEtatFactureChange(key, e.target.value)
+                      }
+                      placeholder={`Libellé état ${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Tab États Proforma */}
+          {activeTab === "etatsProforma" && (
+            <>
+              <p className="tab-description">
+                Définissez les libellés des états de proforma (codes 0 à 9) pour
+                cette entreprise. Ces libellés seront affichés dans les écrans
+                Proformas. Laissez vide un code non utilisé.
+              </p>
+              <div className="etats-grid">
+                {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
+                  <div className="form-group etat-field" key={key}>
+                    <label>
+                      <span className="etat-key">État {key}</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.mappingEtatsProforma[key] || ""}
+                      onChange={(e) =>
+                        handleEtatProformaChange(key, e.target.value)
+                      }
+                      placeholder={`Libellé état ${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           {/* Tab Réception */}
           {activeTab === "reception" && (
             <>
@@ -522,6 +723,131 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                   acceptés). Le rapport PDF leur sera envoyé en pièce jointe.
                 </span>
               </div>
+            </>
+          )}
+
+          {/* Tab Vendeurs */}
+          {activeTab === "vendeurs" && (
+            <>
+              <p className="tab-description">
+                Associez chaque code vendeur (champ <strong>REPRES</strong>, 2
+                chiffres) à une identité et un type. « Détecter » récupère les
+                codes réellement présents dans les factures ; vous pouvez aussi
+                en ajouter manuellement.
+              </p>
+
+              <div className="vendeurs-toolbar">
+                <button
+                  type="button"
+                  className="btn-detect-vendeur"
+                  onClick={detecterVendeurs}
+                  disabled={detecting}
+                >
+                  <HiSearch />{" "}
+                  {detecting ? "Détection…" : "Détecter depuis les factures"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-add-vendeur"
+                  onClick={addVendeur}
+                >
+                  <HiPlus /> Ajouter un code
+                </button>
+                {vendeursMsg ? (
+                  <span className="vendeurs-msg">{vendeursMsg}</span>
+                ) : null}
+              </div>
+
+              {formData.vendeurs.length === 0 ? (
+                <div className="vendeurs-empty">
+                  Aucun code vendeur. Cliquez sur « Détecter » ou « Ajouter un
+                  code ».
+                </div>
+              ) : (
+                <table className="vendeurs-table">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Nom</th>
+                      <th>Prénom</th>
+                      <th>Email</th>
+                      <th>Type</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.vendeurs.map((v, i) => (
+                      <tr key={i}>
+                        <td>
+                          <input
+                            className="vendeur-code-input"
+                            type="text"
+                            inputMode="numeric"
+                            value={v.code}
+                            maxLength={2}
+                            placeholder="00"
+                            onChange={(e) =>
+                              updateVendeur(i, "code", e.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={v.nom}
+                            placeholder="Nom"
+                            onChange={(e) =>
+                              updateVendeur(i, "nom", e.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={v.prenom}
+                            placeholder="Prénom"
+                            onChange={(e) =>
+                              updateVendeur(i, "prenom", e.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="email"
+                            value={v.email}
+                            placeholder="email (optionnel)"
+                            onChange={(e) =>
+                              updateVendeur(i, "email", e.target.value)
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={v.type}
+                            onChange={(e) =>
+                              updateVendeur(i, "type", e.target.value)
+                            }
+                          >
+                            <option value="commercial">Commercial</option>
+                            <option value="vendeur">Vendeur</option>
+                            <option value="autre">Autre</option>
+                          </select>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-vendeur-remove"
+                            onClick={() => removeVendeur(i)}
+                            title="Supprimer"
+                          >
+                            <HiTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </>
           )}
 

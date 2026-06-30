@@ -89,6 +89,15 @@ const AdminFacturesScreen = () => {
 
   const { data: entreprises, isLoading: loadingEntreprises } = useGetEntreprisesQuery();
 
+  // Entreprise sélectionnée (pour les libellés d'états facture)
+  const selectedEntrepriseData = useMemo(
+    () =>
+      (entreprises || []).find(
+        (e) => e.nomDossierDBF === selectedEntreprise,
+      ) || null,
+    [entreprises, selectedEntreprise],
+  );
+
   const {
     data: facturesData,
     isLoading: loadingFactures,
@@ -512,6 +521,7 @@ const AdminFacturesScreen = () => {
                     <div className="info-item"><label>Date facture</label><span className="value">{formatDate(selectedFacture.DATFACT)}</span></div>
                     <div className="info-item"><label>Représentant</label><span className="value">{selectedFacture.REPRES || "-"}</span></div>
                     <div className="info-item"><label>Bon commande</label><span className="value">{safeTrim(selectedFacture.BONCDE) || "-"}</span></div>
+                    <div className="info-item"><label>État</label><span className="value">{selectedEntrepriseData?.mappingEtatsFacture?.[selectedFacture.ETAT] || (selectedFacture.ETAT != null && selectedFacture.ETAT !== "" ? `État ${selectedFacture.ETAT}` : "-")}</span></div>
                   </div>
                 </div>
                 <div className="info-block">

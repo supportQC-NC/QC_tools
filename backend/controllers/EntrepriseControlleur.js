@@ -1,6 +1,21 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import Permission from "../models/PermissionModel.js";
+import factureCacheService from "../services/factureCacheService.js";
+
+const TYPES_VENDEUR = ["commercial", "vendeur", "autre"];
+
+// Normalise la liste des vendeurs reçue du front (filtre les lignes sans code).
+const normaliserVendeurs = (arr) =>
+  (Array.isArray(arr) ? arr : [])
+    .map((v) => ({
+      code: String(v?.code ?? "").trim(),
+      nom: String(v?.nom ?? "").trim(),
+      prenom: String(v?.prenom ?? "").trim(),
+      email: String(v?.email ?? "").trim(),
+      type: TYPES_VENDEUR.includes(v?.type) ? v.type : "vendeur",
+    }))
+    .filter((v) => v.code !== "");
 
 // @desc    Get all entreprises
 // @route   GET /api/entreprises
@@ -60,9 +75,12 @@ const createEntreprise = asyncHandler(async (req, res) => {
     cheminExportInventaire,
     mappingEntrepots,
     mappingEtatsCommande,
+    mappingEtatsFacture,
+    mappingEtatsProforma,
     cheminRapportReception,
     emailsRapportReception,
     cheminLogoEtiquettes,
+    vendeurs,
   } = req.body;
 
   // Vérifier si le dossier DBF existe déjà
@@ -113,10 +131,19 @@ const createEntreprise = asyncHandler(async (req, res) => {
   if (cheminLogoEtiquettes !== undefined) {
     entrepriseData.cheminLogoEtiquettes = cheminLogoEtiquettes;
   }
+  if (Array.isArray(vendeurs)) {
+    entrepriseData.vendeurs = normaliserVendeurs(vendeurs);
+  }
 
   // Ajouter le mapping des états si fourni
   if (mappingEtatsCommande) {
     entrepriseData.mappingEtatsCommande = mappingEtatsCommande;
+  }
+  if (mappingEtatsFacture) {
+    entrepriseData.mappingEtatsFacture = mappingEtatsFacture;
+  }
+  if (mappingEtatsProforma) {
+    entrepriseData.mappingEtatsProforma = mappingEtatsProforma;
   }
 
   const entreprise = await Entreprise.create(entrepriseData);
@@ -145,10 +172,13 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     cheminExportInventaire,
     mappingEntrepots,
     mappingEtatsCommande,
+    mappingEtatsFacture,
+    mappingEtatsProforma,
     isActive,
     cheminRapportReception,
     emailsRapportReception,
     cheminLogoEtiquettes,
+    vendeurs,
   } = req.body;
 
   // Vérifier unicité du dossier DBF si modifié
@@ -203,6 +233,14 @@ const updateEntreprise = asyncHandler(async (req, res) => {
       Object.entries(mappingEtatsCommande),
     );
   }
+  if (mappingEtatsFacture) {
+    entreprise.mappingEtatsFacture = new Map(Object.entries(mappingEtatsFacture));
+  }
+  if (mappingEtatsProforma) {
+    entreprise.mappingEtatsProforma = new Map(
+      Object.entries(mappingEtatsProforma),
+    );
+  }
 
   entreprise.isActive = isActive !== undefined ? isActive : entreprise.isActive;
 
@@ -217,6 +255,9 @@ const updateEntreprise = asyncHandler(async (req, res) => {
   }
   if (cheminLogoEtiquettes !== undefined) {
     entreprise.cheminLogoEtiquettes = cheminLogoEtiquettes;
+  }
+  if (Array.isArray(vendeurs)) {
+    entreprise.vendeurs = normaliserVendeurs(vendeurs);
   }
 
   const updatedEntreprise = await entreprise.save();
@@ -317,6 +358,26 @@ const getEntrepriseByTrigramme = asyncHandler(async (req, res) => {
   res.json(entreprise);
 });
 
+// @desc    Codes vendeurs (REPRES) détectés dans facture.dbf
+// @route   GET /api/entreprises/:nomDossierDBF/representants
+// @access  Private/Admin
+const getRepresentantsCodes = asyncHandler(async (req, res) => {
+  const entreprise = await Entreprise.findOne({
+    nomDossierDBF: req.params.nomDossierDBF,
+  });
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  const reps = await factureCacheService.getRepresentants(entreprise);
+  const representants = (reps || [])
+    .map((r) => ({ code: String(r.code).padStart(2, "0"), count: r.count }))
+    .sort((a, b) => a.code.localeCompare(b.code));
+
+  res.json({ representants });
+});
+
 export {
   getEntreprises,
   getEntrepriseById,
@@ -327,4 +388,5 @@ export {
   toggleEntrepriseActive,
   getMyEntreprises,
   getEntrepriseByTrigramme,
+  getRepresentantsCodes,
 };

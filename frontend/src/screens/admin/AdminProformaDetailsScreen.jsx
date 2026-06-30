@@ -190,13 +190,14 @@ const AdminProformaDetailScreen = () => {
   };
 
   const getEtatInfo = (etat) => {
-    return (
+    const base =
       ETAT_CONFIG[etat] || {
         label: `État ${etat}`,
         color: "muted",
         icon: HiDocumentText,
-      }
-    );
+      };
+    const custom = entrepriseData?.mappingEtatsProforma?.[etat];
+    return custom ? { ...base, label: custom } : base;
   };
 
   // =============================================
@@ -315,7 +316,9 @@ const AdminProformaDetailScreen = () => {
         ["ETAT", proforma.ETAT ?? ""],
         [
           "ETAT (Libellé)",
-          ETAT_LABELS[proforma.ETAT] || `État ${proforma.ETAT}`,
+          entrepriseData?.mappingEtatsProforma?.[proforma.ETAT] ||
+            ETAT_LABELS[proforma.ETAT] ||
+            `État ${proforma.ETAT}`,
         ],
         ["MAILING1", safeTrim(proforma.MAILING1)],
         ["MAILING2", safeTrim(proforma.MAILING2)],
@@ -458,7 +461,7 @@ const AdminProformaDetailScreen = () => {
     } finally {
       setIsExporting(false);
     }
-  }, [proforma, lignes, nomDossierDBF]);
+  }, [proforma, lignes, nomDossierDBF, entrepriseData]);
 
   // === LOADING ===
   if (isLoading) {

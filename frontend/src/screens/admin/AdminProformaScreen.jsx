@@ -1,691 +1,878 @@
-// src/screens/admin/AdminInventaireProformaScreen.jsx
-import React, { useState } from "react";
+// src/screens/admin/AdminProformasScreen.jsx
+import React, { useState, useEffect, useMemo } from "react";
 import {
-  HiClipboardList,
-  HiOfficeBuilding,
-  HiUser,
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import {
   HiSearch,
   HiRefresh,
+  HiFilter,
+  HiChevronLeft,
+  HiChevronRight,
+  HiOfficeBuilding,
+  HiEye,
+  HiX,
+  HiChevronDown,
+  HiChevronUp,
+  HiAdjustments,
+  HiExternalLink,
   HiDocumentText,
   HiCalendar,
-  HiChevronRight,
-  HiChevronDown,
-  HiPrinter,
-  HiTable,
-  HiDownload,
-  HiServer,
+  HiCurrencyDollar,
+  HiClipboardList,
+  HiCheckCircle,
+  HiClock,
+  HiExclamation,
+  HiUser,
+  HiUserGroup,
 } from "react-icons/hi";
-import { useSelector, useDispatch } from "react-redux";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
-import { useGetInventaireProformaByTiersQuery } from "../../slices/inventaireProformaApiSlice";
-import { setSelectedEntreprise } from "../../slices/inventaireSelectionSlice";
-import { BASE_URL } from "../../constants";
-import "./AdminInventaireProformaScreen.css";
+import {
+  useGetProformasQuery,
+  useGetRepresentantsQuery,
+} from "../../slices/proformaApiSlice";
+import "./AdminProformasScreen.css";
 
-const AdminInventaireProformaScreen = () => {
-  const dispatch = useDispatch();
-  const persistedEntreprise = useSelector(
-    (s) => s.inventaireSelection.selectedEntreprise,
-  );
-  const [nomDossierDBF, setNomDossierDBF] = useState(persistedEntreprise || "");
-  const [tiersInput, setTiersInput] = useState("");
-  const [tiers, setTiers] = useState(""); // tiers validé (déclenche la requête)
-  const [dateDebut, setDateDebut] = useState(""); // "à partir du" (DATFACT >= dateDebut)
-  const [expanded, setExpanded] = useState(() => new Set()); // NUMFACT dépliés
-  const [ficheLoading, setFicheLoading] = useState(""); // NUMFACT en génération
-  const [groupBy, setGroupBy] = useState("famille"); // famille | fournisseur
-  const [seuil, setSeuil] = useState(""); // seuil écart valeur (XPF)
-  const [docLoading, setDocLoading] = useState(false);
-  const [excluded, setExcluded] = useState(() => new Set()); // NUMFACT décochés
+// Clé pour le localStorage
+const STORAGE_KEY_ENTREPRISE = "admin_proformas_selected_entreprise";
 
-  // Export .DAT (mode inventaire proforma)
-  const [zoneOverrides, setZoneOverrides] = useState({}); // numfact -> zone (modif locale)
-  const [datPortee, setDatPortee] = useState("zone"); // "zone" | "general"
-  const [datLoading, setDatLoading] = useState(false);
-  const [datMsg, setDatMsg] = useState(null); // { type, text }
+// Debounce hook
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+};
 
-  const { data: entreprises } = useGetEntreprisesQuery();
+// Labels et styles des états
+const ETAT_CONFIG = {
+  0: { label: "Brouillon", color: "muted", icon: HiDocumentText },
+  1: { label: "Validée", color: "success", icon: HiCheckCircle },
+  2: { label: "Facturée", color: "info", icon: HiCurrencyDollar },
+};
+
+const AdminProformasScreen = () => {
+  const navigate = useNavigate();
+  const { nomDossierDBF: urlNomDossier } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const getInitialEntreprise = () => {
+    if (urlNomDossier) return urlNomDossier;
+    const saved = localStorage.getItem(STORAGE_KEY_ENTREPRISE);
+    return saved || "";
+  };
+
+  // État principal
+  const [selectedEntreprise, setSelectedEntreprise] =
+    useState(getInitialEntreprise);
+  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
+  const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
+  const [limit] = useState(50);
+
+  // États des filtres
+  const [filters, setFilters] = useState({
+    search: searchParams.get("search") || "",
+    tiers: searchParams.get("tiers") || "",
+    repres: searchParams.get("repres") || "",
+    etat: searchParams.get("etat") || "TOUT",
+    dateDebut: searchParams.get("dateDebut") || "",
+    dateFin: searchParams.get("dateFin") || "",
+  });
+
+  const debouncedFilters = useDebounce(filters, 400);
+
+  // États UI
+  const [showFilters, setShowFilters] = useState(true);
+  const [selectedProforma, setSelectedProforma] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({
+    identification: true,
+    statut: true,
+    dates: false,
+  });
+
+  // Queries
+  const { data: entreprises, isLoading: loadingEntreprises } =
+    useGetEntreprisesQuery();
 
   const {
-    data: lignesData,
-    isFetching: lignesLoading,
+    data: proformasData,
+    isLoading: loadingProformas,
+    error: proformasError,
     refetch,
-  } = useGetInventaireProformaByTiersQuery(
-    { nomDossierDBF, tiers, dateDebut },
-    { skip: !nomDossierDBF || !tiers },
+    isFetching,
+  } = useGetProformasQuery(
+    {
+      nomDossierDBF: selectedEntreprise,
+      page,
+      limit,
+      search: debouncedFilters.search || undefined,
+      tiers: debouncedFilters.tiers || undefined,
+      repres: debouncedFilters.repres || undefined,
+      etat:
+        debouncedFilters.etat !== "TOUT" ? debouncedFilters.etat : undefined,
+      dateDebut: debouncedFilters.dateDebut || undefined,
+      dateFin: debouncedFilters.dateFin || undefined,
+    },
+    { skip: !selectedEntreprise },
   );
 
-  const groupes = lignesData?.groupes || [];
+  const { data: representantsData } = useGetRepresentantsQuery(
+    selectedEntreprise,
+    { skip: !selectedEntreprise },
+  );
 
-  const mappingEntrepots = lignesData?.mappingEntrepots || {
-    S1: "S1",
-    S2: "S2",
-    S3: "S3",
-    S4: "S4",
-    S5: "S5",
-  };
-  const ZONES = ["S1", "S2", "S3", "S4", "S5"];
-  const zoneOf = (numfact, fallback) =>
-    zoneOverrides[numfact] ?? fallback ?? "S1";
-
-  // Affecte une proforma à une zone/entrepôt (PUT)
-  const changeZone = async (numfact, zone) => {
-    setZoneOverrides((prev) => ({ ...prev, [numfact]: zone })); // optimiste
-    try {
-      const res = await fetch(
-        `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/proforma/${numfact}/zone`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ zone }),
-        },
+  // Effets
+  useEffect(() => {
+    if (entreprises && selectedEntreprise) {
+      const entreprise = entreprises.find(
+        (e) => e.nomDossierDBF === selectedEntreprise,
       );
-      if (!res.ok) throw new Error("Échec de l'affectation");
-    } catch (e) {
-      setDatMsg({ type: "error", text: `Zone non enregistrée : ${e.message}` });
+      if (entreprise) {
+        setSelectedEntrepriseData(entreprise);
+        localStorage.setItem(STORAGE_KEY_ENTREPRISE, selectedEntreprise);
+      }
     }
-  };
+  }, [entreprises, selectedEntreprise]);
 
-  // Exporte les proformas du tiers en .DAT (mode "serveur" | "download")
-  const exportDat = async (mode) => {
-    if (!nomDossierDBF || !tiers) return;
-    setDatLoading(true);
-    setDatMsg(null);
-    try {
-      const res = await fetch(
-        `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/tiers/${tiers}/export-dat`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dateDebut, mode, portee: datPortee }),
-        },
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (page > 1) params.set("page", page.toString());
+    if (filters.search) params.set("search", filters.search);
+    if (filters.tiers) params.set("tiers", filters.tiers);
+    if (filters.repres) params.set("repres", filters.repres);
+    if (filters.etat !== "TOUT") params.set("etat", filters.etat);
+    if (filters.dateDebut) params.set("dateDebut", filters.dateDebut);
+    if (filters.dateFin) params.set("dateFin", filters.dateFin);
+    setSearchParams(params, { replace: true });
+  }, [filters, page, setSearchParams]);
+
+  // Les proformas viennent du serveur (déjà filtrées et triées)
+  const proformas = proformasData?.proformas || [];
+
+  // Handlers
+  const handleEntrepriseChange = (e) => {
+    const nomDossier = e.target.value;
+    setSelectedEntreprise(nomDossier);
+    if (nomDossier) {
+      const entreprise = entreprises?.find(
+        (ent) => ent.nomDossierDBF === nomDossier,
       );
-
-      if (mode === "serveur") {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.message || "Erreur export serveur");
-        const noms = (data.fichiers || []).map((f) => f.fichier).join(", ");
-        setDatMsg({
-          type: "success",
-          text: `${data.message}. Dossier : ${data.dossier}${noms ? ` — ${noms}` : ""}`,
-        });
-      } else {
-        if (!res.ok) {
-          let msg = "Erreur lors de l'export";
-          try {
-            const j = await res.json();
-            msg = j?.message || msg;
-          } catch {
-            /* corps non-JSON */
-          }
-          throw new Error(msg);
-        }
-        const blob = await res.blob();
-        const cd = res.headers.get("content-disposition") || "";
-        const m = cd.match(/filename="?([^"]+)"?/);
-        const filename =
-          (m && m[1]) ||
-          (datPortee === "general"
-            ? "stock.dat inventaire_general"
-            : `inventaire_proforma_${tiers}_dat.zip`);
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        setDatMsg({ type: "success", text: `Téléchargé : ${filename}` });
-      }
-    } catch (e) {
-      setDatMsg({ type: "error", text: e.message });
-    } finally {
-      setDatLoading(false);
+      setSelectedEntrepriseData(entreprise);
+      localStorage.setItem(STORAGE_KEY_ENTREPRISE, nomDossier);
+    } else {
+      setSelectedEntrepriseData(null);
+      localStorage.removeItem(STORAGE_KEY_ENTREPRISE);
     }
+    setPage(1);
+    resetFilters();
   };
 
-  // Total global des écarts (XPF) : articles agrégés par NART, proformas cochées.
-  const totalEcartGlobal = React.useMemo(() => {
-    const artMap = new Map();
-    for (const g of groupes) {
-      if (excluded.has(g.numfact)) continue;
-      for (const l of g.lignes) {
-        if (l.isComment || !l.nart) continue;
-        const k = l.nart.toUpperCase();
-        if (!artMap.has(k))
-          artMap.set(k, { qte: 0, stock: l.stock, prev: l.prev });
-        artMap.get(k).qte += Number.isFinite(l.qte) ? l.qte : 0;
-      }
-    }
-    let total = 0;
-    for (const a of artMap.values()) {
-      if (Number.isFinite(a.stock) && Number.isFinite(a.prev))
-        total += Math.round((a.qte - a.stock) * a.prev);
-    }
-    return total;
-  }, [groupes, excluded]);
-
-  const onEntrepriseChange = (e) => {
-    setNomDossierDBF(e.target.value);
-    dispatch(setSelectedEntreprise(e.target.value));
-    setTiersInput("");
-    setTiers("");
-    setExpanded(new Set());
-    setExcluded(new Set());
-  };
-
-  const onSubmit = (e) => {
-    e.preventDefault();
-    setTiers(tiersInput.trim());
-    setExpanded(new Set());
-    setExcluded(new Set());
-  };
-
-  const toggleCheck = (numfact) => {
-    setExcluded((prev) => {
-      const next = new Set(prev);
-      if (next.has(numfact)) next.delete(numfact);
-      else next.add(numfact);
-      return next;
+  const resetFilters = () => {
+    setFilters({
+      search: "",
+      tiers: "",
+      repres: "",
+      etat: "TOUT",
+      dateDebut: "",
+      dateFin: "",
     });
+    setPage(1);
   };
 
-  const toggle = (numfact) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(numfact)) next.delete(numfact);
-      else next.add(numfact);
-      return next;
-    });
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setPage(1);
   };
 
-  // Génère la feuille de contrôle PDF de la proforma et l'ouvre (cookie auth).
-  const genererFiche = async (numfact) => {
-    if (!nomDossierDBF) return;
-    setFicheLoading(numfact);
-    try {
-      const url = `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/proforma/${numfact}/fiche-controle`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(`Génération échouée (${res.status})`);
-      const blob = await res.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `fiche_controle_${numfact}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 60000);
-    } catch (e) {
-      alert(e.message || "Impossible de générer la feuille de contrôle");
-    } finally {
-      setFicheLoading("");
-    }
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
   };
 
-  // Génère le document d'inventaire (PDF paysage ou Excel) du tiers et le télécharge.
-  const genererDoc = async (format = "pdf") => {
-    if (!nomDossierDBF || !tiers) return;
-    const selected = groupes
-      .map((g) => g.numfact)
-      .filter((nf) => !excluded.has(nf));
-    if (selected.length === 0) {
-      alert("Sélectionnez au moins une proforma.");
-      return;
-    }
-    setDocLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("groupBy", groupBy);
-      params.set("format", format);
-      if (seuil) params.set("seuil", seuil);
-      if (dateDebut) params.set("dateDebut", dateDebut);
-      // N'envoyer la liste que si certaines proformas sont décochées
-      if (selected.length < groupes.length)
-        params.set("numfacts", selected.join(","));
-      const url = `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/tiers/${tiers}/inventaire-doc?${params.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) {
-        let msg = `Génération échouée (${res.status})`;
-        try {
-          const j = await res.json();
-          if (j?.message) msg = j.message;
-        } catch {
-          /* réponse non-JSON */
-        }
-        throw new Error(msg);
+  // Compteurs de filtres actifs
+  const activeFiltersCount = useMemo(() => {
+    return Object.entries(filters).filter(([key, value]) => {
+      if (
+        ["search", "tiers", "repres", "dateDebut", "dateFin"].includes(key)
+      ) {
+        return value !== "";
       }
-      const blob = await res.blob();
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `inventaire_proforma_${tiers}.${format === "xlsx" ? "xlsx" : "pdf"}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 60000);
-    } catch (e) {
-      alert(e.message || "Impossible de générer le document");
-    } finally {
-      setDocLoading(false);
-    }
+      return value !== "TOUT";
+    }).length;
+  }, [filters]);
+
+  // Formatters
+  const formatPrice = (price) => {
+    if (!price && price !== 0) return "-";
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "XPF",
+      minimumFractionDigits: 0,
+    }).format(price);
   };
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "-";
+    if (dateValue instanceof Date) {
+      if (isNaN(dateValue.getTime())) return "-";
+      return dateValue.toLocaleDateString("fr-FR");
+    }
+    if (typeof dateValue === "string" && dateValue.length === 8) {
+      const year = dateValue.substring(0, 4);
+      const month = dateValue.substring(4, 6);
+      const day = dateValue.substring(6, 8);
+      return `${day}/${month}/${year}`;
+    }
+    if (typeof dateValue === "string" && dateValue.includes("-")) {
+      const d = new Date(dateValue);
+      if (!isNaN(d.getTime())) return d.toLocaleDateString("fr-FR");
+    }
+    return "-";
+  };
+
+  const safeTrim = (value) => {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value.trim();
+    return String(value);
+  };
+
+  const getEtatInfo = (etat) => {
+    const base =
+      ETAT_CONFIG[etat] || {
+        label: `État ${etat}`,
+        color: "muted",
+        icon: HiDocumentText,
+      };
+    const custom = selectedEntrepriseData?.mappingEtatsProforma?.[etat];
+    return custom ? { ...base, label: custom } : base;
+  };
+
+  if (loadingEntreprises) {
+    return (
+      <div className="admin-proformas-page">
+        <div className="admin-loading-state">
+          <div className="loading-spinner"></div>
+          <p>Chargement des entreprises...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="admin-invproforma">
-      <div className="admin-invproforma-header">
-        <h1>
-          <HiClipboardList /> Inventaire Proforma
-        </h1>
-        <div className="admin-invproforma-actions">
-          <div className="select-with-icon">
-            <HiOfficeBuilding />
-            <select value={nomDossierDBF} onChange={onEntrepriseChange}>
-              <option value="">Sélectionner une entreprise…</option>
+    <div className="admin-proformas-page">
+      {/* Header */}
+      <header className="admin-proformas-header">
+        <div className="header-left">
+          <div className="header-icon proformas-icon">
+            <HiDocumentText />
+          </div>
+          <div className="header-title">
+            <h1>Gestion des Proformas</h1>
+            <p className="header-subtitle">
+              Consultation des proformas — entêtes et lignes détail
+            </p>
+          </div>
+        </div>
+
+        <div className="header-actions">
+          <div className="entreprise-selector">
+            <HiOfficeBuilding className="selector-icon" />
+            <select
+              value={selectedEntreprise}
+              onChange={handleEntrepriseChange}
+            >
+              <option value="">Sélectionner une entreprise</option>
               {entreprises?.map((e) => (
                 <option key={e._id} value={e.nomDossierDBF}>
                   {e.trigramme} - {e.nomComplet}
                 </option>
               ))}
             </select>
+            <HiChevronDown className="selector-arrow" />
           </div>
-
-          <form className="client-form" onSubmit={onSubmit}>
-            <div className="select-with-icon">
-              <HiUser />
-              <input
-                type="text"
-                placeholder="N° de compte (tiers)…"
-                value={tiersInput}
-                onChange={(e) => setTiersInput(e.target.value)}
-                disabled={!nomDossierDBF}
-                autoComplete="off"
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={!nomDossierDBF || !tiersInput.trim()}
-            >
-              <HiSearch /> Afficher
-            </button>
-          </form>
-
-          <button
-            className="btn-icon"
-            onClick={refetch}
-            disabled={!tiers}
-            title="Rafraîchir"
-          >
-            <HiRefresh />
-          </button>
         </div>
-      </div>
+      </header>
 
-      {/* Filtre de date : à partir du (DATFACT) */}
-      <div className="invproforma-datebar">
-        <HiCalendar />
-        <label>
-          À partir du
-          <input
-            type="date"
-            value={dateDebut}
-            onChange={(e) => setDateDebut(e.target.value)}
-            disabled={!nomDossierDBF}
-          />
-        </label>
-        {dateDebut && (
-          <button
-            type="button"
-            className="btn-clear-date"
-            onClick={() => setDateDebut("")}
-            disabled={!nomDossierDBF}
-          >
-            Réinitialiser la date
-          </button>
-        )}
-      </div>
-
-      {!nomDossierDBF ? (
-        <div className="admin-invproforma-placeholder">
-          <HiOfficeBuilding />
-          <p>Sélectionnez une entreprise pour commencer.</p>
-        </div>
-      ) : !tiers ? (
-        <div className="admin-invproforma-placeholder">
-          <HiUser />
-          <p>Saisissez un numéro de compte (tiers) puis « Afficher ».</p>
-        </div>
-      ) : lignesLoading ? (
-        <div className="admin-loading">Chargement…</div>
-      ) : groupes.length === 0 ? (
-        <div className="admin-invproforma-placeholder">
-          <HiDocumentText />
-          <p>
-            Aucune proforma pour le tiers {tiers}
-            {dateDebut ? ` à partir du ${dateDebut}` : ""}.
-          </p>
+      {!selectedEntreprise ? (
+        <div className="empty-state">
+          <div className="empty-icon">
+            <HiDocumentText />
+          </div>
+          <h2>Sélectionnez une entreprise</h2>
+          <p>Choisissez une entreprise pour consulter ses proformas</p>
         </div>
       ) : (
-        <>
-          <div className="admin-invproforma-summary">
-            Tiers <strong>{tiers}</strong>
-            {lignesData.nom ? <> — {lignesData.nom}</> : null} ·{" "}
-            {lignesData.totalProformas} proforma
-            {lignesData.totalProformas > 1 ? "s" : ""} ·{" "}
-            {lignesData.totalLignes} ligne
-            {lignesData.totalLignes > 1 ? "s" : ""}
-            {dateDebut ? <> · à partir du {dateDebut}</> : null}
-          </div>
-
-          <div className="invproforma-docbar">
-            <label>
-              Regrouper par
-              <select
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value)}
+        <div className="admin-proformas-content">
+          {/* Sidebar Filtres */}
+          <aside className={`filters-sidebar ${showFilters ? "open" : ""}`}>
+            <div className="filters-header">
+              <div className="filters-title">
+                <HiFilter />
+                <span>Filtres</span>
+                {activeFiltersCount > 0 && (
+                  <span className="filters-badge">{activeFiltersCount}</span>
+                )}
+              </div>
+              <button
+                className="btn-toggle-filters"
+                onClick={() => setShowFilters(!showFilters)}
               >
-                <option value="famille">Famille (2 1ers car. NART)</option>
-                <option value="fournisseur">Fournisseur</option>
-              </select>
-            </label>
-            <label>
-              Seuil écart (XPF)
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={seuil}
-                onChange={(e) => setSeuil(e.target.value)}
-                placeholder="0"
-              />
-            </label>
-            <span className="docbar-total">
-              Total écarts :{" "}
-              <strong
-                className={
-                  totalEcartGlobal > 0
-                    ? "ecart-pos"
-                    : totalEcartGlobal < 0
-                      ? "ecart-neg"
-                      : ""
-                }
-              >
-                {totalEcartGlobal > 0 ? "+" : ""}
-                {totalEcartGlobal.toLocaleString("fr-FR")} XPF
-              </strong>
-            </span>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => genererDoc("pdf")}
-              disabled={docLoading}
-              title="Document d'inventaire (PDF paysage)"
-            >
-              <HiPrinter /> {docLoading ? "Génération…" : "PDF"}
-            </button>
-            <button
-              type="button"
-              className="btn-excel"
-              onClick={() => genererDoc("xlsx")}
-              disabled={docLoading}
-              title="Document d'inventaire (Excel)"
-            >
-              <HiTable /> {docLoading ? "Génération…" : "Excel"}
-            </button>
-          </div>
+                {showFilters ? <HiX /> : <HiFilter />}
+              </button>
+            </div>
 
-          {/* Export .DAT (format réappro) */}
-          <div className="invproforma-dat-bar">
-            <span className="dat-bar-label">
-              <HiServer /> Export .DAT
-            </span>
-            <select
-              className="dat-portee-select"
-              value={datPortee}
-              onChange={(e) => setDatPortee(e.target.value)}
-              title="Un fichier par entrepôt, ou un seul fichier général"
-            >
-              <option value="zone">Un fichier par zone</option>
-              <option value="general">Un seul fichier général</option>
-            </select>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => exportDat("serveur")}
-              disabled={datLoading}
-              title="Déposer le(s) .DAT sur le serveur configuré"
-            >
-              <HiServer /> {datLoading ? "Export…" : "Sur le serveur"}
-            </button>
-            <button
-              type="button"
-              className="btn-excel"
-              onClick={() => exportDat("download")}
-              disabled={datLoading}
-              title="Télécharger sur mon poste (ZIP si plusieurs zones)"
-            >
-              <HiDownload /> {datLoading ? "Export…" : "Télécharger"}
-            </button>
-            {datMsg ? (
-              <span
-                className={`dat-bar-msg ${datMsg.type === "error" ? "error" : "success"}`}
-              >
-                {datMsg.text}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="admin-invproforma-list">
-            {groupes.map((g) => {
-              const isOpen = expanded.has(g.numfact);
-
-              // Anomalies de la proforma : XX (qté > stock) et D (doublons)
-              let countXX = 0;
-              const doublonNarts = new Set();
-              for (const l of g.lignes) {
-                if (l.isComment) continue;
-                if (
-                  Number.isFinite(l.qte) &&
-                  Number.isFinite(l.stock) &&
-                  l.qte > l.stock
-                )
-                  countXX += 1;
-                if (l.doublon && l.nart)
-                  doublonNarts.add(l.nart.toUpperCase());
-              }
-              const countD = doublonNarts.size;
-
-              return (
-                <div
-                  key={g.numfact}
-                  className={`proforma-group${excluded.has(g.numfact) ? " excluded" : ""}`}
+            <div className="filters-body">
+              {/* Section Identification */}
+              <div className="filter-section">
+                <button
+                  className="section-header"
+                  onClick={() => toggleSection("identification")}
                 >
-                  <div className="proforma-group-bar">
-                    <input
-                      type="checkbox"
-                      className="proforma-check"
-                      checked={!excluded.has(g.numfact)}
-                      onChange={() => toggleCheck(g.numfact)}
-                      title="Inclure cette proforma dans le document généré"
-                    />
-                    <button
-                      type="button"
-                      className="proforma-group-header"
-                      onClick={() => toggle(g.numfact)}
-                      aria-expanded={isOpen}
-                    >
-                      {isOpen ? <HiChevronDown /> : <HiChevronRight />}
-                      <span className="proforma-numfact">
-                        Proforma {g.numfact}
-                      </span>
-                      {g.texte ? (
-                        <span className="proforma-obs" title={g.texte}>
-                          {g.texte}
-                        </span>
-                      ) : null}
-                      <span className="proforma-flags">
-                        <span className="flag-xx" title="Quantités excédentaires (qté > stock)">
-                          XX {countXX}
-                        </span>
-                        <span className="flag-d" title="Articles bipés sur plusieurs proformas">
-                          D {countD}
-                        </span>
-                      </span>
-                      <span className="proforma-nb">
-                        {g.nbLignes} ligne{g.nbLignes > 1 ? "s" : ""}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn-fiche"
-                      onClick={() => genererFiche(g.numfact)}
-                      disabled={ficheLoading === g.numfact}
-                      title="Générer la feuille de contrôle (PDF)"
-                    >
-                      <HiPrinter />{" "}
-                      {ficheLoading === g.numfact ? "…" : "Fiche de contrôle"}
-                    </button>
-
-                    <select
-                      className="proforma-zone-select"
-                      value={zoneOf(g.numfact, g.zone)}
-                      onChange={(e) => changeZone(g.numfact, e.target.value)}
-                      title="Entrepôt/zone pour l'export .DAT"
-                    >
-                      {ZONES.map((z) => (
-                        <option key={z} value={z}>
-                          {z} — {mappingEntrepots[z] || z}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {isOpen && (
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th className="col-nl">NL</th>
-                          <th className="col-nart">NART</th>
-                          <th className="col-att-screen">ATT</th>
-                          <th>Désignation</th>
-                          <th className="col-qte">Qté comptée</th>
-                          <th className="col-stock">Stock théo.</th>
-                          <th className="col-ecart">Écart</th>
-                          <th className="col-ecartval">Écart (XPF)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {g.lignes.map((l, idx) => {
-                          const qteNum = Number.isFinite(l.qte) ? l.qte : null;
-                          const hasStock =
-                            l.stock !== null &&
-                            l.stock !== undefined &&
-                            Number.isFinite(l.stock);
-                          const ecart =
-                            qteNum !== null && hasStock
-                              ? qteNum - l.stock
-                              : null;
-                          const ecartClass =
-                            ecart === null
-                              ? ""
-                              : ecart > 0
-                                ? "ecart-pos"
-                                : ecart < 0
-                                  ? "ecart-neg"
-                                  : "ecart-zero";
-                          const prevNum = Number.isFinite(l.prev)
-                            ? l.prev
-                            : null;
-                          const ecartValeur =
-                            ecart !== null && prevNum !== null
-                              ? Math.round(ecart * prevNum)
-                              : null;
-                          const ecartValClass =
-                            ecartValeur === null
-                              ? ""
-                              : ecartValeur > 0
-                                ? "ecart-pos"
-                                : ecartValeur < 0
-                                  ? "ecart-neg"
-                                  : "ecart-zero";
-                          const isXX =
-                            qteNum !== null && hasStock && qteNum > l.stock;
-                          const isD = !!l.doublon;
-                          const attText = [isD ? "D" : null, isXX ? "XX" : null]
-                            .filter(Boolean)
-                            .join(" ");
-                          const rowClass = l.isComment
-                            ? "row-comment"
-                            : isXX
-                              ? "row-xx"
-                              : isD
-                                ? "row-d"
-                                : "";
-                          return (
-                            <tr
-                              key={`${g.numfact}-${l.nl}-${idx}`}
-                              className={rowClass}
-                            >
-                              <td className="num-cell">{l.nl}</td>
-                              <td className="mono">{l.nart || "—"}</td>
-                              <td
-                                className={`att-cell ${isXX ? "att-xx" : isD ? "att-d" : ""}`}
-                              >
-                                {attText}
-                              </td>
-                              <td className="desig-cell">
-                                {l.design}
-                                {l.detail && l.detail.length > 1 ? (
-                                  <span
-                                    className="bip-badge"
-                                    title={l.detail
-                                      .map(
-                                        (d) =>
-                                          `${d.texte || d.numfact} (${d.numfact}) : ${d.qte}`,
-                                      )
-                                      .join("\n")}
-                                  >
-                                    ⎘ {l.detail.length} proformas
-                                  </span>
-                                ) : null}
-                              </td>
-                              <td className="num-cell">
-                                {l.isComment || qteNum === null ? "—" : qteNum}
-                              </td>
-                              <td className="num-cell">
-                                {hasStock ? l.stock : "—"}
-                              </td>
-                              <td className={`num-cell ${ecartClass}`}>
-                                {ecart === null
-                                  ? "—"
-                                  : ecart > 0
-                                    ? `+${ecart}`
-                                    : ecart}
-                              </td>
-                              <td className={`num-cell ${ecartValClass}`}>
-                                {ecartValeur === null
-                                  ? "—"
-                                  : `${ecartValeur > 0 ? "+" : ""}${ecartValeur.toLocaleString("fr-FR")} XPF`}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <span className="section-icon">🔍</span>
+                  <span>Identification</span>
+                  {expandedSections.identification ? (
+                    <HiChevronUp />
+                  ) : (
+                    <HiChevronDown />
                   )}
+                </button>
+                {expandedSections.identification && (
+                  <div className="section-content">
+                    <div className="filter-group">
+                      <label>
+                        <HiSearch /> Recherche globale
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="N° proforma, nom, texte..."
+                        value={filters.search}
+                        onChange={(e) =>
+                          handleFilterChange("search", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className="filter-group">
+                      <label>
+                        <HiUser /> Code tiers/client
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Code tiers..."
+                        value={filters.tiers}
+                        onChange={(e) =>
+                          handleFilterChange("tiers", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className="filter-group">
+                      <label>
+                        <HiUserGroup /> Représentant
+                      </label>
+                      <select
+                        value={filters.repres}
+                        onChange={(e) =>
+                          handleFilterChange("repres", e.target.value)
+                        }
+                      >
+                        <option value="">Tous les représentants</option>
+                        {representantsData?.representants?.map((r) => (
+                          <option key={r.code} value={r.code}>
+                            Rep. {r.code} ({r.count} proformas)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section Statut */}
+              <div className="filter-section">
+                <button
+                  className="section-header"
+                  onClick={() => toggleSection("statut")}
+                >
+                  <span className="section-icon">📋</span>
+                  <span>Statut</span>
+                  {expandedSections.statut ? (
+                    <HiChevronUp />
+                  ) : (
+                    <HiChevronDown />
+                  )}
+                </button>
+                {expandedSections.statut && (
+                  <div className="section-content">
+                    <div className="filter-group">
+                      <label>
+                        <HiCheckCircle /> État
+                      </label>
+                      <select
+                        value={filters.etat}
+                        onChange={(e) =>
+                          handleFilterChange("etat", e.target.value)
+                        }
+                      >
+                        <option value="TOUT">Tous les états</option>
+                        <option value="0">Brouillon</option>
+                        <option value="1">Validée</option>
+                        <option value="2">Facturée</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section Dates */}
+              <div className="filter-section">
+                <button
+                  className="section-header"
+                  onClick={() => toggleSection("dates")}
+                >
+                  <span className="section-icon">📅</span>
+                  <span>Période</span>
+                  {expandedSections.dates ? (
+                    <HiChevronUp />
+                  ) : (
+                    <HiChevronDown />
+                  )}
+                </button>
+                {expandedSections.dates && (
+                  <div className="section-content">
+                    <div className="filter-group">
+                      <label>
+                        <HiCalendar /> Date début
+                      </label>
+                      <input
+                        type="date"
+                        value={filters.dateDebut}
+                        onChange={(e) =>
+                          handleFilterChange("dateDebut", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div className="filter-group">
+                      <label>
+                        <HiCalendar /> Date fin
+                      </label>
+                      <input
+                        type="date"
+                        value={filters.dateFin}
+                        onChange={(e) =>
+                          handleFilterChange("dateFin", e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="filters-footer">
+              <button className="btn-reset" onClick={resetFilters}>
+                <HiRefresh />
+                <span>Réinitialiser</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* Main Content */}
+          <main className="proformas-main">
+            {/* Stats Bar */}
+            <div className="stats-bar">
+              <div className="stat-item primary">
+                <span className="stat-value">
+                  {proformasData?.pagination?.totalRecords?.toLocaleString() ||
+                    0}
+                </span>
+                <span className="stat-label">
+                  {activeFiltersCount > 0
+                    ? "Proformas filtrées"
+                    : "Proformas"}
+                </span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">
+                  {representantsData?.totalRepresentants || 0}
+                </span>
+                <span className="stat-label">Représentants</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-value">
+                  {proformasData?.pagination?.page || 1}/
+                  {proformasData?.pagination?.totalPages || 1}
+                </span>
+                <span className="stat-label">Page</span>
+              </div>
+              {proformasData?._queryTime && (
+                <div className="stat-item">
+                  <span className="stat-value">
+                    {proformasData._queryTime}
+                  </span>
+                  <span className="stat-label">Temps</span>
                 </div>
-              );
-            })}
+              )}
+
+              <div className="stats-actions">
+                <button
+                  className={`btn-icon-action ${showFilters ? "active" : ""}`}
+                  onClick={() => setShowFilters(!showFilters)}
+                  title="Afficher/Masquer les filtres"
+                >
+                  <HiAdjustments />
+                </button>
+                <button
+                  className="btn-icon-action"
+                  onClick={refetch}
+                  disabled={isFetching}
+                  title="Rafraîchir"
+                >
+                  <HiRefresh className={isFetching ? "spinning" : ""} />
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="proformas-table-container">
+              {loadingProformas || isFetching ? (
+                <div className="table-loading">
+                  <div className="loading-spinner"></div>
+                  <p>Chargement des proformas...</p>
+                </div>
+              ) : proformasError ? (
+                <div className="table-error">
+                  <HiExclamation />
+                  <p>
+                    Erreur:{" "}
+                    {proformasError?.data?.message ||
+                      "Impossible de charger les proformas"}
+                  </p>
+                  <button onClick={refetch}>Réessayer</button>
+                </div>
+              ) : proformas.length === 0 ? (
+                <div className="table-empty">
+                  <HiDocumentText />
+                  <h3>Aucune proforma trouvée</h3>
+                  <p>Modifiez vos filtres pour afficher des résultats</p>
+                </div>
+              ) : (
+                <table className="proformas-table">
+                  <thead>
+                    <tr>
+                      <th className="col-numfact">N° Proforma</th>
+                      <th className="col-datfact">Date</th>
+                      <th className="col-tiers">Tiers</th>
+                      <th className="col-nom">Nom</th>
+                      <th className="col-texte">Texte / Objet</th>
+                      <th className="col-repres">Rep.</th>
+                      <th className="col-montant text-right">Montant</th>
+                      <th className="col-etat">État</th>
+                      <th className="col-datchant">Date Chantier</th>
+                      <th className="col-actions">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {proformas.map((proforma, index) => {
+                      const etatInfo = getEtatInfo(proforma.ETAT);
+                      const EtatIcon = etatInfo.icon;
+
+                      return (
+                        <tr
+                          key={`${proforma.NUMFACT}-${index}`}
+                          className={`row-etat-${etatInfo.color}`}
+                        >
+                          <td className="col-numfact">
+                            <Link
+                              to={`/admin/proformas/${selectedEntreprise}/${safeTrim(proforma.NUMFACT)}`}
+                              className="proforma-numfact-link"
+                            >
+                              {safeTrim(proforma.NUMFACT)}
+                              <HiExternalLink className="link-icon" />
+                            </Link>
+                          </td>
+                          <td className="col-datfact">
+                            <span className="date-value">
+                              {formatDate(proforma.DATFACT)}
+                            </span>
+                          </td>
+                          <td className="col-tiers">
+                            <span className="tiers-badge">
+                              {proforma.TIERS || "-"}
+                            </span>
+                          </td>
+                          <td className="col-nom">
+                            <span
+                              className="nom-text"
+                              title={safeTrim(proforma.NOM)}
+                            >
+                              {safeTrim(proforma.NOM) || "-"}
+                            </span>
+                          </td>
+                          <td className="col-texte">
+                            <span
+                              className="texte-text"
+                              title={safeTrim(proforma.TEXTE)}
+                            >
+                              {safeTrim(proforma.TEXTE) || "-"}
+                            </span>
+                          </td>
+                          <td className="col-repres">
+                            <span className="repres-badge">
+                              {proforma.REPRES || "-"}
+                            </span>
+                          </td>
+                          <td className="col-montant text-right">
+                            <span className="montant-value">
+                              {formatPrice(proforma.MONTANT)}
+                            </span>
+                          </td>
+                          <td className="col-etat">
+                            <span
+                              className={`etat-badge etat-${etatInfo.color}`}
+                            >
+                              <EtatIcon />
+                              {etatInfo.label}
+                            </span>
+                          </td>
+                          <td className="col-datchant">
+                            <span className="date-value">
+                              {formatDate(proforma.DATCHANT)}
+                            </span>
+                          </td>
+                          <td className="col-actions">
+                            <div className="actions-group">
+                              <button
+                                className="btn-view"
+                                onClick={() => setSelectedProforma(proforma)}
+                                title="Aperçu rapide"
+                              >
+                                <HiEye />
+                              </button>
+                              <Link
+                                to={`/admin/proformas/${selectedEntreprise}/${safeTrim(proforma.NUMFACT)}`}
+                                className="btn-view btn-detail"
+                                title="Voir les détails"
+                              >
+                                <HiExternalLink />
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Pagination */}
+            {proformasData?.pagination && (
+              <div className="pagination-bar">
+                <div className="pagination-info">
+                  Affichage de{" "}
+                  <strong>
+                    {Math.min(
+                      (proformasData.pagination.page - 1) * limit + 1,
+                      proformasData.pagination.totalRecords,
+                    )}
+                  </strong>{" "}
+                  à{" "}
+                  <strong>
+                    {Math.min(
+                      proformasData.pagination.page * limit,
+                      proformasData.pagination.totalRecords,
+                    )}
+                  </strong>{" "}
+                  sur{" "}
+                  <strong>
+                    {proformasData.pagination.totalRecords.toLocaleString()}
+                  </strong>{" "}
+                  proformas
+                </div>
+                <div className="pagination-controls">
+                  <button
+                    className="btn-page"
+                    disabled={!proformasData.pagination.hasPrevPage}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    <HiChevronLeft />
+                    <span>Précédent</span>
+                  </button>
+                  <div className="page-indicator">
+                    <span className="current-page">
+                      {proformasData.pagination.page}
+                    </span>
+                    <span className="page-separator">/</span>
+                    <span className="total-pages">
+                      {proformasData.pagination.totalPages}
+                    </span>
+                  </div>
+                  <button
+                    className="btn-page"
+                    disabled={!proformasData.pagination.hasNextPage}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    <span>Suivant</span>
+                    <HiChevronRight />
+                  </button>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      )}
+
+      {/* Modal Aperçu Proforma */}
+      {selectedProforma && (
+        <div
+          className="proforma-modal-overlay"
+          onClick={() => setSelectedProforma(null)}
+        >
+          <div
+            className="proforma-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div className="modal-title">
+                <HiDocumentText />
+                <div>
+                  <h2>Aperçu proforma</h2>
+                  <span className="modal-numfact">
+                    N° {safeTrim(selectedProforma.NUMFACT)}
+                  </span>
+                </div>
+              </div>
+              <div className="modal-header-actions">
+                <Link
+                  to={`/admin/proformas/${selectedEntreprise}/${safeTrim(selectedProforma.NUMFACT)}`}
+                  className="btn-view-full"
+                  title="Voir la fiche complète"
+                >
+                  <HiExternalLink />
+                  <span>Fiche complète</span>
+                </Link>
+                <button
+                  className="btn-close-modal"
+                  onClick={() => setSelectedProforma(null)}
+                >
+                  <HiX />
+                </button>
+              </div>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-info-section">
+                {/* État */}
+                <div className="modal-status-row">
+                  <span
+                    className={`etat-badge etat-${getEtatInfo(selectedProforma.ETAT).color} large`}
+                  >
+                    {React.createElement(
+                      getEtatInfo(selectedProforma.ETAT).icon,
+                    )}
+                    {getEtatInfo(selectedProforma.ETAT).label}
+                  </span>
+                </div>
+
+                {/* Infos principales */}
+                <div className="info-block">
+                  <h4>📋 Informations générales</h4>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>N° Proforma</label>
+                      <span className="value highlight">
+                        {safeTrim(selectedProforma.NUMFACT)}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Code tiers</label>
+                      <span className="value">
+                        {selectedProforma.TIERS || "-"}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Nom</label>
+                      <span className="value">
+                        {safeTrim(selectedProforma.NOM) || "-"}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Date proforma</label>
+                      <span className="value">
+                        {formatDate(selectedProforma.DATFACT)}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Représentant</label>
+                      <span className="value">
+                        {selectedProforma.REPRES || "-"}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Date chantier</label>
+                      <span className="value">
+                        {formatDate(selectedProforma.DATCHANT)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Montant */}
+                <div className="info-block">
+                  <h4>💰 Montant</h4>
+                  <div className="montants-grid">
+                    <div className="montant-item main">
+                      <label>Montant total</label>
+                      <span>{formatPrice(selectedProforma.MONTANT)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Texte / Objet */}
+                {safeTrim(selectedProforma.TEXTE) && (
+                  <div className="info-block observations-block">
+                    <h4>📝 Texte / Objet</h4>
+                    <p className="observations-text">
+                      {safeTrim(selectedProforma.TEXTE)}
+                    </p>
+                  </div>
+                )}
+
+                {/* Adresse mailing */}
+                {(safeTrim(selectedProforma.MAILING1) ||
+                  safeTrim(selectedProforma.MAILING2)) && (
+                  <div className="info-block">
+                    <h4>📮 Adresse</h4>
+                    <div className="mailing-lines">
+                      {[1, 2, 3, 4, 5].map((i) => {
+                        const line = safeTrim(
+                          selectedProforma[`MAILING${i}`],
+                        );
+                        return line ? (
+                          <p key={i} className="mailing-line">
+                            {line}
+                          </p>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
 };
 
-export default AdminInventaireProformaScreen;
+export default AdminProformasScreen;

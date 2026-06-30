@@ -9,6 +9,7 @@ import {
   toggleEntrepriseActive,
   getMyEntreprises,
   getEntrepriseByTrigramme,
+  getRepresentantsCodes,
 } from "../controllers/EntrepriseControlleur.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 
@@ -22,6 +23,14 @@ router.get("/dossier/:nomDossierDBF", protect, getEntrepriseByDossier);
 // Admin only
 router.get("/", protect, admin, getEntreprises);
 router.post("/", protect, admin, createEntreprise);
+// Codes vendeurs (REPRES) détectés dans facture.dbf — route à 2 segments,
+// placée avant /:id (1 segment) pour rester sans ambiguïté.
+router.get(
+  "/:nomDossierDBF/representants",
+  protect,
+  admin,
+  getRepresentantsCodes,
+);
 router.get("/:id", protect, admin, getEntrepriseById);
 router.put("/:id", protect, admin, updateEntreprise);
 router.delete("/:id", protect, admin, deleteEntreprise);

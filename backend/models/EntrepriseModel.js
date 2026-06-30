@@ -29,6 +29,22 @@ const traduireCheminExport = (v) => {
   return dernier ? `${root.replace(/[\\/]+$/, "")}/${dernier}` : root;
 };
 
+// Sous-document : code vendeur (REPRES, 2 chiffres) -> identité.
+const vendeurSchema = new mongoose.Schema(
+  {
+    code: { type: String, trim: true, default: "" }, // code REPRES (ex: "05")
+    nom: { type: String, default: "" },
+    prenom: { type: String, default: "" },
+    email: { type: String, default: "" },
+    type: {
+      type: String,
+      enum: ["commercial", "vendeur", "autre"],
+      default: "vendeur",
+    },
+  },
+  { _id: false },
+);
+
 const entrepriseSchema = new mongoose.Schema(
   {
     nomDossierDBF: {
@@ -100,6 +116,11 @@ const entrepriseSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Codes vendeurs (REPRES) : code 2 chiffres -> identité + type.
+    vendeurs: {
+      type: [vendeurSchema],
+      default: [],
+    },
     // Mapping des noms d'entrepôts (S1, S2, S3, S4, S5)
     mappingEntrepots: {
       S1: { type: String, default: "Magasin" },
@@ -125,6 +146,19 @@ const entrepriseSchema = new mongoose.Schema(
           ["8", "Avion"],
           ["9", "Commande locale"],
         ]),
+    },
+    // Mapping des états de FACTURE (personnalisable par entreprise, codes 0-9).
+    // Libellés vides par défaut (à remplir par l'admin).
+    mappingEtatsFacture: {
+      type: Map,
+      of: String,
+      default: () => new Map(),
+    },
+    // Mapping des états de PROFORMA (personnalisable par entreprise, codes 0-9).
+    mappingEtatsProforma: {
+      type: Map,
+      of: String,
+      default: () => new Map(),
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

@@ -24,8 +24,10 @@
   animation: modalSlide 0.2s ease;
 }
 
+/* Modal entreprise : nettement plus large (table vendeurs, états, etc.) */
 .modal-entreprise {
-  max-width: 560px;
+  max-width: 960px;
+  width: 95%;
 }
 
 @keyframes modalSlide {
@@ -84,6 +86,7 @@
   padding: 12px 20px 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
+  flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -219,6 +222,168 @@
   cursor: pointer;
 }
 
+/* ===== Onglet États (grille) ===== */
+.tab-description-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn-reset-etats {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.btn-reset-etats:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.etats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.etat-key {
+  font-weight: 600;
+}
+
+.etat-default {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ===== Onglet Vendeurs ===== */
+.vendeurs-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.btn-detect-vendeur,
+.btn-add-vendeur {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.btn-detect-vendeur {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-detect-vendeur:hover {
+  background: var(--accent-hover);
+}
+
+.btn-add-vendeur:hover {
+  border-color: var(--accent);
+}
+
+.btn-detect-vendeur:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vendeurs-msg {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.vendeurs-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.vendeurs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.vendeurs-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.vendeurs-table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.vendeurs-table input,
+.vendeurs-table select {
+  width: 100%;
+  padding: 8px 9px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+}
+
+.vendeurs-table input:focus,
+.vendeurs-table select:focus {
+  border-color: var(--accent);
+}
+
+.vendeur-code-input {
+  max-width: 64px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.btn-vendeur-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.btn-vendeur-remove:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
 /* Footer */
 .modal-footer {
   display: flex;
@@ -265,17 +430,32 @@
   cursor: not-allowed;
 }
 
-/* Responsive */
-@media (max-width: 500px) {
-  .modal {
-    max-height: 100vh;
-    border-radius: 0;
+/* Plein écran sur écrans moyens/petits */
+@media (max-width: 900px) {
+  .modal-overlay {
+    padding: 0;
   }
 
-  .modal-entreprise {
+  .modal.modal-entreprise {
     max-width: 100%;
+    width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
   }
 
+  .etats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vendeurs-table th:nth-child(4),
+  .vendeurs-table td:nth-child(4) {
+    display: none; /* masque l'email sur petit écran */
+  }
+}
+
+@media (max-width: 500px) {
   .form-row {
     grid-template-columns: 1fr;
   }
