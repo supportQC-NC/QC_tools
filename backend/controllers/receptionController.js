@@ -173,7 +173,10 @@ const buildArticleInfo = (entreprise, code, resultatRenvoi) => {
   }
 
   const a = resultatRenvoi.articleFinal;
-  const reserv = parseFloat(a.RESERV) || 0;
+  // Réservations : champ article.RESERV (tolérant à quelques variantes de nom).
+  const reservRaw =
+    a.RESERV ?? a.RESERVE ?? a.RESERVED ?? a.RESA ?? a.RESERVQTE ?? 0;
+  const reserv = parseFloat(reservRaw) || 0;
   return {
     nart: a.NART ? a.NART.trim() : code,
     gencod: a.GENCOD ? a.GENCOD.trim() : "",
