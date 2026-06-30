@@ -7,6 +7,8 @@ import { ecrirePDF } from "../services/ficheControleService.js";
 import path from "path";
 import os from "os";
 import fs from "fs";
+import zlib from "zlib";
+import ProformaZone from "../models/ProformaZoneModel.js";
 
 /**
  * Mode « Inventaire Proforma » (admin, lecture seule).
@@ -28,6 +30,117 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 const isComment = (nart) => nart === "" || nart.includes("!");
+
+// ---------------------------------------------------------------------------
+// Export .DAT (mode Inventaire Proforma) — même format que les réappros :
+//   CODE(13, gencod sinon nart, complété d'espaces) | QTE(8, zéros) | 000
+// La ZONE est portée par le NOM du fichier : "stock.dat inventaire_<zone>".
+// ---------------------------------------------------------------------------
+const ZONES = ["S1", "S2", "S3", "S4", "S5"];
+const ZONE_DEFAUT = "S1";
+
+// Nom de fichier déposé / téléchargé. <zone> = code entrepôt (S1..S5).
+const nomFichierDat = (zone) =>
+  `stock.dat inventaire_${String(zone || ZONE_DEFAUT)
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "_")}`;
+
+// Contenu .DAT à partir de lignes { gencod, nart, quantite }.
+const genererContenuDat = (lignes) => {
+  let contenu = "";
+  for (const ligne of lignes) {
+    let code = "";
+    if (ligne.gencod && ligne.gencod.trim()) {
+      code = ligne.gencod.trim().padEnd(13, " ");
+    } else {
+      code = (ligne.nart || "").trim().padEnd(13, " ");
+    }
+    const q = Math.max(0, Math.trunc(Number(ligne.quantite) || 0)); // négatif -> 0
+    const quantiteFormatee = q.toString().padStart(8, "0");
+    contenu += `${code}|${quantiteFormatee}|000\r\n`;
+  }
+  return contenu;
+};
+
+// --- ZIP minimal (méthode deflate), sans dépendance externe ---
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+const crc32 = (buf) => {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+};
+const makeZip = (files) => {
+  // files : [{ name, data: Buffer }]
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+  for (const f of files) {
+    const nameBuf = Buffer.from(f.name, "utf8");
+    const data = f.data;
+    const crc = crc32(data);
+    const comp = zlib.deflateRawSync(data);
+    const lfh = Buffer.alloc(30);
+    lfh.writeUInt32LE(0x04034b50, 0);
+    lfh.writeUInt16LE(20, 4);
+    lfh.writeUInt16LE(0x0800, 6); // UTF-8
+    lfh.writeUInt16LE(8, 8); // deflate
+    lfh.writeUInt16LE(0, 10);
+    lfh.writeUInt16LE(0, 12);
+    lfh.writeUInt32LE(crc, 14);
+    lfh.writeUInt32LE(comp.length, 18);
+    lfh.writeUInt32LE(data.length, 22);
+    lfh.writeUInt16LE(nameBuf.length, 26);
+    lfh.writeUInt16LE(0, 28);
+    chunks.push(lfh, nameBuf, comp);
+    const cdr = Buffer.alloc(46);
+    cdr.writeUInt32LE(0x02014b50, 0);
+    cdr.writeUInt16LE(20, 4);
+    cdr.writeUInt16LE(20, 6);
+    cdr.writeUInt16LE(0x0800, 8);
+    cdr.writeUInt16LE(8, 10);
+    cdr.writeUInt16LE(0, 12);
+    cdr.writeUInt16LE(0, 14);
+    cdr.writeUInt32LE(crc, 16);
+    cdr.writeUInt32LE(comp.length, 20);
+    cdr.writeUInt32LE(data.length, 24);
+    cdr.writeUInt16LE(nameBuf.length, 28);
+    cdr.writeUInt16LE(0, 30);
+    cdr.writeUInt16LE(0, 32);
+    cdr.writeUInt16LE(0, 34);
+    cdr.writeUInt16LE(0, 36);
+    cdr.writeUInt32LE(0, 38);
+    cdr.writeUInt32LE(offset, 42);
+    central.push({ cdr, nameBuf });
+    offset += lfh.length + nameBuf.length + comp.length;
+  }
+  const centralStart = offset;
+  let centralSize = 0;
+  for (const c of central) {
+    chunks.push(c.cdr, c.nameBuf);
+    centralSize += c.cdr.length + c.nameBuf.length;
+  }
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(files.length, 8);
+  eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(centralSize, 12);
+  eocd.writeUInt32LE(centralStart, 16);
+  eocd.writeUInt16LE(0, 20);
+  chunks.push(eocd);
+  return Buffer.concat(chunks);
+};
 
 const formatEntreprise = (e) => ({
   _id: e._id,
@@ -147,10 +260,9 @@ const getByTiers = asyncHandler(async (req, res) => {
   const dFin = inputDate(req.query.dateFin);
   if (dFin) dFin.setHours(23, 59, 59, 999);
 
-  // 1) Entêtes du tiers → NUMFACT + NOM + TEXTE (observation) + DATFACT
+  // 1) Entêtes du tiers → NUMFACT + NOM + TEXTE (observation)
   const numfactsSet = new Set();
   const texteByNumfact = new Map();
-  const datfactByNumfact = new Map(); // NUMFACT -> "AAAA-MM-JJ"
   let nom = "";
   for (const h of cache.proformaRecords) {
     if (!matchTiers(h.TIERS)) continue;
@@ -165,15 +277,6 @@ const getByTiers = asyncHandler(async (req, res) => {
     if (nf) {
       numfactsSet.add(nf);
       if (!texteByNumfact.has(nf)) texteByNumfact.set(nf, safeTrim(h.TEXTE));
-      if (!datfactByNumfact.has(nf)) {
-        const df = recDate(h.DATFACT);
-        datfactByNumfact.set(
-          nf,
-          df
-            ? `${df.getFullYear()}-${String(df.getMonth() + 1).padStart(2, "0")}-${String(df.getDate()).padStart(2, "0")}`
-            : "",
-        );
-      }
     }
     if (!nom) nom = safeTrim(h.NOM);
   }
@@ -266,7 +369,6 @@ const getByTiers = asyncHandler(async (req, res) => {
     groupes.push({
       numfact,
       texte: texteByNumfact.get(numfact) || "",
-      datfact: datfactByNumfact.get(numfact) || "",
       nbLignes: lignes.length,
       lignes,
     });
@@ -274,8 +376,25 @@ const getByTiers = asyncHandler(async (req, res) => {
 
   groupes.sort((a, b) => a.numfact.localeCompare(b.numfact, "fr"));
 
+  // Affectation de zone (entrepôt) par proforma — défaut S1.
+  const zonesAff = await ProformaZone.find({
+    entreprise: entreprise._id,
+    numfact: { $in: groupes.map((g) => g.numfact) },
+  }).lean();
+  const zoneByNumfact = new Map(zonesAff.map((z) => [z.numfact, z.zone]));
+  for (const g of groupes) {
+    g.zone = zoneByNumfact.get(g.numfact) || ZONE_DEFAUT;
+  }
+
   res.json({
     entreprise: formatEntreprise(entreprise),
+    mappingEntrepots: entreprise.mappingEntrepots || {
+      S1: "S1",
+      S2: "S2",
+      S3: "S3",
+      S4: "S4",
+      S5: "S5",
+    },
     tiers,
     nom,
     filtreDate: {
@@ -367,7 +486,9 @@ const genererFicheControle = asyncHandler(async (req, res) => {
   const rows = entries.map((e, i) => {
     const flags = [];
     if (counts.get(e.dupKey) > 1) flags.push("D");
-    if (!e.nonTrouve && e.qte > e.stock) flags.push("XX");
+    if (e.nonTrouve) flags.push("A");
+    else if (e.qte > e.stock) flags.push("XX");
+    else if (e.stock > e.qte) flags.push("A");
 
     return {
       n: i + 1,
@@ -396,13 +517,7 @@ const genererFicheControle = asyncHandler(async (req, res) => {
     `fiche_proforma_${numfact.replace(/[^\w-]+/g, "_")}_${Date.now()}.pdf`,
   );
 
-  await ecrirePDF({
-    header,
-    rows,
-    outPath: tmp,
-    legende:
-      "   D = Doublon | XX = Quantité excédentaire | Lignes rouges = Contrôle prioritaire",
-  });
+  await ecrirePDF({ header, rows, outPath: tmp });
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
@@ -1083,9 +1198,206 @@ const genererInventaireDoc = asyncHandler(async (req, res) => {
   stream.pipe(res);
 });
 
+/**
+ * @desc    Affecter une proforma à une zone/entrepôt (S1..S5)
+ * @route   PUT /api/inventaire-proforma/:nomDossierDBF/proforma/:numfact/zone
+ * @access  Admin
+ */
+const setProformaZone = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const numfact = safeTrim(req.params.numfact);
+  const zone = safeTrim(req.body.zone).toUpperCase();
+
+  if (!numfact) {
+    res.status(400);
+    throw new Error("NUMFACT requis");
+  }
+  if (!ZONES.includes(zone)) {
+    res.status(400);
+    throw new Error(`Zone invalide (attendu : ${ZONES.join(", ")})`);
+  }
+
+  const doc = await ProformaZone.findOneAndUpdate(
+    { entreprise: entreprise._id, numfact },
+    { $set: { zone, nomDossierDBF: entreprise.nomDossierDBF } },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+
+  res.json({ numfact: doc.numfact, zone: doc.zone });
+});
+
+/**
+ * @desc    Exporter les proformas d'un tiers en .DAT (format réappro).
+ *          portee = "zone" (un fichier par entrepôt) | "general" (un seul fichier)
+ *          mode   = "serveur" (cheminExportInventaire) | "download" (poste, ZIP si multi)
+ * @route   POST /api/inventaire-proforma/:nomDossierDBF/tiers/:tiers/export-dat
+ * @access  Admin
+ */
+const exportProformaDat = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const tiers = safeTrim(req.params.tiers);
+  const { dateDebut, dateFin, mode, portee, cheminDestination } = req.body;
+
+  if (!tiers) {
+    res.status(400);
+    throw new Error("N° de tiers requis");
+  }
+
+  const chk = checkFiles(entreprise);
+  if (!chk.ok) {
+    res.status(404);
+    throw new Error(chk.error);
+  }
+
+  const cache = await proformaCacheService.getProformas(entreprise);
+  const matchTiers = makeTiersMatcher(tiers);
+  const dDeb = inputDate(dateDebut);
+  const dFin = inputDate(dateFin);
+  if (dFin) dFin.setHours(23, 59, 59, 999);
+
+  // NUMFACT du tiers (+ filtre date) — même périmètre que getByTiers
+  const numfacts = [];
+  const seen = new Set();
+  for (const h of cache.proformaRecords) {
+    if (!matchTiers(h.TIERS)) continue;
+    if (dDeb || dFin) {
+      const df = recDate(h.DATFACT);
+      if (dDeb && (!df || df < dDeb)) continue;
+      if (dFin && (!df || df > dFin)) continue;
+    }
+    const nf = safeTrim(h.NUMFACT);
+    if (nf && !seen.has(nf)) {
+      seen.add(nf);
+      numfacts.push(nf);
+    }
+  }
+  if (numfacts.length === 0) {
+    res.status(400);
+    throw new Error("Aucune proforma pour ce tiers / cette période");
+  }
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+
+  // Zone par proforma (défaut S1)
+  const zonesAff = await ProformaZone.find({
+    entreprise: entreprise._id,
+    numfact: { $in: numfacts },
+  }).lean();
+  const zoneByNumfact = new Map(zonesAff.map((z) => [z.numfact, z.zone]));
+
+  // Résolution gencod par NART (mémorisée)
+  const gencodCache = new Map();
+  const resolveGencod = async (nart) => {
+    const key = nart.toUpperCase();
+    if (gencodCache.has(key)) return gencodCache.get(key);
+    let g = "";
+    try {
+      const a = await articleCacheService.findByNart(entreprise, nart);
+      if (a && a.GENCOD) g = String(a.GENCOD).trim();
+    } catch {
+      /* ignore */
+    }
+    gencodCache.set(key, g);
+    return g;
+  };
+
+  // Agrégation par bucket (zone, ou "__general__") -> Map(NART -> { nart, quantite })
+  const general = portee === "general";
+  const buckets = new Map();
+  const ensure = (k) => {
+    if (!buckets.has(k)) buckets.set(k, new Map());
+    return buckets.get(k);
+  };
+
+  for (const nf of numfacts) {
+    const zone = zoneByNumfact.get(nf) || ZONE_DEFAUT;
+    const agg = ensure(general ? "__general__" : zone);
+    for (const r of cache.prodetByNumfact.get(nf) || []) {
+      const nart = safeTrim(r.NART);
+      if (isComment(nart) || !nart) continue;
+      const q = Math.max(0, toNum(r.QTE)); // quantité négative -> 0
+      const key = nart.toUpperCase();
+      const cur = agg.get(key) || { nart, quantite: 0 };
+      cur.quantite += q;
+      agg.set(key, cur);
+    }
+  }
+
+  // Construction des fichiers
+  const files = [];
+  for (const [bucketKey, agg] of buckets) {
+    const lignes = [...agg.values()];
+    for (const l of lignes) l.gencod = await resolveGencod(l.nart);
+    lignes.sort((a, b) => a.nart.localeCompare(b.nart, "fr"));
+    const zoneForName = general ? "general" : bucketKey;
+    files.push({
+      zone: zoneForName,
+      name: nomFichierDat(zoneForName),
+      data: Buffer.from(genererContenuDat(lignes), "utf8"),
+      nbLignes: lignes.length,
+    });
+  }
+  files.sort((a, b) => a.zone.localeCompare(b.zone, "fr"));
+
+  if (files.length === 0) {
+    res.status(400);
+    throw new Error("Rien à exporter");
+  }
+
+  // ---- Destination : serveur ----
+  if (mode === "serveur") {
+    let cheminExport =
+      entreprise.cheminExportInventaire ||
+      (cheminDestination && cheminDestination.trim()) ||
+      "/mnt/rcommun/STOCK/collect_sec";
+    try {
+      if (!fs.existsSync(cheminExport)) {
+        fs.mkdirSync(cheminExport, { recursive: true });
+      }
+    } catch (e) {
+      res.status(400);
+      throw new Error(
+        `Impossible d'accéder au chemin: ${cheminExport}. Vérifiez les droits. (${e.message})`,
+      );
+    }
+    const ecrits = [];
+    for (const f of files) {
+      const p = path.join(cheminExport, f.name);
+      try {
+        fs.writeFileSync(p, f.data, "utf8");
+      } catch (e) {
+        res.status(400);
+        throw new Error(`Impossible d'écrire ${f.name}: ${e.message}`);
+      }
+      ecrits.push({ fichier: f.name, zone: f.zone, lignes: f.nbLignes, chemin: p });
+    }
+    return res.json({
+      message: `${ecrits.length} fichier(s) .DAT exporté(s) sur le serveur`,
+      dossier: cheminExport,
+      fichiers: ecrits,
+    });
+  }
+
+  // ---- Destination : téléchargement (poste) ----
+  if (files.length === 1) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${files[0].name}"`);
+    return res.send(files[0].data);
+  }
+  const zip = makeZip(files.map((f) => ({ name: f.name, data: f.data })));
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="inventaire_proforma_${tiers}_dat.zip"`,
+  );
+  return res.send(zip);
+});
+
 export {
   getTiers,
   getByTiers,
   genererFicheControle,
   genererInventaireDoc,
+  setProformaZone,
+  exportProformaDat,
 };

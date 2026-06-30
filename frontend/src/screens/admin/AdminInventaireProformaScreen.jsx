@@ -12,6 +12,8 @@ import {
   HiChevronDown,
   HiPrinter,
   HiTable,
+  HiDownload,
+  HiServer,
 } from "react-icons/hi";
 import { useSelector, useDispatch } from "react-redux";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
@@ -19,13 +21,6 @@ import { useGetInventaireProformaByTiersQuery } from "../../slices/inventairePro
 import { setSelectedEntreprise } from "../../slices/inventaireSelectionSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminInventaireProformaScreen.css";
-
-// Formate une date ISO "AAAA-MM-JJ" en "JJ/MM/AAAA" (vide si absente)
-const fmtDateFr = (iso) => {
-  if (!iso) return "";
-  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso);
-};
 
 const AdminInventaireProformaScreen = () => {
   const dispatch = useDispatch();
@@ -43,6 +38,12 @@ const AdminInventaireProformaScreen = () => {
   const [docLoading, setDocLoading] = useState(false);
   const [excluded, setExcluded] = useState(() => new Set()); // NUMFACT décochés
 
+  // Export .DAT (mode inventaire proforma)
+  const [zoneOverrides, setZoneOverrides] = useState({}); // numfact -> zone (modif locale)
+  const [datPortee, setDatPortee] = useState("zone"); // "zone" | "general"
+  const [datLoading, setDatLoading] = useState(false);
+  const [datMsg, setDatMsg] = useState(null); // { type, text }
+
   const { data: entreprises } = useGetEntreprisesQuery();
 
   const {
@@ -55,6 +56,96 @@ const AdminInventaireProformaScreen = () => {
   );
 
   const groupes = lignesData?.groupes || [];
+
+  const mappingEntrepots = lignesData?.mappingEntrepots || {
+    S1: "S1",
+    S2: "S2",
+    S3: "S3",
+    S4: "S4",
+    S5: "S5",
+  };
+  const ZONES = ["S1", "S2", "S3", "S4", "S5"];
+  const zoneOf = (numfact, fallback) =>
+    zoneOverrides[numfact] ?? fallback ?? "S1";
+
+  // Affecte une proforma à une zone/entrepôt (PUT)
+  const changeZone = async (numfact, zone) => {
+    setZoneOverrides((prev) => ({ ...prev, [numfact]: zone })); // optimiste
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/proforma/${numfact}/zone`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ zone }),
+        },
+      );
+      if (!res.ok) throw new Error("Échec de l'affectation");
+    } catch (e) {
+      setDatMsg({ type: "error", text: `Zone non enregistrée : ${e.message}` });
+    }
+  };
+
+  // Exporte les proformas du tiers en .DAT (mode "serveur" | "download")
+  const exportDat = async (mode) => {
+    if (!nomDossierDBF || !tiers) return;
+    setDatLoading(true);
+    setDatMsg(null);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/tiers/${tiers}/export-dat`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dateDebut, mode, portee: datPortee }),
+        },
+      );
+
+      if (mode === "serveur") {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || "Erreur export serveur");
+        const noms = (data.fichiers || []).map((f) => f.fichier).join(", ");
+        setDatMsg({
+          type: "success",
+          text: `${data.message}. Dossier : ${data.dossier}${noms ? ` — ${noms}` : ""}`,
+        });
+      } else {
+        if (!res.ok) {
+          let msg = "Erreur lors de l'export";
+          try {
+            const j = await res.json();
+            msg = j?.message || msg;
+          } catch {
+            /* corps non-JSON */
+          }
+          throw new Error(msg);
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get("content-disposition") || "";
+        const m = cd.match(/filename="?([^"]+)"?/);
+        const filename =
+          (m && m[1]) ||
+          (datPortee === "general"
+            ? "stock.dat inventaire_general"
+            : `inventaire_proforma_${tiers}_dat.zip`);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        setDatMsg({ type: "success", text: `Téléchargé : ${filename}` });
+      }
+    } catch (e) {
+      setDatMsg({ type: "error", text: e.message });
+    } finally {
+      setDatLoading(false);
+    }
+  };
 
   // Total global des écarts (XPF) : articles agrégés par NART, proformas cochées.
   const totalEcartGlobal = React.useMemo(() => {
@@ -347,6 +438,47 @@ const AdminInventaireProformaScreen = () => {
             </button>
           </div>
 
+          {/* Export .DAT (format réappro) */}
+          <div className="invproforma-dat-bar">
+            <span className="dat-bar-label">
+              <HiServer /> Export .DAT
+            </span>
+            <select
+              className="dat-portee-select"
+              value={datPortee}
+              onChange={(e) => setDatPortee(e.target.value)}
+              title="Un fichier par entrepôt, ou un seul fichier général"
+            >
+              <option value="zone">Un fichier par zone</option>
+              <option value="general">Un seul fichier général</option>
+            </select>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => exportDat("serveur")}
+              disabled={datLoading}
+              title="Déposer le(s) .DAT sur le serveur configuré"
+            >
+              <HiServer /> {datLoading ? "Export…" : "Sur le serveur"}
+            </button>
+            <button
+              type="button"
+              className="btn-excel"
+              onClick={() => exportDat("download")}
+              disabled={datLoading}
+              title="Télécharger sur mon poste (ZIP si plusieurs zones)"
+            >
+              <HiDownload /> {datLoading ? "Export…" : "Télécharger"}
+            </button>
+            {datMsg ? (
+              <span
+                className={`dat-bar-msg ${datMsg.type === "error" ? "error" : "success"}`}
+              >
+                {datMsg.text}
+              </span>
+            ) : null}
+          </div>
+
           <div className="admin-invproforma-list">
             {groupes.map((g) => {
               const isOpen = expanded.has(g.numfact);
@@ -390,11 +522,6 @@ const AdminInventaireProformaScreen = () => {
                       <span className="proforma-numfact">
                         Proforma {g.numfact}
                       </span>
-                      {g.datfact ? (
-                        <span className="proforma-date" title="Date de création (DATFACT)">
-                          {fmtDateFr(g.datfact)}
-                        </span>
-                      ) : null}
                       {g.texte ? (
                         <span className="proforma-obs" title={g.texte}>
                           {g.texte}
@@ -423,6 +550,19 @@ const AdminInventaireProformaScreen = () => {
                       <HiPrinter />{" "}
                       {ficheLoading === g.numfact ? "…" : "Fiche de contrôle"}
                     </button>
+
+                    <select
+                      className="proforma-zone-select"
+                      value={zoneOf(g.numfact, g.zone)}
+                      onChange={(e) => changeZone(g.numfact, e.target.value)}
+                      title="Entrepôt/zone pour l'export .DAT"
+                    >
+                      {ZONES.map((z) => (
+                        <option key={z} value={z}>
+                          {z} — {mappingEntrepots[z] || z}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {isOpen && (

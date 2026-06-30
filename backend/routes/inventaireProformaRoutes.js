@@ -5,6 +5,8 @@ import {
   getByTiers,
   genererFicheControle,
   genererInventaireDoc,
+  setProformaZone,
+  exportProformaDat,
 } from "../controllers/inventaireProformaController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
@@ -36,6 +38,24 @@ router.get(
   admin,
   checkEntrepriseAccess,
   genererInventaireDoc,
+);
+
+// Affecter une proforma à une zone/entrepôt (S1..S5)
+router.put(
+  "/:nomDossierDBF/proforma/:numfact/zone",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  setProformaZone,
+);
+
+// Exporter les proformas d'un tiers en .DAT (zone/général, serveur/téléchargement)
+router.post(
+  "/:nomDossierDBF/tiers/:tiers/export-dat",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  exportProformaDat,
 );
 
 // Proformas d'un tiers, lignes groupées par NUMFACT, triées par NL

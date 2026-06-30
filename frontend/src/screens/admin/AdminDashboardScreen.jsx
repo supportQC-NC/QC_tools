@@ -1,18 +1,20 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   HiUsers,
   HiOfficeBuilding,
-  HiUserGroup,
   HiClipboardList,
   HiRefresh,
   HiDocumentReport,
   HiArrowRight,
   HiCheckCircle,
-  HiXCircle,
   HiClock,
   HiTrendingUp,
   HiTruck,
+  HiInboxIn,
+  HiSparkles,
+  HiExclamationCircle,
+  HiCube,
 } from "react-icons/hi";
 import {
   BarChart,
@@ -22,8 +24,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
   AreaChart,
   Area,
@@ -31,13 +31,13 @@ import {
 } from "recharts";
 import { useGetUsersQuery } from "../../slices/userApiSlice";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
-import { useGetConcurrentsQuery } from "../../slices/concurrentApiSLice";
-import { useGetRelevesStatsQuery } from "../../slices/releveApiSlice";
-import { useGetCommandesQuery } from "../../slices/commandeApiSlice";
+import {
+  useGetGlobalDashboardQuery,
+  useGetEntrepriseDashboardQuery,
+} from "../../slices/dashboardApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminDashboardScreen.css";
 
-// Couleurs pour les graphiques
 const COLORS = {
   primary: "#4da6ff",
   success: "#22c55e",
@@ -50,196 +50,90 @@ const COLORS = {
   amber: "#f59e0b",
 };
 
+const ETAT_COLORS = {
+  0: "#94a3b8",
+  1: "#3b82f6",
+  2: "#f59e0b",
+  3: "#22c55e",
+  4: "#6b7280",
+};
+
+const fmtInt = (n) =>
+  (Math.trunc(Number(n) || 0)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+const fmtDate = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="chart-tooltip">
+        <p className="tooltip-label">{label}</p>
+        {payload.map((entry, index) => (
+          <p
+            key={index}
+            className="tooltip-value"
+            style={{ color: entry.color }}
+          >
+            {entry.name}: <strong>{fmtInt(entry.value)}</strong>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 const AdminDashboard = () => {
-  // Récupération des données
-  const { data: users, isLoading: loadingUsers } = useGetUsersQuery();
+  const { data: users } = useGetUsersQuery();
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetEntreprisesQuery();
-  const { data: concurrents, isLoading: loadingConcurrents } =
-    useGetConcurrentsQuery({});
-  const { data: relevesStats, isLoading: loadingReleves } =
-    useGetRelevesStatsQuery();
-  const { data: commandesData, isLoading: loadingCommandes } =
-    useGetCommandesQuery(
-      {
-        // On charge la première entreprise active pour avoir des stats globales
-        nomDossierDBF: entreprises?.[0]?.nomDossierDBF,
-        page: 1,
-        limit: 1,
-      },
-      {
-        skip: !entreprises?.[0]?.nomDossierDBF,
-      },
-    );
+  const { data: global, isLoading: loadingGlobal } =
+    useGetGlobalDashboardQuery();
 
-  // Charger aussi les commandes en cours (ETAT=1)
-  const { data: commandesEnCoursData } = useGetCommandesQuery(
-    {
-      nomDossierDBF: entreprises?.[0]?.nomDossierDBF,
-      page: 1,
-      limit: 1,
-      etat: 1,
-    },
-    {
-      skip: !entreprises?.[0]?.nomDossierDBF,
-    },
+  // Entreprise sélectionnée pour la section DBF
+  const entreprisesActives = useMemo(
+    () => (entreprises || []).filter((e) => e.isActive !== false),
+    [entreprises],
   );
-
-  // Charger les commandes clôturées (ETAT=4)
-  const { data: commandesClotuData } = useGetCommandesQuery(
-    {
-      nomDossierDBF: entreprises?.[0]?.nomDossierDBF,
-      page: 1,
-      limit: 1,
-      etat: 4,
-    },
-    {
-      skip: !entreprises?.[0]?.nomDossierDBF,
-    },
-  );
-
-  const isLoading =
-    loadingUsers ||
-    loadingEntreprises ||
-    loadingConcurrents ||
-    loadingReleves;
-
-  // Calcul des statistiques
-  const stats = {
-    users: {
-      total: users?.length || 0,
-      active: users?.filter((u) => u.isActive).length || 0,
-      admins: users?.filter((u) => u.role === "admin").length || 0,
-      inactive: users?.filter((u) => !u.isActive).length || 0,
-    },
-    entreprises: {
-      total: entreprises?.length || 0,
-      active: entreprises?.filter((e) => e.isActive).length || 0,
-      inactive: entreprises?.filter((e) => !e.isActive).length || 0,
-    },
-    concurrents: {
-      total: concurrents?.length || 0,
-      active: concurrents?.filter((c) => c.isActive).length || 0,
-      inactive: concurrents?.filter((c) => !c.isActive).length || 0,
-    },
-    releves: {
-      total: relevesStats?.totalReleves || 0,
-      enCours: relevesStats?.relevesEnCours || 0,
-      exportes: relevesStats?.relevesExportes || 0,
-    },
-    commandes: {
-      total: commandesData?.pagination?.totalRecords || 0,
-      enCours: commandesEnCoursData?.pagination?.totalRecords || 0,
-      cloturees: commandesClotuData?.pagination?.totalRecords || 0,
-    },
-  };
-
-  // Données pour le graphique des utilisateurs par rôle
-  const usersByRole = [
-    { name: "Admins", value: stats.users.admins, color: COLORS.danger },
-    {
-      name: "Utilisateurs",
-      value: stats.users.total - stats.users.admins,
-      color: COLORS.primary,
-    },
-  ];
-
-  // Données pour le graphique des statuts
-  const statusData = [
-    {
-      name: "Utilisateurs",
-      actifs: stats.users.active,
-      inactifs: stats.users.inactive,
-    },
-    {
-      name: "Entreprises",
-      actifs: stats.entreprises.active,
-      inactifs: stats.entreprises.inactive,
-    },
-    {
-      name: "Concurrents",
-      actifs: stats.concurrents.active,
-      inactifs: stats.concurrents.inactive,
-    },
-  ];
-
-  // Données pour les relevés par entreprise
-  const relevesByEntreprise = relevesStats?.parEntreprise?.slice(0, 6) || [];
-
-  // Données pour les concurrents les plus utilisés
-  const topConcurrents = relevesStats?.parConcurrent?.slice(0, 5) || [];
-
-  // Données pour commandes par état (construites depuis les queries)
-  const commandesByEtat = [
-    {
-      label: "En cours",
-      etat: 1,
-      count: stats.commandes.enCours,
-    },
-    {
-      label: "Autres",
-      etat: 0,
-      count: Math.max(
-        0,
-        stats.commandes.total - stats.commandes.enCours - stats.commandes.cloturees,
-      ),
-    },
-    {
-      label: "Clôturées",
-      etat: 4,
-      count: stats.commandes.cloturees,
-    },
-  ].filter((e) => e.count > 0);
-
-  // Données simulées pour l'activité récente
-  const activityData = [
-    { jour: "Lun", releves: 12, inventaires: 5 },
-    { jour: "Mar", releves: 19, inventaires: 8 },
-    { jour: "Mer", releves: 15, inventaires: 12 },
-    { jour: "Jeu", releves: 22, inventaires: 7 },
-    { jour: "Ven", releves: 28, inventaires: 15 },
-    { jour: "Sam", releves: 8, inventaires: 3 },
-    { jour: "Dim", releves: 5, inventaires: 2 },
-  ];
-
-  // Custom tooltip pour les graphiques
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="chart-tooltip">
-          <p className="tooltip-label">{label}</p>
-          {payload.map((entry, index) => (
-            <p
-              key={index}
-              className="tooltip-value"
-              style={{ color: entry.color }}
-            >
-              {entry.name}: <strong>{entry.value}</strong>
-            </p>
-          ))}
-        </div>
-      );
+  const [dossier, setDossier] = useState("");
+  useEffect(() => {
+    if (!dossier && entreprisesActives.length > 0) {
+      setDossier(entreprisesActives[0].nomDossierDBF);
     }
-    return null;
-  };
+  }, [entreprisesActives, dossier]);
 
-  // Labels des états commande
-  const ETAT_LABELS = {
-    0: "Brouillon",
-    1: "En cours",
-    2: "Expédiée",
-    3: "Réceptionnée",
-    4: "Clôturée",
-  };
-  const ETAT_COLORS = {
-    0: "#94a3b8",
-    1: "#3b82f6",
-    2: "#f59e0b",
-    3: "#22c55e",
-    4: "#6b7280",
-  };
+  const { data: entrepriseData, isFetching: loadingEntreprise } =
+    useGetEntrepriseDashboardQuery(dossier, { skip: !dossier });
 
-  if (isLoading) {
+  const rec = global?.receptions || {};
+  const activite = global?.activite || [];
+
+  // ---- Données section entreprise ----
+  const commandesParEtat = entrepriseData?.commandes?.parEtat || [];
+  const topFournisseurs = entrepriseData?.commandes?.topFournisseurs || [];
+  const prochainsBateaux = entrepriseData?.commandes?.prochainsBateaux || [];
+  const topVentes = entrepriseData?.articles?.topVentes || [];
+  const topRuptures = entrepriseData?.articles?.topRuptures || [];
+
+  const ventesChart = useMemo(
+    () =>
+      topVentes.map((v) => ({
+        name: (v.design || v.nart || "").slice(0, 22) || v.nart,
+        ventes: v.ventes,
+      })),
+    [topVentes],
+  );
+
+  if (loadingGlobal || loadingEntreprises) {
     return (
       <div className="admin-dashboard">
         <div className="dashboard-loading">
@@ -267,21 +161,68 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* ===================== KPI GLOBAUX (Mongo) ===================== */}
       <div className="stats-grid">
+        <div className="stat-card stat-card-commandes">
+          <div className="stat-card-icon">
+            <HiInboxIn />
+          </div>
+          <div className="stat-card-content">
+            <span className="stat-card-value">{fmtInt(rec.total || 0)}</span>
+            <span className="stat-card-label">Réceptions</span>
+            <div className="stat-card-details">
+              <span className="stat-detail warning">
+                <HiClock /> {fmtInt(rec.enCours || 0)} en cours
+              </span>
+              <span className="stat-detail success">
+                <HiCheckCircle /> {fmtInt(rec.termine || 0)} terminées
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-entreprises">
+          <div className="stat-card-icon">
+            <HiCheckCircle />
+          </div>
+          <div className="stat-card-content">
+            <span className="stat-card-value">
+              {rec.tauxConformite == null ? "—" : `${rec.tauxConformite}%`}
+            </span>
+            <span className="stat-card-label">Conformité réception</span>
+            <div className="stat-card-details">
+              <span className="stat-detail danger">
+                <HiExclamationCircle /> {fmtInt(rec.totalEcarts || 0)} écarts
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-releves">
+          <div className="stat-card-icon">
+            <HiSparkles />
+          </div>
+          <div className="stat-card-content">
+            <span className="stat-card-value">{fmtInt(rec.nouveautes || 0)}</span>
+            <span className="stat-card-label">Nouveautés détectées</span>
+            <div className="stat-card-details">
+              <span className="stat-detail">en réception</span>
+            </div>
+          </div>
+        </div>
+
         <div className="stat-card stat-card-users">
           <div className="stat-card-icon">
             <HiUsers />
           </div>
           <div className="stat-card-content">
-            <span className="stat-card-value">{stats.users.total}</span>
+            <span className="stat-card-value">
+              {fmtInt(users?.length || 0)}
+            </span>
             <span className="stat-card-label">Utilisateurs</span>
             <div className="stat-card-details">
               <span className="stat-detail success">
-                <HiCheckCircle /> {stats.users.active} actifs
-              </span>
-              <span className="stat-detail danger">
-                <HiXCircle /> {stats.users.inactive} inactifs
+                <HiCheckCircle /> {fmtInt((users || []).filter((u) => u.isActive).length)} actifs
               </span>
             </div>
           </div>
@@ -290,16 +231,18 @@ const AdminDashboard = () => {
           </Link>
         </div>
 
-        <div className="stat-card stat-card-entreprises">
+        <div className="stat-card stat-card-concurrents">
           <div className="stat-card-icon">
             <HiOfficeBuilding />
           </div>
           <div className="stat-card-content">
-            <span className="stat-card-value">{stats.entreprises.total}</span>
+            <span className="stat-card-value">
+              {fmtInt(entreprises?.length || 0)}
+            </span>
             <span className="stat-card-label">Entreprises</span>
             <div className="stat-card-details">
               <span className="stat-detail success">
-                <HiCheckCircle /> {stats.entreprises.active} actives
+                <HiCheckCircle /> {fmtInt(entreprisesActives.length)} actives
               </span>
             </div>
           </div>
@@ -307,440 +250,271 @@ const AdminDashboard = () => {
             <HiArrowRight />
           </Link>
         </div>
-
-        <div className="stat-card stat-card-commandes">
-          <div className="stat-card-icon">
-            <HiTruck />
-          </div>
-          <div className="stat-card-content">
-            <span className="stat-card-value">{stats.commandes.total}</span>
-            <span className="stat-card-label">Commandes</span>
-            <div className="stat-card-details">
-              <span className="stat-detail warning">
-                <HiClock /> {stats.commandes.enCours} en cours
-              </span>
-              <span className="stat-detail success">
-                <HiCheckCircle /> {stats.commandes.cloturees} clôturées
-              </span>
-            </div>
-          </div>
-          <Link to="/admin/commandes" className="stat-card-link">
-            <HiArrowRight />
-          </Link>
-        </div>
-
-        <div className="stat-card stat-card-concurrents">
-          <div className="stat-card-icon">
-            <HiUserGroup />
-          </div>
-          <div className="stat-card-content">
-            <span className="stat-card-value">{stats.concurrents.total}</span>
-            <span className="stat-card-label">Concurrents</span>
-            <div className="stat-card-details">
-              <span className="stat-detail success">
-                <HiCheckCircle /> {stats.concurrents.active} actifs
-              </span>
-            </div>
-          </div>
-          <Link to="/admin/concurrents" className="stat-card-link">
-            <HiArrowRight />
-          </Link>
-        </div>
-
-        <div className="stat-card stat-card-releves">
-          <div className="stat-card-icon">
-            <HiDocumentReport />
-          </div>
-          <div className="stat-card-content">
-            <span className="stat-card-value">{stats.releves.total}</span>
-            <span className="stat-card-label">Relevés de prix</span>
-            <div className="stat-card-details">
-              <span className="stat-detail warning">
-                <HiClock /> {stats.releves.enCours} en cours
-              </span>
-              <span className="stat-detail success">
-                <HiCheckCircle /> {stats.releves.exportes} exportés
-              </span>
-            </div>
-          </div>
-          <Link to="/admin/releves" className="stat-card-link">
-            <HiArrowRight />
-          </Link>
-        </div>
       </div>
 
-      {/* Main Content: Charts à gauche + Sidebar à droite */}
+      {/* ===================== Activité + sessions ===================== */}
       <div className="dashboard-main">
-        {/* Colonne des graphiques */}
         <div className="dashboard-charts">
-          {/* Row 1: Activité + Pie */}
-          <div className="charts-row">
-            {/* Activité de la semaine */}
-            <div className="chart-card">
-              <div className="chart-card-header">
-                <h3>
-                  <HiTrendingUp /> Activité de la semaine
-                </h3>
-              </div>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={activityData}>
-                    <defs>
-                      <linearGradient
-                        id="colorReleves"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor={COLORS.primary}
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor={COLORS.primary}
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorInventaires"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor={COLORS.success}
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor={COLORS.success}
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--border)"
-                    />
-                    <XAxis
-                      dataKey="jour"
-                      stroke="var(--text-muted)"
-                      fontSize={10}
-                    />
-                    <YAxis stroke="var(--text-muted)" fontSize={10} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: "10px" }} />
-                    <Area
-                      type="monotone"
-                      dataKey="releves"
-                      name="Relevés"
-                      stroke={COLORS.primary}
-                      fillOpacity={1}
-                      fill="url(#colorReleves)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="inventaires"
-                      name="Inventaires"
-                      stroke={COLORS.success}
-                      fillOpacity={1}
-                      fill="url(#colorInventaires)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Répartition des utilisateurs */}
-            <div className="chart-card">
-              <div className="chart-card-header">
-                <h3>
-                  <HiUsers /> Utilisateurs par rôle
-                </h3>
-              </div>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={usersByRole}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {usersByRole.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: "10px" }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: Statuts + Relevés par entreprise */}
-          <div className="charts-row">
-            {/* Statuts actifs/inactifs */}
-            <div className="chart-card">
-              <div className="chart-card-header">
-                <h3>
-                  <HiCheckCircle /> Statuts par catégorie
-                </h3>
-              </div>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={statusData} layout="vertical">
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--border)"
-                    />
-                    <XAxis
-                      type="number"
-                      stroke="var(--text-muted)"
-                      fontSize={10}
-                    />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      stroke="var(--text-muted)"
-                      fontSize={10}
-                      width={70}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: "10px" }} />
-                    <Bar
-                      dataKey="actifs"
-                      name="Actifs"
-                      fill={COLORS.success}
-                      radius={[0, 4, 4, 0]}
-                    />
-                    <Bar
-                      dataKey="inactifs"
-                      name="Inactifs"
-                      fill={COLORS.danger}
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Relevés par entreprise */}
-            <div className="chart-card">
-              <div className="chart-card-header">
-                <h3>
-                  <HiOfficeBuilding /> Relevés par entreprise
-                </h3>
-              </div>
-              <div className="chart-container">
-                {relevesByEntreprise.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={relevesByEntreprise}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--border)"
-                      />
-                      <XAxis
-                        dataKey="trigramme"
-                        stroke="var(--text-muted)"
-                        fontSize={10}
-                      />
-                      <YAxis stroke="var(--text-muted)" fontSize={10} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar
-                        dataKey="count"
-                        name="Relevés"
-                        fill={COLORS.purple}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="chart-empty">
-                    <HiDocumentReport />
-                    <p>Aucune donnée disponible</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Row 3: Commandes par état */}
           <div className="charts-row charts-row-single">
             <div className="chart-card">
               <div className="chart-card-header">
                 <h3>
-                  <HiTruck /> Commandes par état
+                  <HiTrendingUp /> Activité réelle ({global?.nbJours || 14} derniers jours)
                 </h3>
-                <Link to="/admin/commandes" className="chart-card-link">
-                  Voir tout <HiArrowRight />
-                </Link>
               </div>
               <div className="chart-container">
-                {commandesByEtat.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={commandesByEtat}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--border)"
-                      />
-                      <XAxis
-                        dataKey="label"
-                        stroke="var(--text-muted)"
-                        fontSize={10}
-                      />
-                      <YAxis stroke="var(--text-muted)" fontSize={10} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="count" name="Commandes" radius={[4, 4, 0, 0]}>
-                        {commandesByEtat.map((entry, index) => (
-                          <Cell
-                            key={`cell-etat-${index}`}
-                            fill={ETAT_COLORS[entry.etat] || COLORS.primary}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="chart-empty">
-                    <HiTruck />
-                    <p>Aucune donnée de commande disponible</p>
-                  </div>
-                )}
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart data={activite}>
+                    <defs>
+                      <linearGradient id="gRec" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gInv" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.success} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={COLORS.success} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gRel" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="jour" stroke="var(--text-muted)" fontSize={10} />
+                    <YAxis stroke="var(--text-muted)" fontSize={10} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Area type="monotone" dataKey="receptions" name="Réceptions" stroke={COLORS.primary} fill="url(#gRec)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="inventaires" name="Inventaires" stroke={COLORS.success} fill="url(#gInv)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="releves" name="Relevés" stroke={COLORS.purple} fill="url(#gRel)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Sidebar droite */}
         <div className="dashboard-sidebar">
-          {/* Actions rapides */}
+          <div className="top-list-card">
+            <h3>
+              <HiClock /> Sessions en cours
+            </h3>
+            <div className="top-list">
+              <div className="top-list-item">
+                <span className="top-list-name">Inventaires</span>
+                <span className="top-list-value">{fmtInt(global?.inventaires?.enCours || 0)}</span>
+              </div>
+              <div className="top-list-item">
+                <span className="top-list-name">Relevés de prix</span>
+                <span className="top-list-value">{fmtInt(global?.releves?.enCours || 0)}</span>
+              </div>
+              <div className="top-list-item">
+                <span className="top-list-name">Réappros</span>
+                <span className="top-list-value">{fmtInt(global?.reappros?.enCours || 0)}</span>
+              </div>
+            </div>
+          </div>
+
           <div className="quick-actions-card">
             <h3>Actions rapides</h3>
             <div className="quick-actions-grid">
-              <Link to="/admin/users" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(77, 166, 255, 0.15)",
-                    color: COLORS.primary,
-                  }}
-                >
-                  <HiUsers />
-                </div>
-                <span>Utilisateurs</span>
-              </Link>
-              <Link to="/admin/entreprises" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(34, 197, 94, 0.15)",
-                    color: COLORS.success,
-                  }}
-                >
-                  <HiOfficeBuilding />
-                </div>
-                <span>Entreprises</span>
-              </Link>
               <Link to="/admin/commandes" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(245, 158, 11, 0.15)",
-                    color: COLORS.amber,
-                  }}
-                >
+                <div className="quick-action-icon" style={{ background: "rgba(245,158,11,0.15)", color: COLORS.amber }}>
                   <HiTruck />
                 </div>
                 <span>Commandes</span>
               </Link>
-              <Link to="/admin/concurrents" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(168, 85, 247, 0.15)",
-                    color: COLORS.purple,
-                  }}
-                >
-                  <HiUserGroup />
-                </div>
-                <span>Concurrents</span>
-              </Link>
-              <Link to="/admin/releves" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(245, 158, 11, 0.15)",
-                    color: COLORS.warning,
-                  }}
-                >
-                  <HiDocumentReport />
-                </div>
-                <span>Relevés</span>
-              </Link>
               <Link to="/admin/inventaires" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(6, 182, 212, 0.15)",
-                    color: COLORS.cyan,
-                  }}
-                >
+                <div className="quick-action-icon" style={{ background: "rgba(6,182,212,0.15)", color: COLORS.cyan }}>
                   <HiClipboardList />
                 </div>
                 <span>Inventaires</span>
               </Link>
+              <Link to="/admin/releves" className="quick-action">
+                <div className="quick-action-icon" style={{ background: "rgba(168,85,247,0.15)", color: COLORS.purple }}>
+                  <HiDocumentReport />
+                </div>
+                <span>Relevés</span>
+              </Link>
               <Link to="/admin/reappros" className="quick-action">
-                <div
-                  className="quick-action-icon"
-                  style={{
-                    background: "rgba(236, 72, 153, 0.15)",
-                    color: COLORS.pink,
-                  }}
-                >
+                <div className="quick-action-icon" style={{ background: "rgba(236,72,153,0.15)", color: COLORS.pink }}>
                   <HiRefresh />
                 </div>
                 <span>Réappros</span>
               </Link>
             </div>
           </div>
-
-          {/* Top concurrents */}
-          <div className="top-list-card">
-            <h3>
-              <HiUserGroup /> Top concurrents
-            </h3>
-            {topConcurrents.length > 0 ? (
-              <div className="top-list">
-                {topConcurrents.map((concurrent, index) => (
-                  <div key={concurrent._id} className="top-list-item">
-                    <span className="top-list-rank">{index + 1}</span>
-                    <span className="top-list-name">{concurrent.nom}</span>
-                    <span className="top-list-value">
-                      {concurrent.nombreReleves}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="top-list-empty">
-                <p>Aucun relevé enregistré</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
+
+      {/* ===================== SECTION ENTREPRISE (DBF) ===================== */}
+      <div className="dashboard-section-head">
+        <h2>
+          <HiOfficeBuilding /> Détail par entreprise
+        </h2>
+        <select
+          className="dashboard-ent-select"
+          value={dossier}
+          onChange={(e) => setDossier(e.target.value)}
+        >
+          {entreprisesActives.map((e) => (
+            <option key={e._id} value={e.nomDossierDBF}>
+              {e.nomComplet || e.nom || e.nomDossierDBF}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {loadingEntreprise ? (
+        <div className="dashboard-loading">
+          <Loader />
+          <p>Chargement des données de l'entreprise...</p>
+        </div>
+      ) : !entrepriseData ? (
+        <div className="chart-empty">
+          <HiOfficeBuilding />
+          <p>Sélectionnez une entreprise</p>
+        </div>
+      ) : (
+        <>
+          {/* KPI mini DBF */}
+          <div className="kpi-mini-grid">
+            <div className="kpi-mini">
+              <span className="kpi-mini-value">{fmtInt(entrepriseData.commandes.total)}</span>
+              <span className="kpi-mini-label"><HiTruck /> Commandes</span>
+            </div>
+            <div className="kpi-mini kpi-mini-amber">
+              <span className="kpi-mini-value">{fmtInt(entrepriseData.commandes.aReceptionner)}</span>
+              <span className="kpi-mini-label"><HiInboxIn /> À réceptionner</span>
+            </div>
+            <div className="kpi-mini kpi-mini-green">
+              <span className="kpi-mini-value">{fmtInt(entrepriseData.articles.nbNouveautes)}</span>
+              <span className="kpi-mini-label"><HiSparkles /> Nouveautés</span>
+            </div>
+            <div className="kpi-mini kpi-mini-red">
+              <span className="kpi-mini-value">{fmtInt(entrepriseData.articles.nbRuptures)}</span>
+              <span className="kpi-mini-label"><HiExclamationCircle /> Ruptures</span>
+            </div>
+            <div className="kpi-mini">
+              <span className="kpi-mini-value">{fmtInt(entrepriseData.articles.totalArticles)}</span>
+              <span className="kpi-mini-label"><HiCube /> Articles</span>
+            </div>
+          </div>
+
+          <div className="charts-row">
+            {/* Commandes par état */}
+            <div className="chart-card">
+              <div className="chart-card-header">
+                <h3><HiTruck /> Commandes par état</h3>
+                <Link to="/admin/commandes" className="chart-card-link">
+                  Voir tout <HiArrowRight />
+                </Link>
+              </div>
+              <div className="chart-container">
+                {commandesParEtat.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={commandesParEtat}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis dataKey="label" stroke="var(--text-muted)" fontSize={10} />
+                      <YAxis stroke="var(--text-muted)" fontSize={10} allowDecimals={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="count" name="Commandes" radius={[4, 4, 0, 0]}>
+                        {commandesParEtat.map((entry, index) => (
+                          <Cell key={`c-${index}`} fill={ETAT_COLORS[entry.etat] || COLORS.primary} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="chart-empty"><HiTruck /><p>Aucune commande</p></div>
+                )}
+              </div>
+            </div>
+
+            {/* Top ventes */}
+            <div className="chart-card">
+              <div className="chart-card-header">
+                <h3><HiTrendingUp /> Meilleures ventes (12 mois)</h3>
+              </div>
+              <div className="chart-container">
+                {ventesChart.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={ventesChart} layout="vertical" margin={{ left: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <XAxis type="number" stroke="var(--text-muted)" fontSize={10} allowDecimals={false} />
+                      <YAxis dataKey="name" type="category" stroke="var(--text-muted)" fontSize={9} width={130} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="ventes" name="Ventes" fill={COLORS.cyan} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="chart-empty"><HiTrendingUp /><p>Aucune vente</p></div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="charts-row">
+            {/* Top fournisseurs */}
+            <div className="top-list-card">
+              <h3><HiTruck /> Top fournisseurs (commandes)</h3>
+              {topFournisseurs.length > 0 ? (
+                <div className="top-list">
+                  {topFournisseurs.map((f, i) => (
+                    <div key={f.code} className="top-list-item">
+                      <span className="top-list-rank">{i + 1}</span>
+                      <span className="top-list-name">{f.nom}</span>
+                      <span className="top-list-value">{fmtInt(f.count)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="top-list-empty"><p>Aucun fournisseur</p></div>
+              )}
+            </div>
+
+            {/* Prochains bateaux */}
+            <div className="top-list-card">
+              <h3><HiInboxIn /> Prochaines arrivées (bateaux)</h3>
+              {prochainsBateaux.length > 0 ? (
+                <div className="top-list">
+                  {prochainsBateaux.map((b, i) => (
+                    <div key={i} className="top-list-item">
+                      <span className="top-list-name">
+                        {b.bateau || "—"}
+                        <span className="top-list-sub"> · {fmtDate(b.arrivee)}</span>
+                      </span>
+                      <span className="top-list-value">{fmtInt(b.count)} cmd</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="top-list-empty"><p>Aucune arrivée à venir</p></div>
+              )}
+            </div>
+
+            {/* Top ruptures */}
+            <div className="top-list-card">
+              <h3><HiExclamationCircle /> Ruptures (vendeurs à 0)</h3>
+              {topRuptures.length > 0 ? (
+                <div className="top-list">
+                  {topRuptures.map((r, i) => (
+                    <div key={r.nart || i} className="top-list-item">
+                      <span className="top-list-name">
+                        {(r.design || r.nart || "").slice(0, 28)}
+                        <span className="top-list-sub"> · {r.nart}</span>
+                      </span>
+                      <span className="top-list-value danger">{fmtInt(r.ventes)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="top-list-empty"><p>Aucune rupture</p></div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

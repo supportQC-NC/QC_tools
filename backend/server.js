@@ -18,6 +18,7 @@ import photoRoutes from "./routes/photoRoutes.js";
 import filialeRoutes from "./routes/fillialeRoutes.js";
 import concurrentRoutes from "./routes/concurrentRoutes.js";
 import releveRoutes from "./routes/releveRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 // ========== ROUTES COMMANDES ==========
 import commandeRoutes from "./routes/commandeRoutes.js";
 // ========== ROUTES CONTRÔLE COMMANDES ==========
@@ -133,6 +134,7 @@ app.use("/api/etiquettes", etiquetteRoutes);
 // ========== ROUTES FOURNISSEURS ==========
 app.use("/api/fournisseurs", fournissRoutes);
 app.use("/api/clients", clientRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 // =======================================
 
 // ==========================================

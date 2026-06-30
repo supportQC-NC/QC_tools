@@ -52,11 +52,11 @@ export const adminMenuStructure = [
         path: "/admin/entreprises",
         icon: HiOfficeBuilding,
       },
-      {
-        label: "Permissions",
-        path: "/admin/permissions",
-        icon: HiLockClosed,
-      },
+      // {
+      //   label: "Permissions",
+      //   path: "/admin/permissions",
+      //   icon: HiLockClosed,
+      // },
       {
         label: "Concurrents",
         path: "/admin/concurrents",
@@ -191,38 +191,38 @@ export const moduleMenuStructure = [
       },
     ],
   },
-  {
-    type: "subgroup",
-    label: "Commandes",
-    icon: HiShoppingCart,
-    collapsible: true,
-    items: [
-      {
-        moduleKey: "ctr_commande",
-        label: "CTRL Commandes",
-        path: "/controle-commandes",
-        icon: HiClipboardCheck,
-      },
-      {
-        moduleKey: "prep_commande",
-        label: "PREPA Commandes",
-        path: "/preparation-commandes",
-        icon: HiShoppingCart,
-      },
-    ],
-  },
+  // {
+  //   type: "subgroup",
+  //   label: "Commandes",
+  //   icon: HiShoppingCart,
+  //   collapsible: true,
+  //   items: [
+  //     {
+  //       moduleKey: "ctr_commande",
+  //       label: "CTRL Commandes",
+  //       path: "/controle-commandes",
+  //       icon: HiClipboardCheck,
+  //     },
+  //     {
+  //       moduleKey: "prep_commande",
+  //       label: "PREPA Commandes",
+  //       path: "/preparation-commandes",
+  //       icon: HiShoppingCart,
+  //     },
+  //   ],
+  // },
   {
     type: "subgroup",
     label: "Analyses",
     icon: HiChartBar,
     collapsible: true,
     items: [
-      {
-        moduleKey: "ctrl_info_produit",
-        label: "CTRL Infos Produit",
-        path: "/controle-infos-produit",
-        icon: HiInformationCircle,
-      },
+      // {
+      //   moduleKey: "ctrl_info_produit",
+      //   label: "CTRL Infos Produit",
+      //   path: "/controle-infos-produit",
+      //   icon: HiInformationCircle,
+      // },
       {
         moduleKey: "releve",
         label: "Relevé Prix",

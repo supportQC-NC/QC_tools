@@ -242,17 +242,6 @@
   white-space: nowrap;
 }
 
-/* Date de création (proforma.DATFACT) affichée à côté du numéro */
-.proforma-date {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-muted, rgba(127, 127, 127, 0.12));
-  border-radius: 10px;
-  padding: 2px 8px;
-  white-space: nowrap;
-}
-
 /* Observation (proforma.TEXTE) affichée dans l'entête */
 .proforma-obs {
   flex: 1;
@@ -616,3 +605,56 @@
 .admin-table tr.row-d:hover td {
   filter: brightness(1.15);
 }
+/* ============================================================
+   Export .DAT + sélecteur de zone par proforma — ajouts
+   ============================================================ */
+.invproforma-dat-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary, #1b2435);
+  border: 1px solid var(--border, #2a3650);
+  border-radius: 10px;
+}
+
+.dat-bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-secondary, #c4d0e6);
+}
+
+.dat-portee-select,
+.proforma-zone-select {
+  background: var(--bg-secondary, #141c2b);
+  color: var(--text-primary, #e8eef7);
+  border: 1px solid var(--border, #2a3650);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.dat-portee-select:focus,
+.proforma-zone-select:focus {
+  outline: none;
+  border-color: var(--accent, #4da6ff);
+}
+
+.proforma-zone-select {
+  margin-left: 8px;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.dat-bar-msg {
+  font-size: 12.5px;
+  font-weight: 600;
+  flex: 1 1 100%;
+}
+.dat-bar-msg.success { color: #22c55e; }
+.dat-bar-msg.error { color: #ef4444; }
