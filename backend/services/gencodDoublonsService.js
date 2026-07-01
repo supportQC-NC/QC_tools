@@ -2,8 +2,12 @@
 // -----------------------------------------------------------------------------
 // Doublons GENCODE — détecte les codes-barres (GENCOD) présents sur ≥ 2 articles
 // dans la base article d'une entreprise. Réutilise articleService (cache).
-// GENCOD vide (ou "0") est ignoré (ce n'est pas un doublon significatif).
-// STOCK = ΣS1..S5. PVTE = prix de vente HT.
+//
+// Colonnes concises et lisibles. Chaque ligne porte un `groupIndex` (0,1,2…) par
+// GENCODE : le front colore les lignes en alternant une teinte par groupe, pour
+// visualiser d'un coup d'œil quels articles partagent le même code.
+//
+// GENCOD vide (ou "0") est ignoré. STOCK = ΣS1..S5. PVTE = prix de vente HT.
 // -----------------------------------------------------------------------------
 
 import articleService from "./articleService.js";
@@ -37,7 +41,6 @@ class GencodDoublonsService {
     const artCache = await articleService.getArticles(entreprise);
     const articles = artCache.records || [];
 
-    // Nom fournisseur (best effort)
     const fournByCode = new Map();
     try {
       const fourCache = await fournissCacheService.getFournisseurs(entreprise);
@@ -59,33 +62,37 @@ class GencodDoublonsService {
       byGencod.get(g).push(a);
     }
 
-    // Ne garder que les GENCOD présents ≥ 2 fois
-    const rows = [];
-    let nbGencods = 0;
-    for (const [gencod, arr] of byGencod) {
-      if (arr.length < 2) continue;
-      nbGencods += 1;
-      arr.forEach((a) => {
-        const fourn = this.safeTrim(a.FOURN);
-        rows.push({
-          gencod,
-          nbDoublons: arr.length,
-          nart: this.safeTrim(a.NART),
-          design: this.safeTrim(a.DESIGN),
-          design2: this.safeTrim(a.DESIGN2),
-          refer: this.safeTrim(a.REFER),
-          fourn,
-          fournNom: fournByCode.get(fourn) || "",
-          stock: this.stockTotal(a),
-          pvte: this.num(a.PVTE),
-        });
-      });
-    }
+    // Ne garder que les GENCOD ≥ 2, triés (les doublons se suivent),
+    // et attribuer un groupIndex par GENCODE (pour la couleur des lignes).
+    const gencodsDoubles = [...byGencod.entries()]
+      .filter(([, arr]) => arr.length >= 2)
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 
-    // Tri : par GENCOD puis NART (les doublons se suivent)
-    rows.sort((a, b) => {
-      if (a.gencod !== b.gencod) return a.gencod < b.gencod ? -1 : 1;
-      return a.nart < b.nart ? -1 : a.nart > b.nart ? 1 : 0;
+    const rows = [];
+    gencodsDoubles.forEach(([gencod, arr], groupIndex) => {
+      arr
+        .slice()
+        .sort((x, y) => {
+          const nx = this.safeTrim(x.NART);
+          const ny = this.safeTrim(y.NART);
+          return nx < ny ? -1 : nx > ny ? 1 : 0;
+        })
+        .forEach((a) => {
+          const fourn = this.safeTrim(a.FOURN);
+          rows.push({
+            groupIndex,
+            gencod,
+            nbDoublons: arr.length,
+            nart: this.safeTrim(a.NART),
+            design: this.safeTrim(a.DESIGN),
+            design2: this.safeTrim(a.DESIGN2),
+            refer: this.safeTrim(a.REFER),
+            fourn,
+            fournNom: fournByCode.get(fourn) || "",
+            stock: this.stockTotal(a),
+            pvte: this.num(a.PVTE),
+          });
+        });
     });
 
     return {
@@ -94,7 +101,7 @@ class GencodDoublonsService {
       generatedAt: new Date().toISOString(),
       totaux: {
         nbArticles: articles.length,
-        nbGencodsDoublons: nbGencods,
+        nbGencodsDoublons: gencodsDoubles.length,
         nbArticlesConcernes: rows.length,
       },
       rows,

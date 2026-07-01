@@ -1,5 +1,5 @@
 // src/screens/admin/AdminGencodDoublonsScreen.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
@@ -74,18 +74,24 @@ const AdminGencodDoublonsScreen = () => {
   const columnDefs = useMemo(
     () => [
       { field: "gencod", headerName: "GENCODE", pinned: "left", minWidth: 150, cellClass: "cell-mono gencod-cell" },
-      { field: "nbDoublons", headerName: "Nb", ...num, filter: "agNumberColumnFilter", maxWidth: 90, cellClass: "col-nb" },
+      { field: "nbDoublons", headerName: "Nb", ...num, filter: "agNumberColumnFilter", maxWidth: 80, cellClass: "col-nb" },
       { field: "nart", headerName: "NART", minWidth: 100, cellClass: "cell-mono" },
-      { field: "design", headerName: "Désignation", minWidth: 240, tooltipField: "design" },
+      { field: "design", headerName: "Désignation", minWidth: 260, tooltipField: "design" },
       { field: "design2", headerName: "Désignation 2", minWidth: 180 },
       { field: "refer", headerName: "Réf. fourn.", minWidth: 130, cellClass: "cell-mono" },
       { field: "fourn", headerName: "Four.", minWidth: 80 },
-      { field: "fournNom", headerName: "Fournisseur", minWidth: 160 },
-      { field: "stock", headerName: "Stock", ...num, filter: "agNumberColumnFilter", valueFormatter: qtyFmt },
-      { field: "pvte", headerName: "PVTE", ...num, filter: "agNumberColumnFilter", valueFormatter: moneyFmt },
+      { field: "fournNom", headerName: "Fournisseur", minWidth: 170 },
+      { field: "stock", headerName: "Stock", ...num, filter: "agNumberColumnFilter", valueFormatter: qtyFmt, minWidth: 90 },
+      { field: "pvte", headerName: "PVTE", ...num, filter: "agNumberColumnFilter", valueFormatter: moneyFmt, minWidth: 110 },
     ],
     [],
   );
+
+  // Couleur alternée par GENCODE (groupe de doublons)
+  const getRowClass = useCallback((params) => {
+    if (!params.data) return "";
+    return params.data.groupIndex % 2 === 0 ? "grp-a" : "grp-b";
+  }, []);
 
   const handleExport = () => {
     if (!data) return;
@@ -154,7 +160,11 @@ const AdminGencodDoublonsScreen = () => {
           >
             <HiRefresh className={refreshing ? "spin" : ""} /> Rafraîchir
           </button>
-          <button className="gd-btn primary" onClick={handleExport} disabled={!data || !data.rows.length}>
+          <button
+            className="gd-btn primary"
+            onClick={handleExport}
+            disabled={!data || !data.rows.length}
+          >
             <HiDownload /> Excel
           </button>
         </div>
@@ -204,6 +214,9 @@ const AdminGencodDoublonsScreen = () => {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
+                <span className="gd-hint">
+                  Les lignes de même couleur = même GENCODE
+                </span>
                 <span className="gd-count">
                   {data.rows.length.toLocaleString("fr-FR")} lignes
                 </span>
@@ -215,6 +228,7 @@ const AdminGencodDoublonsScreen = () => {
                   columnDefs={columnDefs}
                   defaultColDef={defaultColDef}
                   quickFilterText={search}
+                  getRowClass={getRowClass}
                   animateRows={false}
                   rowHeight={30}
                   headerHeight={30}

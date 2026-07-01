@@ -203,3 +203,23 @@
     height: 70vh;
   }
 }
+
+/* Légende */
+.gd-hint {
+  font-size: 0.78rem;
+  color: var(--admin-text-muted, #606070);
+  font-style: italic;
+}
+
+/* Coloration des lignes par groupe de GENCODE (alternance de teinte).
+   !important pour passer devant le striping par défaut d'AG Grid. */
+.gd-grid .ag-row.grp-a {
+  background-color: var(--admin-bg-secondary, #12121a) !important;
+}
+.gd-grid .ag-row.grp-b {
+  background-color: rgba(129, 140, 248, 0.14) !important;
+}
+.gd-grid .ag-row.grp-a.ag-row-hover,
+.gd-grid .ag-row.grp-b.ag-row-hover {
+  background-color: var(--admin-bg-hover, #22222e) !important;
+}
