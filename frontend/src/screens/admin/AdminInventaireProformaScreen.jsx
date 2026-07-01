@@ -522,6 +522,11 @@ const AdminInventaireProformaScreen = () => {
                       <span className="proforma-numfact">
                         Proforma {g.numfact}
                       </span>
+                      {g.dateFact ? (
+                        <span className="proforma-date" title="Date de création">
+                          {g.dateFact}
+                        </span>
+                      ) : null}
                       {g.texte ? (
                         <span className="proforma-obs" title={g.texte}>
                           {g.texte}

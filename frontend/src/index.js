@@ -60,6 +60,7 @@ import AdminCommercialDetailScreen from "./screens/admin/AdminCommercialDetailSc
 import AdminFilialesScreen from "./screens/admin/AdminFilialesScreen";
 import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
 import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
+ import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
 
 
 const router = createBrowserRouter(
@@ -97,6 +98,7 @@ const router = createBrowserRouter(
         <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
          <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
             <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
+            <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />
 <Route
   path="/admin/commerciaux/:nomDossierDBF/:code"
   element={<AdminCommercialDetailScreen />}

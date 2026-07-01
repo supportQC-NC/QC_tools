@@ -50,6 +50,7 @@ import filialesRoutes from "./routes/filialesRoutes.js";
  import reapproLocalRoutes from "./routes/reapproLocalRoutes.js";
 import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import debitComptantRoutes from "./routes/debitComptantRoutes.js";
+   import gencodDoublonsRoutes from "./routes/gencodDoublonsRoutes.js";
 
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
@@ -143,6 +144,7 @@ app.use("/api/commerciaux", commerciauxRoutes);
 app.use("/api/filiales", filialesRoutes);
 app.use("/api/reappro-local", reapproLocalRoutes);
   app.use("/api/debit-comptant", debitComptantRoutes);
+   app.use("/api/gencod-doublons", gencodDoublonsRoutes);
  
 // =======================================
 

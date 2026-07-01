@@ -33,7 +33,8 @@ const isComment = (nart) => nart === "" || nart.includes("!");
 
 // ---------------------------------------------------------------------------
 // Export .DAT (mode Inventaire Proforma) — même format que les réappros :
-//   CODE(13, gencod sinon nart, complété d'espaces) | QTE(8, zéros) | 000
+//   CODE(13, NART complété d'espaces) | QTE(8, zéros) | 000
+// NB : pour la proforma inventaire, on n'utilise JAMAIS le GENCOD — toujours le NART.
 // La ZONE est portée par le NOM du fichier : "stock.dat inventaire_<zone>".
 // ---------------------------------------------------------------------------
 const ZONES = ["S1", "S2", "S3", "S4", "S5"];
@@ -45,16 +46,13 @@ const nomFichierDat = (zone) =>
     .trim()
     .replace(/[\\/:*?"<>|]/g, "_")}`;
 
-// Contenu .DAT à partir de lignes { gencod, nart, quantite }.
+// Contenu .DAT à partir de lignes { nart, quantite }.
+// Proforma inventaire : identifiant = NART uniquement (jamais GENCOD),
+// complété par des espaces jusqu'à 13 caractères.
 const genererContenuDat = (lignes) => {
   let contenu = "";
   for (const ligne of lignes) {
-    let code = "";
-    if (ligne.gencod && ligne.gencod.trim()) {
-      code = ligne.gencod.trim().padEnd(13, " ");
-    } else {
-      code = (ligne.nart || "").trim().padEnd(13, " ");
-    }
+    const code = (ligne.nart || "").trim().padEnd(13, " ");
     const q = Math.max(0, Math.trunc(Number(ligne.quantite) || 0)); // négatif -> 0
     const quantiteFormatee = q.toString().padStart(8, "0");
     contenu += `${code}|${quantiteFormatee}|000\r\n`;
@@ -188,6 +186,13 @@ const recDate = (val) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+// Formatage JJ/MM/AAAA pour l'affichage de la date de création (proforma.DATFACT).
+const fmtDateFr = (d) => {
+  if (!d) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
 const inputDate = (s) => {
   if (!s) return null;
   const d = new Date(s);
@@ -263,6 +268,7 @@ const getByTiers = asyncHandler(async (req, res) => {
   // 1) Entêtes du tiers → NUMFACT + NOM + TEXTE (observation)
   const numfactsSet = new Set();
   const texteByNumfact = new Map();
+  const dateByNumfact = new Map();
   let nom = "";
   for (const h of cache.proformaRecords) {
     if (!matchTiers(h.TIERS)) continue;
@@ -277,6 +283,7 @@ const getByTiers = asyncHandler(async (req, res) => {
     if (nf) {
       numfactsSet.add(nf);
       if (!texteByNumfact.has(nf)) texteByNumfact.set(nf, safeTrim(h.TEXTE));
+      if (!dateByNumfact.has(nf)) dateByNumfact.set(nf, recDate(h.DATFACT));
     }
     if (!nom) nom = safeTrim(h.NOM);
   }
@@ -368,6 +375,7 @@ const getByTiers = asyncHandler(async (req, res) => {
     totalLignes += lignes.length;
     groupes.push({
       numfact,
+      dateFact: fmtDateFr(dateByNumfact.get(numfact)),
       texte: texteByNumfact.get(numfact) || "",
       nbLignes: lignes.length,
       lignes,
@@ -1285,23 +1293,8 @@ const exportProformaDat = asyncHandler(async (req, res) => {
   }).lean();
   const zoneByNumfact = new Map(zonesAff.map((z) => [z.numfact, z.zone]));
 
-  // Résolution gencod par NART (mémorisée)
-  const gencodCache = new Map();
-  const resolveGencod = async (nart) => {
-    const key = nart.toUpperCase();
-    if (gencodCache.has(key)) return gencodCache.get(key);
-    let g = "";
-    try {
-      const a = await articleCacheService.findByNart(entreprise, nart);
-      if (a && a.GENCOD) g = String(a.GENCOD).trim();
-    } catch {
-      /* ignore */
-    }
-    gencodCache.set(key, g);
-    return g;
-  };
-
   // Agrégation par bucket (zone, ou "__general__") -> Map(NART -> { nart, quantite })
+  // Proforma inventaire : identifiant = NART uniquement (pas de GENCOD).
   const general = portee === "general";
   const buckets = new Map();
   const ensure = (k) => {
@@ -1327,7 +1320,6 @@ const exportProformaDat = asyncHandler(async (req, res) => {
   const files = [];
   for (const [bucketKey, agg] of buckets) {
     const lignes = [...agg.values()];
-    for (const l of lignes) l.gencod = await resolveGencod(l.nart);
     lignes.sort((a, b) => a.nart.localeCompare(b.nart, "fr"));
     const zoneForName = general ? "general" : bucketKey;
     files.push({

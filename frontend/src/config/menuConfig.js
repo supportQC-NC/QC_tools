@@ -120,6 +120,7 @@ export const adminMenuStructure = [
       },
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
        { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
+         { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
  
     ],
   },
@@ -221,7 +222,7 @@ export const moduleMenuStructure = [
   // },
   {
     type: "subgroup",
-    label: "Analyses",
+    label: "Relevé",
     icon: HiChartBar,
     collapsible: true,
     items: [
