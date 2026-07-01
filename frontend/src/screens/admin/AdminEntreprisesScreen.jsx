@@ -141,8 +141,17 @@ const AdminEntreprises = () => {
               className={`entreprise-card ${!entreprise.isActive ? "inactive" : ""}`}
             >
               <div className="entreprise-card-header">
-                <div className="entreprise-trigramme">
-                  {entreprise.trigramme}
+                <div className="entreprise-card-head-left">
+                  {entreprise.logo ? (
+                    <img
+                      className="entreprise-logo"
+                      src={entreprise.logo}
+                      alt={entreprise.nomComplet || "Logo"}
+                    />
+                  ) : null}
+                  <div className="entreprise-trigramme">
+                    {entreprise.trigramme}
+                  </div>
                 </div>
                 <span
                   className={`status-badge ${entreprise.isActive ? "active" : "inactive"}`}

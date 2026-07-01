@@ -359,3 +359,22 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Logo entreprise dans l.en-tete de carte */
+.entreprise-card-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.entreprise-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--bg-primary, #fff);
+  border: 1px solid var(--border);
+  padding: 2px;
+  flex-shrink: 0;
+}
