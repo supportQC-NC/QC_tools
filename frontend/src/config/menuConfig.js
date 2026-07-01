@@ -121,6 +121,7 @@ export const adminMenuStructure = [
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
        { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
          { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
+         
  
     ],
   },

@@ -80,6 +80,9 @@ const createEntreprise = asyncHandler(async (req, res) => {
     cheminRapportReception,
     emailsRapportReception,
     cheminLogoEtiquettes,
+    couleurPrimaire,
+    couleurSecondaire,
+    logo,
     vendeurs,
   } = req.body;
 
@@ -131,6 +134,18 @@ const createEntreprise = asyncHandler(async (req, res) => {
   if (cheminLogoEtiquettes !== undefined) {
     entrepriseData.cheminLogoEtiquettes = cheminLogoEtiquettes;
   }
+
+  // Apparence de marque (couleurs + logo base64)
+  if (couleurPrimaire !== undefined) {
+    entrepriseData.couleurPrimaire = couleurPrimaire;
+  }
+  if (couleurSecondaire !== undefined) {
+    entrepriseData.couleurSecondaire = couleurSecondaire;
+  }
+  if (logo !== undefined) {
+    entrepriseData.logo = logo;
+  }
+
   if (Array.isArray(vendeurs)) {
     entrepriseData.vendeurs = normaliserVendeurs(vendeurs);
   }
@@ -178,6 +193,9 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     cheminRapportReception,
     emailsRapportReception,
     cheminLogoEtiquettes,
+    couleurPrimaire,
+    couleurSecondaire,
+    logo,
     vendeurs,
   } = req.body;
 
@@ -256,6 +274,18 @@ const updateEntreprise = asyncHandler(async (req, res) => {
   if (cheminLogoEtiquettes !== undefined) {
     entreprise.cheminLogoEtiquettes = cheminLogoEtiquettes;
   }
+
+  // Apparence de marque (couleurs + logo base64)
+  if (couleurPrimaire !== undefined) {
+    entreprise.couleurPrimaire = couleurPrimaire;
+  }
+  if (couleurSecondaire !== undefined) {
+    entreprise.couleurSecondaire = couleurSecondaire;
+  }
+  if (logo !== undefined) {
+    entreprise.logo = logo;
+  }
+
   if (Array.isArray(vendeurs)) {
     entreprise.vendeurs = normaliserVendeurs(vendeurs);
   }

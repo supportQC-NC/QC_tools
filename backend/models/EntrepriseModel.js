@@ -116,6 +116,24 @@ const entrepriseSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // ---- Apparence de marque (réutilisable pour rapports PDF et étiquettes) ----
+    // Couleur primaire (ex: bandeaux, titres). Format hex "#RRGGBB".
+    couleurPrimaire: {
+      type: String,
+      default: "#4F46E5",
+    },
+    // Couleur secondaire (ex: accents, encadrés). Format hex "#RRGGBB".
+    couleurSecondaire: {
+      type: String,
+      default: "#10B981",
+    },
+    // Logo UPLOADÉ, stocké en base64 (data URL "data:image/png;base64,....").
+    // Réutilisable directement dans les PDF (pdfkit accepte le Buffer décodé)
+    // et dans les étiquettes/aperçus front (balise <img src>). Vide = aucun logo.
+    logo: {
+      type: String,
+      default: "",
+    },
     // Codes vendeurs (REPRES) : code 2 chiffres -> identité + type.
     vendeurs: {
       type: [vendeurSchema],

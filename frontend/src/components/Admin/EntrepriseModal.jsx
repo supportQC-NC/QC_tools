@@ -11,6 +11,7 @@ import {
   HiPlus,
   HiTrash,
   HiSearch,
+  HiColorSwatch,
 } from "react-icons/hi";
 import {
   useCreateEntrepriseMutation,
@@ -31,6 +32,10 @@ const DEFAULT_ETATS_COMMANDE = {
   8: "Avion",
   9: "Commande locale",
 };
+
+const DEFAULT_PRIMAIRE = "#4F46E5";
+const DEFAULT_SECONDAIRE = "#10B981";
+const LOGO_MAX_PX = 400; // redimensionnement max (garde le base64 léger)
 
 const EntrepriseModal = ({ entreprise, onClose }) => {
   const isEdit = !!entreprise;
@@ -57,6 +62,9 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
     emailsRapportReception: [],
     cheminLogoEtiquettes: "",
+    couleurPrimaire: DEFAULT_PRIMAIRE,
+    couleurSecondaire: DEFAULT_SECONDAIRE,
+    logo: "",
     vendeurs: [],
     isActive: true,
   });
@@ -125,6 +133,9 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           ? entreprise.emailsRapportReception
           : [],
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
+        couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
+        couleurSecondaire: entreprise.couleurSecondaire || DEFAULT_SECONDAIRE,
+        logo: entreprise.logo || "",
         vendeurs: Array.isArray(entreprise.vendeurs)
           ? entreprise.vendeurs.map((v) => ({
               code: v.code || "",
@@ -205,6 +216,49 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       emailsRapportReception: e.target.value.split("\n"),
     }));
   };
+
+  // ---- Apparence (couleurs + logo) ----
+  const handleColorChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleLogoFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ""; // permet de re-sélectionner le même fichier
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Le logo doit être un fichier image (PNG/JPG).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > LOGO_MAX_PX || h > LOGO_MAX_PX) {
+          const ratio = Math.min(LOGO_MAX_PX / w, LOGO_MAX_PX / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        // PNG : conserve la transparence
+        const dataUrl = canvas.toDataURL("image/png");
+        setFormData((prev) => ({ ...prev, logo: dataUrl }));
+        setError("");
+      };
+      img.onerror = () => setError("Image illisible.");
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => setError("Lecture du fichier impossible.");
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => setFormData((prev) => ({ ...prev, logo: "" }));
 
   // ---- Vendeurs (codes REPRES) ----
   const addVendeur = () => {
@@ -335,6 +389,12 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
             Général
           </button>
           <button
+            className={`tab-btn ${activeTab === "apparence" ? "active" : ""}`}
+            onClick={() => setActiveTab("apparence")}
+          >
+            <HiColorSwatch /> Apparence
+          </button>
+          <button
             className={`tab-btn ${activeTab === "chemins" ? "active" : ""}`}
             onClick={() => setActiveTab("chemins")}
           >
@@ -444,6 +504,123 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                   />
                   <span>Entreprise active</span>
                 </label>
+              </div>
+            </>
+          )}
+
+          {/* Tab Apparence */}
+          {activeTab === "apparence" && (
+            <>
+              <p className="tab-description">
+                Couleurs de marque et logo de l'entreprise. Réutilisables sur
+                les rapports PDF et les étiquettes.
+              </p>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>
+                    <HiColorSwatch /> Couleur primaire
+                  </label>
+                  <div className="color-field">
+                    <input
+                      type="color"
+                      value={formData.couleurPrimaire || DEFAULT_PRIMAIRE}
+                      onChange={(e) =>
+                        handleColorChange("couleurPrimaire", e.target.value)
+                      }
+                    />
+                    <input
+                      type="text"
+                      value={formData.couleurPrimaire || ""}
+                      onChange={(e) =>
+                        handleColorChange("couleurPrimaire", e.target.value)
+                      }
+                      placeholder={DEFAULT_PRIMAIRE}
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>
+                    <HiColorSwatch /> Couleur secondaire
+                  </label>
+                  <div className="color-field">
+                    <input
+                      type="color"
+                      value={formData.couleurSecondaire || DEFAULT_SECONDAIRE}
+                      onChange={(e) =>
+                        handleColorChange("couleurSecondaire", e.target.value)
+                      }
+                    />
+                    <input
+                      type="text"
+                      value={formData.couleurSecondaire || ""}
+                      onChange={(e) =>
+                        handleColorChange("couleurSecondaire", e.target.value)
+                      }
+                      placeholder={DEFAULT_SECONDAIRE}
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>
+                  <HiPhotograph /> Logo
+                </label>
+                <div className="logo-uploader">
+                  <div className="logo-preview">
+                    {formData.logo ? (
+                      <img src={formData.logo} alt="Logo entreprise" />
+                    ) : (
+                      <span className="logo-empty">Aucun logo</span>
+                    )}
+                  </div>
+                  <div className="logo-actions">
+                    <label className="btn-logo-upload">
+                      <HiPhotograph /> Choisir une image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoFile}
+                        hidden
+                      />
+                    </label>
+                    {formData.logo ? (
+                      <button
+                        type="button"
+                        className="btn-logo-remove"
+                        onClick={removeLogo}
+                      >
+                        <HiTrash /> Retirer
+                      </button>
+                    ) : null}
+                    <span className="input-hint">
+                      PNG/JPG. Redimensionné automatiquement (max {LOGO_MAX_PX}px)
+                      et stocké compressé dans l'entreprise.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="apparence-preview">
+                <span
+                  className="swatch"
+                  style={{ background: formData.couleurPrimaire || DEFAULT_PRIMAIRE }}
+                  title="Primaire"
+                />
+                <span
+                  className="swatch"
+                  style={{
+                    background: formData.couleurSecondaire || DEFAULT_SECONDAIRE,
+                  }}
+                  title="Secondaire"
+                />
+                <span className="apparence-preview-lbl">
+                  Aperçu des couleurs
+                </span>
               </div>
             </>
           )}
