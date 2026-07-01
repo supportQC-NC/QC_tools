@@ -206,8 +206,24 @@ const isPngOrJpeg = (buf) => {
   return false;
 };
 
+// Décode un logo UPLOADÉ stocké en base64 (data URL "data:image/png;base64,…").
+// Renvoie un Buffer PNG/JPEG (accepté par pdfkit) ou null.
+const bufferFromLogoDataUrl = (logo) => {
+  const s = logo == null ? "" : String(logo).trim();
+  const m = /^data:image\/(png|jpe?g);base64,(.+)$/i.exec(s);
+  if (!m) return null;
+  try {
+    const buf = Buffer.from(m[2], "base64");
+    return isPngOrJpeg(buf) ? buf : null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Résout et lit le logo de l'entreprise (PNG/JPEG). Renvoie un Buffer ou null.
+ * PRIORITÉ au logo UPLOADÉ (entreprise.logo, base64) ; à défaut, REPLI sur le
+ * fichier pointé par cheminLogoEtiquettes.
  * Gère :
  *  - dev Windows : chemin UNC lu tel quel,
  *  - prod Linux (RCOMMON_STOCK_ROOT défini) : traduction du chemin UNC vers le
@@ -215,6 +231,11 @@ const isPngOrJpeg = (buf) => {
  * Écrit un message explicite dans les logs si le logo est ignoré.
  */
 const resolveLogoBuffer = (entreprise) => {
+  // 1) Logo uploadé (base64) prioritaire.
+  const uploaded = bufferFromLogoDataUrl(entreprise && entreprise.logo);
+  if (uploaded) return uploaded;
+
+  // 2) Repli : fichier configuré via cheminLogoEtiquettes.
   const raw = entreprise && entreprise.cheminLogoEtiquettes;
   const p = raw == null ? "" : String(raw).trim();
   if (!p) return null; // aucun logo configuré → silencieux
