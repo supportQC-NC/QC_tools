@@ -55,6 +55,12 @@ import AdminFactureDetailScreen from "./screens/admin/AdminFactureDetailsScreen"
 import AdminClientDetailScreen from "./screens/admin/AdminClientDetailsScreen";
 import AdminClientsScreen from "./screens/admin/AdminClientsScreen";
 import UserDashboard from "./screens/user/userDashboardScreen";
+import AdminCommerciauxScreen from "./screens/admin/AdminCommerciauxScreen";
+import AdminCommercialDetailScreen from "./screens/admin/AdminCommercialDetailScreen";
+import AdminFilialesScreen from "./screens/admin/AdminFilialesScreen";
+import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
+import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
+
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -87,6 +93,14 @@ const router = createBrowserRouter(
         <Route path="/admin/releves" element={<AdminRelevesScreen />} />
         <Route path="/admin/inventaires" element={<AdminInventairesScreen />} />
         <Route path="/admin/zones" element={<AdminZonesScreen />} />
+        <Route path="/admin/commerciaux" element={<AdminCommerciauxScreen />} />
+        <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
+         <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
+            <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
+<Route
+  path="/admin/commerciaux/:nomDossierDBF/:code"
+  element={<AdminCommercialDetailScreen />}
+/>
         <Route
           path="/admin/inventaire-progression"
           element={<AdminInventaireProgressionScreen />}

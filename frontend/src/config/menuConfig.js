@@ -104,15 +104,23 @@ export const adminMenuStructure = [
   },
   {
     type: "subgroup",
-    label: "Système",
+    label: "Analyse",
     icon: HiCog,
     collapsible: true,
     items: [
       {
-        label: "Paramètres",
-        path: "/admin/settings",
-        icon: HiCog,
+        label: "Analyse Commerciaux",
+        path: "/admin/commerciaux",
+        icon: HiUserGroup,
       },
+      {
+        label: "Analyse Filiales",
+        path: "/admin/filiales",
+        icon: HiOfficeBuilding,
+      },
+      { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
+       { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
+ 
     ],
   },
 ];

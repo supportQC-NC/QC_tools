@@ -46,6 +46,10 @@ import inventaireProformaRoutes from "./routes/inventaireProformaRoutes.js";
 import fournissRoutes from "./routes/fournissRoutes.js";
 import factureRoutes from "./routes/factureRoutes.js";
 import clientRoutes from "./routes/clientRoutes.js";
+import filialesRoutes from "./routes/filialesRoutes.js";
+ import reapproLocalRoutes from "./routes/reapproLocalRoutes.js";
+import commerciauxRoutes from "./routes/commerciauxRoutes.js";
+import debitComptantRoutes from "./routes/debitComptantRoutes.js";
 
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
@@ -135,6 +139,11 @@ app.use("/api/etiquettes", etiquetteRoutes);
 app.use("/api/fournisseurs", fournissRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/commerciaux", commerciauxRoutes);
+app.use("/api/filiales", filialesRoutes);
+app.use("/api/reappro-local", reapproLocalRoutes);
+  app.use("/api/debit-comptant", debitComptantRoutes);
+ 
 // =======================================
 
 // ==========================================

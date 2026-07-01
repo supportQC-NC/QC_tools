@@ -100,7 +100,7 @@ class ClientCacheService {
     }
 
     try {
-      const dbf = await DBFFile.open(tiersPath);
+      const dbf = await DBFFile.open(tiersPath, { readMode: "loose" });
       const records = await dbf.readRecords();
       const indexByTiers = new Map();
       const indexByCompte = new Map();
@@ -258,7 +258,7 @@ class ClientCacheService {
       const startTime = Date.now();
       if (!fs.existsSync(dbfPath)) throw new Error(`Fichier clients.dbf non trouvé: ${dbfPath}`);
 
-      const dbf = await DBFFile.open(dbfPath);
+      const dbf = await DBFFile.open(dbfPath, { readMode: "loose" });
       const records = await dbf.readRecords();
       const stats = await fs.promises.stat(dbfPath);
       const dbfInfo = { path: dbfPath, recordCount: dbf.recordCount, fileSize: stats.size, lastModified: stats.mtime, fields: dbf.fields };

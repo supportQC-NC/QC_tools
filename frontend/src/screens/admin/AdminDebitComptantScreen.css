@@ -1,0 +1,250 @@
+/* AdminDebitComptantScreen.css */
+.admin-debit-comptant {
+  padding: 20px;
+  color: var(--admin-text, #f0f0f5);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 40px);
+}
+
+.dc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.dc-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  margin: 0;
+}
+.dc-header h1 svg {
+  color: var(--admin-primary, #6366f1);
+}
+.dc-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dc-select {
+  background: var(--admin-bg-secondary, #12121a);
+  color: var(--admin-text, #f0f0f5);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.88rem;
+  min-width: 200px;
+}
+.dc-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.dc-field input {
+  background: var(--admin-bg-secondary, #12121a);
+  color: var(--admin-text, #f0f0f5);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+.dc-field input[type="number"] {
+  width: 70px;
+}
+.dc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  color: var(--admin-text, #f0f0f5);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.dc-btn:hover:not(:disabled) {
+  background: var(--admin-bg-hover, #22222e);
+}
+.dc-btn.primary {
+  background: var(--admin-success, #10b981);
+  border-color: var(--admin-success, #10b981);
+  color: #fff;
+}
+.dc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.dc-btn .spin {
+  animation: dc-spin 1s linear infinite;
+}
+@keyframes dc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dc-periode {
+  font-size: 0.85rem;
+  color: var(--admin-text-secondary, #a0a0b0);
+  margin-bottom: 12px;
+}
+
+.dc-empty,
+.dc-error,
+.dc-loading {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.dc-error {
+  border-color: var(--admin-danger, #ef4444);
+}
+.dc-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.dc-refreshing {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid var(--admin-primary, #6366f1);
+  color: var(--admin-primary-light, #818cf8);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+/* KPIs */
+.dc-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dc-kpi {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dc-kpi.teal {
+  border-color: #0e6e72;
+}
+.dc-kpi .v {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.dc-kpi.teal .v {
+  color: #2dd4bf;
+}
+.dc-kpi .l {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted, #606070);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Onglets */
+.dc-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.dc-tabs button {
+  background: var(--admin-bg-secondary, #12121a);
+  color: var(--admin-text-secondary, #a0a0b0);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.dc-tabs button.active {
+  background: var(--admin-primary, #6366f1);
+  color: #fff;
+  border-color: var(--admin-primary, #6366f1);
+}
+.dc-tabs button.teal.active {
+  background: #0e6e72;
+  border-color: #0e6e72;
+}
+
+/* AG Grid */
+.dc-grid {
+  flex: 1;
+  width: 100%;
+  min-height: 400px;
+  --ag-background-color: var(--admin-bg-secondary, #12121a);
+  --ag-odd-row-background-color: var(--admin-bg, #0a0a0f);
+  --ag-header-background-color: var(--admin-bg-tertiary, #1a1a25);
+  --ag-border-color: var(--admin-border, #2a2a3a);
+  --ag-row-border-color: var(--admin-border, #2a2a3a);
+  --ag-font-size: 12px;
+  --ag-row-hover-color: var(--admin-bg-hover, #22222e);
+}
+.dc-grid .cell-mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.dc-grid .col-montant {
+  font-weight: 700;
+}
+.dc-grid .col-remise {
+  color: #fbbf24;
+}
+
+@media (max-width: 640px) {
+  .admin-debit-comptant {
+    padding: 12px;
+    height: auto;
+  }
+  .dc-grid {
+    height: 70vh;
+  }
+}
+
+/* Progression streaming */
+.dc-progress-msg {
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-height: 1.3em;
+}
+.dc-progress-bar {
+  width: 100%;
+  max-width: 460px;
+  height: 12px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dc-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  transition: width 0.4s ease;
+}
+.dc-progress-pct {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--admin-primary-light, #818cf8);
+}
+.dc-progress-hint {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted, #606070);
+  margin: 0;
+}

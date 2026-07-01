@@ -14,9 +14,6 @@ class ArticleCacheService {
     this.cache = new Map();
     // Durée de validité du cache (5 minutes par défaut)
     this.cacheTTL = 5 * 60 * 1000;
-    // Filet de sécurité : au-delà de ce délai, on revalide en arrière-plan
-    // (non bloquant) même si mtime/taille n'ont pas changé.
-    this.revalidateAfter = 30 * 60 * 1000;
     // Locks pour éviter les chargements multiples simultanés
     this.loadingLocks = new Map();
   }
@@ -239,33 +236,6 @@ class ArticleCacheService {
   }
 
   /**
-   * État de fraîcheur du cache : "fresh" | "stale" | "missing".
-   * - missing : aucun cache -> chargement synchrone obligatoire
-   * - fresh   : fichier inchangé (mtime + taille) -> on sert le cache
-   * - stale   : fichier modifié (ou filet de sécurité) -> on sert le cache
-   *             et on recharge en arrière-plan (stale-while-revalidate)
-   */
-  cacheFreshness(cacheEntry, dbfPath) {
-    if (!cacheEntry) return "missing";
-    let stats;
-    try {
-      stats = fs.statSync(dbfPath);
-    } catch {
-      // Chemin momentanément inaccessible : servir le cache existant.
-      return "fresh";
-    }
-    const mtimeChanged =
-      stats.mtime.getTime() !== cacheEntry.lastModified.getTime();
-    const sizeChanged =
-      cacheEntry.dbfInfo && typeof cacheEntry.dbfInfo.fileSize === "number"
-        ? stats.size !== cacheEntry.dbfInfo.fileSize
-        : false;
-    if (mtimeChanged || sizeChanged) return "stale";
-    if (Date.now() - cacheEntry.loadedAt > this.revalidateAfter) return "stale";
-    return "fresh";
-  }
-
-  /**
    * Charge ou récupère du cache les articles d'une entreprise
    */
   async getArticles(entreprise) {
@@ -276,29 +246,13 @@ class ArticleCacheService {
       "article.dbf",
     );
 
+    // Vérifier le cache
     const cached = this.cache.get(cacheKey);
-    const freshness = this.cacheFreshness(cached, dbfPath);
-    if (freshness === "fresh") return cached;
-    if (freshness === "stale") {
-      // stale-while-revalidate : on sert le cache immédiatement et on
-      // recharge en arrière-plan (l'utilisateur n'attend jamais la relecture).
-      if (!this.loadingLocks.has(cacheKey)) {
-        this._loadArticles(entreprise, cacheKey, dbfPath).catch((e) =>
-          console.error(
-            `[ArticleCache] Revalidation échouée ${cacheKey}: ${e.message}`,
-          ),
-        );
-      }
+    if (this.isCacheValid(cached, dbfPath)) {
       return cached;
     }
-    // missing : premier chargement -> synchrone (inévitable)
-    return this._loadArticles(entreprise, cacheKey, dbfPath);
-  }
 
-  /**
-   * Chargement effectif (lecture DBF). Protégé par lock anti-concurrence.
-   */
-  async _loadArticles(entreprise, cacheKey, dbfPath) {
+    // Éviter les chargements multiples simultanés
     if (this.loadingLocks.has(cacheKey)) {
       // Attendre que le chargement en cours se termine
       await this.loadingLocks.get(cacheKey);
@@ -320,7 +274,7 @@ class ArticleCacheService {
         throw new Error(`Fichier DBF non trouvé: ${dbfPath}`);
       }
 
-      const dbf = await DBFFile.open(dbfPath);
+      const dbf = await DBFFile.open(dbfPath, { readMode: "loose" });
       const records = await dbf.readRecords();
       const stats = fs.statSync(dbfPath);
 

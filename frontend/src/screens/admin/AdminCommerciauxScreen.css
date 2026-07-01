@@ -1,0 +1,301 @@
+/* AdminCommerciauxScreen.css */
+.admin-commerciaux {
+  padding: 24px;
+  color: var(--admin-text, #f0f0f5);
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.ac-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.ac-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  margin: 0;
+}
+.ac-header h1 svg {
+  color: var(--admin-primary, #6366f1);
+}
+.ac-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ac-select {
+  background: var(--admin-bg-secondary, #12121a);
+  color: var(--admin-text, #f0f0f5);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+.ac-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  color: var(--admin-text, #f0f0f5);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.ac-btn:hover:not(:disabled) {
+  background: var(--admin-bg-hover, #22222e);
+}
+.ac-btn.primary {
+  background: var(--admin-primary, #6366f1);
+  border-color: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+.ac-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ac-btn .spin {
+  animation: ac-spin 1s linear infinite;
+}
+@keyframes ac-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ac-annee {
+  color: var(--admin-text-muted, #606070);
+  font-size: 0.82rem;
+  margin: 0 0 18px;
+}
+
+.ac-empty,
+.ac-error {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.ac-error {
+  border-color: var(--admin-warning, #f59e0b);
+}
+
+/* KPIs */
+.ac-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.ac-kpi {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.ac-kpi-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--admin-primary-light, #818cf8);
+}
+.ac-kpi-icon.alt {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--admin-warning, #f59e0b);
+}
+.ac-kpi-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.ac-kpi-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--admin-text-muted, #606070);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Grille cartes commerciaux */
+.ac-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 16px;
+}
+.ac-card {
+  text-align: left;
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 14px;
+  padding: 18px;
+  cursor: pointer;
+  transition: 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: inherit;
+  font: inherit;
+}
+.ac-card:hover {
+  border-color: var(--admin-primary, #6366f1);
+  transform: translateY(-2px);
+}
+.ac-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.ac-card-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 1.02rem;
+}
+.ac-card-name svg {
+  color: var(--admin-text-muted, #606070);
+  flex-shrink: 0;
+}
+.com-tag {
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.com-tag.vendeur {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+.com-tag.magasin {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+.com-tag.orphelin {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+
+.ac-card-ca {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ac-card-ca .big {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.evol {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.evol.up {
+  color: #34d399;
+}
+.evol.down {
+  color: #f87171;
+}
+.evol.flat {
+  color: var(--admin-text-muted, #808080);
+}
+
+.ac-bar {
+  height: 6px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ac-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+}
+
+/* Split portefeuille */
+.ac-split {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--admin-warning, #f59e0b);
+}
+.ac-split-self {
+  background: var(--admin-primary, #6366f1);
+  height: 100%;
+}
+.ac-split-other {
+  flex: 1;
+  background: var(--admin-warning, #f59e0b);
+}
+.ac-split-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.ac-split-legend .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.ac-split-legend .dot.self {
+  background: var(--admin-primary, #6366f1);
+}
+.ac-split-legend .dot.other {
+  background: var(--admin-warning, #f59e0b);
+}
+
+.ac-card-stats {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--admin-border, #2a2a3a);
+  padding-top: 10px;
+}
+.ac-card-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ac-card-stats .lbl {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted, #606070);
+  text-transform: uppercase;
+}
+.ac-card-stats .val {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 640px) {
+  .admin-commerciaux {
+    padding: 14px;
+  }
+  .ac-select {
+    min-width: 0;
+    flex: 1;
+  }
+}
