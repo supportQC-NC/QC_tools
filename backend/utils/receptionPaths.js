@@ -10,17 +10,27 @@
 //       <NUMCDE>_<AAAA-MM-JJ>_<fournisseur>.pdf         (rapport)
 //       signalement_<REF>_<type>.<ext>                  (photos problèmes)
 //
-// La « base collecteur » est lue depuis entreprise.cheminRapportReception
-// (getter du modèle Entreprise qui traduit dev/prod automatiquement). En prod,
-// le getter conserve le dernier segment sous RCOMMON_STOCK_ROOT
-// (ex: "\\...\STOCK\collecteur" -> "<root>/collecteur"). Le reste de
-// l'arborescence (controle_cmd/<trig>/<commande>) est ajouté ici en JS, donc
-// il fonctionne aussi bien en dev (UNC Windows) qu'en prod (montage Linux).
+// IMPORTANT — Base « collecteur » SANS migration de base de données :
+// L'ancien module déposait le PDF directement dans `entreprise.cheminRapportReception`
+// (ex: "...\STOCK\controle commande"). Ce chemin RCOMMUN FONCTIONNE DÉJÀ (le serveur
+// en ligne y écrivait les PDF). On réutilise donc ce chemin et on remplace simplement
+// son DERNIER segment par "collecteur" -> "...\STOCK\collecteur". Ainsi :
+//   - aucun changement à faire en base (les entreprises existantes marchent telles quelles) ;
+//   - on s'appuie sur le chemin déjà éprouvé pour l'écriture sur le partage ;
+//   - c'est idempotent : si le champ vaut déjà "...\STOCK\collecteur", il est conservé.
+// La traduction dev/prod (UNC Windows <-> montage Linux) reste gérée par le getter
+// du modèle Entreprise ; on travaille ici sur la valeur déjà traduite.
 
 import path from "path";
 
 // Sous-dossier fixe créé dans la base « collecteur ».
 export const CONTROLE_CMD_DIR = "controle_cmd";
+
+// Nom du dossier « collecteur » (dernier segment de la base).
+export const COLLECTEUR_DIR = "collecteur";
+
+// Base de repli si l'entreprise n'a aucun chemin configuré.
+const DEFAULT_BASE_COLLECTEUR = "\\\\192.168.0.250\\Rcommun\\STOCK\\collecteur";
 
 // ---------------------------------------------------------------------------
 // TYPES DE SIGNALEMENT (problème article)
@@ -55,6 +65,41 @@ export const sanitizeSegment = (nom) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 150) || "sans_nom";
+
+/**
+ * Dérive la base « collecteur » à partir du chemin de dépôt existant de
+ * l'entreprise (celui qui déposait déjà le PDF sur RCOMMUN).
+ * On remplace le DERNIER segment par "collecteur" en conservant le préfixe
+ * (UNC "\\serveur\..." ou POSIX "/mnt/..."). Idempotent.
+ *
+ * Exemples :
+ *   "\\192.168.0.250\Rcommun\STOCK\controle commande" -> "...\STOCK\collecteur"
+ *   "\\192.168.0.250\Rcommun\STOCK\collecteur"          -> inchangé
+ *   "/mnt/rcommun/STOCK/controle commande"              -> "/mnt/rcommun/STOCK/collecteur"
+ *   "" (vide)                                            -> DEFAULT_BASE_COLLECTEUR
+ */
+export const deriveCollecteurBase = (cheminDepot) => {
+  const raw = safeTrim(cheminDepot);
+  if (!raw) return DEFAULT_BASE_COLLECTEUR;
+
+  const parts = raw.split(/[\\/]+/).filter(Boolean);
+  if (parts.length === 0) return DEFAULT_BASE_COLLECTEUR;
+
+  // Déjà "collecteur" ? on garde tel quel (idempotent).
+  if (parts[parts.length - 1].toLowerCase() === COLLECTEUR_DIR) return raw;
+
+  // Remplace le dernier segment par "collecteur", en préservant le séparateur
+  // et l'éventuel préfixe UNC / racine absolue.
+  const usesBackslash = raw.includes("\\");
+  const sep = usesBackslash ? "\\" : "/";
+  let prefix = "";
+  if (raw.startsWith("\\\\")) prefix = "\\\\"; // UNC Windows
+  else if (raw.startsWith("//")) prefix = "//"; // UNC POSIX
+  else if (raw.startsWith("/")) prefix = "/"; // racine POSIX
+
+  parts[parts.length - 1] = COLLECTEUR_DIR;
+  return prefix + parts.join(sep);
+};
 
 /** Date -> "AAAA-MM-JJ" (ou "" si invalide). */
 const dateToYmd = (d) => {
@@ -91,18 +136,15 @@ export const buildPdfFileName = (reception) => `${buildBaseName(reception)}.pdf`
  * Construit (et renvoie) le chemin ABSOLU du dossier de la commande :
  *   <base collecteur>/controle_cmd/<TRIGRAMME>/<NUMCDE>_<date>_<fournisseur>
  *
+ * La base « collecteur » est DÉRIVÉE du chemin de dépôt existant de l'entreprise
+ * (voir deriveCollecteurBase) -> aucune migration de base nécessaire.
+ *
  * @param {object} entreprise  Document Entreprise (getter cheminRapportReception + trigramme)
  * @param {object} reception   Document Reception (numcde + commandeInfo)
- * @returns {string} chemin du dossier (NON créé — voir ensureDir)
- * @throws si la base collecteur n'est pas configurée
+ * @returns {string} chemin du dossier (NON créé — voir mkdir côté appelant)
  */
 export const buildControleCmdDir = (entreprise, reception) => {
-  const base = safeTrim(entreprise?.cheminRapportReception);
-  if (!base) {
-    throw new Error(
-      "Chemin de dépôt (cheminRapportReception / base collecteur) non configuré pour cette entreprise.",
-    );
-  }
+  const base = deriveCollecteurBase(entreprise?.cheminRapportReception);
   const trigramme = sanitizeSegment(
     safeTrim(entreprise?.trigramme).toUpperCase() || "XXX",
   );
@@ -126,10 +168,12 @@ export const buildSignalementFileName = (refKey, type, ext = "jpg") => {
 
 export default {
   CONTROLE_CMD_DIR,
+  COLLECTEUR_DIR,
   SIGNALEMENT_TYPES,
   SIGNALEMENT_VALUES,
   signalementLabel,
   sanitizeSegment,
+  deriveCollecteurBase,
   buildBaseName,
   buildPdfFileName,
   buildControleCmdDir,
