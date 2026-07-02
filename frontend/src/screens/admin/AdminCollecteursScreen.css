@@ -1,0 +1,345 @@
+/* src/screens/admin/AdminCollecteursScreen.css */
+.admin-collecteurs {
+  padding: 20px;
+  color: var(--text-primary);
+}
+
+.col-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.col-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  margin: 0;
+}
+.col-header h1 svg {
+  color: var(--accent);
+}
+.col-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn-primary,
+.btn-secondary,
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--accent-hover, #3b8eea);
+}
+.btn-secondary:hover {
+  border-color: var(--accent);
+}
+.btn-icon {
+  padding: 9px 11px;
+}
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compteurs */
+.col-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.col-stat {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.col-stat .v {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+.col-stat .l {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.col-stat.total .v {
+  color: var(--accent);
+}
+.col-stat.st-service .v {
+  color: #10b981;
+}
+.col-stat.st-stock .v {
+  color: #3b82f6;
+}
+.col-stat.st-panne .v {
+  color: #ef4444;
+}
+.col-stat.st-reparation .v {
+  color: #f59e0b;
+}
+.col-stat.st-reforme .v {
+  color: #6b7280;
+}
+.col-stat.st-perdu .v {
+  color: #b91c1c;
+}
+
+/* Filtres */
+.col-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.col-filters .search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 240px;
+}
+.col-filters .search-box svg {
+  color: var(--text-muted);
+}
+.col-filters .search-box input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  width: 100%;
+  font-size: 13px;
+}
+.col-filters select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Table */
+.col-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.col-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 900px;
+}
+.col-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg-tertiary);
+  white-space: nowrap;
+}
+.col-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.col-table tr:last-child td {
+  border-bottom: none;
+}
+.col-table tr.row-inactive {
+  opacity: 0.5;
+}
+.col-table .mono {
+  font-family: ui-monospace, Menlo, monospace;
+  font-weight: 600;
+}
+.acc-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ga {
+  font-weight: 700;
+  font-size: 11px;
+}
+.ga.oui {
+  color: #10b981;
+}
+.ga.non {
+  color: var(--text-muted);
+}
+
+/* Badges statut */
+.statut-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.statut-badge.st-stock {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+.statut-badge.st-service {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: #10b981;
+}
+.statut-badge.st-panne {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+.statut-badge.st-reparation {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+.statut-badge.st-reforme {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border-color: #6b7280;
+}
+.statut-badge.st-perdu {
+  background: rgba(185, 28, 28, 0.15);
+  color: #f87171;
+  border-color: #b91c1c;
+}
+
+/* Actions ligne */
+.col-row-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+.btn-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-row:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-row.danger:hover {
+  border-color: var(--danger, #ef4444);
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.col-empty,
+.col-error {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.col-error {
+  border-color: var(--danger, #ef4444);
+  color: #fca5a5;
+}
+
+@media (max-width: 600px) {
+  .admin-collecteurs {
+    padding: 12px;
+  }
+}
+
+/* Légende version */
+.col-legend {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 12px;
+}
+.col-legend strong {
+  color: var(--accent);
+}
+
+/* Badge de version app */
+.ver-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, Menlo, monospace;
+  border: 1px solid transparent;
+}
+.ver-badge.uptodate {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: #10b981;
+}
+.ver-badge.outdated {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border-color: #ef4444;
+}
+.ver-badge.unknown {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border-color: #6b7280;
+}
+
+/* Ligne d'un collecteur pas à jour : liseré rouge + fond légèrement teinté */
+.col-table tr.row-outdated td {
+  background: rgba(239, 68, 68, 0.07);
+}
+.col-table tr.row-outdated td:first-child {
+  box-shadow: inset 3px 0 0 0 #ef4444;
+}

@@ -21,6 +21,8 @@ import {
   HiFolder,
   HiTemplate,
   HiTag,
+  HiQrcode,
+  HiDeviceMobile
 } from "react-icons/hi";
 
 // =============================================
@@ -62,6 +64,8 @@ export const adminMenuStructure = [
         path: "/admin/concurrents",
         icon: HiUserGroup,
       },
+           { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
+     { label: "Installation app", path: "/install", icon: HiQrcode },
     ],
   },
   {
@@ -121,6 +125,7 @@ export const adminMenuStructure = [
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
        { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
          { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
+            { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
          
  
     ],

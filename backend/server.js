@@ -52,6 +52,9 @@ import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import debitComptantRoutes from "./routes/debitComptantRoutes.js";
    import gencodDoublonsRoutes from "./routes/gencodDoublonsRoutes.js";
  import performanceDockRoutes from "./routes/performanceDockRoutes.js";
+  import collecteurRoutes from "./routes/collecteurRoutes.js";
+       import appReleaseRoutes from "./routes/appReleaseRoutes.js";
+       import bipageCollecteRoutes from "./routes/bipageCollecteRoutes.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -146,6 +149,9 @@ app.use("/api/reappro-local", reapproLocalRoutes);
   app.use("/api/debit-comptant", debitComptantRoutes);
    app.use("/api/gencod-doublons", gencodDoublonsRoutes);
  app.use("/api/performance-dock", performanceDockRoutes);
+  app.use("/api/collecteurs", collecteurRoutes);
+    app.use("/api/app-release", appReleaseRoutes);
+    app.use("/api/bipage-collecte", bipageCollecteRoutes);
 // =======================================
 
 // ==========================================

@@ -18,7 +18,7 @@ import Login from "./screens/LoginScreen/LoginScreen";
 import ForgotPassword from "./screens/ForgotPasswordScreen/ForgotPasswordScreen";
 import ResetPassword from "./screens/ResetPasswordScreen/ResetPasswordScreen";
 import NotFound from "./screens/NotFoundScreen/NotFoundScreen";
-
+  import InstallAppScreen from "./screens/InstallAppScreen";
 import AdminUsers from "./screens/admin/AdminUsersScreen";
 import AdminEntreprises from "./screens/admin/AdminEntreprisesScreen";
 import AdminArticles from "./screens/admin/AdminArticlesScreen";
@@ -62,11 +62,13 @@ import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
 import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
  import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
  import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScreen";
+  import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/" element={<App />}>
       <Route path="/login" element={<Login />} />
+       <Route path="/install" element={<InstallAppScreen />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
 
@@ -97,7 +99,9 @@ const router = createBrowserRouter(
         <Route path="/admin/commerciaux" element={<AdminCommerciauxScreen />} />
         <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
          <Route path="/admin/performance-dock" element={<AdminPerformanceDockScreen />} />
+         <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
  
+  <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
          <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
             <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
             <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />

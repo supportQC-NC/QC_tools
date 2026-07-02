@@ -35,6 +35,8 @@ export const apiSlice = createApi({
         // ========== TAGS Facture ==========
     "Factures",
     // ====================================
+    "Collecteur",
+    "AppRelease"
   ],
   endpoints: (builder) => ({}),
 });
