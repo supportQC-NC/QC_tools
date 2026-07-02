@@ -1,5 +1,6 @@
 // backend/routes/receptionRoutes.js
 import express from "express";
+import multer from "multer";
 import {
   // Lecture (commandes à contrôler — DBF)
   getCommandesAControler,
@@ -19,6 +20,10 @@ import {
   addComptage,
   updateComptage,
   deleteComptage,
+  // Signalements (problèmes + photos)
+  getSignalementTypes,
+  upsertSignalement,
+  deleteSignalement,
   // Phase finale
   terminerScan,
   getAnalyse,
@@ -36,6 +41,22 @@ import {
 } from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
+
+// ------------------------------------------------------------------
+// Upload photo de signalement : stockage EN MÉMOIRE (aucun fichier
+// temporaire) -> le controller écrit ensuite directement sur RCOMMUN.
+// ------------------------------------------------------------------
+const uploadPhoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 Mo / photo
+  fileFilter: (req, file, cb) => {
+    if (String(file.mimetype || "").toLowerCase().startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Seules les images sont acceptées"));
+    }
+  },
+});
 
 // ==========================================
 // SESSIONS — routes statiques (AVANT les routes :id génériques)
@@ -55,6 +76,14 @@ router.get(
   protect,
   checkModuleAccess("reception", "read"),
   getHistoriqueReceptions,
+);
+
+// Types de problème (menu déroulant) — statique, avant /:id
+router.get(
+  "/signalement-types",
+  protect,
+  checkModuleAccess("reception", "read"),
+  getSignalementTypes,
 );
 
 // ==========================================
@@ -149,6 +178,21 @@ router.delete(
   protect,
   checkModuleAccess("reception", "delete"),
   deleteComptage,
+);
+
+// Signalements (problème article + photo déposée sur RCOMMUN)
+router.post(
+  "/:id/signalements",
+  protect,
+  checkModuleAccess("reception", "write"),
+  uploadPhoto.single("photo"),
+  upsertSignalement,
+);
+router.delete(
+  "/:id/signalements/:signalementId",
+  protect,
+  checkModuleAccess("reception", "delete"),
+  deleteSignalement,
 );
 
 // Phase finale (analyse des écarts)

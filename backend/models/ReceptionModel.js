@@ -1,5 +1,6 @@
 // backend/models/ReceptionModel.js
 import mongoose from "mongoose";
+import { SIGNALEMENT_VALUES } from "../utils/receptionPaths.js";
 
 /**
  * Module « Réception de marchandises » (contrôle SANS réappro).
@@ -7,6 +8,11 @@ import mongoose from "mongoose";
  * Une session de réception compare les quantités réceptionnées (X) aux quantités
  * commandées dans Stock XL (Y). Toutes les données vivent en Mongo (aucune écriture DBF).
  * Le livrable final est un rapport PDF déposé sur RCOMMUN + envoyé par email au service Achats.
+ *
+ * Dépôt RCOMMUN (base « collecteur ») :
+ *   <collecteur>/controle_cmd/<TRIGRAMME>/<NUMCDE>_<date>_<fournisseur>/
+ *       - rapport PDF
+ *       - photos de signalement (problèmes articles), écrites DÈS la prise.
  *
  * Cycle de vie (status) :
  *   en_cours        -> phase de scan/comptage terrain
@@ -47,6 +53,44 @@ const nouveauGencodeSchema = new mongoose.Schema(
     },
   },
   { _id: false },
+);
+
+// ---------------------------------------------------------------------------
+// SIGNALEMENT d'un PROBLÈME sur un article (1 max par article).
+// La photo est écrite DIRECTEMENT sur RCOMMUN au moment de la prise ; on ne
+// conserve ici que les métadonnées (type + nom/chemin du fichier photo).
+// La clé d'unicité est refKey (NART si connu, sinon gencode scanné).
+// ---------------------------------------------------------------------------
+const signalementSchema = new mongoose.Schema(
+  {
+    // Clé d'unicité : NART si l'article est identifié, sinon gencode scanné.
+    refKey: { type: String, default: "", trim: true },
+
+    // Identité article (snapshot, pour le rapport).
+    nart: { type: String, default: "" },
+    gencod: { type: String, default: "" },
+    designation: { type: String, default: "" },
+    refer: { type: String, default: "" },
+
+    // Type de problème (menu déroulant).
+    type: {
+      type: String,
+      enum: SIGNALEMENT_VALUES, // avarie | cassee | manquant | abimee
+      required: true,
+    },
+
+    // Photo déposée sur RCOMMUN (dans le dossier de la commande).
+    photoFileName: { type: String, default: "" },
+    photoPath: { type: String, default: "" }, // chemin absolu serveur (RCOMMUN)
+    mimeType: { type: String, default: "" },
+    taille: { type: Number, default: 0 }, // octets
+
+    // Traçabilité.
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
 );
 
 // ---------------------------------------------------------------------------
@@ -158,6 +202,9 @@ const receptionSchema = new mongoose.Schema(
 
     // Mesure "X" : comptage terrain
     comptages: [comptageSchema],
+
+    // Signalements de problèmes articles (1 max par article, clé refKey)
+    signalements: [signalementSchema],
 
     // Commentaire libre de fin de contrôle (§9)
     commentaire: { type: String, default: "" },

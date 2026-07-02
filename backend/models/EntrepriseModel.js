@@ -12,14 +12,22 @@ import path from "path";
 //       mais sous la racine Linux montée. Aucune migration en base nécessaire.
 const DEFAULT_BASE = "\\\\serveur\\Bases";
 const DEFAULT_COLLECT = "\\\\192.168.0.250\\Rcommun\\STOCK\\collect_sec";
-// Dossier commun où sont déposés les rapports PDF de réception (controle commande).
-const DEFAULT_RAPPORT_RECEPTION =
-  "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande";
+
+// BASE « collecteur » où sont déposés les livrables du module RÉCEPTION.
+// L'arborescence complète est construite en code (voir utils/receptionPaths.js) :
+//   <base collecteur>/controle_cmd/<TRIGRAMME>/<NUMCDE>_<date>_<fournisseur>/
+//       - le rapport PDF de contrôle
+//       - les photos de signalement (problèmes articles)
+// NB (migration) : ce champ pointait auparavant sur "...\STOCK\controle commande"
+// (dépôt à plat du PDF). Il désigne désormais la base "collecteur". Les entreprises
+// déjà en base doivent voir leur valeur mise à jour vers "...\STOCK\collecteur".
+const DEFAULT_BASE_COLLECTEUR =
+  "\\\\192.168.0.250\\Rcommun\\STOCK\\collecteur";
 
 // Traduit un chemin d'export stocké (UNC Windows) vers le montage Linux,
 // en conservant le DERNIER segment (le dossier propre à l'entreprise / au module).
 //   "\\192.168.0.250\Rcommun\STOCK\collect_sec_aw"  ->  "<root>/collect_sec_aw"
-//   "\\192.168.0.250\Rcommun\STOCK\controle commande" -> "<root>/controle commande"
+//   "\\192.168.0.250\Rcommun\STOCK\collecteur"       ->  "<root>/collecteur"
 // En dev (RCOMMON_STOCK_ROOT non défini) : renvoie la valeur stockée inchangée.
 const traduireCheminExport = (v) => {
   const root = process.env.RCOMMON_STOCK_ROOT;
@@ -96,11 +104,12 @@ const entrepriseSchema = new mongoose.Schema(
       default: DEFAULT_COLLECT,
       get: (v) => traduireCheminExport(v),
     },
-    // Chemin de dépôt des RAPPORTS PDF de RÉCEPTION (module reception) — Rcommun.
-    // Traduit comme cheminExportInventaire (garde le dernier segment "controle commande").
+    // BASE « collecteur » du module RÉCEPTION (dépôt du PDF + photos de signalement).
+    // Traduit comme cheminExportInventaire (garde le dernier segment "collecteur").
+    // L'arborescence controle_cmd/<trigramme>/<commande> est ajoutée en code.
     cheminRapportReception: {
       type: String,
-      default: DEFAULT_RAPPORT_RECEPTION,
+      default: DEFAULT_BASE_COLLECTEUR,
       get: (v) => traduireCheminExport(v),
     },
     // Destinataires de l'EMAIL D'ALERTE du rapport de réception (réservé à ce rapport).

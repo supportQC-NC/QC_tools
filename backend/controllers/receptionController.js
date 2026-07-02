@@ -7,6 +7,12 @@ import receptionReportService from "../services/receptionReportService.js";
 import Reception from "../models/ReceptionModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import User from "../models/UserModel.js";
+import {
+  SIGNALEMENT_TYPES,
+  SIGNALEMENT_VALUES,
+  buildControleCmdDir,
+  buildSignalementFileName,
+} from "../utils/receptionPaths.js";
 import path from "path";
 import fs from "fs";
 
@@ -27,6 +33,21 @@ const safeTrim = (value) => {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value.trim();
   return String(value).trim();
+};
+
+// Extension de fichier image à partir du type MIME (repli sur "jpg").
+const extFromMime = (mime) => {
+  const map = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "image/heif": "heif",
+    "image/gif": "gif",
+    "image/bmp": "bmp",
+  };
+  return map[String(mime || "").toLowerCase()] || "jpg";
 };
 
 const checkCommandeFiles = (entreprise) => {
@@ -573,6 +594,7 @@ const createReception = asyncHandler(async (req, res) => {
     commandeInfo,
     lignesCommande,
     comptages: [],
+    signalements: [],
   });
 
   // Précharger le cache des articles (arrière-plan)
@@ -1028,6 +1050,174 @@ const deleteComptage = asyncHandler(async (req, res) => {
 });
 
 // ===========================================
+// SIGNALEMENTS (PROBLÈMES ARTICLES + PHOTOS RCOMMUN)
+// ===========================================
+
+/**
+ * @desc    Liste des types de problème (menu déroulant mobile).
+ *          Renvoie { value: label } pour rester synchronisé avec le backend.
+ * @route   GET /api/receptions/signalement-types
+ * @access  Private
+ */
+const getSignalementTypes = asyncHandler(async (req, res) => {
+  res.json({ types: SIGNALEMENT_TYPES });
+});
+
+/**
+ * @desc    Créer / remplacer le signalement d'un article (1 max par article) et
+ *          déposer la PHOTO directement sur RCOMMUN (dans le dossier de la
+ *          commande). La photo est transmise en multipart/form-data (champ "photo").
+ * @route   POST /api/receptions/:id/signalements
+ * @body    multipart : { type, refKey?, nart?, gencod?, designation?, refer?, photo (fichier) }
+ * @access  Private (module reception, write)
+ */
+const upsertSignalement = asyncHandler(async (req, res) => {
+  const reception = await loadReceptionOwned(req.params.id, req, res);
+  if (reception.status === "termine") {
+    res.status(400);
+    throw new Error("Cette réception est déjà terminée");
+  }
+
+  const type = safeTrim(req.body.type).toLowerCase();
+  if (!SIGNALEMENT_VALUES.includes(type)) {
+    res.status(400);
+    throw new Error(
+      `Type de problème invalide. Valeurs autorisées : ${SIGNALEMENT_VALUES.join(", ")}`,
+    );
+  }
+
+  // Clé d'unicité : NART si connu, sinon gencode scanné / refKey fourni.
+  const nart = safeTrim(req.body.nart);
+  const refKey = safeTrim(req.body.refKey) || nart || safeTrim(req.body.gencodeScanne);
+  if (!refKey) {
+    res.status(400);
+    throw new Error("Article non identifié (nart / refKey manquant)");
+  }
+
+  // Photo obligatoire (le dépôt de la photo est l'objet du signalement).
+  if (!req.file || !req.file.buffer || !req.file.buffer.length) {
+    res.status(400);
+    throw new Error("Photo manquante");
+  }
+  if (!String(req.file.mimetype || "").toLowerCase().startsWith("image/")) {
+    res.status(400);
+    throw new Error("Le fichier envoyé n'est pas une image");
+  }
+
+  // Entreprise (pour trigramme + base collecteur via getter)
+  const entreprise = await Entreprise.findById(reception.entreprise);
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  // Dossier de la commande sur RCOMMUN (créé si absent)
+  let dossier;
+  try {
+    dossier = buildControleCmdDir(entreprise, reception);
+    if (!fs.existsSync(dossier)) {
+      fs.mkdirSync(dossier, { recursive: true });
+    }
+  } catch (error) {
+    res.status(400);
+    throw new Error(
+      `Impossible d'accéder au dossier de dépôt: ${error.message}`,
+    );
+  }
+
+  const ext = extFromMime(req.file.mimetype);
+  const fileName = buildSignalementFileName(refKey, type, ext);
+  const filePath = path.join(dossier, fileName);
+
+  // Signalement existant pour cet article ?
+  const existing = reception.signalements.find(
+    (s) => safeTrim(s.refKey) === refKey,
+  );
+
+  // Si un ancien fichier photo porte un autre nom, on le supprime (best-effort).
+  if (existing && existing.photoFileName && existing.photoFileName !== fileName) {
+    const ancien = existing.photoPath || path.join(dossier, existing.photoFileName);
+    try {
+      if (ancien && fs.existsSync(ancien)) fs.unlinkSync(ancien);
+    } catch (e) {
+      console.warn("Suppression ancienne photo signalement impossible:", e.message);
+    }
+  }
+
+  // Écriture directe de la photo sur RCOMMUN
+  try {
+    fs.writeFileSync(filePath, req.file.buffer);
+  } catch (error) {
+    res.status(400);
+    throw new Error(`Écriture de la photo impossible: ${error.message}`);
+  }
+
+  const now = new Date();
+  const payload = {
+    refKey,
+    nart,
+    gencod: safeTrim(req.body.gencod),
+    designation: safeTrim(req.body.designation),
+    refer: safeTrim(req.body.refer),
+    type,
+    photoFileName: fileName,
+    photoPath: filePath,
+    mimeType: safeTrim(req.file.mimetype),
+    taille: req.file.size || req.file.buffer.length || 0,
+    user: req.user._id,
+    updatedAt: now,
+  };
+
+  let signalement;
+  if (existing) {
+    Object.assign(existing, payload);
+    reception.markModified("signalements");
+    signalement = existing;
+  } else {
+    reception.signalements.push({ ...payload, createdAt: now });
+    signalement = reception.signalements[reception.signalements.length - 1];
+  }
+
+  await reception.save();
+
+  res.status(201).json({ reception, signalement });
+});
+
+/**
+ * @desc    Supprimer un signalement (et sa photo sur RCOMMUN).
+ * @route   DELETE /api/receptions/:id/signalements/:signalementId
+ * @access  Private (module reception, delete)
+ */
+const deleteSignalement = asyncHandler(async (req, res) => {
+  const reception = await loadReceptionOwned(req.params.id, req, res);
+  if (reception.status === "termine") {
+    res.status(400);
+    throw new Error("Cette réception est déjà terminée");
+  }
+
+  const signalement = reception.signalements.id(req.params.signalementId);
+  if (!signalement) {
+    res.status(404);
+    throw new Error("Signalement non trouvé");
+  }
+
+  // Suppression du fichier photo (best-effort)
+  const photo = signalement.photoPath || "";
+  if (photo) {
+    try {
+      if (fs.existsSync(photo)) fs.unlinkSync(photo);
+    } catch (e) {
+      console.warn("Suppression photo signalement impossible:", e.message);
+    }
+  }
+
+  reception.signalements.pull(req.params.signalementId);
+  await reception.save();
+
+  res.json({ reception });
+});
+
+// ===========================================
 // PHASE FINALE (ANALYSE DES ÉCARTS)
 // ===========================================
 
@@ -1204,6 +1394,10 @@ export {
   addComptage,
   updateComptage,
   deleteComptage,
+  // Signalements (problèmes + photos)
+  getSignalementTypes,
+  upsertSignalement,
+  deleteSignalement,
   // Phase finale
   terminerScan,
   getAnalyse,
