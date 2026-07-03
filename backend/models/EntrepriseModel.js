@@ -118,6 +118,12 @@ const entrepriseSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Destinataires de l'EMAIL du rapport de PRÉPARATION de commande.
+    // Liste d'adresses email (préparateurs, service commercial, ...).
+    emailsRapportPreparation: {
+      type: [String],
+      default: [],
+    },
     // Chemin du LOGO utilisé sur les étiquettes pleine page (module etiquettes).
     // Chemin lisible par le serveur (UNC en dev Windows, chemin Linux en prod).
     // Lu tel quel ; si vide ou illisible, aucun logo n'est dessiné.
