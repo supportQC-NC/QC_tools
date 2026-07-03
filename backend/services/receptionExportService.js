@@ -2,7 +2,9 @@
 //
 // Génère, en fin de réception, deux fichiers CSV destinés aux Achats et déposés
 // dans le dossier d'export inventaire de l'entreprise (collect_sec =
-// entreprise.cheminExportInventaire) :
+// entreprise.cheminExportInventaire), AVEC une copie dans le dossier de la
+// commande (celui du PDF + photos de signalement,
+// <collecteur>/controle_cmd/<TRIG>/<commande>/) :
 //
 //   1) regul_<NUMCDE>.csv   — régularisation d'inventaire (écarts définitifs)
 //        Format : "NART;quantité" (quantité SIGNÉE), une ligne par article.
@@ -28,6 +30,7 @@
 
 import fs from "fs";
 import path from "path";
+import { buildControleCmdDir } from "../utils/receptionPaths.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 
@@ -156,27 +159,63 @@ const csvRenvoi = (lignes) => {
 };
 
 /**
- * Génère et dépose les fichiers CSV (régul + renvoi) dans collect_sec.
+ * Génère et dépose les fichiers CSV (régul + renvoi) :
+ *   - dans collect_sec (destination principale pour les Achats / Stock XL) ;
+ *   - ET une COPIE dans le dossier de la commande (celui du PDF + photos de
+ *     signalement : <collecteur>/controle_cmd/<TRIG>/<commande>/).
+ *
  * Ne lève JAMAIS : les erreurs d'écriture sont capturées et remontées dans le
  * résultat (la génération du rapport principal ne doit pas échouer pour autant).
+ * L'écriture dans collect_sec est prioritaire ; la copie dans le dossier
+ * collecteur est best-effort (une copie ratée n'invalide pas le fichier principal).
  *
  * @param {object} reception  Document Reception
- * @param {object} entreprise Document Entreprise (getter cheminExportInventaire)
- * @returns {{dossier, regul, renvoi}} chemins + comptes (ou {error} par fichier)
+ * @param {object} entreprise Document Entreprise (getters chemins)
+ * @returns {{dossierExport, dossierCollecteur, regul, renvoi}}
  */
 export const genererFichiersStockXL = (reception, entreprise) => {
-  const dossier = resoudreDossierCollectSec(entreprise);
+  const dossierExport = resoudreDossierCollectSec(entreprise); // collect_sec
+
+  // Dossier de la commande (PDF + photos). Best-effort : si indisponible, on
+  // dépose quand même dans collect_sec.
+  let dossierCollecteur = null;
+  try {
+    dossierCollecteur = buildControleCmdDir(entreprise, reception);
+  } catch (e) {
+    dossierCollecteur = null;
+    console.error("[RECEPTION] dossier collecteur indisponible:", e.message);
+  }
+
   const numcde = sanitizeFileSegment(reception.numcde);
-  const resultat = { dossier, regul: null, renvoi: null };
+  const resultat = { dossierExport, dossierCollecteur, regul: null, renvoi: null };
+
+  // Dépose un fichier dans collect_sec + copie dans le dossier collecteur.
+  const deposer = (fichier, contenu) => {
+    const chemins = [];
+    // 1) collect_sec (principal)
+    chemins.push(ecrireFichier(dossierExport, fichier, contenu));
+    // 2) copie dans le dossier de la commande (PDF/photos)
+    if (dossierCollecteur) {
+      try {
+        chemins.push(ecrireFichier(dossierCollecteur, fichier, contenu));
+      } catch (e) {
+        console.error(
+          `[RECEPTION] copie ${fichier} dans le dossier collecteur impossible:`,
+          e.message,
+        );
+      }
+    }
+    return chemins;
+  };
 
   // --- Régul d'inventaire ---
   try {
     const lignesRegul = construireLignesRegul(reception);
     if (lignesRegul.length > 0) {
-      const chemin = ecrireFichier(dossier, `regul_${numcde}.csv`, csvRegul(lignesRegul));
-      resultat.regul = { chemin, lignes: lignesRegul.length };
+      const chemins = deposer(`regul_${numcde}.csv`, csvRegul(lignesRegul));
+      resultat.regul = { chemins, lignes: lignesRegul.length };
     } else {
-      resultat.regul = { chemin: null, lignes: 0 }; // rien à régulariser
+      resultat.regul = { chemins: [], lignes: 0 }; // rien à régulariser
     }
   } catch (e) {
     resultat.regul = { error: e.message };
@@ -187,10 +226,10 @@ export const genererFichiersStockXL = (reception, entreprise) => {
   try {
     const lignesRenvoi = construireLignesRenvoi(reception);
     if (lignesRenvoi.length > 0) {
-      const chemin = ecrireFichier(dossier, `renvoi_${numcde}.csv`, csvRenvoi(lignesRenvoi));
-      resultat.renvoi = { chemin, lignes: lignesRenvoi.length };
+      const chemins = deposer(`renvoi_${numcde}.csv`, csvRenvoi(lignesRenvoi));
+      resultat.renvoi = { chemins, lignes: lignesRenvoi.length };
     } else {
-      resultat.renvoi = { chemin: null, lignes: 0 }; // aucun renvoi
+      resultat.renvoi = { chemins: [], lignes: 0 }; // aucun renvoi
     }
   } catch (e) {
     resultat.renvoi = { error: e.message };
