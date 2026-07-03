@@ -4,7 +4,8 @@
 //   1) PDF « Prepa_cde_<client>_<numpro>.pdf » déposé dans
 //      <collecteur>/prepa_cmd/<TRIGRAMME>/<NUMPRO>_<date>_<client>/  (+ email).
 //   2) Fichier de transfert de stock (quantités prélevées au DOCK), déposé dans
-//      collect_sec (cheminExportInventaire) sous « tsf_prepa_<client>_<numpro>.dat ».
+//      collect_sec (cheminExportInventaire) ET copié dans le dossier prepa_cmd
+//      (à côté du PDF), sous « tsf_prepa_<client>_<numpro>.dat ».
 //      Nom volontairement HORS motif "stock.dat …" -> ignoré par le watcher inventaire.
 //      Format .dat standard : CODE(13, gauche, espaces) | QTE(8, zéros) | 000 + CRLF,
 //      CODE = GENCOD si présent sinon NART.
@@ -373,24 +374,49 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     stats,
   };
 
-  // ---- 2) Fichier de transfert dock (collect_sec) ----
-  let transfert = { fileName: "", filePath: "", lignes: 0 };
+  // ---- 2) Fichier de transfert dock : collect_sec (Stock XL) + copie dans prepa_cmd ----
+  let transfert = { fileName: "", filePath: "", chemins: [], lignes: 0 };
   try {
     const contenu = construireContenuTransfert(preparation);
-    const nbLignes = contenu ? contenu.trimEnd().split("\r\n").filter(Boolean).length : 0;
+    const nbLignes = contenu
+      ? contenu.trimEnd().split("\r\n").filter(Boolean).length
+      : 0;
     if (nbLignes > 0) {
-      const dir = dossierCollectSec(entreprise);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const nomTsf = sanitizeFileName(
-        `tsf_prepa_${header.client}_${header.numpro}`,
-      ) + ".dat";
-      const cheminTsf = path.join(dir, nomTsf);
-      fs.writeFileSync(cheminTsf, contenu, "utf8");
-      transfert = { fileName: nomTsf, filePath: cheminTsf, lignes: nbLignes };
+      const nomTsf =
+        sanitizeFileName(`tsf_prepa_${header.client}_${header.numpro}`) + ".dat";
+      const chemins = [];
+
+      // a) collect_sec (destination principale pour Stock XL)
+      try {
+        const dir = dossierCollectSec(entreprise);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const p1 = path.join(dir, nomTsf);
+        fs.writeFileSync(p1, contenu, "utf8");
+        chemins.push(p1);
+      } catch (e) {
+        console.error("[PREPA transfert collect_sec] écriture impossible:", e.message);
+      }
+
+      // b) copie dans le dossier prepa_cmd (à côté du PDF)
+      try {
+        if (!fs.existsSync(dossier)) fs.mkdirSync(dossier, { recursive: true });
+        const p2 = path.join(dossier, nomTsf);
+        fs.writeFileSync(p2, contenu, "utf8");
+        chemins.push(p2);
+      } catch (e) {
+        console.error("[PREPA transfert prepa_cmd] écriture impossible:", e.message);
+      }
+
+      transfert = {
+        fileName: nomTsf,
+        filePath: chemins[0] || "", // rétro-compat (1er emplacement écrit)
+        chemins,
+        lignes: nbLignes,
+      };
     }
   } catch (error) {
     transfert = { error: error.message };
-    console.error("[PREPA transfert] écriture impossible:", error.message);
+    console.error("[PREPA transfert] génération impossible:", error.message);
   }
 
   return { rapport, transfert };
