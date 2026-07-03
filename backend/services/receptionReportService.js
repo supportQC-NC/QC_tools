@@ -31,21 +31,36 @@ const num = (v) => {
 
 /**
  * L'article porte-t-il au moins une réservation ?
- * Basé sur le champ RESERV de l'article (mobile : "reserv"), avec quelques
- * alias défensifs + un éventuel booléen déjà calculé en amont.
+ * Le comptage stocke la réservation sous `enReservation` (booléen) et
+ * `nbReservations` (compteur, = article.RESERV). On accepte aussi quelques
+ * alias défensifs et un éventuel booléen déjà calculé en amont.
  */
 const aReservation = (o) => {
   if (!o) return false;
-  if (o.estReserve === true || o.aReservation === true || o.hasReserv === true)
+  if (
+    o.estReserve === true ||
+    o.aReservation === true ||
+    o.hasReserv === true ||
+    o.enReservation === true // champ réellement stocké sur le comptage
+  )
     return true;
-  return num(o.reserv ?? o.RESERV ?? o.qteReservee ?? o.qteReservation) > 0;
+  return (
+    num(
+      o.nbReservations ?? // compteur stocké sur le comptage (article.RESERV)
+        o.reserv ??
+        o.RESERV ??
+        o.qteReservee ??
+        o.qteReservation,
+    ) > 0
+  );
 };
 
 /** Construit le libellé de la colonne R/N : "R", "N", "R/N" ou "". */
-const construireRN = (estReserve, estNouveau) => {
+const construireRN = (estReserve, estNouveau, estRenvoi) => {
   const parts = [];
   if (estReserve) parts.push("R");
   if (estNouveau) parts.push("N");
+  if (estRenvoi) parts.push("V"); // V = gencode renVoyé (GENDOUBL)
   return parts.join("/");
 };
 
@@ -137,6 +152,8 @@ export const construireLignesRapport = (reception) => {
 
     const estNouveau = !!(l.estNouveau || c?.estNouveau);
     const estReserve = aReservation(l) || aReservation(c);
+    const estRenvoi = !!c?.isRenvoi;
+    const gencodeBipe = safeTrim(c?.renvoiGencodeBipe);
 
     rows.push({
       n,
@@ -148,10 +165,12 @@ export const construireLignesRapport = (reception) => {
       qteVal: qteValidee,
       ecart,
       ecartType: ecart > 0 ? "surplus" : ecart < 0 ? "manquant" : "",
-      nouv: construireRN(estReserve, estNouveau),
+      nouv: construireRN(estReserve, estNouveau, estRenvoi),
       estNouveau,
       estReserve,
-      gencodeNouveau: c?.nouveauGencode?.gencode || "",
+      estRenvoi,
+      // Pour un renvoi, on affiche le gencode RÉELLEMENT bipé dans "GENCODE NOUV.".
+      gencodeNouveau: estRenvoi ? gencodeBipe : c?.nouveauGencode?.gencode || "",
       enDefaut: ecart !== 0,
       section: "commande",
     });
@@ -166,6 +185,7 @@ export const construireLignesRapport = (reception) => {
       const qteVal = c.qteValidee != null ? c.qteValidee : c.qteComptee;
       const estNouveau = !!c.estNouveau;
       const estReserve = aReservation(c);
+      const estRenvoi = !!c.isRenvoi;
       rows.push({
         n,
         code: c.nart || "",
@@ -175,10 +195,13 @@ export const construireLignesRapport = (reception) => {
         qteBip: c.qteComptee,
         qteVal,
         ecart: "",
-        nouv: construireRN(estReserve, estNouveau),
+        nouv: construireRN(estReserve, estNouveau, estRenvoi),
         estNouveau,
         estReserve,
-        gencodeNouveau: c.nouveauGencode?.gencode || c.gencodeScanne || "",
+        estRenvoi,
+        gencodeNouveau: estRenvoi
+          ? safeTrim(c.renvoiGencodeBipe) || safeTrim(c.gencodeScanne)
+          : c.nouveauGencode?.gencode || c.gencodeScanne || "",
         enDefaut: c.isInconnu,
         section: "hors",
       });
@@ -372,9 +395,10 @@ export const ecrirePDFReception = async ({
         color = r.ecart > 0 ? "#1f6feb" : "#c0392b";
       }
 
-      // Colonne R/N : couleur selon le flag (N nouveauté = orange, R seul = vert).
-      if (c.key === "nouv" && (r.estReserve || r.estNouveau)) {
-        color = r.estNouveau ? "#b9770e" : "#0a7d55";
+      // Colonne R/N : couleur selon le flag (N nouveauté = orange, R seul = vert,
+      // V renvoi = violet — priorité au violet pour attirer l'œil des Achats).
+      if (c.key === "nouv" && (r.estReserve || r.estNouveau || r.estRenvoi)) {
+        color = r.estRenvoi ? "#7c3aed" : r.estNouveau ? "#b9770e" : "#0a7d55";
       }
 
       const val = fitText(doc, raw, c.w - 4);
@@ -415,6 +439,10 @@ export const ecrirePDFReception = async ({
     .text("   |   ", { continued: true })
     .fillColor("#b9770e")
     .text("N = nouveauté (V1..V12 = 0)", { continued: true })
+    .fillColor("#000")
+    .text("   |   ", { continued: true })
+    .fillColor("#7c3aed")
+    .text("V = gencode renvoyé (bipé indiqué en GENCODE NOUV.)", { continued: true })
     .fillColor("#000")
     .text("   |   lignes grisées = écart à traiter / gencode inconnu");
 
