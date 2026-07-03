@@ -55,16 +55,15 @@ const totalPrepare = (l) =>
     : num(l.qtePrepareeDock) + num(l.qtePrepareeMagasin);
 
 // ===========================================
-// LIGNES DU RAPPORT
+// LIGNES DU RAPPORT (§11 CDC)
+// Articles présentés dans L'ORDRE DE LA PROFORMA (NL croissant).
+// Colonnes : code, désignation, Gencode bipé, fournisseur, qté commandée,
+//            qté préparée dock, qté préparée magasin, total préparé, écart.
 // ===========================================
 const construireLignes = (preparation) => {
   const lignes = (preparation.lignes || []).slice();
-  // Ordre de lecture : dock (ordreDock) puis magasin (ordreMagasin), fallback NL.
-  lignes.sort((a, b) => {
-    const oa = a.ordreDock ?? a.ordreMagasin ?? a.nl ?? 0;
-    const ob = b.ordreDock ?? b.ordreMagasin ?? b.nl ?? 0;
-    return oa - ob;
-  });
+  // Ordre de la proforma (NL croissant).
+  lignes.sort((a, b) => (a.nl ?? 0) - (b.nl ?? 0));
 
   let n = 0;
   let nbManquants = 0;
@@ -78,14 +77,15 @@ const construireLignes = (preparation) => {
     if (l.introuvable) nbIntrouvables += 1;
     if (ecart < 0) nbManquants += 1;
     if (ecart > 0) nbSurplus += 1;
-    const rayonTxt = [safeTrim(l.gism1), safeTrim(l.rayon)]
-      .filter(Boolean)
-      .join(" · ");
+    // Gencode réellement bipé : dock en priorité, sinon magasin.
+    const gencodeBipe =
+      safeTrim(l.gencodeBipeDock) || safeTrim(l.gencodeBipeMagasin);
     return {
       n,
       code: safeTrim(l.nart),
       designation: safeTrim(l.designation),
-      rayon: rayonTxt,
+      gencodeBipe,
+      fournisseur: safeTrim(l.fournisseurNom),
       qteCmd: num(l.qteCommandee),
       qteDock: num(l.qtePrepareeDock),
       qteMag: num(l.qtePrepareeMagasin),
@@ -109,15 +109,16 @@ const construireLignes = (preparation) => {
 // PDF
 // ===========================================
 const COLS = [
-  { key: "n", label: "N°", w: 22, align: "center" },
-  { key: "code", label: "CODE", w: 46, align: "left" },
-  { key: "designation", label: "DÉSIGNATION", w: 150, align: "left" },
-  { key: "rayon", label: "GISEMENT / LIBELLÉ", w: 96, align: "left" },
-  { key: "qteCmd", label: "CMD", w: 32, align: "center" },
-  { key: "qteDock", label: "DOCK", w: 34, align: "center" },
-  { key: "qteMag", label: "MAG", w: 34, align: "center" },
-  { key: "qtePrep", label: "PRÉP", w: 36, align: "center" },
-  { key: "ecart", label: "ÉCART", w: 40, align: "center" },
+  { key: "n", label: "N°", w: 20, align: "center" },
+  { key: "code", label: "CODE", w: 42, align: "left" },
+  { key: "designation", label: "DÉSIGNATION", w: 132, align: "left" },
+  { key: "gencodeBipe", label: "GENCODE BIPÉ", w: 76, align: "left" },
+  { key: "fournisseur", label: "FOURNISSEUR", w: 78, align: "left" },
+  { key: "qteCmd", label: "CMD", w: 30, align: "center" },
+  { key: "qteDock", label: "DOCK", w: 32, align: "center" },
+  { key: "qteMag", label: "MAG", w: 32, align: "center" },
+  { key: "qtePrep", label: "TOTAL", w: 34, align: "center" },
+  { key: "ecart", label: "ÉCART", w: 36, align: "center" },
 ];
 
 const fitText = (doc, text, maxWidth) => {

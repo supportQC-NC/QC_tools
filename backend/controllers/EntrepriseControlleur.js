@@ -79,6 +79,7 @@ const createEntreprise = asyncHandler(async (req, res) => {
     mappingEtatsProforma,
     cheminRapportReception,
     emailsRapportReception,
+    emailsRapportPreparation,
     cheminLogoEtiquettes,
     couleurPrimaire,
     couleurSecondaire,
@@ -128,6 +129,11 @@ const createEntreprise = asyncHandler(async (req, res) => {
   }
   if (Array.isArray(emailsRapportReception)) {
     entrepriseData.emailsRapportReception = emailsRapportReception
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  if (Array.isArray(emailsRapportPreparation)) {
+    entrepriseData.emailsRapportPreparation = emailsRapportPreparation
       .map((e) => String(e || "").trim())
       .filter(Boolean);
   }
@@ -192,6 +198,7 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     isActive,
     cheminRapportReception,
     emailsRapportReception,
+    emailsRapportPreparation,
     cheminLogoEtiquettes,
     couleurPrimaire,
     couleurSecondaire,
@@ -268,6 +275,11 @@ const updateEntreprise = asyncHandler(async (req, res) => {
   }
   if (Array.isArray(emailsRapportReception)) {
     entreprise.emailsRapportReception = emailsRapportReception
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  if (Array.isArray(emailsRapportPreparation)) {
+    entreprise.emailsRapportPreparation = emailsRapportPreparation
       .map((e) => String(e || "").trim())
       .filter(Boolean);
   }

@@ -61,6 +61,7 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     cheminRapportReception:
       "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
     emailsRapportReception: [],
+    emailsRapportPreparation: [],
     cheminLogoEtiquettes: "",
     couleurPrimaire: DEFAULT_PRIMAIRE,
     couleurSecondaire: DEFAULT_SECONDAIRE,
@@ -131,6 +132,11 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           entreprise.emailsRapportReception,
         )
           ? entreprise.emailsRapportReception
+          : [],
+        emailsRapportPreparation: Array.isArray(
+          entreprise.emailsRapportPreparation,
+        )
+          ? entreprise.emailsRapportPreparation
           : [],
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
         couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
@@ -214,6 +220,14 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     setFormData((prev) => ({
       ...prev,
       emailsRapportReception: e.target.value.split("\n"),
+    }));
+  };
+
+  // Emails du rapport de PRÉPARATION : édition multi-lignes (1 email par ligne)
+  const handleEmailsPrepaChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      emailsRapportPreparation: e.target.value.split("\n"),
     }));
   };
 
@@ -353,7 +367,15 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       .flatMap((l) => String(l).split(/[,;]+/))
       .map((s) => s.trim())
       .filter(Boolean);
-    const payload = { ...formData, emailsRapportReception: emails };
+    const emailsPrepa = (formData.emailsRapportPreparation || [])
+      .flatMap((l) => String(l).split(/[,;]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const payload = {
+      ...formData,
+      emailsRapportReception: emails,
+      emailsRapportPreparation: emailsPrepa,
+    };
 
     try {
       if (isEdit) {
@@ -898,6 +920,24 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                 <span className="input-hint">
                   Un email par ligne (les virgules et points-virgules sont aussi
                   acceptés). Le rapport PDF leur sera envoyé en pièce jointe.
+                </span>
+              </div>
+
+              <div className="form-group">
+                <label>
+                  <HiMail /> Emails destinataires du rapport de préparation
+                </label>
+                <textarea
+                  name="emailsRapportPreparation"
+                  rows={5}
+                  value={(formData.emailsRapportPreparation || []).join("\n")}
+                  onChange={handleEmailsPrepaChange}
+                  placeholder={"preparation@exemple.com\ncommercial@exemple.com"}
+                />
+                <span className="input-hint">
+                  Un email par ligne (virgules / points-virgules acceptés). Le
+                  rapport PDF de préparation de commande leur sera envoyé en
+                  pièce jointe.
                 </span>
               </div>
             </>
