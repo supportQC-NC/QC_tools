@@ -128,6 +128,14 @@ const comptageSchema = new mongoose.Schema(
     nbReservations: { type: Number, default: 0 }, // article.RESERV (nb de réservations)
     estNouveau: { type: Boolean, default: false },
 
+    // Renvoi GENDOUBL : l'article compté est la CIBLE d'un renvoi de gencode.
+    // On conserve le gencode RÉELLEMENT bipé et le NART de la fiche « renvoi »
+    // (source), pour l'afficher au rapport (colonne V) et générer le fichier de
+    // switch gencode destiné aux Achats.
+    isRenvoi: { type: Boolean, default: false },
+    renvoiGencodeBipe: { type: String, default: "" }, // gencode physiquement scanné
+    renvoiNartOrigine: { type: String, default: "" }, // NART de la fiche renvoi (source)
+
     // Stocks au moment du scan (historique).
     stocksSnapshot: {
       S1: { type: Number, default: 0 },

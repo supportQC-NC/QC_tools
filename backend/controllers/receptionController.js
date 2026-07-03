@@ -4,6 +4,7 @@ import commandeCacheService from "../services/commandeService.js";
 import articleCacheService from "../services/articleService.js";
 import fournissCacheService from "../services/fournissCacheService.js";
 import receptionReportService from "../services/receptionReportService.js";
+import receptionExportService from "../services/receptionExportService.js";
 import Reception from "../models/ReceptionModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import User from "../models/UserModel.js";
@@ -901,6 +902,9 @@ const addComptage = asyncHandler(async (req, res) => {
     enReservation,
     nbReservations,
     estNouveau,
+    isRenvoi,
+    renvoiGencodeBipe,
+    renvoiNartOrigine,
   } = req.body;
 
   const reception = await loadReceptionOwned(req.params.id, req, res);
@@ -938,6 +942,12 @@ const addComptage = asyncHandler(async (req, res) => {
     if (nouveauGencode && !existing.nouveauGencode) {
       existing.nouveauGencode = nouveauGencode;
     }
+    // Renseigne l'info renvoi si elle n'était pas encore captée sur ce comptage.
+    if (isRenvoi && !existing.isRenvoi) {
+      existing.isRenvoi = true;
+      existing.renvoiGencodeBipe = safeTrim(renvoiGencodeBipe) || gencodeScanneTrim;
+      existing.renvoiNartOrigine = safeTrim(renvoiNartOrigine);
+    }
     reception.markModified("comptages");
     comptage = existing;
   } else {
@@ -957,6 +967,11 @@ const addComptage = asyncHandler(async (req, res) => {
       nbReservations: parseInt(nbReservations, 10) || 0,
       estNouveau: !!estNouveau,
       trouveEnPhaseFinale: !!trouveEnPhaseFinale,
+      isRenvoi: !!isRenvoi,
+      renvoiGencodeBipe: isRenvoi
+        ? safeTrim(renvoiGencodeBipe) || gencodeScanneTrim
+        : "",
+      renvoiNartOrigine: isRenvoi ? safeTrim(renvoiNartOrigine) : "",
     });
     comptage = reception.comptages[reception.comptages.length - 1];
   }
@@ -1115,6 +1130,10 @@ const upsertSignalement = asyncHandler(async (req, res) => {
   let dossier;
   try {
     dossier = buildControleCmdDir(entreprise, reception);
+    // [DIAGNOSTIC] Chemin exact où la photo va être déposée. À retirer une fois validé.
+    console.log(
+      `[RECEPTION signalement] base=${entreprise.cheminRapportReception} | trigramme=${entreprise.trigramme} | dossier=${dossier}`,
+    );
     if (!fs.existsSync(dossier)) {
       fs.mkdirSync(dossier, { recursive: true });
     }
@@ -1147,6 +1166,7 @@ const upsertSignalement = asyncHandler(async (req, res) => {
   // Écriture directe de la photo sur RCOMMUN
   try {
     fs.writeFileSync(filePath, req.file.buffer);
+    console.log(`[RECEPTION signalement] photo écrite: ${filePath} (${req.file.size || req.file.buffer.length} octets)`);
   } catch (error) {
     res.status(400);
     throw new Error(`Écriture de la photo impossible: ${error.message}`);
@@ -1344,6 +1364,19 @@ const genererRapport = asyncHandler(async (req, res) => {
     throw new Error(`Génération du rapport impossible: ${error.message}`);
   }
 
+  // Fichiers CSV Stock XL (régul d'inventaire + switch renvoi) déposés dans
+  // collect_sec. Ne bloque jamais la clôture de la réception si l'écriture échoue.
+  let fichiersStockXL = null;
+  try {
+    fichiersStockXL = receptionExportService.genererFichiersStockXL(
+      reception,
+      entreprise,
+    );
+  } catch (error) {
+    console.error("[RECEPTION] génération fichiers Stock XL:", error.message);
+    fichiersStockXL = { error: error.message };
+  }
+
   reception.status = "termine";
   reception.rapport = {
     fileName: resultat.fileName,
@@ -1361,6 +1394,7 @@ const genererRapport = asyncHandler(async (req, res) => {
       : "Rapport généré (email non envoyé)",
     reception,
     rapport: resultat,
+    fichiersStockXL,
   });
 });
 
