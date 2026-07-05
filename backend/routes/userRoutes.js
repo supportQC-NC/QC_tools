@@ -14,7 +14,8 @@ import {
   deleteUser,
   toggleUserActive,
 } from "../controllers/userControlleur.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { superAdmin } from "../middleware/accessControl.js";
 
 const router = express.Router();
 
@@ -28,12 +29,13 @@ router.post("/logout", protect, logoutUser);
 router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, updateUserProfile);
 
-// Admin only
-router.post("/", protect, admin, createUser);
-router.get("/", protect, admin, getUsers);
-router.get("/:id", protect, admin, getUserById);
-router.put("/:id", protect, admin, updateUser);
-router.delete("/:id", protect, admin, deleteUser);
-router.patch("/:id/toggle-active", protect, admin, toggleUserActive);
+// Gestion des utilisateurs — RÉSERVÉE AUX SUPER-ADMINS
+// (un admin scopé ne doit pas pouvoir créer/éditer des comptes ni des permissions).
+router.post("/", protect, superAdmin, createUser);
+router.get("/", protect, superAdmin, getUsers);
+router.get("/:id", protect, superAdmin, getUserById);
+router.put("/:id", protect, superAdmin, updateUser);
+router.delete("/:id", protect, superAdmin, deleteUser);
+router.patch("/:id/toggle-active", protect, superAdmin, toggleUserActive);
 
 export default router;

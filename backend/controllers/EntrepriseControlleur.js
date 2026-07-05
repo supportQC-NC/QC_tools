@@ -358,15 +358,19 @@ const toggleEntrepriseActive = asyncHandler(async (req, res) => {
 const getMyEntreprises = asyncHandler(async (req, res) => {
   const permission = await Permission.findOne({ user: req.user._id });
 
-  // Admin ou accès à toutes les entreprises
-  if (req.user.role === "admin" || permission?.allEntreprises) {
+  // Accès à toutes les entreprises : allEntreprises, OU admin hérité sans
+  // document Permission (sécurité anti-verrouillage — voir accessControl.js).
+  const accesTotal =
+    permission?.allEntreprises || (!permission && req.user.role === "admin");
+
+  if (accesTotal) {
     const entreprises = await Entreprise.find({ isActive: true }).sort({
       nomComplet: 1,
     });
     return res.json(entreprises);
   }
 
-  // Sinon, filtrer selon les permissions
+  // Sinon, filtrer selon les permissions (admin scopé inclus).
   if (
     !permission ||
     !permission.entreprises ||

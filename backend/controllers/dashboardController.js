@@ -15,6 +15,7 @@ import Entreprise from "../models/EntrepriseModel.js";
 import commandeCacheService from "../services/commandeService.js";
 import articleCacheService from "../services/articleService.js";
 import fournissCacheService from "../services/fournissCacheService.js";
+import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,9 +82,13 @@ const ETAT_LABELS = {
 const NB_JOURS = 14;
 
 export const getGlobalStats = asyncHandler(async (req, res) => {
+  // Périmètre de l'utilisateur : un admin scopé ne voit que SES entreprises.
+  const access = await getAccessibleEntreprises(req.user);
+  const entFilter = access.all ? {} : { entreprise: { $in: access.ids } };
+
   // --- Réceptions : statuts + conformité + écarts + nouveautés ---
   const receptions = await Reception.find(
-    {},
+    { ...entFilter },
     {
       status: 1,
       lignesCommande: 1,
@@ -138,13 +143,13 @@ export const getGlobalStats = asyncHandler(async (req, res) => {
     reaEnCours,
     reaTotal,
   ] = await Promise.all([
-    Inventaire.countDocuments({ status: "en_cours" }),
-    Inventaire.countDocuments({}),
-    Releve.countDocuments({ status: "en_cours" }),
-    Releve.countDocuments({ status: "exporte" }),
-    Releve.countDocuments({}),
-    Reappro.countDocuments({ status: "en_cours" }),
-    Reappro.countDocuments({}),
+    Inventaire.countDocuments({ ...entFilter, status: "en_cours" }),
+    Inventaire.countDocuments({ ...entFilter }),
+    Releve.countDocuments({ ...entFilter, status: "en_cours" }),
+    Releve.countDocuments({ ...entFilter, status: "exporte" }),
+    Releve.countDocuments({ ...entFilter }),
+    Reappro.countDocuments({ ...entFilter, status: "en_cours" }),
+    Reappro.countDocuments({ ...entFilter }),
   ]);
 
   // --- Activité réelle (NB_JOURS derniers jours), bucketisée en JS ---
@@ -152,7 +157,10 @@ export const getGlobalStats = asyncHandler(async (req, res) => {
   since.setDate(since.getDate() - (NB_JOURS - 1));
 
   const fetchDates = (Model) =>
-    Model.find({ createdAt: { $gte: since } }, { createdAt: 1 }).lean();
+    Model.find(
+      { ...entFilter, createdAt: { $gte: since } },
+      { createdAt: 1 },
+    ).lean();
 
   const [rDates, iDates, lDates] = await Promise.all([
     fetchDates(Reception),

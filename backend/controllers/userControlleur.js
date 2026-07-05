@@ -1,4 +1,3 @@
-
 // backend/controllers/userControlleur.js
 import asyncHandler from "../middleware/asyncHandler.js";
 import User from "../models/UserModel.js";
@@ -214,27 +213,31 @@ const createUser = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
+  // Un compte ADMIN est super-admin par défaut (accès à toutes les entreprises +
+  // tous les modules), sauf si l'UI restreint explicitement son périmètre.
+  const isAdminRole = (role || "user") === "admin";
+
   if (permissions) {
     await Permission.create({
       user: user._id,
       entreprises: permissions.entreprises || [],
       modules: permissions.modules || {},
-      allEntreprises: permissions.allEntreprises || false,
-      allModules: permissions.allModules || false,
+      allEntreprises:
+        permissions.allEntreprises !== undefined
+          ? permissions.allEntreprises
+          : isAdminRole,
+      allModules:
+        permissions.allModules !== undefined
+          ? permissions.allModules
+          : isAdminRole,
     });
   } else {
     await Permission.create({
       user: user._id,
       entreprises: [],
-      modules: {
-        clients: { read: false, write: false, delete: false },
-        factures: { read: false, write: false, delete: false },
-        rapports: { read: false, write: false, delete: false },
-        stock: { read: false, write: false, delete: false },
-        parametres: { read: false, write: false, delete: false },
-      },
-      allEntreprises: false,
-      allModules: false,
+      modules: {},
+      allEntreprises: isAdminRole,
+      allModules: isAdminRole,
     });
   }
 
@@ -343,13 +346,16 @@ const updateUser = asyncHandler(async (req, res) => {
   const updatedUser = await user.save();
 
   if (req.body.permissions) {
+    const p = req.body.permissions;
+    const isAdminRole = updatedUser.role === "admin";
     await Permission.findOneAndUpdate(
       { user: user._id },
       {
-        entreprises: req.body.permissions.entreprises || [],
-        modules: req.body.permissions.modules,
-        allEntreprises: req.body.permissions.allEntreprises,
-        allModules: req.body.permissions.allModules,
+        entreprises: p.entreprises || [],
+        modules: p.modules,
+        allEntreprises:
+          p.allEntreprises !== undefined ? p.allEntreprises : isAdminRole,
+        allModules: p.allModules !== undefined ? p.allModules : isAdminRole,
       },
       { new: true, upsert: true },
     );
