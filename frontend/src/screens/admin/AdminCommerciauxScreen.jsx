@@ -12,6 +12,12 @@ import {
   HiOfficeBuilding,
   HiCurrencyDollar,
   HiUsers,
+  HiChartBar,
+  HiShoppingCart,
+  HiDocumentText,
+  HiTrendingUp,
+  HiUserAdd,
+  HiStar,
 } from "react-icons/hi";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
@@ -224,7 +230,8 @@ const AdminCommerciauxScreen = () => {
 
       {data && (
         <p className="ac-annee">
-          Année {data.anneeN} comparée à {data.anneeN1} · recalcul{" "}
+          {data.anneeN} vs {data.anneeN1}
+          {data.dateArret ? ` · N-1 arrêté au ${data.dateArret}` : ""} · recalcul{" "}
           {new Date(data.generatedAt).toLocaleString("fr-FR")}
         </p>
       )}
@@ -249,6 +256,7 @@ const AdminCommerciauxScreen = () => {
                 <div>
                   <span className="ac-kpi-value">{formatF(totaux.caN)}</span>
                   <span className="ac-kpi-label">CA HT {data.anneeN}</span>
+                  <EvolBadge value={totaux.evolCa} />
                 </div>
               </div>
               <div className="ac-kpi">
@@ -257,7 +265,33 @@ const AdminCommerciauxScreen = () => {
                 </div>
                 <div>
                   <span className="ac-kpi-value">{formatF(totaux.caN1)}</span>
-                  <span className="ac-kpi-label">CA HT {data.anneeN1}</span>
+                  <span className="ac-kpi-label">
+                    CA HT {data.anneeN1}
+                    {data.dateArret ? ` (au ${data.dateArret})` : ""}
+                  </span>
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiChartBar />
+                </div>
+                <div>
+                  <span className="ac-kpi-value">{formatF(totaux.margeN)}</span>
+                  <span className="ac-kpi-label">
+                    Marge {data.anneeN} · {formatPct(totaux.pctMarge)}
+                  </span>
+                  <EvolBadge value={totaux.evolMarge} />
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiShoppingCart />
+                </div>
+                <div>
+                  <span className="ac-kpi-value">
+                    {formatF(totaux.panierMoyen)}
+                  </span>
+                  <span className="ac-kpi-label">Panier moyen</span>
                 </div>
               </div>
               <div className="ac-kpi">
@@ -265,13 +299,80 @@ const AdminCommerciauxScreen = () => {
                   <HiCurrencyDollar />
                 </div>
                 <div>
-                  <span className="ac-kpi-value">{formatPct(totaux.pctMarge)}</span>
-                  <span className="ac-kpi-label">Marge moyenne</span>
+                  <span className="ac-kpi-value">
+                    {formatF(totaux.caMoyenParClient)}
+                  </span>
+                  <span className="ac-kpi-label">CA moyen / client</span>
                 </div>
               </div>
               <div className="ac-kpi">
                 <div className="ac-kpi-icon">
                   <HiUsers />
+                </div>
+                <div>
+                  <span className="ac-kpi-value">{totaux.nbClients}</span>
+                  <span className="ac-kpi-label">Clients actifs</span>
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiDocumentText />
+                </div>
+                <div>
+                  <span className="ac-kpi-value">{totaux.nbFactures}</span>
+                  <span className="ac-kpi-label">Factures</span>
+                  <span className="ac-kpi-mini">
+                    vs {totaux.nbFacturesN1 ?? 0} en N-1
+                  </span>
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiTrendingUp />
+                </div>
+                <div>
+                  <span className="ac-kpi-value">
+                    {totaux.nbClientsCroissance ?? 0}
+                  </span>
+                  <span className="ac-kpi-label">Clients en croissance</span>
+                  <span className="ac-kpi-mini">
+                    {totaux.nbClientsBaisse ?? 0} en baisse
+                  </span>
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiUserAdd />
+                </div>
+                <div>
+                  <span className="ac-kpi-value">
+                    {totaux.nbClientsNouveaux ?? 0}
+                  </span>
+                  <span className="ac-kpi-label">Nouveaux clients</span>
+                  <span className="ac-kpi-mini">
+                    {totaux.nbClientsPerdus ?? 0} perdus
+                  </span>
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiStar />
+                </div>
+                <div>
+                  <span className="ac-kpi-value small">
+                    {totaux.topCommercial?.nom || "—"}
+                  </span>
+                  <span className="ac-kpi-label">Top commercial</span>
+                  <span className="ac-kpi-mini">
+                    {totaux.topCommercial
+                      ? formatF(totaux.topCommercial.caN)
+                      : ""}
+                  </span>
+                </div>
+              </div>
+              <div className="ac-kpi">
+                <div className="ac-kpi-icon">
+                  <HiUserGroup />
                 </div>
                 <div>
                   <span className="ac-kpi-value">{totaux.nbCommerciaux}</span>

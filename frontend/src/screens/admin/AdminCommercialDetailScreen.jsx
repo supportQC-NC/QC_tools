@@ -14,6 +14,8 @@ import {
   Cell,
   CartesianGrid,
   Legend,
+  LineChart,
+  Line,
 } from "recharts";
 import {
   HiArrowLeft,
@@ -31,6 +33,15 @@ import "./AdminCommercialDetailScreen.css";
 
 const formatF = (n) => `${Math.round(Number(n) || 0).toLocaleString("fr-FR")} F`;
 const formatPct = (n) => `${(Number(n) || 0).toFixed(1)} %`;
+
+// Valeurs avec repli si l'analyse en cache (5 min) ne contient pas encore les
+// nouveaux champs calculés côté serveur.
+const panierMoyen = (c) =>
+  c.panierMoyen ?? (c.nbFactures ? c.caN / c.nbFactures : 0);
+const caMoyenClient = (c) =>
+  c.caMoyenParClient ?? (c.nbClients ? c.caN / c.nbClients : 0);
+const pctMargeN1 = (c) =>
+  c.pctMargeN1 ?? (c.caN1 !== 0 ? (c.margeN1 / c.caN1) * 100 : 0);
 
 const COLOR_SELF = "#6366f1";
 const COLOR_OTHER = "#f59e0b";
@@ -110,9 +121,21 @@ const AdminCommercialDetailScreen = () => {
     if (!com || !data) return [];
     return (data.mois || []).map((m, i) => ({
       mois: m.slice(0, 3),
-      CA: Math.round((com.moisN && com.moisN[i]) || 0),
+      caN: Math.round((com.moisN && com.moisN[i]) || 0),
+      caN1: Math.round((com.moisN1 && com.moisN1[i]) || 0),
     }));
   }, [com, data]);
+
+  // CA cumulé mois par mois (N vs N-1 borné à date)
+  const cumulData = useMemo(() => {
+    let cn = 0;
+    let cn1 = 0;
+    return monthlyData.map((d) => {
+      cn += d.caN;
+      cn1 += d.caN1;
+      return { mois: d.mois, cumulN: cn, cumulN1: cn1 };
+    });
+  }, [monthlyData]);
 
   const splitData = useMemo(() => {
     if (!com) return [];
@@ -189,7 +212,8 @@ const AdminCommercialDetailScreen = () => {
       <div className="cd-head">
         <h1>{com.nom}</h1>
         <span className="cd-sub">
-          Portefeuille · année {data.anneeN} vs {data.anneeN1}
+          Portefeuille · {data.anneeN} vs {data.anneeN1}
+          {data.dateArret ? ` · N-1 arrêté au ${data.dateArret}` : ""}
         </span>
       </div>
 
@@ -201,18 +225,67 @@ const AdminCommercialDetailScreen = () => {
           <Evol value={com.evolCA} />
         </div>
         <div className="cd-kpi">
-          <span className="cd-kpi-label">CA HT {data.anneeN1}</span>
+          <span className="cd-kpi-label">
+            CA HT {data.anneeN1}
+            {data.dateArret ? ` (au ${data.dateArret})` : ""}
+          </span>
           <span className="cd-kpi-value">{formatF(com.caN1)}</span>
         </div>
         <div className="cd-kpi">
           <span className="cd-kpi-label">Marge {data.anneeN}</span>
           <span className="cd-kpi-value">{formatF(com.margeN)}</span>
           <span className="cd-kpi-mini">{formatPct(com.pctMarge)} de marge</span>
+          <Evol value={com.evolMarge} />
         </div>
         <div className="cd-kpi">
-          <span className="cd-kpi-label">Clients / Factures</span>
+          <span className="cd-kpi-label">
+            Marge {data.anneeN1}
+            {data.dateArret ? ` (au ${data.dateArret})` : ""}
+          </span>
+          <span className="cd-kpi-value">{formatF(com.margeN1)}</span>
+          <span className="cd-kpi-mini">
+            {formatPct(pctMargeN1(com))} de marge
+          </span>
+        </div>
+        <div className="cd-kpi">
+          <span className="cd-kpi-label">Panier moyen</span>
+          <span className="cd-kpi-value">{formatF(panierMoyen(com))}</span>
+          <span className="cd-kpi-mini">CA / facture</span>
+        </div>
+        <div className="cd-kpi">
+          <span className="cd-kpi-label">CA moyen / client</span>
+          <span className="cd-kpi-value">{formatF(caMoyenClient(com))}</span>
+        </div>
+        <div className="cd-kpi">
+          <span className="cd-kpi-label">Clients actifs</span>
+          <span className="cd-kpi-value">{com.nbClients}</span>
+          <span className="cd-kpi-mini">
+            {com.nbClientsCroissance ?? 0} en hausse ·{" "}
+            {com.nbClientsBaisse ?? 0} en baisse
+          </span>
+        </div>
+        <div className="cd-kpi">
+          <span className="cd-kpi-label">Nouveaux clients</span>
+          <span className="cd-kpi-value">{com.nbClientsNouveaux ?? 0}</span>
+          <span className="cd-kpi-mini">
+            {com.nbClientsPerdus ?? 0} perdus (sans CA {data.anneeN})
+          </span>
+        </div>
+        <div className="cd-kpi">
+          <span className="cd-kpi-label">Factures {data.anneeN}</span>
+          <span className="cd-kpi-value">{com.nbFactures}</span>
+          <span className="cd-kpi-mini">
+            vs {com.nbFacturesN1 ?? 0} en N-1
+          </span>
+          <Evol value={com.evolNbFactures ?? 0} />
+        </div>
+        <div className="cd-kpi">
+          <span className="cd-kpi-label">Taux de facturation</span>
           <span className="cd-kpi-value">
-            {com.nbClients} <small>/ {com.nbFactures}</small>
+            {formatPct(com.tauxFacturation)}
+          </span>
+          <span className="cd-kpi-mini">
+            de son portefeuille facturé par lui
           </span>
         </div>
       </div>
@@ -260,7 +333,9 @@ const AdminCommercialDetailScreen = () => {
         </div>
 
         <div className="cd-card">
-          <h3>CA mensuel {data.anneeN}</h3>
+          <h3>
+            CA mensuel {data.anneeN} vs {data.anneeN1}
+          </h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
@@ -274,8 +349,63 @@ const AdminCommercialDetailScreen = () => {
                 formatter={(v) => formatF(v)}
                 contentStyle={{ background: "#12121a", border: "1px solid #2a2a3a" }}
               />
-              <Bar dataKey="CA" fill={COLOR_SELF} radius={[4, 4, 0, 0]} />
+              <Legend />
+              <Bar
+                name={`${data.anneeN}`}
+                dataKey="caN"
+                fill={COLOR_SELF}
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                name={`${data.anneeN1}`}
+                dataKey="caN1"
+                fill={COLOR_OTHER}
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Trajectoire annuelle : CA cumulé N vs N-1 (à date) */}
+      <div className="cd-cards">
+        <div className="cd-card full">
+          <h3>
+            CA cumulé {data.anneeN} vs {data.anneeN1}
+            {data.dateArret ? ` (N-1 au ${data.dateArret})` : ""}
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={cumulData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
+              <XAxis dataKey="mois" stroke="#a0a0b0" fontSize={12} />
+              <YAxis
+                stroke="#a0a0b0"
+                fontSize={11}
+                tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+              />
+              <Tooltip
+                formatter={(v) => formatF(v)}
+                contentStyle={{ background: "#12121a", border: "1px solid #2a2a3a" }}
+              />
+              <Legend />
+              <Line
+                name={`${data.anneeN} cumulé`}
+                type="monotone"
+                dataKey="cumulN"
+                stroke={COLOR_SELF}
+                strokeWidth={2.5}
+                dot={false}
+              />
+              <Line
+                name={`${data.anneeN1} cumulé`}
+                type="monotone"
+                dataKey="cumulN1"
+                stroke={COLOR_OTHER}
+                strokeWidth={2}
+                strokeDasharray="6 3"
+                dot={false}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>

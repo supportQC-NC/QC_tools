@@ -2,7 +2,7 @@
 .admin-commerciaux {
   padding: 24px;
   color: var(--admin-text, #f0f0f5);
-  max-width: 1500px;
+  max-width: none;
   margin: 0 auto;
 }
 
@@ -94,7 +94,7 @@
 /* KPIs */
 .ac-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -298,4 +298,21 @@
     min-width: 0;
     flex: 1;
   }
+}
+/* Badge d'évolution dans une carte KPI */
+.ac-kpi .evol {
+  margin-top: 6px;
+}
+
+/* Texte secondaire dans une carte KPI */
+.ac-kpi-mini {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted, #9ca3af);
+  margin-top: 2px;
+}
+/* Valeur plus compacte (ex. nom du top commercial) */
+.ac-kpi-value.small {
+  font-size: 1rem;
+  line-height: 1.2;
 }

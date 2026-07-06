@@ -15,24 +15,15 @@ const toInt = (c) => {
 };
 
 // Filtre la liste des commerciaux sur les codes autorisés et RECALCULE les
-// totaux pour n'exposer que le périmètre de l'utilisateur.
+// totaux (via computeTotaux) pour n'exposer que le périmètre de l'utilisateur.
 const filtrerParCodes = (data, codes) => {
   const autorises = new Set(codes.map(toInt).filter((n) => n !== null));
   const commerciaux = (data.commerciaux || []).filter((c) =>
     autorises.has(toInt(c.code)),
   );
-  const caN = commerciaux.reduce((s, x) => s + (x.caN || 0), 0);
-  const caN1 = commerciaux.reduce((s, x) => s + (x.caN1 || 0), 0);
-  const margeN = commerciaux.reduce((s, x) => s + (x.margeN || 0), 0);
   return {
     ...data,
-    totaux: {
-      caN,
-      caN1,
-      margeN,
-      pctMarge: caN !== 0 ? (margeN / caN) * 100 : 0,
-      nbCommerciaux: commerciaux.length,
-    },
+    totaux: commerciauxService.computeTotaux(commerciaux),
     commerciaux,
   };
 };

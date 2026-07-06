@@ -2,7 +2,7 @@
 .commercial-detail {
   padding: 24px;
   color: var(--admin-text, #f0f0f5);
-  max-width: 1500px;
+  max-width: none;
   margin: 0 auto;
 }
 
@@ -63,7 +63,7 @@
 /* KPIs */
 .cd-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -251,4 +251,13 @@
   .commercial-detail {
     padding: 14px;
   }
+}
+/* Badge évolution dans une carte KPI */
+.cd-kpi .cd-evol {
+  margin-top: 4px;
+}
+
+/* Carte graphique pleine largeur (CA cumulé) */
+.cd-card.full {
+  grid-column: 1 / -1;
 }

@@ -65,7 +65,7 @@ class CommerciauxService {
     if (!v) return null;
     const d = v instanceof Date ? v : new Date(v);
     if (Number.isNaN(d.getTime())) return null;
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
   }
 
   // Évolution en % (gère la division par zéro comme le script Python)
@@ -76,11 +76,74 @@ class CommerciauxService {
     return courant === 0 ? 0 : 100;
   }
 
+  // KPI agrégés à partir d'une liste de commerciaux (réutilisé côté
+  // contrôleur pour les utilisateurs restreints à certains commerciaux).
+  computeTotaux(commerciaux) {
+    const list = commerciaux || [];
+    const caN = list.reduce((s, x) => s + (x.caN || 0), 0);
+    const caN1 = list.reduce((s, x) => s + (x.caN1 || 0), 0);
+    const margeN = list.reduce((s, x) => s + (x.margeN || 0), 0);
+    const margeN1 = list.reduce((s, x) => s + (x.margeN1 || 0), 0);
+    const nbFactures = list.reduce((s, x) => s + (x.nbFactures || 0), 0);
+    const nbClients = list.reduce((s, x) => s + (x.nbClients || 0), 0);
+    const nbFacturesN1 = list.reduce((s, x) => s + (x.nbFacturesN1 || 0), 0);
+    const nbClientsCroissance = list.reduce(
+      (s, x) => s + (x.nbClientsCroissance || 0),
+      0,
+    );
+    const nbClientsBaisse = list.reduce(
+      (s, x) => s + (x.nbClientsBaisse || 0),
+      0,
+    );
+    const nbClientsNouveaux = list.reduce(
+      (s, x) => s + (x.nbClientsNouveaux || 0),
+      0,
+    );
+    const nbClientsPerdus = list.reduce(
+      (s, x) => s + (x.nbClientsPerdus || 0),
+      0,
+    );
+    // Meilleur commercial du périmètre (liste triée ou non)
+    const top = list.reduce(
+      (best, x) => (best === null || (x.caN || 0) > best.caN ? x : best),
+      null,
+    );
+    return {
+      caN,
+      caN1,
+      evolCa: this.evol(caN, caN1),
+      margeN,
+      margeN1,
+      evolMarge: this.evol(margeN, margeN1),
+      pctMarge: caN !== 0 ? (margeN / caN) * 100 : 0,
+      pctMargeN1: caN1 !== 0 ? (margeN1 / caN1) * 100 : 0,
+      nbCommerciaux: list.length,
+      nbFactures,
+      nbClients,
+      panierMoyen: nbFactures !== 0 ? caN / nbFactures : 0,
+      caMoyenParClient: nbClients !== 0 ? caN / nbClients : 0,
+      nbFacturesN1,
+      evolNbFactures: this.evol(nbFactures, nbFacturesN1),
+      nbClientsCroissance,
+      nbClientsBaisse,
+      nbClientsNouveaux,
+      nbClientsPerdus,
+      topCommercial: top
+        ? { code: top.code, nom: top.nom, caN: top.caN }
+        : null,
+    };
+  }
+
   // --- Construction de l'analyse complète ------------------------------------
 
   async buildAnalyse(entreprise) {
-    const anneeN = new Date().getFullYear();
+    const today = new Date();
+    const anneeN = today.getFullYear();
     const anneeN1 = anneeN - 1;
+    // Bornage N-1 à la même date que N (comparaison year-to-date) :
+    // on ne compte N-1 que jusqu'au jour/mois d'aujourd'hui.
+    const cutoffMonth = today.getMonth() + 1;
+    const cutoffDay = today.getDate();
 
     const [clientCache, factureCache] = await Promise.all([
       clientCacheService.getClients(entreprise),
@@ -118,7 +181,7 @@ class CommerciauxService {
         byRepNb: new Map(),
         mois: new Array(12).fill(0),
       },
-      N1: { ca: 0, marge: 0, nb: 0 },
+      N1: { ca: 0, marge: 0, nb: 0, mois: new Array(12).fill(0) },
     });
 
     for (let i = 0; i < factures.length; i += 1) {
@@ -157,9 +220,16 @@ class CommerciauxService {
         agg.N.byRepNb.set(rep, (agg.N.byRepNb.get(rep) || 0) + 1);
         caParRepGlobalN.set(rep, (caParRepGlobalN.get(rep) || 0) + montant);
       } else {
-        agg.N1.ca += montant;
-        agg.N1.marge += marge;
-        agg.N1.nb += 1;
+        // N-1 borné à la date du jour (comparaison year-to-date)
+        const avantArret =
+          ym.month < cutoffMonth ||
+          (ym.month === cutoffMonth && ym.day <= cutoffDay);
+        if (avantArret) {
+          agg.N1.ca += montant;
+          agg.N1.marge += marge;
+          agg.N1.nb += 1;
+          agg.N1.mois[ym.month - 1] += montant;
+        }
       }
     }
 
@@ -244,6 +314,7 @@ class CommerciauxService {
       const com = getCommercial(repClient);
       com.clients.push(stat);
       for (let m = 0; m < 12; m += 1) com.moisN[m] += agg.N.mois[m];
+      for (let m = 0; m < 12; m += 1) com.moisN1[m] += agg.N1.mois[m];
     }
 
     // 4) KPI agrégés par commercial + taux de contribution + CA hors portefeuille
@@ -268,6 +339,30 @@ class CommerciauxService {
       const caTotalRealiseN = caParRepGlobalN.get(com.code) || 0;
       const caHorsPortefeuilleN = caTotalRealiseN - caParSoiN;
 
+      // KPI additionnels du portefeuille
+      const nbFacturesN1 = com.clients.reduce((s2, x) => s2 + x.nbFactureN1, 0);
+      // Segmentation des clients (N vs N-1 à date) :
+      //   nouveaux = pas de CA N-1 mais du CA N ; perdus = l'inverse ;
+      //   croissance / baisse = clients actifs sur les deux périodes.
+      let nbClientsCroissance = 0;
+      let nbClientsBaisse = 0;
+      let nbClientsNouveaux = 0;
+      let nbClientsPerdus = 0;
+      com.clients.forEach((x) => {
+        if (x.caN1 === 0 && x.caN > 0) nbClientsNouveaux += 1;
+        else if (x.caN === 0 && x.caN1 > 0) nbClientsPerdus += 1;
+        else if (x.caN > x.caN1) nbClientsCroissance += 1;
+        else if (x.caN < x.caN1) nbClientsBaisse += 1;
+      });
+      // Clients déjà triés par CA décroissant -> le 1er est le top client
+      const topClient = com.clients.length
+        ? {
+            tiers: com.clients[0].tiers,
+            nomTiers: com.clients[0].nomTiers,
+            caN: com.clients[0].caN,
+          }
+        : null;
+
       result.push({
         code: com.code,
         nom: com.nom,
@@ -280,7 +375,18 @@ class CommerciauxService {
         margeN1,
         evolMarge: this.evol(margeN, margeN1),
         pctMarge: caN !== 0 ? (margeN / caN) * 100 : 0,
+        pctMargeN1: caN1 !== 0 ? (margeN1 / caN1) * 100 : 0,
         nbFactures,
+        nbFacturesN1,
+        evolNbFactures: this.evol(nbFactures, nbFacturesN1),
+        panierMoyen: nbFactures !== 0 ? caN / nbFactures : 0,
+        caMoyenParClient:
+          com.clients.length !== 0 ? caN / com.clients.length : 0,
+        nbClientsCroissance,
+        nbClientsBaisse,
+        nbClientsNouveaux,
+        nbClientsPerdus,
+        topClient,
         // Comparaison portefeuille
         caParSoiN, // CA réalisé par le commercial sur SON portefeuille
         caAutresN, // CA capté par d'autres représentants sur son portefeuille
@@ -288,6 +394,7 @@ class CommerciauxService {
         caTotalRealiseN, // CA total facturé par ce commercial (tous clients)
         caHorsPortefeuilleN, // ventes faites hors de son portefeuille
         moisN: com.moisN,
+        moisN1: com.moisN1,
         clients: com.clients,
       });
     });
@@ -295,24 +402,15 @@ class CommerciauxService {
     // Tri des commerciaux par CA décroissant
     result.sort((a, b) => b.caN - a.caN);
 
-    // KPI entreprise (tous portefeuilles confondus)
-    const totalCaN = result.reduce((s, x) => s + x.caN, 0);
-    const totalCaN1 = result.reduce((s, x) => s + x.caN1, 0);
-    const totalMargeN = result.reduce((s, x) => s + x.margeN, 0);
-
     return {
       nomDossierDBF: entreprise.nomDossierDBF,
       anneeN,
       anneeN1,
       mois: MOIS,
+      // Date d'arrêt du comparatif N-1 (jour/mois d'aujourd'hui)
+      dateArret: `${String(cutoffDay).padStart(2, "0")}/${String(cutoffMonth).padStart(2, "0")}`,
       generatedAt: new Date().toISOString(),
-      totaux: {
-        caN: totalCaN,
-        caN1: totalCaN1,
-        margeN: totalMargeN,
-        pctMarge: totalCaN !== 0 ? (totalMargeN / totalCaN) * 100 : 0,
-        nbCommerciaux: result.length,
-      },
+      totaux: this.computeTotaux(result),
       commerciaux: result,
     };
   }
@@ -361,6 +459,7 @@ class CommerciauxService {
       anneeN: analyse.anneeN,
       anneeN1: analyse.anneeN1,
       mois: analyse.mois,
+      dateArret: analyse.dateArret,
       generatedAt: analyse.generatedAt,
       commercial: com,
     };
