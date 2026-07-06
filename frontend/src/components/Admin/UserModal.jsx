@@ -52,6 +52,9 @@ const getDefaultAnalyse = () => {
 };
 
 // Sélecteur des codes commerciaux d'UNE entreprise (fiche utilisateur).
+// "NOM Prénom (code)" si le vendeur est renseigné, sinon juste le code.
+const commercialLabel = (r) => (r.nom ? `${r.nom} (${r.code})` : r.code);
+
 const CommerciauxEntreprisePicker = ({
   entreprise,
   selected,
@@ -62,50 +65,81 @@ const CommerciauxEntreprisePicker = ({
     entreprise.nomDossierDBF,
   );
   const reps = data?.representants || [];
+  const [open, setOpen] = useState(false);
   const allCodes = reps.map((r) => r.code);
   const allSelected =
     allCodes.length > 0 && allCodes.every((c) => selected.includes(c));
 
+  const triggerText =
+    selected.length === 0
+      ? "Aucun commercial"
+      : reps
+          .filter((r) => selected.includes(r.code))
+          .map(commercialLabel)
+          .join(", ");
+
   return (
     <div className="commerciaux-ent">
-      <div className="commerciaux-ent-header">
-        <span className="ent-name">
-          {entreprise.trigramme} — {entreprise.nomComplet}
-        </span>
-        {reps.length > 0 && (
-          <button
-            type="button"
-            className="commerciaux-ent-toggle"
-            onClick={() => onSelectAll(entreprise._id, allCodes)}
-          >
-            {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
-          </button>
-        )}
-      </div>
+      <label className="commerciaux-ent-label">
+        {entreprise.trigramme} — {entreprise.nomComplet}
+      </label>
 
       {isLoading ? (
         <span className="permissions-hint">Chargement…</span>
       ) : reps.length === 0 ? (
         <span className="permissions-hint">Aucun commercial détecté</span>
       ) : (
-        <div className="commerciaux-codes">
-          {reps.map((r) => {
-            const checked = selected.includes(r.code);
-            return (
-              <label
-                key={r.code}
-                className={`commerciaux-code ${checked ? "selected" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => onToggle(entreprise._id, r.code)}
-                />
-                <span className="code-num">{r.code}</span>
-                <span className="code-count">{r.count}</span>
-              </label>
-            );
-          })}
+        <div className="multi-select">
+          <div className="multi-select-trigger" onClick={() => setOpen(!open)}>
+            <span className="multi-select-text">
+              {triggerText || `${selected.length} sélectionné(s)`}
+            </span>
+            <HiChevronDown
+              className={`multi-select-icon ${open ? "open" : ""}`}
+            />
+          </div>
+
+          {open && (
+            <div className="multi-select-dropdown">
+              <div className="multi-select-header">
+                <button
+                  type="button"
+                  className="btn-select-all"
+                  onClick={() => onSelectAll(entreprise._id, allCodes)}
+                >
+                  {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                </button>
+                <span className="selected-count">
+                  {selected.length} sélectionné(s)
+                </span>
+              </div>
+
+              <div className="multi-select-options">
+                {reps.map((r) => {
+                  const checked = selected.includes(r.code);
+                  return (
+                    <div
+                      key={r.code}
+                      className={`multi-select-option ${
+                        checked ? "selected" : ""
+                      }`}
+                      onClick={() => onToggle(entreprise._id, r.code)}
+                    >
+                      <div className="option-checkbox">
+                        {checked && <HiCheck />}
+                      </div>
+                      <div className="option-content">
+                        <span className="option-trigramme">
+                          {commercialLabel(r)}
+                        </span>
+                        <span className="option-name">{r.count} factures</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

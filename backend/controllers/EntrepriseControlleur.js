@@ -420,9 +420,25 @@ const getRepresentantsCodes = asyncHandler(async (req, res) => {
     throw new Error("Entreprise non trouvée");
   }
 
+  // Noms des vendeurs renseignés sur l'entreprise : code(int) -> "NOM Prénom"
+  const nomByCode = new Map();
+  (Array.isArray(entreprise.vendeurs) ? entreprise.vendeurs : []).forEach((v) => {
+    const codeInt = parseInt(String(v.code).trim(), 10);
+    if (!Number.isFinite(codeInt)) return;
+    const nom = [v.nom, v.prenom].filter(Boolean).join(" ").trim();
+    if (nom) nomByCode.set(codeInt, nom);
+  });
+
   const reps = await factureCacheService.getRepresentants(entreprise);
   const representants = (reps || [])
-    .map((r) => ({ code: String(r.code).padStart(2, "0"), count: r.count }))
+    .map((r) => {
+      const codeInt = parseInt(String(r.code).trim(), 10);
+      return {
+        code: String(r.code).padStart(2, "0"),
+        count: r.count,
+        nom: Number.isFinite(codeInt) ? nomByCode.get(codeInt) || null : null,
+      };
+    })
     .sort((a, b) => a.code.localeCompare(b.code));
 
   res.json({ representants });
