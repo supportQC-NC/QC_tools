@@ -9,6 +9,7 @@ const PATH_TO_KEY = [
   { prefix: "/admin/reappro-local", key: "reapproLocal" },
   { prefix: "/admin/debit-comptant", key: "debitComptant" },
   { prefix: "/admin/gencod-doublons", key: "doublonsGencode" },
+  { prefix: "/admin/facture-analyse", key: "factures" },
 ];
 
 // Super-admin = admin avec accès à toutes les entreprises (ou admin hérité).

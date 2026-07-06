@@ -42,6 +42,7 @@ const analyseScreens = [
   { key: "reapproLocal", label: "Reappro Local" },
   { key: "debitComptant", label: "Débit / Comptant" },
   { key: "doublonsGencode", label: "Doublons GENCODE" },
+  { key: "factures", label: "Analyse Factures" },
 ];
 // Analyse Filiales : droit PAR RÉSEAU (figés : DQ, QC, LD)
 const FILIALE_RESEAUX = ["DQ", "QC", "LD"];

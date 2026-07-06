@@ -92,6 +92,7 @@ export const ANALYSE_KEYS = [
   "reapproLocal",
   "debitComptant",
   "doublonsGencode",
+  "factures",
 ];
 
 // Réseaux de l'analyse Filiales (figés côté service : DQ, QC, LD).

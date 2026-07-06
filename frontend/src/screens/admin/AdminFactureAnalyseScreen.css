@@ -1,0 +1,237 @@
+/* AdminFactureAnalyseScreen.css */
+.admin-facture-analyse {
+  padding: 24px;
+  color: #f0f0f5;
+  max-width: none;
+}
+
+/* ===== Header ===== */
+.fa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.fa-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.4rem;
+  margin: 0;
+}
+.fa-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.fa-select,
+.fa-field input {
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+}
+.fa-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #9aa0b5;
+}
+.fa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.fa-btn:hover {
+  border-color: #6366f1;
+}
+.fa-btn.primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-color: #4f46e5;
+}
+.fa-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fa-note {
+  background: #14142099;
+  border: 1px solid #2a2a3a;
+  border-left: 3px solid #6366f1;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-bottom: 1.25rem;
+}
+
+/* ===== États ===== */
+.fa-empty,
+.fa-loading,
+.fa-error {
+  padding: 2rem;
+  text-align: center;
+  color: #9aa0b5;
+}
+.fa-empty.small {
+  padding: 1.25rem;
+  font-size: 0.9rem;
+}
+.fa-error {
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  background: #2a0f0f66;
+}
+.fa-hint {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 0.75rem;
+}
+
+/* ===== KPI ===== */
+.fa-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.fa-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+}
+.fa-kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #6366f122;
+  color: #a5b4fc;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.fa-kpi-icon.warn {
+  background: #f59e0b22;
+  color: #fbbf24;
+}
+.fa-kpi > div {
+  display: flex;
+  flex-direction: column;
+}
+.fa-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.fa-kpi-label {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 2px;
+}
+.fa-kpi-mini {
+  font-size: 0.72rem;
+  color: #7c8298;
+  margin-top: 2px;
+}
+
+/* ===== Cartes graphiques (dashboard) ===== */
+.fa-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.fa-card {
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  min-width: 0;
+}
+.fa-card h3 {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.fa-card.wide {
+  grid-column: auto;
+}
+
+@media (max-width: 1100px) {
+  .fa-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Détail par vendeur ===== */
+.fa-vendeur-section {
+  background: #0f0f17;
+  border: 1px solid #2a2a3a;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.fa-vendeur-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.fa-vendeur-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.fa-vendeur-header .fa-select {
+  min-width: 320px;
+}
+
+/* ===== Tableau ===== */
+.fa-table-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+.fa-table-title small {
+  font-weight: 500;
+  color: #9aa0b5;
+}
+.fa-grid {
+  width: 100%;
+  height: 520px;
+}
+.fa-grid .cell-mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.fa-grid .col-strong {
+  font-weight: 700;
+}
+.fa-grid .col-warn {
+  color: #fbbf24;
+  font-weight: 700;
+}
+.fa-grid .ag-row {
+  cursor: pointer;
+}

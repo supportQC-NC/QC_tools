@@ -63,6 +63,7 @@ import AdminFilialesScreen from "./screens/admin/AdminFilialesScreen";
 import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
 import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
  import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
+import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
  import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScreen";
   import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
 
@@ -100,6 +101,7 @@ const router = createBrowserRouter(
         <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
         <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
         <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />
+        <Route path="/admin/facture-analyse" element={<AdminFactureAnalyseScreen />} />
       </Route>
 
       <Route element={<AdminRoute />}>

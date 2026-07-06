@@ -118,6 +118,7 @@ export const analyseMenuStructure = [
   { key: "reapproLocal", label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
   { key: "debitComptant", label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
   { key: "doublonsGencode", label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
+  { key: "factures", label: "Analyse Factures", path: "/admin/facture-analyse", icon: HiDocumentReport },
 ];
 
 // Structure des menus MODULES avec sous-groupes

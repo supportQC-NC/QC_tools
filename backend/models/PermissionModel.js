@@ -97,6 +97,7 @@ const permissionSchema = new mongoose.Schema(
       reapproLocal: { type: Boolean, default: false },
       debitComptant: { type: Boolean, default: false },
       doublonsGencode: { type: Boolean, default: false },
+      factures: { type: Boolean, default: false },
     },
     // Commerciaux visibles PAR ENTREPRISE : { "<entrepriseId>": ["01","03"], ... }
     // Vide/absent pour une entreprise = AUCUN commercial (sauf super-admin = tout).
