@@ -6,7 +6,6 @@ import {
   HiCube,
   HiX,
   HiQrcode,
-  HiPhotograph,
   HiExclamation,
   HiCubeTransparent,
   HiSwitchHorizontal,
@@ -22,9 +21,10 @@ import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetArticleByNartQuery,
   useGetArticleByGencodQuery,
-  getPhotoUrl,
 } from "../../slices/articleApiSlice";
 import { useGetArticleFilialeDataQuery } from "../../slices/fillialeApiSlice";
+import { useGetFournisseurByCodeQuery } from "../../slices/fournissApiSlice";
+import { BASE_URL } from "../../constants";
 import "./UserArticleSearch.css";
 
 const ArticleSearch = () => {
@@ -33,8 +33,8 @@ const ArticleSearch = () => {
   const [searchValue, setSearchValue] = useState("");
   const [searchType, setSearchType] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [photoError, setPhotoError] = useState(false);
-  const [photoLoaded, setPhotoLoaded] = useState(false);
+  // Photo article : idle | loading | ok | none (même système que le mobile)
+  const [photo, setPhoto] = useState({ status: "idle", url: null });
   const [activeTab, setActiveTab] = useState("details"); // "details" ou "filiales"
   const inputRef = useRef(null);
 
@@ -80,6 +80,16 @@ const ArticleSearch = () => {
     },
   );
 
+  // Nom du fournisseur (résolu via le code FOURN de l'article)
+  const fournCode = article ? String(article.FOURN ?? "").trim() : "";
+  const { data: fournData } = useGetFournisseurByCodeQuery(
+    { nomDossierDBF: selectedEntreprise, fourn: fournCode },
+    { skip: !selectedEntreprise || !fournCode },
+  );
+  const fournisseurNom = fournData?.fournisseur?.NOM
+    ? String(fournData.fournisseur.NOM).trim()
+    : "";
+
   // Helper pour trim sécurisé
   const safeTrim = (value) => {
     if (value === null || value === undefined) return "";
@@ -102,12 +112,51 @@ const ArticleSearch = () => {
     }
   }, [selectedEntreprise]);
 
-  // Reset photo state quand l'article change
+  // Revenir sur l'onglet détails quand la recherche change
   useEffect(() => {
-    setPhotoError(false);
-    setPhotoLoaded(false);
-    setActiveTab("details"); // Reset vers l'onglet détails
+    setActiveTab("details");
   }, [searchTerm]);
+
+  // Photo article — MÊME SYSTÈME QUE L'APP MOBILE (ScanScreen) : on tente
+  // TOUJOURS l'API photos (requête authentifiée -> object URL), sans dépendre
+  // de cheminPhotos en base (en prod, le backend résout le dossier via
+  // PHOTOS_BASE_PATH + trigramme, indépendamment de la valeur en base).
+  useEffect(() => {
+    let alive = true;
+    let objectUrl = null;
+    const trig = selectedEntrepriseData?.trigramme;
+    const nart = article ? String(article.NART ?? "").trim() : "";
+
+    if (!article || !trig || !nart) {
+      setPhoto({ status: "idle", url: null });
+      return undefined;
+    }
+
+    setPhoto({ status: "loading", url: null });
+    fetch(
+      `${BASE_URL}/api/photos/${encodeURIComponent(trig)}/${encodeURIComponent(nart)}`,
+      { credentials: "include" },
+    )
+      .then(async (res) => {
+        if (!alive) return;
+        if (!res.ok) {
+          setPhoto({ status: "none", url: null });
+          return;
+        }
+        const blob = await res.blob();
+        if (!alive) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPhoto({ status: "ok", url: objectUrl });
+      })
+      .catch(() => {
+        if (alive) setPhoto({ status: "none", url: null });
+      });
+
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [article, selectedEntrepriseData]);
 
   // Vider l'input et garder le focus quand un article est trouvé
   useEffect(() => {
@@ -139,8 +188,6 @@ const ArticleSearch = () => {
     setSearchValue("");
     setSearchTerm("");
     setSearchType(null);
-    setPhotoError(false);
-    setPhotoLoaded(false);
     setActiveTab("details");
     inputRef.current?.focus();
   };
@@ -239,11 +286,27 @@ const ArticleSearch = () => {
 
   const hasActivePromo = article ? isPromoActive(article) : false;
 
+  // Ventes (V1..V12) et ruptures (RUP1..RUP12) : V1/RUP1 = mois en cours,
+  // V2/RUP2 = mois précédent, ... jusqu'à V12/RUP12 (11 mois en arrière).
+  const MOIS_NOMS = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+  ];
+  const ventesRuptures = article
+    ? Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
+        return {
+          moisNom: MOIS_NOMS[d.getMonth()],
+          annee: d.getFullYear(),
+          ventes: Number(article[`V${i + 1}`]) || 0,
+          ruptures: Number(article[`RUP${i + 1}`]) || 0,
+        };
+      })
+    : [];
+
   const isLoading = loadingNart || loadingGencod;
   const isFetching = fetchingNart || fetchingGencod;
   const error = searchType === "gencod" ? errorGencod : errorNart;
-
-  const hasPhotosConfigured = !!selectedEntrepriseData?.cheminPhotos;
 
   const mappingEntrepots = selectedEntrepriseData?.mappingEntrepots || {
     S1: "Magasin",
@@ -252,11 +315,6 @@ const ArticleSearch = () => {
     S4: "S4",
     S5: "S5",
   };
-
-  const photoUrl =
-    hasPhotosConfigured && article
-      ? getPhotoUrl(selectedEntrepriseData?.trigramme, article.NART)
-      : null;
 
   const formatPrice = (price) => {
     if (!price && price !== 0) return "-";
@@ -683,10 +741,13 @@ const ArticleSearch = () => {
                   {activeTab === "details" ? (
                     <div
                       className={`article-details-container ${
-                        hasPhotosConfigured ? "with-photo" : ""
+                        photo.status === "loading" || photo.status === "ok"
+                          ? "with-photo"
+                          : ""
                       }`}
                     >
-                      {hasPhotosConfigured && (
+                      {(photo.status === "loading" ||
+                        photo.status === "ok") && (
                         <div className="article-photo-section">
                           {hasActivePromo && (
                             <div className="photo-promo-badge">
@@ -700,27 +761,17 @@ const ArticleSearch = () => {
                               </span>
                             </div>
                           )}
-                          {!photoError ? (
-                            <div
-                              className={`photo-container ${photoLoaded ? "loaded" : ""}`}
-                            >
+                          {photo.status === "ok" ? (
+                            <div className="photo-container loaded">
                               <img
-                                src={photoUrl}
+                                src={photo.url}
                                 alt={safeTrim(article.DESIGN)}
-                                onError={() => setPhotoError(true)}
-                                onLoad={() => setPhotoLoaded(true)}
                                 className="article-photo"
                               />
-                              {!photoLoaded && (
-                                <div className="photo-placeholder">
-                                  <div className="loading-spinner small"></div>
-                                </div>
-                              )}
                             </div>
                           ) : (
-                            <div className="no-photo">
-                              <HiPhotograph />
-                              <span>Photo non disponible</span>
+                            <div className="photo-placeholder">
+                              <div className="loading-spinner small"></div>
                             </div>
                           )}
                         </div>
@@ -780,6 +831,9 @@ const ArticleSearch = () => {
                             <span className="info-value">
                               {safeTrim(article.FOURN) || "-"}
                             </span>
+                            {fournisseurNom && (
+                              <span className="info-sub">{fournisseurNom}</span>
+                            )}
                           </div>
 
                           {/* Card En Commande (ENCDE) */}
@@ -934,9 +988,53 @@ const ArticleSearch = () => {
                               <span>{formatPrice(article.PVTE)}</span>
                             </div>
                             <div className="price-item">
-                              <span>Taxe</span>
-                              <span>{article.TAXES || 0}%</span>
+                              <span>TGC</span>
+                              <span>{Number(article.ATVA) || 0}%</span>
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Ventes & ruptures — 12 derniers mois */}
+                        <div className="ventes-section">
+                          <h3>Ventes &amp; ruptures — 12 derniers mois</h3>
+                          <div className="ventes-table-wrap">
+                            <table className="ventes-table">
+                              <thead>
+                                <tr>
+                                  <th className="vr-row-label">Mois</th>
+                                  {ventesRuptures.map((m, i) => (
+                                    <th key={i}>
+                                      {m.moisNom.slice(0, 4)}
+                                      <small>{String(m.annee).slice(2)}</small>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <th className="vr-row-label">Ventes</th>
+                                  {ventesRuptures.map((m, i) => (
+                                    <td
+                                      key={i}
+                                      className={m.ventes > 0 ? "vr-pos" : ""}
+                                    >
+                                      {m.ventes}
+                                    </td>
+                                  ))}
+                                </tr>
+                                <tr>
+                                  <th className="vr-row-label">Ruptures</th>
+                                  {ventesRuptures.map((m, i) => (
+                                    <td
+                                      key={i}
+                                      className={m.ruptures > 0 ? "vr-rup" : ""}
+                                    >
+                                      {m.ruptures}
+                                    </td>
+                                  ))}
+                                </tr>
+                              </tbody>
+                            </table>
                           </div>
                         </div>
 
