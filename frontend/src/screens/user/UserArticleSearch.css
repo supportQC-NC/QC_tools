@@ -1759,3 +1759,118 @@
     padding: 0.75rem;
   }
 }
+
+/* ============================================================
+   GRANDS ÉCRANS — refonte de la fiche article + correctif photo
+   ============================================================ */
+
+/* CORRECTIF : sans photos configurées, la section photo n'est pas rendue et
+   la fiche atterrissait dans la colonne fixe de 300px -> tout était tassé.
+   Par défaut : une seule colonne pleine largeur ; la colonne photo n'existe
+   que si .with-photo est présent (posé par le JSX). */
+.article-details-container {
+  grid-template-columns: 1fr;
+}
+.article-details-container.with-photo {
+  grid-template-columns: 340px 1fr;
+}
+
+@media (min-width: 1200px) {
+  /* Exploiter la largeur des grands écrans */
+  .header-content,
+  .search-main {
+    max-width: 1720px;
+  }
+
+  /* Fiche article en 2 colonnes : identité + stocks à gauche, PRIX à droite */
+  .article-info-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+    grid-template-areas:
+      "header header"
+      "designation price"
+      "entrepots price"
+      "extra price"
+      "stockres price"
+      "obs obs";
+    gap: 1.25rem 2.25rem;
+    align-content: start;
+    padding: 2rem 2.5rem;
+  }
+  .article-info-section > .article-header {
+    grid-area: header;
+  }
+  .article-info-section > .article-designation {
+    grid-area: designation;
+  }
+  .article-info-section > .entrepots-info-grid {
+    grid-area: entrepots;
+    align-self: start;
+  }
+  .article-info-section > .article-extra-info {
+    grid-area: extra;
+    align-self: start;
+  }
+  .article-info-section > .price-section {
+    grid-area: price;
+    align-self: start;
+    padding: 1.75rem;
+  }
+  .article-info-section > .stock-section {
+    grid-area: stockres;
+  }
+  .article-info-section > .observations-section {
+    grid-area: obs;
+  }
+
+  /* Cartes stock : 6 colonnes lisibles (fourn 2 + en commande 2 + dépôts,
+     stock total en pleine largeur) */
+  .entrepots-info-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+  }
+  .info-card.stock-total {
+    grid-column: span 6;
+  }
+  .info-card {
+    padding: 1.15rem 1rem;
+  }
+  .info-card .info-value {
+    font-size: 1.45rem;
+  }
+  .info-card.stock-total .info-value {
+    font-size: 2.3rem;
+  }
+
+  /* Typo agrandie pour la lecture sur grand écran */
+  .article-designation h2 {
+    font-size: 1.65rem;
+    line-height: 1.25;
+  }
+  .designation-2 {
+    font-size: 1.05rem;
+  }
+  .price-section .price-value {
+    font-size: 2.4rem;
+  }
+
+  /* Photo plus généreuse quand présente */
+  .article-details-container.with-photo {
+    grid-template-columns: 380px 1fr;
+  }
+  .article-photo-section {
+    min-height: 480px;
+  }
+  .article-photo {
+    max-height: 480px;
+  }
+
+  /* Onglet Stock Groupe : profiter de la largeur */
+  .filiales-cards-container {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.25rem;
+  }
+  .filiales-summary {
+    gap: 1.25rem;
+  }
+}

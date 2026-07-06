@@ -681,7 +681,11 @@ const ArticleSearch = () => {
 
                   {/* Contenu selon l'onglet actif */}
                   {activeTab === "details" ? (
-                    <div className="article-details-container">
+                    <div
+                      className={`article-details-container ${
+                        hasPhotosConfigured ? "with-photo" : ""
+                      }`}
+                    >
                       {hasPhotosConfigured && (
                         <div className="article-photo-section">
                           {hasActivePromo && (
