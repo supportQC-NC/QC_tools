@@ -529,3 +529,83 @@
   color: #9ca3af;
   font-weight: 400;
 }
+/* ============================================================
+   Commerciaux visibles par entreprise — grille de codes lisible
+   ============================================================ */
+.commerciaux-ent {
+  margin-top: 14px;
+}
+
+.commerciaux-ent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.commerciaux-ent-header .ent-name {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.commerciaux-ent-toggle {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s;
+}
+.commerciaux-ent-toggle:hover {
+  border-color: var(--accent);
+}
+
+.commerciaux-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.commerciaux-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.commerciaux-code:hover {
+  border-color: var(--accent);
+}
+.commerciaux-code.selected {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.commerciaux-code input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.commerciaux-code .code-num {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.commerciaux-code .code-count {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-left: auto;
+}

@@ -83,6 +83,28 @@ const permissionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Accès aux écrans d'ANALYSE, réglable écran par écran (admins ET users).
+    // N'est PAS couvert par allModules : seul un super-admin (allEntreprises)
+    // y accède d'office ; sinon il faut cocher chaque écran.
+    analyse: {
+      commerciaux: { type: Boolean, default: false },
+      // Filiales : droit PAR RÉSEAU (DQ, QC, LD) — on peut n'en autoriser qu'un ou plusieurs.
+      filiales: {
+        DQ: { type: Boolean, default: false },
+        QC: { type: Boolean, default: false },
+        LD: { type: Boolean, default: false },
+      },
+      reapproLocal: { type: Boolean, default: false },
+      debitComptant: { type: Boolean, default: false },
+      doublonsGencode: { type: Boolean, default: false },
+    },
+    // Commerciaux visibles PAR ENTREPRISE : { "<entrepriseId>": ["01","03"], ... }
+    // Vide/absent pour une entreprise = AUCUN commercial (sauf super-admin = tout).
+    // Codes = REPRES détectés par getRepresentantsCodes (facture.dbf).
+    commerciauxScope: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,

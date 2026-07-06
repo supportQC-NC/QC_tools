@@ -62,6 +62,14 @@ export const entrepriseApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: ["Entreprise"],
     }),
+
+    // Codes commerciaux (REPRES) détectés pour une entreprise (super-admin)
+    getEntrepriseRepresentants: builder.query({
+      query: (nomDossierDBF) => ({
+        url: `${ENTREPRISES_URL}/${nomDossierDBF}/representants`,
+      }),
+      keepUnusedDataFor: 120,
+    }),
   }),
 });
 
@@ -74,4 +82,5 @@ export const {
   useDeleteEntrepriseMutation,
   useToggleEntrepriseActiveMutation,
   useGetMyEntreprisesQuery,
+  useGetEntrepriseRepresentantsQuery,
 } = entrepriseApiSlice;

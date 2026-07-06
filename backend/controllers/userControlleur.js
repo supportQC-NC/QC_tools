@@ -222,6 +222,8 @@ const createUser = asyncHandler(async (req, res) => {
       user: user._id,
       entreprises: permissions.entreprises || [],
       modules: permissions.modules || {},
+      analyse: permissions.analyse || {},
+      commerciauxScope: permissions.commerciauxScope || {},
       allEntreprises:
         permissions.allEntreprises !== undefined
           ? permissions.allEntreprises
@@ -236,6 +238,8 @@ const createUser = asyncHandler(async (req, res) => {
       user: user._id,
       entreprises: [],
       modules: {},
+      analyse: {},
+      commerciauxScope: {},
       allEntreprises: isAdminRole,
       allModules: isAdminRole,
     });
@@ -353,6 +357,8 @@ const updateUser = asyncHandler(async (req, res) => {
       {
         entreprises: p.entreprises || [],
         modules: p.modules,
+        analyse: p.analyse || {},
+        commerciauxScope: p.commerciauxScope || {},
         allEntreprises:
           p.allEntreprises !== undefined ? p.allEntreprises : isAdminRole,
         allModules: p.allModules !== undefined ? p.allModules : isAdminRole,

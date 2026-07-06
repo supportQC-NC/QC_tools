@@ -5,7 +5,10 @@ import {
   useCreateUserMutation,
   useUpdateUserMutation,
 } from "../../slices/userApiSlice";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import {
+  useGetEntreprisesQuery,
+  useGetEntrepriseRepresentantsQuery,
+} from "../../slices/entrepriseApiSlice";
 import "./UserModal.css";
 
 // Définition des modules alignée avec menuConfig.js et le modèle Permission
@@ -33,6 +36,82 @@ const getDefaultModulePermissions = () => {
   return permissions;
 };
 
+// Écrans d'analyse (droit par écran)
+const analyseScreens = [
+  { key: "commerciaux", label: "Analyse Commerciaux" },
+  { key: "reapproLocal", label: "Reappro Local" },
+  { key: "debitComptant", label: "Débit / Comptant" },
+  { key: "doublonsGencode", label: "Doublons GENCODE" },
+];
+// Analyse Filiales : droit PAR RÉSEAU (figés : DQ, QC, LD)
+const FILIALE_RESEAUX = ["DQ", "QC", "LD"];
+const getDefaultAnalyse = () => {
+  const a = analyseScreens.reduce((acc, sc) => ({ ...acc, [sc.key]: false }), {});
+  a.filiales = FILIALE_RESEAUX.reduce((acc, r) => ({ ...acc, [r]: false }), {});
+  return a;
+};
+
+// Sélecteur des codes commerciaux d'UNE entreprise (fiche utilisateur).
+const CommerciauxEntreprisePicker = ({
+  entreprise,
+  selected,
+  onToggle,
+  onSelectAll,
+}) => {
+  const { data, isLoading } = useGetEntrepriseRepresentantsQuery(
+    entreprise.nomDossierDBF,
+  );
+  const reps = data?.representants || [];
+  const allCodes = reps.map((r) => r.code);
+  const allSelected =
+    allCodes.length > 0 && allCodes.every((c) => selected.includes(c));
+
+  return (
+    <div className="commerciaux-ent">
+      <div className="commerciaux-ent-header">
+        <span className="ent-name">
+          {entreprise.trigramme} — {entreprise.nomComplet}
+        </span>
+        {reps.length > 0 && (
+          <button
+            type="button"
+            className="commerciaux-ent-toggle"
+            onClick={() => onSelectAll(entreprise._id, allCodes)}
+          >
+            {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <span className="permissions-hint">Chargement…</span>
+      ) : reps.length === 0 ? (
+        <span className="permissions-hint">Aucun commercial détecté</span>
+      ) : (
+        <div className="commerciaux-codes">
+          {reps.map((r) => {
+            const checked = selected.includes(r.code);
+            return (
+              <label
+                key={r.code}
+                className={`commerciaux-code ${checked ? "selected" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggle(entreprise._id, r.code)}
+                />
+                <span className="code-num">{r.code}</span>
+                <span className="code-count">{r.count}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const UserModal = ({ user, onClose }) => {
   const isEdit = !!user;
   const [entreprisesOpen, setEntreprisesOpen] = useState(false);
@@ -49,6 +128,8 @@ const UserModal = ({ user, onClose }) => {
       allModules: false,
       entreprises: [],
       modules: getDefaultModulePermissions(),
+      analyse: getDefaultAnalyse(),
+      commerciauxScope: {},
     },
   });
 
@@ -73,6 +154,16 @@ const UserModal = ({ user, onClose }) => {
         }
       });
 
+      // Permissions d'analyse (écran par écran)
+      const analysePermissions = getDefaultAnalyse();
+      analyseScreens.forEach((sc) => {
+        analysePermissions[sc.key] = user.permissions?.analyse?.[sc.key] || false;
+      });
+      FILIALE_RESEAUX.forEach((r) => {
+        analysePermissions.filiales[r] =
+          user.permissions?.analyse?.filiales?.[r] || false;
+      });
+
       setFormData({
         nom: user.nom || "",
         prenom: user.prenom || "",
@@ -86,6 +177,8 @@ const UserModal = ({ user, onClose }) => {
           entreprises:
             user.permissions?.entreprises?.map((e) => e._id || e) || [],
           modules: modulePermissions,
+          analyse: analysePermissions,
+          commerciauxScope: user.permissions?.commerciauxScope || {},
         },
       });
     }
@@ -93,6 +186,20 @@ const UserModal = ({ user, onClose }) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    // Passage en administrateur : super-admin par défaut (tous modules + toutes
+    // entreprises). Décochez « Toutes les entreprises » pour le limiter ensuite.
+    if (name === "role" && value === "admin") {
+      setFormData((prev) => ({
+        ...prev,
+        role: "admin",
+        permissions: {
+          ...prev.permissions,
+          allModules: true,
+          allEntreprises: true,
+        },
+      }));
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -178,19 +285,88 @@ const UserModal = ({ user, onClose }) => {
     return names;
   };
 
+  const handleAnalyseChange = (key) => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        analyse: {
+          ...prev.permissions.analyse,
+          [key]: !prev.permissions.analyse?.[key],
+        },
+      },
+    }));
+  };
+
+  const handleFilialeReseauChange = (reseau) => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        analyse: {
+          ...prev.permissions.analyse,
+          filiales: {
+            ...prev.permissions.analyse.filiales,
+            [reseau]: !prev.permissions.analyse.filiales?.[reseau],
+          },
+        },
+      },
+    }));
+  };
+
+  const handleCommercialCodeToggle = (entrepriseId, code) => {
+    setFormData((prev) => {
+      const scope = { ...(prev.permissions.commerciauxScope || {}) };
+      const current = new Set(scope[entrepriseId] || []);
+      if (current.has(code)) current.delete(code);
+      else current.add(code);
+      scope[entrepriseId] = Array.from(current);
+      return {
+        ...prev,
+        permissions: { ...prev.permissions, commerciauxScope: scope },
+      };
+    });
+  };
+
+  const handleCommercialSelectAll = (entrepriseId, allCodes) => {
+    setFormData((prev) => {
+      const scope = { ...(prev.permissions.commerciauxScope || {}) };
+      const current = scope[entrepriseId] || [];
+      const allSelected =
+        allCodes.length > 0 && allCodes.every((c) => current.includes(c));
+      scope[entrepriseId] = allSelected ? [] : [...allCodes];
+      return {
+        ...prev,
+        permissions: { ...prev.permissions, commerciauxScope: scope },
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
     try {
+      const payload = {
+        ...formData,
+        permissions: {
+          ...formData.permissions,
+          // Un admin conserve l'accès à TOUS les modules ; seul le périmètre
+          // entreprise est ajustable (allEntreprises / liste de sociétés).
+          allModules:
+            formData.role === "admin"
+              ? true
+              : formData.permissions.allModules,
+        },
+      };
       if (isEdit) {
-        await updateUser({ id: user._id, ...formData }).unwrap();
+        await updateUser({ id: user._id, ...payload }).unwrap();
       } else {
-        if (!formData.password) {
+        if (!payload.password) {
           setError("Le mot de passe est requis");
           return;
         }
-        await createUser(formData).unwrap();
+        await createUser(payload).unwrap();
       }
       onClose();
     } catch (err) {
@@ -292,9 +468,20 @@ const UserModal = ({ user, onClose }) => {
             </div>
           </div>
 
-          {formData.role !== "admin" && (
-            <div className="permissions-section">
-              <h3>Permissions</h3>
+          <div className="permissions-section">
+            <h3>
+              {formData.role === "admin"
+                ? "Périmètre d'accès (entreprises)"
+                : "Permissions"}
+            </h3>
+            {formData.role === "admin" && (
+              <p className="permissions-hint">
+                Un administrateur a accès à tous les modules. « Toutes les
+                entreprises » = super-admin (gestion des utilisateurs, des
+                entreprises et analyses multi-sociétés). Décochez pour limiter
+                cet administrateur à certaines sociétés.
+              </p>
+            )}
 
               <div className="global-permissions">
                 <label className="checkbox-label">
@@ -307,14 +494,18 @@ const UserModal = ({ user, onClose }) => {
                   />
                   <span>Toutes les entreprises</span>
                 </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={formData.permissions.allModules}
-                    onChange={() => handleGlobalPermissionChange("allModules")}
-                  />
-                  <span>Tous les modules</span>
-                </label>
+                {formData.role !== "admin" && (
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={formData.permissions.allModules}
+                      onChange={() =>
+                        handleGlobalPermissionChange("allModules")
+                      }
+                    />
+                    <span>Tous les modules</span>
+                  </label>
+                )}
               </div>
 
               {/* Sélection des entreprises */}
@@ -399,8 +590,8 @@ const UserModal = ({ user, onClose }) => {
                 </div>
               )}
 
-              {/* Modules */}
-              {!formData.permissions.allModules && (
+              {/* Modules (utilisateurs uniquement — un admin a tous les modules) */}
+              {formData.role !== "admin" && !formData.permissions.allModules && (
                 <div className="modules-permissions">
                   <label>Modules accessibles</label>
                   <table className="permissions-table">
@@ -440,7 +631,80 @@ const UserModal = ({ user, onClose }) => {
                 </div>
               )}
             </div>
-          )}
+
+          {/* Analyse — accès écran par écran (admins ET users) */}
+          <div className="permissions-section">
+            <h3>Analyse</h3>
+            <p className="permissions-hint">
+              Accès aux écrans d'analyse, écran par écran (admins et
+              utilisateurs). Un super-admin y accède d'office.
+            </p>
+            <div className="global-permissions">
+              {analyseScreens.map((sc) => (
+                <label key={sc.key} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.permissions.analyse?.[sc.key]}
+                    onChange={() => handleAnalyseChange(sc.key)}
+                  />
+                  <span>{sc.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="form-group">
+              <label>Analyse Filiales (par réseau)</label>
+              <div className="global-permissions">
+                {FILIALE_RESEAUX.map((r) => (
+                  <label key={r} className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.permissions.analyse?.filiales?.[r]}
+                      onChange={() => handleFilialeReseauChange(r)}
+                    />
+                    <span>{r}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Commerciaux visibles par entreprise (si Analyse Commerciaux activée) */}
+          {formData.permissions.analyse?.commerciaux &&
+            !(
+              formData.role === "admin" &&
+              formData.permissions.allEntreprises
+            ) && (
+              <div className="permissions-section">
+                <h3>Commerciaux visibles (par entreprise)</h3>
+                <p className="permissions-hint">
+                  Coche les codes commerciaux que cet utilisateur peut voir
+                  dans « Analyse Commerciaux », entreprise par entreprise.
+                  Aucun code coché = aucun commercial pour cette société.
+                </p>
+                {formData.permissions.entreprises.length === 0 ? (
+                  <p className="permissions-hint">
+                    Sélectionne d'abord une ou plusieurs entreprises ci-dessus.
+                  </p>
+                ) : (
+                  (entreprises || [])
+                    .filter((e) =>
+                      formData.permissions.entreprises.includes(e._id),
+                    )
+                    .map((ent) => (
+                      <CommerciauxEntreprisePicker
+                        key={ent._id}
+                        entreprise={ent}
+                        selected={
+                          formData.permissions.commerciauxScope?.[ent._id] || []
+                        }
+                        onToggle={handleCommercialCodeToggle}
+                        onSelectAll={handleCommercialSelectAll}
+                      />
+                    ))
+                )}
+              </div>
+            )}
 
           <div className="modal-footer">
             <button type="button" className="btn-cancel" onClick={onClose}>

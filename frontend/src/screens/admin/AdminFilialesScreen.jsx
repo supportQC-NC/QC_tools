@@ -45,8 +45,13 @@ const AdminFilialesScreen = () => {
   const [refreshReseau, { isLoading: refreshing }] = useRefreshReseauMutation();
 
   useEffect(() => {
-    if (!selectedReseau && reseaux && reseaux.length > 0) {
-      setSelectedReseau(reseaux[0].code);
+    if (reseaux && reseaux.length > 0) {
+      const codes = reseaux.map((r) => r.code);
+      // Aucun réseau choisi, ou réseau mémorisé non/plus autorisé -> bascule
+      // sur le premier réseau AUTORISÉ (évite un 403 sur un réseau interdit).
+      if (!selectedReseau || !codes.includes(selectedReseau)) {
+        setSelectedReseau(reseaux[0].code);
+      }
     }
   }, [reseaux, selectedReseau]);
 

@@ -11,7 +11,7 @@ import {
   getEntrepriseByTrigramme,
   getRepresentantsCodes,
 } from "../controllers/EntrepriseControlleur.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
 import { superAdmin } from "../middleware/accessControl.js";
 
 const router = express.Router();
@@ -21,9 +21,13 @@ router.get("/my-entreprises", protect, getMyEntreprises);
 router.get("/trigramme/:trigramme", protect, getEntrepriseByTrigramme);
 router.get("/dossier/:nomDossierDBF", protect, getEntrepriseByDossier);
 
-// Gestion des entreprises — RÉSERVÉE AUX SUPER-ADMINS
-// (un admin scopé ne doit pas pouvoir créer/éditer des entreprises ni s'en octroyer).
-router.get("/", protect, superAdmin, getEntreprises);
+// LISTE des entreprises — tous les admins, mais FILTRÉE sur leur périmètre
+// (super-admin = toutes ; admin scopé = ses sociétés). Sert de sélecteur aux
+// écrans de données admin.
+router.get("/", protect, admin, getEntreprises);
+
+// GESTION des entreprises — RÉSERVÉE AUX SUPER-ADMINS
+// (créer/éditer/supprimer/activer, détail par id, codes vendeurs).
 router.post("/", protect, superAdmin, createEntreprise);
 // Codes vendeurs (REPRES) détectés dans facture.dbf — route à 2 segments,
 // placée avant /:id (1 segment) pour rester sans ambiguïté.

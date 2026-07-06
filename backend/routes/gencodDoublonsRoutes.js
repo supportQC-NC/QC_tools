@@ -4,13 +4,23 @@ import {
   getReport,
   refreshReport,
 } from "../controllers/gencodDoublonsController.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
 import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
+import { checkAnalyseAccess } from "../middleware/accessControl.js";
 
 const router = express.Router();
 
-router.post("/:nomDossierDBF/refresh", protect, admin, refreshReport);
+// Accès : droit d'analyse « doublonsGencode » (admins ET users).
+const analyse = checkAnalyseAccess("doublonsGencode");
 
-router.get("/:nomDossierDBF", protect, admin, checkEntrepriseAccess, getReport);
+router.post("/:nomDossierDBF/refresh", protect, analyse, refreshReport);
+
+router.get(
+  "/:nomDossierDBF",
+  protect,
+  analyse,
+  checkEntrepriseAccess,
+  getReport,
+);
 
 export default router;

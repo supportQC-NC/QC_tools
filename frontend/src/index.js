@@ -13,6 +13,8 @@ import App from "./App";
 
 import PrivateRoute from "./components/Utils/PrivateRoute";
 import AdminRoute from "./components/Utils/AdminRoute";
+import SuperAdminRoute from "./components/Utils/SuperAdminRoute";
+import AnalyseRoute from "./components/Utils/AnalyseRoute";
 
 import Login from "./screens/LoginScreen/LoginScreen";
 import ForgotPassword from "./screens/ForgotPasswordScreen/ForgotPasswordScreen";
@@ -87,28 +89,35 @@ const router = createBrowserRouter(
         <Route path="/etiquettes" element={<AdminEtiquettesScreen />} />
       </Route>
 
+      {/* ANALYSE — accessible aux admins ET users autorisés (droit par écran) */}
+      <Route element={<AnalyseRoute />}>
+        <Route path="/admin/commerciaux" element={<AdminCommerciauxScreen />} />
+        <Route
+          path="/admin/commerciaux/:nomDossierDBF/:code"
+          element={<AdminCommercialDetailScreen />}
+        />
+        <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
+        <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
+        <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
+        <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />
+      </Route>
+
       <Route element={<AdminRoute />}>
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/admin/entreprises" element={<AdminEntreprises />} />
+        {/* Réservé aux SUPER-ADMINS (gestion + analyse multi-sociétés) */}
+        <Route element={<SuperAdminRoute />}>
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/entreprises" element={<AdminEntreprises />} />
+        </Route>
         <Route path="/admin/articles" element={<AdminArticles />} />
         <Route path="/admin/concurrents" element={<AdminConcurrents />} />
         <Route path="/admin/releves" element={<AdminRelevesScreen />} />
         <Route path="/admin/inventaires" element={<AdminInventairesScreen />} />
         <Route path="/admin/zones" element={<AdminZonesScreen />} />
-        <Route path="/admin/commerciaux" element={<AdminCommerciauxScreen />} />
-        <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
          <Route path="/admin/performance-dock" element={<AdminPerformanceDockScreen />} />
          <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
  
   <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
-         <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
-            <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
-            <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />
-<Route
-  path="/admin/commerciaux/:nomDossierDBF/:code"
-  element={<AdminCommercialDetailScreen />}
-/>
         <Route
           path="/admin/inventaire-progression"
           element={<AdminInventaireProgressionScreen />}

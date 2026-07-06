@@ -6,25 +6,23 @@ import {
   getCommercialDetail,
   refreshCommerciaux,
 } from "../controllers/commerciauxController.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
 import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
+import { checkAnalyseAccess } from "../middleware/accessControl.js";
 
 const router = express.Router();
 
+// Accès : droit d'analyse « commerciaux » (admins ET users) + accès à l'entreprise.
+const analyse = checkAnalyseAccess("commerciaux");
+
 // Liste des commerciaux + KPI agrégés
-router.get(
-  "/:nomDossierDBF",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  getCommerciaux,
-);
+router.get("/:nomDossierDBF", protect, analyse, checkEntrepriseAccess, getCommerciaux);
 
 // Analyse complète (avec clients) — AVANT la route générique /:code
 router.get(
   "/:nomDossierDBF/full",
   protect,
-  admin,
+  analyse,
   checkEntrepriseAccess,
   getCommerciauxFull,
 );
@@ -33,7 +31,7 @@ router.get(
 router.post(
   "/:nomDossierDBF/refresh",
   protect,
-  admin,
+  analyse,
   checkEntrepriseAccess,
   refreshCommerciaux,
 );
@@ -42,7 +40,7 @@ router.post(
 router.get(
   "/:nomDossierDBF/:code",
   protect,
-  admin,
+  analyse,
   checkEntrepriseAccess,
   getCommercialDetail,
 );

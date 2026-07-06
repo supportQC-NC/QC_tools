@@ -1,28 +1,45 @@
-// backend/routes/filialesRoutes.js
+// backend/routes/fillialeRoutes.js
+//
+// Données FILIALES par ARTICLE (comparatif d'un article à travers les filiales).
+// Utilisé par les fiches article (AdminArticleInfosScreen, UserArticleSearch).
+// NE PAS confondre avec filialesRoutes.js (analyse réseau DQ/QC/LD).
 import express from "express";
 import {
-  getReseaux,
-  getReseauProgress,
-  refreshReseau,
-  getReseau,
-} from "../controllers/filialesController.js";
-import { protect } from "../middleware/authMiddleware.js";
-import { superAdmin } from "../middleware/accessControl.js";
+  getArticleFilialeData,
+  getMultipleArticlesFilialeData,
+  invalidateFilialeCache,
+  getFilialesCacheStats,
+} from "../controllers/fillialeController.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
+import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Analyse Filiales = consolidation MULTI-sociétés par réseau -> réservée aux
-// SUPER-ADMINS (un admin scopé ne voit que ses propres sociétés).
-// Liste des réseaux
-router.get("/", protect, superAdmin, getReseaux);
+// Stats du cache (admin)
+router.get("/cache-stats", protect, admin, getFilialesCacheStats);
 
-// Progression — AVANT la route générique /:reseau
-router.get("/:reseau/progress", protect, superAdmin, getReseauProgress);
+// Obtenir les données filiales pour un article
+router.get(
+  "/:nomDossierDBF/article/:nart",
+  protect,
+  checkModuleAccess("stock", "read"),
+  getArticleFilialeData,
+);
 
-// Invalidation du cache
-router.post("/:reseau/refresh", protect, superAdmin, refreshReseau);
+// Obtenir les données filiales pour plusieurs articles
+router.post(
+  "/:nomDossierDBF/articles",
+  protect,
+  checkModuleAccess("stock", "read"),
+  getMultipleArticlesFilialeData,
+);
 
-// Consolidation d'un réseau — EN DERNIER (route générique)
-router.get("/:reseau", protect, superAdmin, getReseau);
+// Invalider le cache (admin)
+router.post(
+  "/:nomDossierDBF/invalidate-cache",
+  protect,
+  admin,
+  invalidateFilialeCache,
+);
 
 export default router;

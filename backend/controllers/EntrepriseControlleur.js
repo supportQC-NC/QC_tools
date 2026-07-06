@@ -1,6 +1,7 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import Permission from "../models/PermissionModel.js";
+import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import factureCacheService from "../services/factureCacheService.js";
 
 const TYPES_VENDEUR = ["commercial", "vendeur", "autre"];
@@ -17,11 +18,14 @@ const normaliserVendeurs = (arr) =>
     }))
     .filter((v) => v.code !== "");
 
-// @desc    Get all entreprises
+// @desc    Get all entreprises (filtrées sur le périmètre de l'utilisateur)
 // @route   GET /api/entreprises
-// @access  Private/Admin
+// @access  Private/Admin (liste filtrée : super-admin = toutes ; admin scopé = ses sociétés)
 const getEntreprises = asyncHandler(async (req, res) => {
-  const entreprises = await Entreprise.find({})
+  const access = await getAccessibleEntreprises(req.user);
+  const filter = access.all ? {} : { _id: { $in: access.ids } };
+
+  const entreprises = await Entreprise.find(filter)
     .populate("createdBy", "nom prenom email")
     .sort({ nomComplet: 1 });
 
