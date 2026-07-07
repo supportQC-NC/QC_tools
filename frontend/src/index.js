@@ -64,6 +64,8 @@ import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
 import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
  import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
 import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
+import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
+import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
  import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScreen";
   import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
 
@@ -102,6 +104,8 @@ const router = createBrowserRouter(
         <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
         <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />
         <Route path="/admin/facture-analyse" element={<AdminFactureAnalyseScreen />} />
+        <Route path="/admin/journal-caisse" element={<AdminJournalCaisseScreen />} />
+        <Route path="/admin/top-articles" element={<AdminTopArticlesScreen />} />
       </Route>
 
       <Route element={<AdminRoute />}>

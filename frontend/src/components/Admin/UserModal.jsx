@@ -43,6 +43,8 @@ const analyseScreens = [
   { key: "debitComptant", label: "Débit / Comptant" },
   { key: "doublonsGencode", label: "Doublons GENCODE" },
   { key: "factures", label: "Analyse Factures" },
+  { key: "journalCaisse", label: "Journal de Caisse" },
+  { key: "topArticles", label: "Top Articles" },
 ];
 // Analyse Filiales : droit PAR RÉSEAU (figés : DQ, QC, LD)
 const FILIALE_RESEAUX = ["DQ", "QC", "LD"];

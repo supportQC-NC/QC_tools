@@ -93,6 +93,8 @@ export const ANALYSE_KEYS = [
   "debitComptant",
   "doublonsGencode",
   "factures",
+  "journalCaisse",
+  "topArticles",
 ];
 
 // Réseaux de l'analyse Filiales (figés côté service : DQ, QC, LD).

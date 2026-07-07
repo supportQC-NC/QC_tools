@@ -1,0 +1,372 @@
+/* AdminJournalCaisseScreen.css */
+.admin-journal-caisse {
+  padding: 24px;
+  color: #f0f0f5;
+  max-width: none;
+}
+
+/* ===== Header ===== */
+.jc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.jc-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.4rem;
+  margin: 0;
+}
+.jc-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.jc-select,
+.jc-day-picker input {
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+}
+.jc-day-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.jc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.jc-btn.icon {
+  padding: 0.55rem 0.6rem;
+  font-size: 1.05rem;
+}
+.jc-btn:hover {
+  border-color: #6366f1;
+}
+.jc-btn.primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-color: #4f46e5;
+}
+.jc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.jc-note {
+  background: #14142099;
+  border: 1px solid #2a2a3a;
+  border-left: 3px solid #6366f1;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-bottom: 1.25rem;
+}
+
+.jc-date-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+}
+
+/* ===== États ===== */
+.jc-empty,
+.jc-loading,
+.jc-error {
+  padding: 2rem;
+  text-align: center;
+  color: #9aa0b5;
+}
+.jc-empty.small {
+  padding: 1rem;
+  font-size: 0.88rem;
+}
+.jc-error {
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  background: #2a0f0f66;
+}
+.jc-hint {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 0.75rem;
+}
+
+/* ===== KPI ===== */
+.jc-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.jc-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+}
+.jc-kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #6366f122;
+  color: #a5b4fc;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.jc-kpi-icon.warn {
+  background: #ef444422;
+  color: #f87171;
+}
+.jc-kpi-icon.net {
+  background: #22c55e22;
+  color: #4ade80;
+}
+.jc-kpi > div {
+  display: flex;
+  flex-direction: column;
+}
+.jc-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.jc-kpi-label {
+  font-size: 0.8rem;
+  color: #9aa0b5;
+  margin-top: 2px;
+}
+.jc-kpi-mini {
+  font-size: 0.72rem;
+  color: #7c8298;
+  margin-top: 2px;
+}
+
+/* ===== Cartes ===== */
+.jc-card {
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.1rem;
+  min-width: 0;
+}
+.jc-card.donut {
+  max-width: 1100px;
+}
+.jc-card.avoirs {
+  border-left: 3px solid #ef4444;
+}
+.jc-card h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+.jc-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+.jc-card-total {
+  font-size: 0.88rem;
+  color: #9aa0b5;
+}
+.jc-card-total strong {
+  color: #f0f0f5;
+  font-size: 1rem;
+}
+.jc-card-footer {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: #9aa0b5;
+  text-align: right;
+}
+.jc-filter {
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  min-width: 320px;
+}
+
+/* ===== Tables ===== */
+.jc-table-wrap {
+  overflow: auto;
+  max-height: 420px;
+  border: 1px solid #22222f;
+  border-radius: 10px;
+}
+.jc-table-wrap.tall {
+  max-height: 560px;
+}
+.jc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+}
+.jc-table th,
+.jc-table td {
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid #22222f;
+  white-space: nowrap;
+}
+.jc-table td {
+  color: #e6e6ef;
+}
+.jc-table thead th {
+  position: sticky;
+  top: 0;
+  background: #191924;
+  color: #9aa0b5;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  z-index: 1;
+}
+.jc-table .right {
+  text-align: right;
+}
+.jc-table .mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.jc-table td.neg {
+  color: #f87171;
+  font-weight: 700;
+}
+.jc-client-nom {
+  font-weight: 600;
+}
+.jc-client-tiers {
+  color: #7c8298;
+  font-size: 0.78rem;
+  margin-left: 0.35rem;
+}
+.jc-badge-a {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  background: #ef444422;
+  color: #f87171;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+/* ===== Donut : graphe + légende custom ===== */
+.jc-donut-layout {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.jc-donut-chart {
+  width: 300px;
+  flex-shrink: 0;
+}
+.jc-donut-legend {
+  flex: 1;
+  min-width: 280px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.45rem 1.25rem;
+  align-content: center;
+}
+.jc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.jc-legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.jc-legend-item .lg-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c9c9d6;
+}
+.jc-legend-item .lg-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.jc-legend-item .lg-pct {
+  color: #7c8298;
+  font-size: 0.74rem;
+  width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Grille des cartes par moyen de paiement ===== */
+.jc-groupes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(600px, 1fr));
+  gap: 1.1rem;
+  margin-bottom: 1.1rem;
+}
+.jc-groupes .jc-card {
+  margin-bottom: 0;
+}
+@media (max-width: 700px) {
+  .jc-groupes {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Détails : regroupement visuel par facture ===== */
+.jc-table tbody tr.g-even {
+  background: #15151f;
+}
+.jc-table tbody tr:hover {
+  background: #1d1d2b;
+}
+.jc-table tbody tr.group-start td {
+  border-top: 2px solid #33334a;
+}
+.jc-table td.fact-cell {
+  font-weight: 800;
+  color: #a5b4fc;
+}
+.jc-table td.wrap {
+  white-space: normal;
+  min-width: 340px;
+  line-height: 1.35;
+}

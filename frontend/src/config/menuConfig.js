@@ -119,6 +119,8 @@ export const analyseMenuStructure = [
   { key: "debitComptant", label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
   { key: "doublonsGencode", label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
   { key: "factures", label: "Analyse Factures", path: "/admin/facture-analyse", icon: HiDocumentReport },
+  { key: "journalCaisse", label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
+  { key: "topArticles", label: "Top Articles", path: "/admin/top-articles", icon: HiShoppingCart },
 ];
 
 // Structure des menus MODULES avec sous-groupes

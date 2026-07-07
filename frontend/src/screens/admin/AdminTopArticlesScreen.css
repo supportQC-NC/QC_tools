@@ -1,0 +1,208 @@
+/* AdminTopArticlesScreen.css */
+.admin-top-articles {
+  padding: 24px;
+  color: #f0f0f5;
+  max-width: none;
+}
+
+/* ===== Header ===== */
+.ta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.ta-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.4rem;
+  margin: 0;
+}
+.ta-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.ta-select,
+.ta-field input {
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+}
+.ta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #9aa0b5;
+}
+.ta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.ta-btn:hover {
+  border-color: #6366f1;
+}
+.ta-btn.primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-color: #4f46e5;
+}
+.ta-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ta-note {
+  background: #14142099;
+  border: 1px solid #2a2a3a;
+  border-left: 3px solid #6366f1;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-bottom: 1.25rem;
+}
+
+/* ===== États ===== */
+.ta-empty,
+.ta-loading,
+.ta-error {
+  padding: 2rem;
+  text-align: center;
+  color: #9aa0b5;
+}
+.ta-error {
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  background: #2a0f0f66;
+}
+.ta-hint {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 0.75rem;
+}
+
+/* ===== KPI ===== */
+.ta-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.ta-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+}
+.ta-kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #6366f122;
+  color: #a5b4fc;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.ta-kpi > div {
+  display: flex;
+  flex-direction: column;
+}
+.ta-kpi-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.ta-kpi-label {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 2px;
+}
+
+/* ===== Toggle CA / Quantité ===== */
+.ta-toggle {
+  display: inline-flex;
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 1.1rem;
+}
+.ta-toggle button {
+  background: transparent;
+  border: none;
+  color: #9aa0b5;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.5rem 1.4rem;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ta-toggle button:hover {
+  color: #f0f0f5;
+}
+.ta-toggle button.active {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #ffffff;
+}
+
+/* ===== Carte graphique ===== */
+.ta-card {
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  min-width: 0;
+}
+.ta-card h3 {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* ===== Tableau ===== */
+.ta-table-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+.ta-grid {
+  width: 100%;
+  height: 620px;
+}
+.ta-grid .cell-mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ta-grid .cell-rang {
+  font-weight: 800;
+  color: #a5b4fc;
+}
+.ta-grid .col-strong {
+  font-weight: 800;
+}

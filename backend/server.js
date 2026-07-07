@@ -57,7 +57,10 @@ import debitComptantRoutes from "./routes/debitComptantRoutes.js";
   import collecteurRoutes from "./routes/collecteurRoutes.js";
        import appReleaseRoutes from "./routes/appReleaseRoutes.js";
        import bipageCollecteRoutes from "./routes/bipageCollecteRoutes.js";
+
        import factureAnalyseRoutes from "./routes/factureAnalyseRoutes.js";
+import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
+import topArticlesRoutes from "./routes/topArticlesRoutes.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -157,7 +160,10 @@ app.use("/api/reappro-local", reapproLocalRoutes);
   app.use("/api/collecteurs", collecteurRoutes);
     app.use("/api/app-release", appReleaseRoutes);
     app.use("/api/bipage-collecte", bipageCollecteRoutes);
+
     app.use("/api/facture-analyse", factureAnalyseRoutes);
+app.use("/api/journal-caisse", journalCaisseRoutes);
+app.use("/api/top-articles", topArticlesRoutes);
 // =======================================
 
 // ==========================================
