@@ -3,16 +3,21 @@
 // Analyse des factures de TYPE "F" (TYPFACT === "F") sur une PLAGE DE DATES
 // choisie par l'utilisateur.
 //
+// DÉFINITION "articles par facture" : somme des QUANTITÉS (champ QTE) des
+// lignes de detail.dbf HORS commentaires (NART vide ou contenant "!").
+// Le nombre de LIGNES article est aussi exposé, à titre indicatif.
+//
 // KPI globaux :
 //   - montant total facturé (somme MONTANT), montant moyen / facture
-//   - nombre de factures, nombre de factures à montant 0
-//   - moyenne d'articles par facture (lignes detail.dbf HORS commentaires :
-//     NART vide ou contenant "!")
+//   - nombre de factures, nombre (et %) de factures à montant 0
+//   - moyenne d'articles / facture (Σ QTE / nb factures) + total articles vendus
+//   - moyenne de lignes / facture + total lignes
 //   - ventilation MENSUELLE (nb factures + montant) pour les graphiques
 //
 // KPI PAR VENDEUR (uniquement entreprise.vendeurs avec type === "vendeur") :
 //   - nb factures, montant, part du montant total
-//   - factures à 0, moyenne d'articles / facture, montant moyen / facture
+//   - factures à 0 (nb + %), articles / facture (moy. QTE), lignes / facture,
+//     montant moyen / facture, total articles vendus
 //   - ventilation mensuelle (graphique du vendeur sélectionné)
 //
 // IMPORTANT : le cache facture (factureCacheService) ne conserve que l'année en
@@ -123,7 +128,8 @@ class FactureAnalyseService {
           nbFactures: 0,
           montant: 0,
           nbFacturesZero: 0,
-          totalLignesArticle: 0,
+          totalArticles: 0, // Σ QTE
+          totalLignesArticle: 0, // nb lignes
           moisMap: new Map(),
         });
       });
@@ -132,7 +138,8 @@ class FactureAnalyseService {
     let montantTotal = 0;
     let nbFactures = 0;
     let nbFacturesZero = 0;
-    let totalLignesArticle = 0;
+    let totalArticles = 0; // Σ QTE
+    let totalLignesArticle = 0; // nb lignes
     const globalMoisMap = new Map();
 
     for (const f of cache.factureRecords) {
@@ -145,14 +152,23 @@ class FactureAnalyseService {
 
       const montant = this.num(f.MONTANT);
       const numfact = this.safeTrim(f.NUMFACT);
+
+      // Lignes article de la facture : Σ QTE + nb lignes
       const lignes = cache.detailByNumfact.get(numfact) || [];
-      const nbArticles = lignes.filter((l) => this.estLigneArticle(l)).length;
+      let qteFacture = 0;
+      let nbLignesFacture = 0;
+      for (const l of lignes) {
+        if (!this.estLigneArticle(l)) continue;
+        nbLignesFacture += 1;
+        qteFacture += this.num(l.QTE);
+      }
 
       // Global
       montantTotal += montant;
       nbFactures += 1;
       if (montant === 0) nbFacturesZero += 1;
-      totalLignesArticle += nbArticles;
+      totalArticles += qteFacture;
+      totalLignesArticle += nbLignesFacture;
 
       const mk = this.moisKey(d);
       if (!globalMoisMap.has(mk)) globalMoisMap.set(mk, { nbFactures: 0, montant: 0 });
@@ -167,7 +183,8 @@ class FactureAnalyseService {
         v.nbFactures += 1;
         v.montant += montant;
         if (montant === 0) v.nbFacturesZero += 1;
-        v.totalLignesArticle += nbArticles;
+        v.totalArticles += qteFacture;
+        v.totalLignesArticle += nbLignesFacture;
         if (!v.moisMap.has(mk)) v.moisMap.set(mk, { nbFactures: 0, montant: 0 });
         const vm = v.moisMap.get(mk);
         vm.nbFactures += 1;
@@ -183,8 +200,14 @@ class FactureAnalyseService {
         nbFactures: v.nbFactures,
         montant: v.montant,
         nbFacturesZero: v.nbFacturesZero,
+        pctFacturesZero:
+          v.nbFactures !== 0 ? (v.nbFacturesZero / v.nbFactures) * 100 : 0,
+        totalArticles: v.totalArticles,
         totalLignesArticle: v.totalLignesArticle,
+        // Moyenne d'ARTICLES / facture = Σ QTE / nb factures
         moyenneArticlesParFacture:
+          v.nbFactures !== 0 ? v.totalArticles / v.nbFactures : 0,
+        moyenneLignesParFacture:
           v.nbFactures !== 0 ? v.totalLignesArticle / v.nbFactures : 0,
         montantMoyenParFacture: v.nbFactures !== 0 ? v.montant / v.nbFactures : 0,
         partMontant: montantTotal !== 0 ? (v.montant / montantTotal) * 100 : 0,
@@ -200,11 +223,16 @@ class FactureAnalyseService {
       totaux: {
         nbFactures,
         montantTotal,
-        moyenneArticlesParFacture:
-          nbFactures !== 0 ? totalLignesArticle / nbFactures : 0,
-        nbFacturesZero,
         montantMoyenParFacture: nbFactures !== 0 ? montantTotal / nbFactures : 0,
+        // Moyenne d'ARTICLES / facture = Σ QTE / nb factures
+        moyenneArticlesParFacture:
+          nbFactures !== 0 ? totalArticles / nbFactures : 0,
+        moyenneLignesParFacture:
+          nbFactures !== 0 ? totalLignesArticle / nbFactures : 0,
+        totalArticles,
         totalLignesArticle,
+        nbFacturesZero,
+        pctFacturesZero: nbFactures !== 0 ? (nbFacturesZero / nbFactures) * 100 : 0,
       },
       parMois: this.moisMapToArray(moisList, globalMoisMap),
       vendeurs: vendeursListe,

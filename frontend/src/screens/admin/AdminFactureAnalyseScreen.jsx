@@ -128,6 +128,11 @@ const AdminFactureAnalyseScreen = () => {
         valueFormatter: (p) => (Number(p.value) || 0).toFixed(2),
       },
       {
+        field: "totalArticles", headerName: "Articles vendus", ...num,
+        minWidth: 140, filter: "agNumberColumnFilter",
+        valueFormatter: (p) => fNum(p.value),
+      },
+      {
         field: "nbFacturesZero", headerName: "Factures à 0", ...num, minWidth: 120,
         filter: "agNumberColumnFilter", valueFormatter: (p) => fNum(p.value),
         cellClass: (p) => (p.value > 0 ? "col-warn" : ""),
@@ -158,8 +163,11 @@ const AdminFactureAnalyseScreen = () => {
       ["Nombre de factures", totaux.nbFactures],
       ["Montant total facturé (XPF)", r0(totaux.montantTotal)],
       ["Montant moyen / facture (XPF)", r0(totaux.montantMoyenParFacture)],
-      ["Moyenne d'articles / facture", Number(totaux.moyenneArticlesParFacture.toFixed(2))],
+      ["Moyenne d'articles / facture (Σ QTE)", Number(totaux.moyenneArticlesParFacture.toFixed(2))],
+      ["Articles vendus (Σ QTE)", r0(totaux.totalArticles)],
+      ["Moyenne de lignes / facture", Number((totaux.moyenneLignesParFacture ?? 0).toFixed(2))],
       ["Factures à 0", totaux.nbFacturesZero],
+      ["% factures à 0", Number((totaux.pctFacturesZero ?? 0).toFixed(1))],
       [],
       ["Mois", "Nb factures", "Montant (XPF)"],
       ...parMois.map((m) => [m.mois, m.nbFactures, r0(m.montant)]),
@@ -168,7 +176,9 @@ const AdminFactureAnalyseScreen = () => {
 
     const wsV = [[
       "Code", "Vendeur", "Nb factures", "Montant facturé (XPF)", "Part (%)",
-      "Montant moy./facture (XPF)", "Articles/facture (moy.)", "Factures à 0",
+      "Montant moy./facture (XPF)", "Articles/facture (moy. QTE)",
+      "Articles vendus (Σ QTE)", "Lignes/facture (moy.)", "Factures à 0",
+      "% factures à 0",
     ]];
     vendeurs.forEach((v) =>
       wsV.push([
@@ -176,7 +186,10 @@ const AdminFactureAnalyseScreen = () => {
         Number(v.partMontant.toFixed(1)),
         r0(v.montantMoyenParFacture),
         Number(v.moyenneArticlesParFacture.toFixed(2)),
+        r0(v.totalArticles),
+        Number((v.moyenneLignesParFacture ?? 0).toFixed(2)),
         v.nbFacturesZero,
+        Number((v.pctFacturesZero ?? 0).toFixed(1)),
       ]),
     );
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsV), "Par vendeur");
@@ -282,7 +295,19 @@ const AdminFactureAnalyseScreen = () => {
                 </span>
                 <span className="fa-kpi-label">Articles / facture (moy.)</span>
                 <span className="fa-kpi-mini">
-                  {fNum(totaux.totalLignesArticle)} lignes au total
+                  {fNum(totaux.totalArticles)} articles vendus (Σ QTE)
+                </span>
+              </div>
+            </div>
+            <div className="fa-kpi">
+              <div className="fa-kpi-icon"><HiCollection /></div>
+              <div>
+                <span className="fa-kpi-value">
+                  {(totaux.moyenneLignesParFacture ?? 0).toFixed(2)}
+                </span>
+                <span className="fa-kpi-label">Lignes / facture (moy.)</span>
+                <span className="fa-kpi-mini">
+                  {fNum(totaux.totalLignesArticle)} lignes (hors commentaires)
                 </span>
               </div>
             </div>
@@ -291,6 +316,9 @@ const AdminFactureAnalyseScreen = () => {
               <div>
                 <span className="fa-kpi-value">{fNum(totaux.nbFacturesZero)}</span>
                 <span className="fa-kpi-label">Factures à 0</span>
+                <span className="fa-kpi-mini">
+                  {fPct(totaux.pctFacturesZero)} des factures
+                </span>
               </div>
             </div>
             <div className="fa-kpi">
@@ -374,6 +402,58 @@ const AdminFactureAnalyseScreen = () => {
                 </ResponsiveContainer>
               )}
             </div>
+
+            <div className="fa-card full">
+              <h3>Par vendeur — nb factures & articles / facture (moy.)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <ComposedChart
+                  data={vendeurs.filter((v) => v.nbFactures > 0)}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis
+                    dataKey="nom"
+                    stroke={AXIS}
+                    fontSize={11}
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis yAxisId="n" stroke={AXIS} fontSize={11} />
+                  <YAxis
+                    yAxisId="a"
+                    orientation="right"
+                    stroke={AXIS}
+                    fontSize={11}
+                  />
+                  <Tooltip
+                    contentStyle={TOOLTIP_STYLE}
+                    formatter={(v, name) =>
+                      name === "Articles/fact. (moy.)"
+                        ? (Number(v) || 0).toFixed(2)
+                        : fNum(v)
+                    }
+                  />
+                  <Legend />
+                  <Bar
+                    yAxisId="n"
+                    name="Nb factures"
+                    dataKey="nbFactures"
+                    fill="#6366f1"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Line
+                    yAxisId="a"
+                    name="Articles/fact. (moy.)"
+                    type="monotone"
+                    dataKey="moyenneArticlesParFacture"
+                    stroke="#f59e0b"
+                    strokeWidth={2.5}
+                    dot
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* ===== Détail par vendeur (menu déroulant) ===== */}
@@ -425,7 +505,9 @@ const AdminFactureAnalyseScreen = () => {
                       </span>
                       <span className="fa-kpi-label">Articles / facture (moy.)</span>
                       <span className="fa-kpi-mini">
-                        {fNum(vendeur.totalLignesArticle)} lignes au total
+                        {fNum(vendeur.totalArticles)} articles vendus ·{" "}
+                        {(vendeur.moyenneLignesParFacture ?? 0).toFixed(2)}{" "}
+                        lignes/fact.
                       </span>
                     </div>
                   </div>
@@ -436,6 +518,9 @@ const AdminFactureAnalyseScreen = () => {
                         {fNum(vendeur.nbFacturesZero)}
                       </span>
                       <span className="fa-kpi-label">Factures à 0</span>
+                      <span className="fa-kpi-mini">
+                        {fPct(vendeur.pctFacturesZero)} de ses factures
+                      </span>
                     </div>
                   </div>
                 </div>

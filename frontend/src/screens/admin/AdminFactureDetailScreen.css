@@ -1,283 +1,240 @@
-/* AdminEtiquettesScreen.css — aligné sur le thème sombre de l'application */
-
-.etiq-screen {
+/* AdminFactureAnalyseScreen.css */
+.admin-facture-analyse {
   padding: 24px;
-  max-width: 920px;
-  margin: 0 auto;
+  color: #f0f0f5;
+  max-width: none;
 }
 
-/* En-tête */
-.etiq-header {
-  margin-bottom: 18px;
-}
-
-.etiq-header h1 {
+/* ===== Header ===== */
+.fa-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 6px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
 }
-
-.etiq-header h1 svg {
-  color: var(--accent);
-}
-
-.etiq-header p {
-  color: var(--text-secondary);
-  font-size: 14px;
+.fa-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.4rem;
   margin: 0;
 }
-
-/* Cartes */
-.etiq-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 18px;
-  margin-bottom: 16px;
-}
-
-.etiq-label {
+.fa-actions {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-/* Champs */
-.etiq-select,
-.etiq-input,
-.etiq-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 14px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  box-sizing: border-box;
-  transition: border-color 0.15s;
-}
-
-.etiq-select:focus,
-.etiq-input:focus,
-.etiq-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.etiq-select option {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.etiq-textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-.etiq-field {
-  margin-top: 14px;
-}
-
-.etiq-hint {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Onglets mode (proforma / NART) */
-.etiq-mode-tabs {
-  display: flex;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
-
-.etiq-mode-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.etiq-mode-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--accent);
-}
-
-.etiq-mode-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-/* Barre d'import CSV */
-.etiq-csv-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.etiq-csv-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 14px;
+.fa-select,
+.fa-field input {
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
   border-radius: 8px;
-  border: 1px solid var(--accent);
-  background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
 }
-
-.etiq-csv-btn:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
-.etiq-csv-count {
-  font-size: 12px;
-  color: var(--success);
-  font-weight: 600;
-}
-
-/* Cartes de type */
-.etiq-types {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 10px;
-}
-
-.etiq-type-card {
+.fa-field {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 4px;
-  padding: 14px;
-  border-radius: 10px;
-  border: 2px solid var(--border);
-  background: var(--bg-tertiary);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #9aa0b5;
 }
-
-.etiq-type-card:hover {
-  border-color: var(--accent);
-}
-
-.etiq-type-card.selected {
-  border-color: var(--accent);
-  background: rgba(77, 166, 255, 0.12);
-}
-
-.etiq-type-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.etiq-type-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.35;
-}
-
-/* Messages */
-.etiq-error {
-  background: rgba(255, 107, 107, 0.12);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
-.etiq-info {
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid var(--success);
-  color: var(--success);
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
-/* Action */
-.etiq-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.etiq-generate {
+.fa-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: var(--accent);
-  color: #fff;
-  border: 0;
-  border-radius: 10px;
-  padding: 13px 26px;
-  font-size: 15px;
-  font-weight: 700;
+  gap: 0.4rem;
+  background: #16161f;
+  border: 1px solid #2a2a3a;
+  color: #f0f0f5;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
   cursor: pointer;
-  transition: background 0.15s;
+  font-size: 0.9rem;
+}
+.fa-btn:hover {
+  border-color: #6366f1;
+}
+.fa-btn.primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-color: #4f46e5;
+}
+.fa-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.etiq-generate:hover:not(:disabled) {
-  background: var(--accent-hover);
+.fa-note {
+  background: #14142099;
+  border: 1px solid #2a2a3a;
+  border-left: 3px solid #6366f1;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-bottom: 1.25rem;
 }
 
-.etiq-generate:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-/* Placeholder / vide */
-.etiq-placeholder {
-  padding: 60px 20px;
+/* ===== États ===== */
+.fa-empty,
+.fa-loading,
+.fa-error {
+  padding: 2rem;
   text-align: center;
-  color: var(--text-muted);
-  background: var(--bg-secondary);
-  border: 1px dashed var(--border);
+  color: #9aa0b5;
+}
+.fa-empty.small {
+  padding: 1.25rem;
+  font-size: 0.9rem;
+}
+.fa-error {
+  color: #f87171;
+  border: 1px solid #7f1d1d;
   border-radius: 10px;
+  background: #2a0f0f66;
+}
+.fa-hint {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 0.75rem;
 }
 
-/* Sélecteur de format (A4 entier / demi A4) */
-.etiq-format {
+/* ===== KPI ===== */
+.fa-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.fa-kpi {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  gap: 0.9rem;
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+}
+.fa-kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #6366f122;
+  color: #a5b4fc;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.fa-kpi-icon.warn {
+  background: #f59e0b22;
+  color: #fbbf24;
+}
+.fa-kpi > div {
+  display: flex;
+  flex-direction: column;
+}
+.fa-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.fa-kpi-label {
+  font-size: 0.82rem;
+  color: #9aa0b5;
+  margin-top: 2px;
+}
+.fa-kpi-mini {
+  font-size: 0.72rem;
+  color: #7c8298;
+  margin-top: 2px;
 }
 
-.etiq-format-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-right: 4px;
+/* ===== Cartes graphiques (dashboard) ===== */
+.fa-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.fa-card {
+  background: #12121a;
+  border: 1px solid #2a2a3a;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  min-width: 0;
+}
+.fa-card h3 {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.fa-card.wide {
+  grid-column: auto;
+}
+.fa-card.full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1100px) {
+  .fa-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Détail par vendeur ===== */
+.fa-vendeur-section {
+  background: #0f0f17;
+  border: 1px solid #2a2a3a;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.fa-vendeur-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.fa-vendeur-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.fa-vendeur-header .fa-select {
+  min-width: 320px;
+}
+
+/* ===== Tableau ===== */
+.fa-table-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+.fa-table-title small {
+  font-weight: 500;
+  color: #9aa0b5;
+}
+.fa-grid {
+  width: 100%;
+  height: 520px;
+}
+.fa-grid .cell-mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.fa-grid .col-strong {
+  font-weight: 700;
+}
+.fa-grid .col-warn {
+  color: #fbbf24;
+  font-weight: 700;
+}
+.fa-grid .ag-row {
+  cursor: pointer;
 }
