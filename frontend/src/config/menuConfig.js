@@ -48,13 +48,11 @@ export const adminMenuStructure = [
         label: "Utilisateurs",
         path: "/admin/users",
         icon: HiUsers,
-        superAdminOnly: true,
       },
       {
         label: "Entreprises",
         path: "/admin/entreprises",
         icon: HiOfficeBuilding,
-        superAdminOnly: true,
       },
       // {
       //   label: "Permissions",
@@ -108,19 +106,31 @@ export const adminMenuStructure = [
       },
     ],
   },
-];
-
-// Écrans d'ANALYSE — droit d'accès PAR ÉCRAN (permission.analyse[key]).
-// Affichés à tout utilisateur (admin ou user) selon ses cases ; super-admin = tout.
-export const analyseMenuStructure = [
-  { key: "commerciaux", label: "Analyse Commerciaux", path: "/admin/commerciaux", icon: HiUserGroup },
-  { key: "filiales", label: "Analyse Filiales", path: "/admin/filiales", icon: HiOfficeBuilding },
-  { key: "reapproLocal", label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
-  { key: "debitComptant", label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
-  { key: "doublonsGencode", label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
-  { key: "factures", label: "Analyse Factures", path: "/admin/facture-analyse", icon: HiDocumentReport },
-  { key: "journalCaisse", label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
-  { key: "topArticles", label: "Top Articles", path: "/admin/top-articles", icon: HiShoppingCart },
+  {
+    type: "subgroup",
+    label: "Analyse",
+    icon: HiCog,
+    collapsible: true,
+    items: [
+      {
+        label: "Analyse Commerciaux",
+        path: "/admin/commerciaux",
+        icon: HiUserGroup,
+      },
+      {
+        label: "Analyse Filiales",
+        path: "/admin/filiales",
+        icon: HiOfficeBuilding,
+      },
+      { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
+       { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
+       { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
+         { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
+            { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
+         
+ 
+    ],
+  },
 ];
 
 // Structure des menus MODULES avec sous-groupes
@@ -315,24 +325,6 @@ export const hasAllEntreprisesAccess = (userInfo) => {
   return userInfo.permissions.allEntreprises === true;
 };
 
-// Super-admin = admin avec accès à toutes les entreprises
-// (ou admin hérité sans document Permission — cohérent avec le backend).
-export const isSuperAdmin = (userInfo) =>
-  isAdmin(userInfo) &&
-  (userInfo?.permissions?.allEntreprises === true || !userInfo?.permissions);
-
-// Accès à un écran d'analyse (droit par écran ; super-admin = tout).
-export const hasAnalyseAccess = (userInfo, key) => {
-  if (!userInfo) return false;
-  if (isSuperAdmin(userInfo)) return true;
-  // Filiales : accès à l'écran dès qu'au moins un réseau (DQ/QC/LD) est autorisé.
-  if (key === "filiales") {
-    const f = userInfo?.permissions?.analyse?.filiales;
-    return !!(f && (f.DQ || f.QC || f.LD));
-  }
-  return userInfo?.permissions?.analyse?.[key] === true;
-};
-
 export const hasModulePermission = (userInfo, module, action = "read") => {
   if (!userInfo) return false;
   if (isAdmin(userInfo)) return true;
@@ -376,21 +368,6 @@ export const hasRouteAccess = (userInfo, path, action = "read") => {
  * Génère les menus pour un utilisateur avec la nouvelle structure
  * supportant les sous-groupes
  */
-// Filtre les entrées d'administration réservées aux super-admins
-// (drapeau superAdminOnly). Retire aussi les sous-groupes devenus vides.
-const filterAdminItems = (items, superAdmin) =>
-  (items || [])
-    .map((it) => {
-      if (it.type === "subgroup") {
-        const sub = (it.items || []).filter(
-          (s) => superAdmin || !s.superAdminOnly,
-        );
-        return sub.length ? { ...it, items: sub } : null;
-      }
-      return superAdmin || !it.superAdminOnly ? it : null;
-    })
-    .filter(Boolean);
-
 export const getUserMenus = (userInfo) => {
   if (!userInfo) return [];
 
@@ -402,20 +379,7 @@ export const getUserMenus = (userInfo) => {
       type: "section",
       label: "Administration",
       collapsible: true,
-      items: filterAdminItems(adminMenuStructure, isSuperAdmin(userInfo)),
-    });
-  }
-
-  // 1bis. Section Analyse (droit par écran — admins ET users)
-  const analyseItems = analyseMenuStructure.filter((it) =>
-    hasAnalyseAccess(userInfo, it.key),
-  );
-  if (analyseItems.length > 0) {
-    menus.push({
-      type: "section",
-      label: "Analyse",
-      collapsible: true,
-      items: analyseItems,
+      items: adminMenuStructure,
     });
   }
 

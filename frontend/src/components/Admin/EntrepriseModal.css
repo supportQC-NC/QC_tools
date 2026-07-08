@@ -584,6 +584,63 @@
   }
 }
 
+/* ===== Section ANALYSE CA (onglet paramètres du module) ===== */
+.aca-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.aca-section {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.aca-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.aca-section-header h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.aca-aide {
+  display: block;
+  margin-bottom: 10px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.aca-empty {
+  padding: 14px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+}
+
+/* L'éditeur clé -> valeur réutilise .vendeurs-table ; 3 colonnes (clé, valeur, action) */
+.aca-table th:nth-child(1),
+.aca-table td:nth-child(1) {
+  width: 34%;
+}
+
+.aca-table th:nth-child(3),
+.aca-table td:nth-child(3) {
+  width: 48px;
+  text-align: center;
+}
+
 @media (max-width: 500px) {
   .form-row {
     grid-template-columns: 1fr;

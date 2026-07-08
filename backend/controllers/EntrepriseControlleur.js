@@ -18,6 +18,57 @@ const normaliserVendeurs = (arr) =>
     }))
     .filter((v) => v.code !== "");
 
+// Normalise les paramètres ANALYSE CA reçus du front (tous facultatifs).
+// Nombres/entiers filtrés ; listes nettoyées ; maps -> objets {clé: valeur}.
+const normaliserAnalyseCA = (a) => {
+  if (!a || typeof a !== "object") return undefined;
+  const out = {};
+  const entier = (v) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const listeNombres = (arr) =>
+    Array.isArray(arr)
+      ? arr.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n))
+      : undefined;
+  const listeTextes = (arr) =>
+    Array.isArray(arr)
+      ? arr.map((v) => String(v).trim()).filter((v) => v !== "")
+      : undefined;
+  const mapTexte = (obj) => {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return undefined;
+    const entries = Object.entries(obj)
+      .map(([k, v]) => [String(k).trim(), String(v ?? "").trim()])
+      .filter(([k]) => k !== "");
+    return Object.fromEntries(entries);
+  };
+
+  const sti = entier(a.seuilTiersInterne);
+  if (sti !== undefined) out.seuilTiersInterne = sti;
+  const spa = entier(a.seuilPvteAberrante);
+  if (spa !== undefined) out.seuilPvteAberrante = spa;
+  const tia = listeNombres(a.tiersInternesAutorises);
+  if (tia) out.tiersInternesAutorises = tia;
+  const tex = listeNombres(a.tiersExclusCA);
+  if (tex) out.tiersExclusCA = tex;
+  const tfa = listeNombres(a.tiersForcerAutre);
+  if (tfa) out.tiersForcerAutre = tfa;
+  const aep = listeTextes(a.articlesExclusPrefixes);
+  if (aep) out.articlesExclusPrefixes = aep;
+  const aee = listeTextes(a.articlesExclusExacts);
+  if (aee) out.articlesExclusExacts = aee;
+  const ncl = mapTexte(a.nomsClasses);
+  if (ncl) out.nomsClasses = ncl;
+  const nsc = mapTexte(a.nomsSousClasses);
+  if (nsc) out.nomsSousClasses = nsc;
+  const nlo = mapTexte(a.nomsLocates);
+  if (nlo) out.nomsLocates = nlo;
+  const nca = mapTexte(a.normalisationCategories);
+  if (nca) out.normalisationCategories = nca;
+
+  return Object.keys(out).length > 0 ? out : undefined;
+};
+
 // @desc    Get all entreprises (filtrées sur le périmètre de l'utilisateur)
 // @route   GET /api/entreprises
 // @access  Private/Admin (liste filtrée : super-admin = toutes ; admin scopé = ses sociétés)
@@ -80,6 +131,7 @@ const createEntreprise = asyncHandler(async (req, res) => {
     mappingEntrepots,
     mappingEtatsCommande,
     mappingEtatsFacture,
+    analyseCA,
     mappingEtatsProforma,
     cheminRapportReception,
     emailsRapportReception,
@@ -160,6 +212,11 @@ const createEntreprise = asyncHandler(async (req, res) => {
     entrepriseData.vendeurs = normaliserVendeurs(vendeurs);
   }
 
+  const analyseCAcree = normaliserAnalyseCA(analyseCA);
+  if (analyseCAcree) {
+    entrepriseData.analyseCA = analyseCAcree;
+  }
+
   // Ajouter le mapping des états si fourni
   if (mappingEtatsCommande) {
     entrepriseData.mappingEtatsCommande = mappingEtatsCommande;
@@ -198,6 +255,7 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     mappingEntrepots,
     mappingEtatsCommande,
     mappingEtatsFacture,
+    analyseCA,
     mappingEtatsProforma,
     isActive,
     cheminRapportReception,
@@ -304,6 +362,13 @@ const updateEntreprise = asyncHandler(async (req, res) => {
 
   if (Array.isArray(vendeurs)) {
     entreprise.vendeurs = normaliserVendeurs(vendeurs);
+  }
+
+  // Paramètres ANALYSE CA : fusion champ à champ (n'écrase que ce qui est fourni)
+  const analyseCAmaj = normaliserAnalyseCA(analyseCA);
+  if (analyseCAmaj) {
+    const actuel = entreprise.analyseCA?.toObject?.() ?? {};
+    entreprise.analyseCA = { ...actuel, ...analyseCAmaj };
   }
 
   const updatedEntreprise = await entreprise.save();

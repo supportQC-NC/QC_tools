@@ -12,6 +12,7 @@ import {
   HiTrash,
   HiSearch,
   HiColorSwatch,
+  HiChartBar,
 } from "react-icons/hi";
 import {
   useCreateEntrepriseMutation,
@@ -36,6 +37,82 @@ const DEFAULT_ETATS_COMMANDE = {
 const DEFAULT_PRIMAIRE = "#4F46E5";
 const DEFAULT_SECONDAIRE = "#10B981";
 const LOGO_MAX_PX = 400; // redimensionnement max (garde le base64 léger)
+
+// ---- ANALYSE CA : défauts (= configuration QC d'origine du pipeline Python) ----
+const ACA_CLASSES_DEFAUT = [
+  { k: "10", v: "Visserie / Boulonnerie" },
+  { k: "20", v: "Outillage" },
+  { k: "30", v: "Quincaillerie" },
+  { k: "40", v: "Électricité" },
+  { k: "50", v: "Peinture" },
+  { k: "60", v: "Plomberie / Sanitaire" },
+  { k: "70", v: "Jardin / Extérieur" },
+  { k: "80", v: "Divers" },
+  { k: "90", v: "Matériaux" },
+];
+const ACA_NORMALISATION_DEFAUT = [
+  { k: "PRO DEBIT EXPORT", v: "PRO DEBIT" },
+  { k: "PRO DEBIT*", v: "PRO DEBIT" },
+  { k: "PRO DEBIT MINE", v: "PRO DEBIT" },
+  { k: "PARTICULER", v: "PARTICULIER" },
+  { k: "COMPTANT", v: "PRO COMPTANT" },
+  { k: "EMPLOYEE", v: "EMPLOYE" },
+  { k: "ADMINISTRATIF", v: "ADMINISTRATION" },
+  { k: "AGRICULTEUR                             PRO COMPTANT", v: "AGRICULTEUR" },
+  { k: "COMPTE FERME", v: "AUTRE" },
+  { k: "INTERNE", v: "INTERNE" },
+];
+
+// Formulaire ANALYSE CA vierge (listes en texte "1, 2, 3" ; maps en lignes k/v)
+const defaultAnalyseCaForm = () => ({
+  seuilTiersInterne: 9905,
+  seuilPvteAberrante: 100,
+  tiersInternesAutorises:
+    "9994, 9915, 9913, 9925, 9914, 9910, 9916, 9905, 9920, 9912, 9998, 9995",
+  tiersExclusCA: "2226",
+  tiersForcerAutre: "",
+  articlesExclusPrefixes: "08",
+  articlesExclusExacts: "000001",
+  nomsClasses: ACA_CLASSES_DEFAUT.map((r) => ({ ...r })),
+  nomsSousClasses: [],
+  nomsLocates: [],
+  normalisationCategories: ACA_NORMALISATION_DEFAUT.map((r) => ({ ...r })),
+});
+
+// entreprise.analyseCA (JSON) -> formulaire d'édition
+const analyseCaToForm = (a) => {
+  const def = defaultAnalyseCaForm();
+  if (!a || typeof a !== "object") return def;
+  const texte = (arr, fallback) =>
+    Array.isArray(arr) ? arr.join(", ") : fallback;
+  const lignes = (obj, fallback) =>
+    obj && typeof obj === "object" && Object.keys(obj).length > 0
+      ? Object.entries(obj).map(([k, v]) => ({ k, v: String(v ?? "") }))
+      : fallback;
+  return {
+    seuilTiersInterne: Number.isFinite(a.seuilTiersInterne)
+      ? a.seuilTiersInterne
+      : def.seuilTiersInterne,
+    seuilPvteAberrante: Number.isFinite(a.seuilPvteAberrante)
+      ? a.seuilPvteAberrante
+      : def.seuilPvteAberrante,
+    tiersInternesAutorises: texte(
+      a.tiersInternesAutorises, def.tiersInternesAutorises,
+    ),
+    tiersExclusCA: texte(a.tiersExclusCA, def.tiersExclusCA),
+    tiersForcerAutre: texte(a.tiersForcerAutre, def.tiersForcerAutre),
+    articlesExclusPrefixes: texte(
+      a.articlesExclusPrefixes, def.articlesExclusPrefixes,
+    ),
+    articlesExclusExacts: texte(a.articlesExclusExacts, def.articlesExclusExacts),
+    nomsClasses: lignes(a.nomsClasses, def.nomsClasses),
+    nomsSousClasses: lignes(a.nomsSousClasses, def.nomsSousClasses),
+    nomsLocates: lignes(a.nomsLocates, def.nomsLocates),
+    normalisationCategories: lignes(
+      a.normalisationCategories, def.normalisationCategories,
+    ),
+  };
+};
 
 const EntrepriseModal = ({ entreprise, onClose }) => {
   const isEdit = !!entreprise;
@@ -67,6 +144,7 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     couleurSecondaire: DEFAULT_SECONDAIRE,
     logo: "",
     vendeurs: [],
+    analyseCA: defaultAnalyseCaForm(),
     isActive: true,
   });
 
@@ -142,6 +220,7 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
         couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
         couleurSecondaire: entreprise.couleurSecondaire || DEFAULT_SECONDAIRE,
         logo: entreprise.logo || "",
+        analyseCA: analyseCaToForm(entreprise.analyseCA),
         vendeurs: Array.isArray(entreprise.vendeurs)
           ? entreprise.vendeurs.map((v) => ({
               code: v.code || "",
@@ -302,6 +381,47 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     }));
   };
 
+  // ---- ANALYSE CA : champs simples / listes texte ----
+  const handleAnalyseCaField = (name, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      analyseCA: { ...prev.analyseCA, [name]: value },
+    }));
+  };
+
+  // ---- ANALYSE CA : éditeurs clé -> valeur (classes, locates, catégories) ----
+  const handleAnalyseCaRow = (liste, index, field, value) => {
+    setFormData((prev) => {
+      const rows = [...prev.analyseCA[liste]];
+      rows[index] = { ...rows[index], [field]: value };
+      return { ...prev, analyseCA: { ...prev.analyseCA, [liste]: rows } };
+    });
+  };
+
+  const addAnalyseCaRow = (liste) => {
+    setFormData((prev) => ({
+      ...prev,
+      analyseCA: {
+        ...prev.analyseCA,
+        [liste]: [...prev.analyseCA[liste], { k: "", v: "" }],
+      },
+    }));
+  };
+
+  const removeAnalyseCaRow = (liste, index) => {
+    setFormData((prev) => ({
+      ...prev,
+      analyseCA: {
+        ...prev.analyseCA,
+        [liste]: prev.analyseCA[liste].filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const resetAnalyseCa = () => {
+    setFormData((prev) => ({ ...prev, analyseCA: defaultAnalyseCaForm() }));
+  };
+
   // Auto-détection des codes vendeurs depuis facture.REPRES
   const detecterVendeurs = async () => {
     if (!formData.nomDossierDBF.trim()) {
@@ -371,10 +491,45 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       .flatMap((l) => String(l).split(/[,;]+/))
       .map((s) => s.trim())
       .filter(Boolean);
+    // ANALYSE CA : formulaire -> structure API (listes/nombres/maps)
+    const aca = formData.analyseCA;
+    const listeNombres = (txt) =>
+      String(txt || "")
+        .split(/[,;\s]+/)
+        .map((v) => v.trim())
+        .filter(Boolean)
+        .map((v) => parseInt(v, 10))
+        .filter((n) => Number.isFinite(n));
+    const listeTextes = (txt) =>
+      String(txt || "")
+        .split(/[,;]+/)
+        .map((v) => v.trim())
+        .filter(Boolean);
+    const lignesEnMap = (rows) =>
+      Object.fromEntries(
+        (rows || [])
+          .map((r) => [String(r.k ?? "").trim(), String(r.v ?? "").trim()])
+          .filter(([k]) => k !== ""),
+      );
+    const analyseCAPayload = {
+      seuilTiersInterne: parseInt(aca.seuilTiersInterne, 10),
+      seuilPvteAberrante: parseInt(aca.seuilPvteAberrante, 10),
+      tiersInternesAutorises: listeNombres(aca.tiersInternesAutorises),
+      tiersExclusCA: listeNombres(aca.tiersExclusCA),
+      tiersForcerAutre: listeNombres(aca.tiersForcerAutre),
+      articlesExclusPrefixes: listeTextes(aca.articlesExclusPrefixes),
+      articlesExclusExacts: listeTextes(aca.articlesExclusExacts),
+      nomsClasses: lignesEnMap(aca.nomsClasses),
+      nomsSousClasses: lignesEnMap(aca.nomsSousClasses),
+      nomsLocates: lignesEnMap(aca.nomsLocates),
+      normalisationCategories: lignesEnMap(aca.normalisationCategories),
+    };
+
     const payload = {
       ...formData,
       emailsRapportReception: emails,
       emailsRapportPreparation: emailsPrepa,
+      analyseCA: analyseCAPayload,
     };
 
     try {
@@ -457,6 +612,13 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
             onClick={() => setActiveTab("vendeurs")}
           >
             <HiUserGroup /> Vendeurs
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === "analyseCA" ? "active" : ""}`}
+            onClick={() => setActiveTab("analyseCA")}
+          >
+            <HiChartBar /> Analyse CA
           </button>
         </div>
 
@@ -1065,6 +1227,211 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                   </tbody>
                 </table>
               )}
+            </>
+          )}
+
+          {activeTab === "analyseCA" && (
+            <>
+              <p className="tab-description">
+                Paramètres du module <strong>Analyse CA</strong> pour CETTE
+                entreprise (équivalents du config.py du pipeline). Les valeurs
+                par défaut correspondent à la configuration QC.
+              </p>
+
+              <div className="aca-toolbar">
+                <button
+                  type="button"
+                  className="btn-add-vendeur"
+                  onClick={resetAnalyseCa}
+                >
+                  Réinitialiser (valeurs QC)
+                </button>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Seuil tiers interne</label>
+                  <input
+                    type="number"
+                    value={formData.analyseCA.seuilTiersInterne}
+                    onChange={(e) =>
+                      handleAnalyseCaField("seuilTiersInterne", e.target.value)
+                    }
+                  />
+                  <small>TIERS ≥ seuil = compte interne</small>
+                </div>
+                <div className="form-group">
+                  <label>Seuil PVTE aberrante (× catalogue)</label>
+                  <input
+                    type="number"
+                    value={formData.analyseCA.seuilPvteAberrante}
+                    onChange={(e) =>
+                      handleAnalyseCaField("seuilPvteAberrante", e.target.value)
+                    }
+                  />
+                  <small>Ligne exclue si PVTE &gt; catalogue × seuil</small>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Tiers internes autorisés (analyse interne)</label>
+                <input
+                  type="text"
+                  value={formData.analyseCA.tiersInternesAutorises}
+                  onChange={(e) =>
+                    handleAnalyseCaField("tiersInternesAutorises", e.target.value)
+                  }
+                  placeholder="9994, 9915, 9913…"
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Tiers exclus du CA</label>
+                  <input
+                    type="text"
+                    value={formData.analyseCA.tiersExclusCA}
+                    onChange={(e) =>
+                      handleAnalyseCaField("tiersExclusCA", e.target.value)
+                    }
+                    placeholder="2226 (BON DE CAISSE)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Tiers forcés en catégorie AUTRE</label>
+                  <input
+                    type="text"
+                    value={formData.analyseCA.tiersForcerAutre}
+                    onChange={(e) =>
+                      handleAnalyseCaField("tiersForcerAutre", e.target.value)
+                    }
+                    placeholder="vide = aucun"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Préfixes d'articles exclus</label>
+                  <input
+                    type="text"
+                    value={formData.analyseCA.articlesExclusPrefixes}
+                    onChange={(e) =>
+                      handleAnalyseCaField(
+                        "articlesExclusPrefixes", e.target.value,
+                      )
+                    }
+                    placeholder="08 (ECOPART)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Codes articles exclus (exacts)</label>
+                  <input
+                    type="text"
+                    value={formData.analyseCA.articlesExclusExacts}
+                    onChange={(e) =>
+                      handleAnalyseCaField("articlesExclusExacts", e.target.value)
+                    }
+                    placeholder="000001 (PROFORMA)"
+                  />
+                </div>
+              </div>
+
+              {[
+                {
+                  liste: "nomsClasses",
+                  titre: "Noms des classes",
+                  aide: "Préfixe article (dizaine) → libellé (onglet Classes)",
+                  cleLabel: "Code",
+                  valLabel: "Libellé",
+                },
+                {
+                  liste: "nomsSousClasses",
+                  titre: "Noms des sous-classes",
+                  aide: "Préfixe article 2 chiffres → libellé (onglet Sous_Classes)",
+                  cleLabel: "Code (2 chiffres)",
+                  valLabel: "Libellé",
+                },
+                {
+                  liste: "nomsLocates",
+                  titre: "Noms des locates",
+                  aide: "Code GROUPE → libellé lisible (onglet Locates)",
+                  cleLabel: "Code groupe",
+                  valLabel: "Libellé",
+                },
+                {
+                  liste: "normalisationCategories",
+                  titre: "Normalisation des catégories clients",
+                  aide: "Variante trouvée en base → catégorie canonique",
+                  cleLabel: "Variante",
+                  valLabel: "Catégorie",
+                },
+              ].map((cfg) => (
+                <div className="aca-section" key={cfg.liste}>
+                  <div className="aca-section-header">
+                    <h4>{cfg.titre}</h4>
+                    <button
+                      type="button"
+                      className="btn-add-vendeur"
+                      onClick={() => addAnalyseCaRow(cfg.liste)}
+                    >
+                      <HiPlus /> Ajouter
+                    </button>
+                  </div>
+                  <small className="aca-aide">{cfg.aide}</small>
+                  {formData.analyseCA[cfg.liste].length === 0 ? (
+                    <div className="aca-empty">Aucune entrée.</div>
+                  ) : (
+                    <table className="vendeurs-table aca-table">
+                      <thead>
+                        <tr>
+                          <th>{cfg.cleLabel}</th>
+                          <th>{cfg.valLabel}</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.analyseCA[cfg.liste].map((row, i) => (
+                          <tr key={`${cfg.liste}-${i}`}>
+                            <td>
+                              <input
+                                type="text"
+                                value={row.k}
+                                onChange={(e) =>
+                                  handleAnalyseCaRow(
+                                    cfg.liste, i, "k", e.target.value,
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                value={row.v}
+                                onChange={(e) =>
+                                  handleAnalyseCaRow(
+                                    cfg.liste, i, "v", e.target.value,
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn-vendeur-remove"
+                                onClick={() => removeAnalyseCaRow(cfg.liste, i)}
+                                title="Supprimer"
+                              >
+                                <HiTrash />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))}
             </>
           )}
 

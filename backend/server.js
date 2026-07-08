@@ -61,6 +61,8 @@ import debitComptantRoutes from "./routes/debitComptantRoutes.js";
        import factureAnalyseRoutes from "./routes/factureAnalyseRoutes.js";
 import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
 import topArticlesRoutes from "./routes/topArticlesRoutes.js";
+// ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
+import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -164,6 +166,8 @@ app.use("/api/reappro-local", reapproLocalRoutes);
     app.use("/api/facture-analyse", factureAnalyseRoutes);
 app.use("/api/journal-caisse", journalCaisseRoutes);
 app.use("/api/top-articles", topArticlesRoutes);
+// ========== ROUTES ANALYSE CA ==========
+app.use("/api/analyse-ca", analyseCaRoutes);
 // =======================================
 
 // ==========================================

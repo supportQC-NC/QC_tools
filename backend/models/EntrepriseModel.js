@@ -15,7 +15,7 @@ const DEFAULT_COLLECT = "\\\\192.168.0.250\\Rcommun\\STOCK\\collect_sec";
 
 // BASE « collecteur » où sont déposés les livrables du module RÉCEPTION.
 // L'arborescence complète est construite en code (voir utils/receptionPaths.js) :
-//   <base collecteur>/controle_cmd/<TRIGRAMME>/<NUMCDE>_<date>_<fournisseur>/
+//   <base collecteur>/<TRIGRAMME>/controle_cmd/<NUMCDE>_<date>_<fournisseur>/
 //       - le rapport PDF de contrôle
 //       - les photos de signalement (problèmes articles)
 // NB (migration) : ce champ pointait auparavant sur "...\STOCK\controle commande"
@@ -48,6 +48,70 @@ const vendeurSchema = new mongoose.Schema(
       type: String,
       enum: ["commercial", "vendeur", "autre"],
       default: "vendeur",
+    },
+  },
+  { _id: false },
+);
+
+// Paramètres du module ANALYSE CA — équivalents de config.py, PAR ENTREPRISE.
+// Les DÉFAUTS reprennent la configuration QC d'origine du pipeline Python.
+const analyseCaSchema = new mongoose.Schema(
+  {
+    // Seuil au-delà duquel un tiers est considéré INTERNE
+    seuilTiersInterne: { type: Number, default: 9905 },
+    // Tiers internes AUTORISÉS dans l'analyse interne (Client_Interne)
+    tiersInternesAutorises: {
+      type: [Number],
+      default: () => [9994, 9915, 9913, 9925, 9914, 9910, 9916, 9905, 9920, 9912, 9998, 9995],
+    },
+    // Tiers exclus COMPLÈTEMENT du CA (ex: 2226 = BON DE CAISSE)
+    tiersExclusCA: { type: [Number], default: () => [2226] },
+    // Tiers forcés en catégorie AUTRE malgré un code < seuil
+    tiersForcerAutre: { type: [Number], default: () => [] },
+    // Préfixes d'articles exclus de toutes les analyses (ex: 08 = ECOPART)
+    articlesExclusPrefixes: { type: [String], default: () => ["08"] },
+    // Codes articles exclus exacts (ex: 000001 = PROFORMA)
+    articlesExclusExacts: { type: [String], default: () => ["000001"] },
+    // Seuil PVTE aberrante : ligne exclue si PVTE > catalogue × ce facteur
+    seuilPvteAberrante: { type: Number, default: 100 },
+    // Noms des classes (préfixe NART par dizaines -> libellé)
+    nomsClasses: {
+      type: Map,
+      of: String,
+      default: () =>
+        new Map([
+          ["10", "Visserie / Boulonnerie"],
+          ["20", "Outillage"],
+          ["30", "Quincaillerie"],
+          ["40", "Électricité"],
+          ["50", "Peinture"],
+          ["60", "Plomberie / Sanitaire"],
+          ["70", "Jardin / Extérieur"],
+          ["80", "Divers"],
+          ["90", "Matériaux"],
+        ]),
+    },
+    // Noms des SOUS-CLASSES (préfixe NART 2 chiffres -> libellé)
+    nomsSousClasses: { type: Map, of: String, default: () => new Map() },
+    // Noms des locates (code GROUPE -> libellé lisible)
+    nomsLocates: { type: Map, of: String, default: () => new Map() },
+    // Normalisation des catégories clients (variante -> catégorie canonique)
+    normalisationCategories: {
+      type: Map,
+      of: String,
+      default: () =>
+        new Map([
+          ["PRO DEBIT EXPORT", "PRO DEBIT"],
+          ["PRO DEBIT*", "PRO DEBIT"],
+          ["PRO DEBIT MINE", "PRO DEBIT"],
+          ["PARTICULER", "PARTICULIER"],
+          ["COMPTANT", "PRO COMPTANT"],
+          ["EMPLOYEE", "EMPLOYE"],
+          ["ADMINISTRATIF", "ADMINISTRATION"],
+          ["AGRICULTEUR                             PRO COMPTANT", "AGRICULTEUR"],
+          ["COMPTE FERME", "AUTRE"],
+          ["INTERNE", "INTERNE"],
+        ]),
     },
   },
   { _id: false },
@@ -106,7 +170,7 @@ const entrepriseSchema = new mongoose.Schema(
     },
     // BASE « collecteur » du module RÉCEPTION (dépôt du PDF + photos de signalement).
     // Traduit comme cheminExportInventaire (garde le dernier segment "collecteur").
-    // L'arborescence controle_cmd/<trigramme>/<commande> est ajoutée en code.
+    // L'arborescence <trigramme>/controle_cmd/<commande> est ajoutée en code.
     cheminRapportReception: {
       type: String,
       default: DEFAULT_BASE_COLLECTEUR,
@@ -153,6 +217,11 @@ const entrepriseSchema = new mongoose.Schema(
     vendeurs: {
       type: [vendeurSchema],
       default: [],
+    },
+    // Paramètres ANALYSE CA de l'entreprise (défauts = config QC).
+    analyseCA: {
+      type: analyseCaSchema,
+      default: () => ({}),
     },
     // Mapping des noms d'entrepôts (S1, S2, S3, S4, S5)
     mappingEntrepots: {
