@@ -6,24 +6,19 @@ import {
   refreshReport,
 } from "../controllers/debitComptantController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
-import { checkAnalyseAccess } from "../middleware/accessControl.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Accès : droit d'analyse « debitComptant » (admins ET users).
-const analyse = checkAnalyseAccess("debitComptant");
+const canRead = checkModuleAccess("debit_comptant_admin", "read");
 
-router.get("/:nomDossierDBF/progress", protect, analyse, getProgress);
+router.get("/:nomDossierDBF/progress", protect, canRead, getProgress);
 
-router.post("/:nomDossierDBF/refresh", protect, analyse, refreshReport);
+router.post("/:nomDossierDBF/refresh", protect, canRead, refreshReport);
 
-router.get(
-  "/:nomDossierDBF",
-  protect,
-  analyse,
-  checkEntrepriseAccess,
-  getReport,
-);
+router.get("/:nomDossierDBF", protect, canRead, checkEntrepriseAccess, getReport);
 
 export default router;

@@ -6,27 +6,22 @@ import {
   getReport,
 } from "../controllers/reapproLocalController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
-import { checkAnalyseAccess } from "../middleware/accessControl.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Accès : droit d'analyse « reapproLocal » (admins ET users).
-const analyse = checkAnalyseAccess("reapproLocal");
+const canRead = checkModuleAccess("reappro_local_admin", "read");
 
 // Progression (léger) — AVANT la route générique
-router.get("/:nomDossierDBF/progress", protect, analyse, getProgress);
+router.get("/:nomDossierDBF/progress", protect, canRead, getProgress);
 
 // Invalidation du cache
-router.post("/:nomDossierDBF/refresh", protect, analyse, refreshReport);
+router.post("/:nomDossierDBF/refresh", protect, canRead, refreshReport);
 
 // Rapport complet
-router.get(
-  "/:nomDossierDBF",
-  protect,
-  analyse,
-  checkEntrepriseAccess,
-  getReport,
-);
+router.get("/:nomDossierDBF", protect, canRead, checkEntrepriseAccess, getReport);
 
 export default router;

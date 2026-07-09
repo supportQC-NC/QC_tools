@@ -83,6 +83,96 @@ class AnalyseCaGenerator {
     };
   }
 
+  // Séries prêtes pour les graphiques du dashboard (détails EXTERNES).
+  calculerCharts(datasets) {
+    const MOIS_COURT = [
+      "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+      "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
+    ];
+    const norm = datasets.config.normalisationCategories || {};
+    const artByNart = datasets.articleByNart;
+
+    const moisDe = (dateFr) => {
+      if (typeof dateFr !== "string") return null;
+      const m = dateFr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      return m ? parseInt(m[2], 10) : null;
+    };
+    const caLigne = (l) => l.QTE * l.PVTE * (1 - l.POURC / 100);
+    const coutLigne = (l) => l.QTE * l.PREV;
+
+    // 1) CA / marge par mois (N vs N-1)
+    const parMois = Array.from({ length: 12 }, (_, i) => ({
+      mois: i + 1, moisLabel: MOIS_COURT[i], caN: 0, caN1: 0, margeN: 0,
+    }));
+    for (const l of datasets.detailsN) {
+      const m = moisDe(l.date_facture);
+      if (m) {
+        parMois[m - 1].caN += caLigne(l);
+        parMois[m - 1].margeN += caLigne(l) - coutLigne(l);
+      }
+    }
+    for (const l of datasets.detailsN1) {
+      const m = moisDe(l.date_facture);
+      if (m) parMois[m - 1].caN1 += caLigne(l);
+    }
+    const caParMois = parMois.map((r) => ({
+      mois: r.mois,
+      moisLabel: r.moisLabel,
+      caN: r0(r.caN),
+      caN1: r0(r.caN1),
+      margeN: r0(r.margeN),
+    }));
+
+    // 2) Répartition du CA par type de client (normalisé)
+    const parType = new Map();
+    for (const l of datasets.detailsN) {
+      const brut = (l.categorie_client || "").toString().trim().toUpperCase();
+      const type = norm[brut] || brut || "INCONNU";
+      parType.set(type, (parType.get(type) || 0) + caLigne(l));
+    }
+    const repartitionTypeClient = [...parType.entries()]
+      .map(([type, ca]) => ({ type, ca: r0(ca) }))
+      .filter((x) => x.ca > 0)
+      .sort((a, b) => b.ca - a.ca);
+
+    // 3) Top 10 articles par CA
+    const parArticle = new Map();
+    for (const l of datasets.detailsN) {
+      const key = l.NART;
+      parArticle.set(key, (parArticle.get(key) || 0) + caLigne(l));
+    }
+    const topArticles = [...parArticle.entries()]
+      .map(([nart, ca]) => {
+        const art = artByNart.get(String(nart).toUpperCase());
+        return {
+          nart,
+          design: art && art.DESIGN ? String(art.DESIGN).slice(0, 30) : nart,
+          ca: r0(ca),
+        };
+      })
+      .filter((x) => x.ca > 0)
+      .sort((a, b) => b.ca - a.ca)
+      .slice(0, 10);
+
+    // 4) Top 8 fournisseurs par CA (via l'article)
+    const parFourn = new Map();
+    for (const l of datasets.detailsN) {
+      const art = artByNart.get(String(l.NART).toUpperCase());
+      const code = art && art.FOURN ? String(art.FOURN).trim() : "—";
+      const nom = art && art.NOM_FOURNISSEUR ? String(art.NOM_FOURNISSEUR) : code;
+      const cur = parFourn.get(code) || { nom, ca: 0 };
+      cur.ca += caLigne(l);
+      parFourn.set(code, cur);
+    }
+    const topFournisseurs = [...parFourn.entries()]
+      .map(([code, v]) => ({ code, nom: v.nom, ca: r0(v.ca) }))
+      .filter((x) => x.ca > 0)
+      .sort((a, b) => b.ca - a.ca)
+      .slice(0, 8);
+
+    return { caParMois, repartitionTypeClient, topArticles, topFournisseurs };
+  }
+
   // Datasets + dépendances + KPIs (facteur commun apercu/generer).
   async prepareEtKpis(entreprise, moisCoupure) {
     const datasets = await analyseCaDataService.prepareDatasets(entreprise, moisCoupure);
@@ -134,6 +224,7 @@ class AnalyseCaGenerator {
     return {
       meta: this.metaDe(datasets, artplus, dictionnaire),
       kpis,
+      charts: this.calculerCharts(datasets),
     };
   }
 

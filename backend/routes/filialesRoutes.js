@@ -7,33 +7,22 @@ import {
   getReseau,
 } from "../controllers/filialesController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import {
-  checkAnalyseAccess,
-  checkFilialeReseauAccess,
-} from "../middleware/accessControl.js";
+import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Liste des réseaux : accès à l'écran Filiales dès qu'AU MOINS un réseau est
-// autorisé (la liste renvoyée est ensuite filtrée réseau par réseau).
-router.get("/", protect, checkAnalyseAccess("filiales"), getReseaux);
+const canRead = checkModuleAccess("filiales_admin", "read");
 
-// Routes ciblant un réseau précis (DQ | QC | LD) : droit par réseau requis.
-router.get(
-  "/:reseau/progress",
-  protect,
-  checkFilialeReseauAccess,
-  getReseauProgress,
-);
+// Liste des réseaux
+router.get("/", protect, canRead, getReseaux);
 
-router.post(
-  "/:reseau/refresh",
-  protect,
-  checkFilialeReseauAccess,
-  refreshReseau,
-);
+// Progression — AVANT la route générique /:reseau
+router.get("/:reseau/progress", protect, canRead, getReseauProgress);
+
+// Invalidation du cache
+router.post("/:reseau/refresh", protect, canRead, refreshReseau);
 
 // Consolidation d'un réseau — EN DERNIER (route générique)
-router.get("/:reseau", protect, checkFilialeReseauAccess, getReseau);
+router.get("/:reseau", protect, canRead, getReseau);
 
 export default router;

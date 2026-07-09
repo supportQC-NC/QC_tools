@@ -9,31 +9,29 @@ import {
   toggleConcurrentActive,
   getConcurrentsStats,
 } from "../controllers/concurrentController.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
+import { protect } from "../middleware/authMiddleware.js";
+import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Routes accessibles aux utilisateurs authentifiés
+const canRead = checkModuleAccess("concurrents", "read");
+const canWrite = checkModuleAccess("concurrents", "write");
+const canDelete = checkModuleAccess("concurrents", "delete");
+
+// Routes accessibles à tout utilisateur authentifié
 // Liste des concurrents (pour les sélectionner lors d'un relevé)
 router.get("/", protect, getConcurrents);
+
+// Statistiques des concurrents (écran admin) — AVANT la route générique /:id
+router.get("/admin/stats", protect, canRead, getConcurrentsStats);
 
 // Détail d'un concurrent
 router.get("/:id", protect, getConcurrentById);
 
-// Routes Admin uniquement
-// Statistiques des concurrents
-router.get("/admin/stats", protect, admin, getConcurrentsStats);
-
-// Créer un concurrent
-router.post("/", protect, admin, createConcurrent);
-
-// Modifier un concurrent
-router.put("/:id", protect, admin, updateConcurrent);
-
-// Supprimer un concurrent
-router.delete("/:id", protect, admin, deleteConcurrent);
-
-// Activer/Désactiver un concurrent
-router.patch("/:id/toggle-active", protect, admin, toggleConcurrentActive);
+// Gestion (module "concurrents")
+router.post("/", protect, canWrite, createConcurrent);
+router.put("/:id", protect, canWrite, updateConcurrent);
+router.delete("/:id", protect, canDelete, deleteConcurrent);
+router.patch("/:id/toggle-active", protect, canWrite, toggleConcurrentActive);
 
 export default router;

@@ -5,9 +5,40 @@ import {
   useGetAnalyseCaApercuQuery,
   useGenererAnalyseCaMutation,
 } from "../../slices/analyseCaApiSlice";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import "./AdminAnalyseCaScreen.css";
 
 const STORAGE_KEY = "analyse_ca_entreprise";
+
+// Palette (cohérente avec les onglets Excel du module)
+const CHART_COLORS = [
+  "#1f4e79", "#2e75b6", "#70ad47", "#ffc000", "#c55a11",
+  "#8db4e2", "#a5a5a5", "#9966cc", "#ed7d31", "#5b9bd5",
+];
+
+// Format XPF compact pour les axes (1 234 567 -> 1,2 M)
+const fmtCompact = (n) => {
+  if (typeof n !== "number") return "";
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${(n / 1e9).toFixed(1)} Md`;
+  if (abs >= 1e6) return `${(n / 1e6).toFixed(1)} M`;
+  if (abs >= 1e3) return `${Math.round(n / 1e3)} k`;
+  return String(n);
+};
 
 // Mois précédent au format YYYY-MM (défaut du sélecteur).
 function moisPrecedent() {
@@ -26,6 +57,27 @@ const fmtPct = (n) =>
   typeof n === "number" ? `${n > 0 ? "+" : ""}${n.toFixed(1)} %` : "—";
 const fmtNb = (n) =>
   typeof n === "number" ? new Intl.NumberFormat("fr-FR").format(n) : "—";
+
+// Tooltip affichant les valeurs en XPF complet.
+const XpfTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="aca-tooltip">
+      {label != null && <div className="aca-tooltip-label">{label}</div>}
+      {payload.map((p) => (
+        <div key={p.dataKey || p.name} className="aca-tooltip-row">
+          <span className="aca-tooltip-dot" style={{ background: p.color }} />
+          {p.name} :{" "}
+          <strong>
+            {typeof p.value === "number"
+              ? new Intl.NumberFormat("fr-FR").format(p.value) + " XPF"
+              : p.value}
+          </strong>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const AdminAnalyseCaScreen = () => {
   const [selectedEntreprise, setSelectedEntreprise] = useState(
@@ -67,6 +119,7 @@ const AdminAnalyseCaScreen = () => {
   const kpis = apercu?.kpis;
   const meta = apercu?.meta;
   const periode = meta?.periode;
+  const charts = apercu?.charts;
 
   const trigramme = useMemo(() => {
     const e = (entreprises || []).find(
@@ -226,6 +279,137 @@ const AdminAnalyseCaScreen = () => {
               <span className="aca-kpi-value">{fmtNb(kpis?.nbArticlesN)}</span>
             </div>
           </section>
+
+          {charts && (
+            <section className="aca-charts">
+              {/* CA mensuel N vs N-1 + marge */}
+              <div className="aca-chart-card aca-chart-wide">
+                <h3 className="aca-chart-title">
+                  CA mensuel N vs N-1 · marge N
+                </h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart data={charts.caParMois}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
+                    <XAxis dataKey="moisLabel" fontSize={11} stroke="#8494a4" />
+                    <YAxis
+                      fontSize={11}
+                      stroke="#8494a4"
+                      tickFormatter={fmtCompact}
+                      width={48}
+                    />
+                    <Tooltip content={<XpfTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar
+                      dataKey="caN1"
+                      name={`CA ${periode?.anneeN1 ?? "N-1"}`}
+                      fill="#c9d6e3"
+                      radius={[3, 3, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="caN"
+                      name={`CA ${periode?.anneeN ?? "N"}`}
+                      fill="#2e75b6"
+                      radius={[3, 3, 0, 0]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="margeN"
+                      name="Marge N"
+                      stroke="#e65100"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Répartition CA par type de client */}
+              <div className="aca-chart-card">
+                <h3 className="aca-chart-title">CA par type de client (N)</h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={charts.repartitionTypeClient}
+                      dataKey="ca"
+                      nameKey="type"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={90}
+                      innerRadius={45}
+                      paddingAngle={2}
+                    >
+                      {charts.repartitionTypeClient.map((entry, i) => (
+                        <Cell
+                          key={entry.type}
+                          fill={CHART_COLORS[i % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<XpfTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: "10px" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top articles par CA */}
+              <div className="aca-chart-card">
+                <h3 className="aca-chart-title">Top 10 articles (CA N)</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart
+                    data={charts.topArticles}
+                    layout="vertical"
+                    margin={{ left: 8, right: 12 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      fontSize={10}
+                      stroke="#8494a4"
+                      tickFormatter={fmtCompact}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="design"
+                      width={150}
+                      fontSize={10}
+                      stroke="#8494a4"
+                    />
+                    <Tooltip content={<XpfTooltip />} />
+                    <Bar dataKey="ca" name="CA N" fill="#70ad47" radius={[0, 3, 3, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top fournisseurs par CA */}
+              <div className="aca-chart-card">
+                <h3 className="aca-chart-title">Top 8 fournisseurs (CA N)</h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart
+                    data={charts.topFournisseurs}
+                    layout="vertical"
+                    margin={{ left: 8, right: 12 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      fontSize={10}
+                      stroke="#8494a4"
+                      tickFormatter={fmtCompact}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="nom"
+                      width={150}
+                      fontSize={10}
+                      stroke="#8494a4"
+                    />
+                    <Tooltip content={<XpfTooltip />} />
+                    <Bar dataKey="ca" name="CA N" fill="#ffc000" radius={[0, 3, 3, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          )}
 
           <section className="aca-onglets">
             <h2 className="aca-section-title">

@@ -235,3 +235,61 @@
   font-size: 0.82rem;
   font-weight: 600;
 }
+
+/* ── Graphiques ── */
+.aca-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.aca-chart-card {
+  background: #fff;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+  padding: 1rem 1rem 0.5rem;
+  box-shadow: 0 1px 2px rgba(31, 78, 121, 0.04);
+}
+
+.aca-chart-wide {
+  grid-column: 1 / -1;
+}
+
+.aca-chart-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #34495e;
+  margin: 0 0 0.75rem;
+}
+
+/* Tooltip recharts custom */
+.aca-tooltip {
+  background: #fff;
+  border: 1px solid #d5dee7;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  box-shadow: 0 4px 12px rgba(31, 78, 121, 0.12);
+  font-size: 0.8rem;
+  color: #22303c;
+}
+
+.aca-tooltip-label {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  color: #1f4e79;
+}
+
+.aca-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  line-height: 1.5;
+}
+
+.aca-tooltip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}

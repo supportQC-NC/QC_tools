@@ -1,0 +1,120 @@
+// src/config/adminModules.js
+//
+// Miroir frontend du registre backend. Fournit :
+//  - PERMISSION_MODULES (clés + libellés + groupes) pour l'UI (UserModal) ;
+//  - PATH_MODULE_MAP (chemin d'écran admin -> clé) pour le menu et <ModuleRoute> ;
+//  - helpers hasModuleAccess / moduleForPath.
+
+export const MODULE_GROUPS = {
+  gestion: "Gestion",
+  donnees: "Données",
+  analyse: "Analyse",
+  administration: "Administration",
+};
+
+export const PERMISSION_MODULES = [
+  { key: "stock", label: "Recherche Article", group: "gestion" },
+  { key: "inventaire", label: "Inventaire", group: "gestion" },
+  { key: "reapro", label: "Reapro", group: "gestion" },
+  { key: "proforma", label: "Proformas", group: "gestion" },
+  { key: "ctr_commande", label: "Contrôle Commandes", group: "gestion" },
+  { key: "reception", label: "Réception marchandises", group: "gestion" },
+  { key: "prep_commande", label: "Préparation Commandes", group: "gestion" },
+  { key: "ctrl_info_produit", label: "Contrôle Infos Produit", group: "gestion" },
+  { key: "releve", label: "Relevé de prix", group: "gestion" },
+  { key: "etiquettes", label: "Générateur d'étiquettes", group: "gestion" },
+  { key: "client", label: "Clients", group: "donnees" },
+  { key: "commandes", label: "Commandes", group: "donnees" },
+  { key: "facture", label: "Factures", group: "donnees" },
+  { key: "bipage", label: "Bipages", group: "donnees" },
+  { key: "concurrents", label: "Concurrents", group: "donnees" },
+  { key: "inventaire_proforma_admin", label: "Inventaire Proforma", group: "donnees" },
+  { key: "fiches_controle_admin", label: "Fiches de contrôle", group: "donnees" },
+  { key: "commerciaux_admin", label: "Analyse Commerciaux", group: "analyse" },
+  { key: "filiales_admin", label: "Analyse Filiales", group: "analyse" },
+  { key: "reappro_local_admin", label: "Reappro Local", group: "analyse" },
+  { key: "debit_comptant_admin", label: "Débit / Comptant", group: "analyse" },
+  { key: "gencod_doublons_admin", label: "Doublons GENCODE", group: "analyse" },
+  { key: "analyse_ca_admin", label: "Analyse CA", group: "analyse" },
+  { key: "performance_dock_admin", label: "Performance Dock", group: "analyse" },
+  { key: "collecteurs_admin", label: "Collecteurs", group: "analyse" },
+  { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
+  { key: "users_admin", label: "Utilisateurs", group: "administration" },
+  { key: "entreprises_admin", label: "Entreprises", group: "administration" },
+];
+
+export const PERMISSION_MODULE_BY_KEY = PERMISSION_MODULES.reduce((acc, m) => {
+  acc[m.key] = m;
+  return acc;
+}, {});
+
+// Chemin d'écran admin -> clé de permission qui le protège (préfixe).
+export const PATH_MODULE_MAP = [
+  // Administration
+  { path: "/admin/users", key: "users_admin" },
+  { path: "/admin/entreprises", key: "entreprises_admin" },
+  { path: "/admin/meilleures-ventes", key: "stock" },
+  { path: "/admin", key: "dashboard_admin" }, // exact "/admin" (les /admin/xxx sont plus spécifiques)
+  // Données
+  { path: "/admin/articles", key: "stock" },
+  { path: "/admin/fournisseurs", key: "stock" },
+  { path: "/admin/clients", key: "client" },
+  { path: "/admin/commandes", key: "commandes" },
+  { path: "/admin/proformas", key: "proforma" },
+  { path: "/admin/factures", key: "facture" },
+  { path: "/admin/concurrents", key: "concurrents" },
+  { path: "/admin/releves", key: "releve" },
+  { path: "/admin/inventaire-proforma", key: "inventaire_proforma_admin" },
+  { path: "/admin/fiches-controle", key: "fiches_controle_admin" },
+  { path: "/admin/inventaires", key: "inventaire" },
+  { path: "/admin/zones", key: "inventaire" },
+  { path: "/admin/inventaire-progression", key: "inventaire" },
+  { path: "/admin/recap-zones", key: "inventaire" },
+  { path: "/admin/bipages", key: "bipage" },
+  { path: "/admin/reappros", key: "reapro" },
+  // Analyse
+  { path: "/admin/commerciaux", key: "commerciaux_admin" },
+  { path: "/admin/filiales", key: "filiales_admin" },
+  { path: "/admin/reappro-local", key: "reappro_local_admin" },
+  { path: "/admin/debit-comptant", key: "debit_comptant_admin" },
+  { path: "/admin/gencod-doublons", key: "gencod_doublons_admin" },
+  { path: "/admin/analyse-ca", key: "analyse_ca_admin" },
+  { path: "/admin/performance-dock", key: "performance_dock_admin" },
+  { path: "/admin/collecteurs", key: "collecteurs_admin" },
+];
+
+// L'utilisateur a-t-il l'action demandée sur ce module ?
+// role admin et allModules -> accès total.
+export function hasModuleAccess(userInfo, moduleKey, action = "read") {
+  if (!userInfo) return false;
+  if (userInfo.role === "admin") return true;
+  const perm = userInfo.permissions;
+  if (!perm) return false;
+  if (perm.allModules) return true;
+  const m = perm.modules?.[moduleKey];
+  return !!(m && m[action]);
+}
+
+// Clé de permission protégeant un chemin (préfixe le plus spécifique), ou null.
+export function moduleForPath(pathname) {
+  let best = null;
+  for (const entry of PATH_MODULE_MAP) {
+    if (pathname === entry.path || pathname.startsWith(entry.path + "/")) {
+      if (!best || entry.path.length > best.path.length) best = entry;
+    }
+  }
+  return best ? best.key : null;
+}
+
+// L'utilisateur a-t-il accès à AU MOINS UNE action d'un des modules d'un groupe ?
+// (utile pour l'affichage des sections de menu)
+export function hasAnyModuleInGroup(userInfo, group) {
+  if (!userInfo) return false;
+  if (userInfo.role === "admin") return true;
+  if (userInfo.permissions?.allModules) return true;
+  return PERMISSION_MODULES.filter((m) => m.group === group).some((m) =>
+    hasModuleAccess(userInfo, m.key, "read"),
+  );
+}
+
+export default PERMISSION_MODULES;

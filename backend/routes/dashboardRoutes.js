@@ -1,7 +1,10 @@
 // backend/routes/dashboardRoutes.js
 import express from "express";
-import { protect, admin } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
+import { protect } from "../middleware/authMiddleware.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 import {
   getGlobalStats,
   getEntrepriseStats,
@@ -9,15 +12,16 @@ import {
 
 const router = express.Router();
 
-// KPI globaux (Mongo) — filtrés sur le périmètre de l'utilisateur (admin scopé
-// inclus, filtrage interne au contrôleur).
-router.get("/global", protect, admin, getGlobalStats);
+const canRead = checkModuleAccess("dashboard_admin", "read");
 
-// KPI d'une entreprise (DBF) — accès vérifié sur le périmètre de l'utilisateur.
+// KPI globaux (Mongo, toutes entreprises)
+router.get("/global", protect, canRead, getGlobalStats);
+
+// KPI d'une entreprise (DBF : commandes, ventes, nouveautés, ruptures)
 router.get(
   "/entreprise/:nomDossierDBF",
   protect,
-  admin,
+  canRead,
   checkEntrepriseAccess,
   getEntrepriseStats,
 );

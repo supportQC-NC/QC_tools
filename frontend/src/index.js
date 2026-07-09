@@ -12,13 +12,13 @@ import "./index.css";
 import App from "./App";
 
 import PrivateRoute from "./components/Utils/PrivateRoute";
-import AdminRoute from "./components/Utils/AdminRoute";
+import ModuleRoute from "./components/Utils/ModuleRoute";
 
 import Login from "./screens/LoginScreen/LoginScreen";
 import ForgotPassword from "./screens/ForgotPasswordScreen/ForgotPasswordScreen";
 import ResetPassword from "./screens/ResetPasswordScreen/ResetPasswordScreen";
 import NotFound from "./screens/NotFoundScreen/NotFoundScreen";
-  import InstallAppScreen from "./screens/InstallAppScreen";
+import InstallAppScreen from "./screens/InstallAppScreen";
 import AdminUsers from "./screens/admin/AdminUsersScreen";
 import AdminEntreprises from "./screens/admin/AdminEntreprisesScreen";
 import AdminArticles from "./screens/admin/AdminArticlesScreen";
@@ -60,21 +60,22 @@ import AdminCommercialDetailScreen from "./screens/admin/AdminCommercialDetailSc
 import AdminFilialesScreen from "./screens/admin/AdminFilialesScreen";
 import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
 import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
- import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
- import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScreen";
-  import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
+import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
+import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScreen";
+import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
 import AdminAnalyseCaScreen from "./screens/admin/AdminAnalyseCaScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/" element={<App />}>
       <Route path="/login" element={<Login />} />
-       <Route path="/install" element={<InstallAppScreen />} />
+      <Route path="/install" element={<InstallAppScreen />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
 
+      {/* ===================== Routes utilisateur ===================== */}
       <Route element={<PrivateRoute />}>
-      <Route path="/" element={<UserDashboard />} />
+        <Route path="/" element={<UserDashboard />} />
         <Route path="/articles" element={<ArticleSearch />} />
         <Route path="/inventaire" element={<InventaireScreen />} />
         <Route path="/proformas" element={<UserProformasScreen />} />
@@ -88,51 +89,31 @@ const router = createBrowserRouter(
         <Route path="/etiquettes" element={<AdminEtiquettesScreen />} />
       </Route>
 
-      <Route element={<AdminRoute />}>
+      {/* ======= Écrans admin : garde par module (admin OU utilisateur
+          autorisé ; données filtrées par société côté API) ======= */}
+
+      {/* Administration · Tableau de bord -> module "dashboard_admin" */}
+      <Route element={<ModuleRoute module="dashboard_admin" />}>
         <Route path="/admin" element={<AdminDashboard />} />
+      </Route>
+
+      {/* Administration · Utilisateurs -> module "users_admin" */}
+      <Route element={<ModuleRoute module="users_admin" />}>
         <Route path="/admin/users" element={<AdminUsers />} />
+      </Route>
+
+      {/* Administration · Entreprises -> module "entreprises_admin" */}
+      <Route element={<ModuleRoute module="entreprises_admin" />}>
         <Route path="/admin/entreprises" element={<AdminEntreprises />} />
+      </Route>
+
+      {/* Données · Articles / Fournisseurs / Meilleures ventes -> "stock" */}
+      <Route element={<ModuleRoute module="stock" />}>
         <Route path="/admin/articles" element={<AdminArticles />} />
-        <Route path="/admin/concurrents" element={<AdminConcurrents />} />
-        <Route path="/admin/releves" element={<AdminRelevesScreen />} />
-        <Route path="/admin/inventaires" element={<AdminInventairesScreen />} />
-        <Route path="/admin/zones" element={<AdminZonesScreen />} />
-        <Route path="/admin/commerciaux" element={<AdminCommerciauxScreen />} />
-        <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
-         <Route path="/admin/performance-dock" element={<AdminPerformanceDockScreen />} />
-         <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
- 
-  <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
-         <Route path="/admin/reappro-local" element={<AdminReapproLocalScreen />} />
-            <Route path="/admin/debit-comptant" element={<AdminDebitComptantScreen />} />
-            <Route path="/admin/gencod-doublons" element={<AdminGencodDoublonsScreen />} />
-            <Route path="/admin/analyse-ca" element={<AdminAnalyseCaScreen />} />
-<Route
-  path="/admin/commerciaux/:nomDossierDBF/:code"
-  element={<AdminCommercialDetailScreen />}
-/>
         <Route
-          path="/admin/inventaire-progression"
-          element={<AdminInventaireProgressionScreen />}
+          path="/admin/articles/:nomDossierDBF/:nart"
+          element={<AdminArticleInfosScreen />}
         />
-        <Route
-          path="/admin/fiches-controle"
-          element={<AdminFichesControleScreen />}
-        />
-        <Route path="/admin/bipages" element={<AdminBipagesScreen />} />
-        <Route
-          path="/admin/inventaire-proforma"
-          element={<AdminInventaireProformaScreen />}
-        />
-        <Route
-          path="/admin/recap-zones"
-          element={<AdminRecapZonesScreen />}
-        />
-        <Route path="/admin/reappros" element={<AdminReapprosScreen />} />
-        <Route path="/admin/proformas" element={<AdminProformasScreen />} />
-        <Route path="/admin/clients" element={<AdminClientsScreen />} />
-        <Route path="/admin/clients/:nomDossierDBF" element={<AdminClientsScreen />} />
-        <Route path="/admin/clients/:nomDossierDBF/:tiers" element={<AdminClientDetailScreen />} />
         <Route
           path="/admin/fournisseurs"
           element={<AdminFournisseursScreen />}
@@ -146,30 +127,26 @@ const router = createBrowserRouter(
           element={<AdminFournisseurInfosScreen />}
         />
         <Route
-          path="/admin/proformas/:nomDossierDBF"
-          element={<AdminProformasScreen />}
-        />
-        <Route
-          path="/admin/proformas/:nomDossierDBF/:numfact"
-          element={<AdminProformaDetailScreen />}
-        />
-        <Route path="/admin/factures" element={<AdminFacturesScreen />} />
-        <Route
-          path="/admin/factures/:nomDossierDBF"
-          element={<AdminFacturesScreen />}
-        />
-        <Route
-          path="/admin/factures/:nomDossierDBF/:numfact"
-          element={<AdminFactureDetailScreen />}
-        />
-        <Route
           path="/admin/meilleures-ventes"
           element={<AdminMeilleursVentesScreen />}
         />
+      </Route>
+
+      {/* Données · Clients -> module "client" */}
+      <Route element={<ModuleRoute module="client" />}>
+        <Route path="/admin/clients" element={<AdminClientsScreen />} />
         <Route
-          path="/admin/articles/:nomDossierDBF/:nart"
-          element={<AdminArticleInfosScreen />}
+          path="/admin/clients/:nomDossierDBF"
+          element={<AdminClientsScreen />}
         />
+        <Route
+          path="/admin/clients/:nomDossierDBF/:tiers"
+          element={<AdminClientDetailScreen />}
+        />
+      </Route>
+
+      {/* Données · Commandes -> module "commandes" */}
+      <Route element={<ModuleRoute module="commandes" />}>
         <Route path="/admin/commandes" element={<AdminCommandesScreen />} />
         <Route
           path="/admin/commandes/:nomDossierDBF"
@@ -179,6 +156,135 @@ const router = createBrowserRouter(
           path="/admin/commandes/:nomDossierDBF/:numcde"
           element={<AdminCommandeDetailScreen />}
         />
+      </Route>
+
+      {/* Données · Proformas -> module "proforma" */}
+      <Route element={<ModuleRoute module="proforma" />}>
+        <Route path="/admin/proformas" element={<AdminProformasScreen />} />
+        <Route
+          path="/admin/proformas/:nomDossierDBF"
+          element={<AdminProformasScreen />}
+        />
+        <Route
+          path="/admin/proformas/:nomDossierDBF/:numfact"
+          element={<AdminProformaDetailScreen />}
+        />
+      </Route>
+
+      {/* Données · Factures -> module "facture" */}
+      <Route element={<ModuleRoute module="facture" />}>
+        <Route path="/admin/factures" element={<AdminFacturesScreen />} />
+        <Route
+          path="/admin/factures/:nomDossierDBF"
+          element={<AdminFacturesScreen />}
+        />
+        <Route
+          path="/admin/factures/:nomDossierDBF/:numfact"
+          element={<AdminFactureDetailScreen />}
+        />
+      </Route>
+
+      {/* Données · Concurrents -> module "concurrents" */}
+      <Route element={<ModuleRoute module="concurrents" />}>
+        <Route path="/admin/concurrents" element={<AdminConcurrents />} />
+      </Route>
+
+      {/* Données · Relevés (admin) -> module "releve" */}
+      <Route element={<ModuleRoute module="releve" />}>
+        <Route path="/admin/releves" element={<AdminRelevesScreen />} />
+      </Route>
+
+      {/* Données · Inventaires (admin) -> module "inventaire" */}
+      <Route element={<ModuleRoute module="inventaire" />}>
+        <Route path="/admin/inventaires" element={<AdminInventairesScreen />} />
+        <Route path="/admin/zones" element={<AdminZonesScreen />} />
+        <Route
+          path="/admin/inventaire-progression"
+          element={<AdminInventaireProgressionScreen />}
+        />
+        <Route path="/admin/recap-zones" element={<AdminRecapZonesScreen />} />
+      </Route>
+
+      {/* Données · Inventaire Proforma -> module "inventaire_proforma_admin" */}
+      <Route element={<ModuleRoute module="inventaire_proforma_admin" />}>
+        <Route
+          path="/admin/inventaire-proforma"
+          element={<AdminInventaireProformaScreen />}
+        />
+      </Route>
+
+      {/* Données · Fiches de contrôle -> module "fiches_controle_admin" */}
+      <Route element={<ModuleRoute module="fiches_controle_admin" />}>
+        <Route
+          path="/admin/fiches-controle"
+          element={<AdminFichesControleScreen />}
+        />
+      </Route>
+
+      {/* Données · Bipages -> module "bipage" */}
+      <Route element={<ModuleRoute module="bipage" />}>
+        <Route path="/admin/bipages" element={<AdminBipagesScreen />} />
+      </Route>
+
+      {/* Données · Réappros (admin) -> module "reapro" */}
+      <Route element={<ModuleRoute module="reapro" />}>
+        <Route path="/admin/reappros" element={<AdminReapprosScreen />} />
+      </Route>
+
+      {/* Analyse · Commerciaux -> module "commerciaux_admin" */}
+      <Route element={<ModuleRoute module="commerciaux_admin" />}>
+        <Route path="/admin/commerciaux" element={<AdminCommerciauxScreen />} />
+        <Route
+          path="/admin/commerciaux/:nomDossierDBF/:code"
+          element={<AdminCommercialDetailScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Filiales -> module "filiales_admin" */}
+      <Route element={<ModuleRoute module="filiales_admin" />}>
+        <Route path="/admin/filiales" element={<AdminFilialesScreen />} />
+      </Route>
+
+      {/* Analyse · Reappro Local -> module "reappro_local_admin" */}
+      <Route element={<ModuleRoute module="reappro_local_admin" />}>
+        <Route
+          path="/admin/reappro-local"
+          element={<AdminReapproLocalScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Débit / Comptant -> module "debit_comptant_admin" */}
+      <Route element={<ModuleRoute module="debit_comptant_admin" />}>
+        <Route
+          path="/admin/debit-comptant"
+          element={<AdminDebitComptantScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Doublons GENCODE -> module "gencod_doublons_admin" */}
+      <Route element={<ModuleRoute module="gencod_doublons_admin" />}>
+        <Route
+          path="/admin/gencod-doublons"
+          element={<AdminGencodDoublonsScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Analyse CA -> module "analyse_ca_admin" */}
+      <Route element={<ModuleRoute module="analyse_ca_admin" />}>
+        <Route path="/admin/analyse-ca" element={<AdminAnalyseCaScreen />} />
+      </Route>
+
+      {/* Analyse · Performance Dock -> module "performance_dock_admin" */}
+      <Route element={<ModuleRoute module="performance_dock_admin" />}>
+        <Route
+          path="/admin/performance-dock"
+          element={<AdminPerformanceDockScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Collecteurs -> module "collecteurs_admin" */}
+      <Route element={<ModuleRoute module="collecteurs_admin" />}>
+        <Route path="/admin/collecteurs" element={<AdminCollecteursScreen />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

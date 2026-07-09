@@ -15,27 +15,30 @@ import {
   toggleUserActive,
 } from "../controllers/userControlleur.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { superAdmin } from "../middleware/accessControl.js";
+import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
+
+const canRead = checkModuleAccess("users_admin", "read");
+const canWrite = checkModuleAccess("users_admin", "write");
+const canDelete = checkModuleAccess("users_admin", "delete");
 
 // Public — DOIVENT être avant /:id
 router.post("/login", authUser);
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 
-// Private (utilisateur connecté)
+// Private (utilisateur connecté) — self-service, jamais gaté par module
 router.post("/logout", protect, logoutUser);
 router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, updateUserProfile);
 
-// Gestion des utilisateurs — RÉSERVÉE AUX SUPER-ADMINS
-// (un admin scopé ne doit pas pouvoir créer/éditer des comptes ni des permissions).
-router.post("/", protect, superAdmin, createUser);
-router.get("/", protect, superAdmin, getUsers);
-router.get("/:id", protect, superAdmin, getUserById);
-router.put("/:id", protect, superAdmin, updateUser);
-router.delete("/:id", protect, superAdmin, deleteUser);
-router.patch("/:id/toggle-active", protect, superAdmin, toggleUserActive);
+// Administration des utilisateurs (module "users_admin")
+router.post("/", protect, canWrite, createUser);
+router.get("/", protect, canRead, getUsers);
+router.get("/:id", protect, canRead, getUserById);
+router.put("/:id", protect, canWrite, updateUser);
+router.delete("/:id", protect, canDelete, deleteUser);
+router.patch("/:id/toggle-active", protect, canWrite, toggleUserActive);
 
 export default router;

@@ -1,125 +1,18 @@
-// // backend/middleware/checkEntrepriseAccess.js
-// import asyncHandler from "./asyncHandler.js";
-// import Entreprise from "../models/EntrepriseModel.js";
-// import Permission from "../models/PermissionModel.js";
-
-// /**
-//  * Middleware pour vérifier si l'utilisateur a accès à une entreprise spécifique
-//  * Utilise le paramètre :entrepriseId ou :nomDossierDBF de la route
-//  */
-// const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
-//   const { entrepriseId, nomDossierDBF } = req.params;
-
-//   // Trouver l'entreprise par ID ou nomDossierDBF
-//   let entreprise;
-//   if (entrepriseId) {
-//     entreprise = await Entreprise.findById(entrepriseId);
-//   } else if (nomDossierDBF) {
-//     entreprise = await Entreprise.findOne({ nomDossierDBF });
-//   }
-
-//   if (!entreprise) {
-//     res.status(404);
-//     throw new Error("Entreprise non trouvée");
-//   }
-
-//   // Vérifier si l'entreprise est active
-//   if (!entreprise.isActive) {
-//     res.status(403);
-//     throw new Error("Cette entreprise est désactivée");
-//   }
-
-//   // Admin a accès à tout
-//   if (req.user.role === "admin") {
-//     req.entreprise = entreprise;
-//     return next();
-//   }
-
-//   // Vérifier les permissions de l'utilisateur
-//   const permission = await Permission.findOne({ user: req.user._id });
-
-//   if (!permission) {
-//     res.status(403);
-//     throw new Error("Vous n'avez pas les permissions nécessaires");
-//   }
-
-//   // Si l'utilisateur a accès à toutes les entreprises
-//   if (permission.allEntreprises) {
-//     req.entreprise = entreprise;
-//     return next();
-//   }
-
-//   // Vérifier si l'entreprise est dans la liste des entreprises autorisées
-//   const hasAccess = permission.entreprises.some(
-//     (e) => e.toString() === entreprise._id.toString(),
-//   );
-
-//   if (!hasAccess) {
-//     res.status(403);
-//     throw new Error("Vous n'avez pas accès à cette entreprise");
-//   }
-
-//   // Attacher l'entreprise à la requête pour utilisation ultérieure
-//   req.entreprise = entreprise;
-//   next();
-// });
-
-// /**
-//  * Middleware pour vérifier l'accès en lecture à un module spécifique
-//  */
-// const checkModuleAccess = (moduleName, action = "read") => {
-//   return asyncHandler(async (req, res, next) => {
-//     // Admin a accès à tout
-//     if (req.user.role === "admin") {
-//       return next();
-//     }
-
-//     const permission = await Permission.findOne({ user: req.user._id });
-
-//     if (!permission) {
-//       res.status(403);
-//       throw new Error("Vous n'avez pas les permissions nécessaires");
-//     }
-
-//     // Si accès à tous les modules
-//     if (permission.allModules) {
-//       return next();
-//     }
-
-//     // Vérifier le module spécifique
-//     const modulePermission = permission.modules?.[moduleName];
-
-//     if (!modulePermission || !modulePermission[action]) {
-//       res.status(403);
-//       throw new Error(
-//         `Vous n'avez pas la permission de ${action === "read" ? "lire" : action === "write" ? "modifier" : "supprimer"} les ${moduleName}`,
-//       );
-//     }
-
-//     next();
-//   });
-// };
-
-// export { checkEntrepriseAccess, checkModuleAccess };
-
 // backend/middleware/checkEntrepriseAccess.js
 import asyncHandler from "./asyncHandler.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import Permission from "../models/PermissionModel.js";
-import { getAccessibleEntreprises } from "./accessControl.js";
 
 /**
- * Vérifie que l'utilisateur a accès à une entreprise donnée
- * (paramètre :entrepriseId ou :nomDossierDBF de la route).
- *
- * IMPORTANT : les ADMINS ne court-circuitent PLUS ce contrôle. Un admin n'accède
- * qu'aux entreprises de son périmètre (allEntreprises = accès total ; sinon la
- * liste permission.entreprises). Voir middleware/accessControl.js.
+ * Vérifie l'accès de l'utilisateur à une entreprise (param :entrepriseId ou
+ * :nomDossierDBF). L'accès aux SOCIÉTÉS est TOUJOURS limité aux entreprises
+ * explicitement accordées — Y COMPRIS pour les administrateurs (un admin a tous
+ * les modules, mais seulement les sociétés qu'on lui attribue).
  */
 const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
   const { entrepriseId, nomDossierDBF } = req.params;
 
-  // Résoudre l'entreprise par ID ou nomDossierDBF.
+  // Trouver l'entreprise par ID ou nomDossierDBF
   let entreprise;
   if (entrepriseId) {
     entreprise = await Entreprise.findById(entrepriseId);
@@ -132,17 +25,32 @@ const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
     throw new Error("Entreprise non trouvée");
   }
 
+  // Vérifier si l'entreprise est active
   if (!entreprise.isActive) {
     res.status(403);
     throw new Error("Cette entreprise est désactivée");
   }
 
-  // Périmètre d'accès (admin inclus).
-  const access = await getAccessibleEntreprises(req.user);
-  const autorise =
-    access.all || access.ids.includes(entreprise._id.toString());
+  // Permissions de l'utilisateur (admin compris : plus de bypass société).
+  const permission = await Permission.findOne({ user: req.user._id });
 
-  if (!autorise) {
+  if (!permission) {
+    res.status(403);
+    throw new Error("Vous n'avez pas les permissions nécessaires");
+  }
+
+  // Accès à toutes les entreprises
+  if (permission.allEntreprises) {
+    req.entreprise = entreprise;
+    return next();
+  }
+
+  // Sinon : l'entreprise doit être dans la liste autorisée
+  const hasAccess = permission.entreprises.some(
+    (e) => e.toString() === entreprise._id.toString(),
+  );
+
+  if (!hasAccess) {
     res.status(403);
     throw new Error("Vous n'avez pas accès à cette entreprise");
   }
@@ -152,13 +60,13 @@ const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
 });
 
 /**
- * Vérifie l'accès à un MODULE (read/write/delete).
- * Les admins conservent l'accès à tous les modules (décision : le périmètre
- * ENTREPRISE change pour les admins, pas le périmètre MODULE).
+ * Vérifie l'accès en lecture/écriture/suppression à un MODULE.
+ * Ici l'admin conserve son bypass : un administrateur a accès à tous les modules
+ * (le périmètre par société est géré séparément par checkEntrepriseAccess).
  */
 const checkModuleAccess = (moduleName, action = "read") => {
   return asyncHandler(async (req, res, next) => {
-    // Admin : accès à tous les modules.
+    // Admin : accès à tous les modules
     if (req.user.role === "admin") {
       return next();
     }
@@ -170,12 +78,12 @@ const checkModuleAccess = (moduleName, action = "read") => {
       throw new Error("Vous n'avez pas les permissions nécessaires");
     }
 
-    // Accès à tous les modules.
+    // Accès à tous les modules
     if (permission.allModules) {
       return next();
     }
 
-    // Module spécifique.
+    // Module spécifique
     const modulePermission = permission.modules?.[moduleName];
 
     if (!modulePermission || !modulePermission[action]) {

@@ -8,25 +8,25 @@ import {
   setProformaZone,
   exportProformaDat,
 } from "../controllers/inventaireProformaController.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
+import { protect } from "../middleware/authMiddleware.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
+const canRead = checkModuleAccess("inventaire_proforma_admin", "read");
+const canWrite = checkModuleAccess("inventaire_proforma_admin", "write");
+
 // Liste des tiers présents dans les proformas (code + nom)
-router.get(
-  "/:nomDossierDBF/tiers",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  getTiers,
-);
+router.get("/:nomDossierDBF/tiers", protect, canRead, checkEntrepriseAccess, getTiers);
 
 // Feuille de contrôle PDF d'une proforma (téléchargement)
 router.get(
   "/:nomDossierDBF/proforma/:numfact/fiche-controle",
   protect,
-  admin,
+  canRead,
   checkEntrepriseAccess,
   genererFicheControle,
 );
@@ -35,7 +35,7 @@ router.get(
 router.get(
   "/:nomDossierDBF/tiers/:tiers/inventaire-doc",
   protect,
-  admin,
+  canRead,
   checkEntrepriseAccess,
   genererInventaireDoc,
 );
@@ -44,7 +44,7 @@ router.get(
 router.put(
   "/:nomDossierDBF/proforma/:numfact/zone",
   protect,
-  admin,
+  canWrite,
   checkEntrepriseAccess,
   setProformaZone,
 );
@@ -53,7 +53,7 @@ router.put(
 router.post(
   "/:nomDossierDBF/tiers/:tiers/export-dat",
   protect,
-  admin,
+  canWrite,
   checkEntrepriseAccess,
   exportProformaDat,
 );
@@ -62,7 +62,7 @@ router.post(
 router.get(
   "/:nomDossierDBF/tiers/:tiers",
   protect,
-  admin,
+  canRead,
   checkEntrepriseAccess,
   getByTiers,
 );

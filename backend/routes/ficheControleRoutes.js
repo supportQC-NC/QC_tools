@@ -10,54 +10,31 @@ import {
   telechargerPdf,
   supprimerFiche,
 } from "../controllers/ficheControleController.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
+import { protect } from "../middleware/authMiddleware.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// ----- Contrôle de la surveillance (global, admin) -----
-router.get("/watch/status", protect, admin, statutSurveillance);
-router.post("/watch/start", protect, admin, demarrerSurveillance);
-router.post("/watch/stop", protect, admin, arreterSurveillance);
+const canRead = checkModuleAccess("fiches_controle_admin", "read");
+const canWrite = checkModuleAccess("fiches_controle_admin", "write");
+const canDelete = checkModuleAccess("fiches_controle_admin", "delete");
 
-router.get(
-  "/:entrepriseId",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  getFiches,
-);
+// ----- Contrôle de la surveillance (global) -----
+router.get("/watch/status", protect, canRead, statutSurveillance);
+router.post("/watch/start", protect, canWrite, demarrerSurveillance);
+router.post("/watch/stop", protect, canWrite, arreterSurveillance);
 
-router.post(
-  "/:entrepriseId/scan",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  scanMaintenant,
-);
+router.get("/:entrepriseId", protect, canRead, checkEntrepriseAccess, getFiches);
 
-router.post(
-  "/:entrepriseId/:id/reprint",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  reimprimer,
-);
+router.post("/:entrepriseId/scan", protect, canWrite, checkEntrepriseAccess, scanMaintenant);
 
-router.get(
-  "/:entrepriseId/:id/pdf",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  telechargerPdf,
-);
+router.post("/:entrepriseId/:id/reprint", protect, canWrite, checkEntrepriseAccess, reimprimer);
 
-router.delete(
-  "/:entrepriseId/:id",
-  protect,
-  admin,
-  checkEntrepriseAccess,
-  supprimerFiche,
-);
+router.get("/:entrepriseId/:id/pdf", protect, canRead, checkEntrepriseAccess, telechargerPdf);
+
+router.delete("/:entrepriseId/:id", protect, canDelete, checkEntrepriseAccess, supprimerFiche);
 
 export default router;

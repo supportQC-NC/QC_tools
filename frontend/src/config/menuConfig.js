@@ -24,6 +24,7 @@ import {
   HiQrcode,
   HiDeviceMobile
 } from "react-icons/hi";
+import { moduleForPath } from "./adminModules";
 
 // =============================================
 // CONFIGURATION DES MENUS AVEC SOUS-GROUPES
@@ -373,13 +374,16 @@ export const getUserMenus = (userInfo) => {
 
   const menus = [];
 
-  // 1. Section Administration (admin uniquement)
-  if (isAdmin(userInfo)) {
+  // 1. Section Administration — filtrée par permission de module.
+  //    Visible pour un admin OU tout utilisateur ayant au moins une entrée
+  //    autorisée (chaque entrée -> clé via moduleForPath -> hasModulePermission).
+  const adminItems = filterAdminStructure(userInfo, adminMenuStructure);
+  if (adminItems.length > 0) {
     menus.push({
       type: "section",
       label: "Administration",
       collapsible: true,
-      items: adminMenuStructure,
+      items: adminItems,
     });
   }
 
@@ -397,6 +401,33 @@ export const getUserMenus = (userInfo) => {
   return menus;
 };
 
+// Un utilisateur peut-il voir une entrée du menu admin ?
+// - entrée mappée à un module (via son path) -> permission requise ;
+// - entrée sans module (ex. /install) -> réservée aux admins.
+const canSeeAdminItem = (userInfo, item) => {
+  if (!item?.path) return isAdmin(userInfo);
+  const key = moduleForPath(item.path);
+  if (key) return hasModulePermission(userInfo, key, "read");
+  return isAdmin(userInfo);
+};
+
+// Filtre la structure admin (items + sous-groupes) selon les permissions.
+const filterAdminStructure = (userInfo, structure) => {
+  const out = [];
+  structure.forEach((node) => {
+    if (node.type === "subgroup") {
+      const items = (node.items || []).filter((it) =>
+        canSeeAdminItem(userInfo, it),
+      );
+      if (items.length > 0) out.push({ ...node, items });
+    } else {
+      // type "item" (Dashboard, etc.)
+      if (canSeeAdminItem(userInfo, node)) out.push(node);
+    }
+  });
+  return out;
+};
+
 /**
  * Récupère les items de modules accessibles avec sous-groupes
  */
@@ -406,13 +437,20 @@ const getModuleMenuItems = (userInfo) => {
   const result = [];
   const hasFullAccess = isAdmin(userInfo) || hasAllModulesAccess(userInfo);
 
+  // Clé de permission d'une entrée : moduleKey explicite, sinon déduite du path.
+  const keyOf = (entry) =>
+    entry.moduleKey || (entry.path ? moduleForPath(entry.path) : null);
+
+  const canSee = (entry) => {
+    if (hasFullAccess) return true;
+    const key = keyOf(entry);
+    return key ? hasModulePermission(userInfo, key, "read") : false;
+  };
+
   moduleMenuStructure.forEach((item) => {
     if (item.type === "subgroup") {
       // Filtrer les items du sous-groupe selon les permissions
-      const accessibleItems = item.items.filter((subItem) => {
-        if (hasFullAccess) return true;
-        return hasModulePermission(userInfo, subItem.moduleKey, "read");
-      });
+      const accessibleItems = item.items.filter((subItem) => canSee(subItem));
 
       // N'ajouter le sous-groupe que s'il a des items accessibles
       if (accessibleItems.length > 0) {
@@ -423,10 +461,7 @@ const getModuleMenuItems = (userInfo) => {
       }
     } else if (item.type === "item") {
       // Item simple - vérifier la permission
-      if (
-        hasFullAccess ||
-        hasModulePermission(userInfo, item.moduleKey, "read")
-      ) {
+      if (canSee(item)) {
         result.push(item);
       }
     }

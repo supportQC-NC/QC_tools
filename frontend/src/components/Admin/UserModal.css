@@ -529,18 +529,33 @@
   color: #9ca3af;
   font-weight: 400;
 }
-
-/* ============================================================
-   Commerciaux visibles par entreprise (menu déroulant)
-   Réutilise les classes .multi-select* existantes.
-   ============================================================ */
-.commerciaux-ent {
-  margin-top: 14px;
+/* ── Permissions : en-têtes de groupe + bascules globales par groupe ── */
+.permissions-table .module-group-row {
+  background: #eef2f7;
 }
-.commerciaux-ent-label {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin-bottom: 6px;
+.permissions-table .module-group-name {
+  font-weight: 700;
+  color: #1f4e79;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+.permissions-table .module-group-toggle {
+  text-align: center;
+}
+.checkbox-label-inline {
+  display: inline-flex;
+  margin: 0;
+  justify-content: center;
+}
+.admin-note {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: #eef4fb;
+  border: 1px solid #cfe0f3;
+  border-radius: 8px;
+  color: #1f4e79;
+  font-size: 0.88rem;
 }

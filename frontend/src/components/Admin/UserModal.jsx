@@ -5,148 +5,32 @@ import {
   useCreateUserMutation,
   useUpdateUserMutation,
 } from "../../slices/userApiSlice";
-import {
-  useGetEntreprisesQuery,
-  useGetEntrepriseRepresentantsQuery,
-} from "../../slices/entrepriseApiSlice";
+import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { PERMISSION_MODULES, MODULE_GROUPS } from "../../config/adminModules";
 import "./UserModal.css";
 
-// Définition des modules alignée avec menuConfig.js et le modèle Permission
-const moduleConfig = {
-  stock: "Recherche Article",
-  inventaire: "Inventaire",
-  reapro: "Reapro",
-  proforma: "Proformas",
-  ctr_commande: "CTRL Commandes",
-  reception: "Réception marchandises",
-  prep_commande: "PREPA Commandes",
-  ctrl_info_produit: "CTRL Infos Produit",
-  releve: "Releve Prix",
-  etiquettes: "Générateur d'étiquettes",
-};
+// Source de vérité : registre partagé (frontend/src/config/adminModules.js).
+const modules = PERMISSION_MODULES.map((m) => m.key);
+const moduleLabel = (key) =>
+  PERMISSION_MODULES.find((m) => m.key === key)?.label || key;
 
-const modules = Object.keys(moduleConfig);
+// Modules regroupés par groupe, dans l'ordre du registre.
+const GROUPS = Object.keys(MODULE_GROUPS).map((g) => ({
+  group: g,
+  label: MODULE_GROUPS[g],
+  items: PERMISSION_MODULES.filter((m) => m.group === g),
+}));
 
-// Fonction pour générer les permissions par défaut des modules
+const actions = ["read", "write", "delete"];
+const actionLabels = { read: "Lecture", write: "Écriture", delete: "Suppr." };
+
+// Permissions par défaut : toutes les clés du registre à false.
 const getDefaultModulePermissions = () => {
   const permissions = {};
   modules.forEach((module) => {
     permissions[module] = { read: false, write: false, delete: false };
   });
   return permissions;
-};
-
-// Écrans d'analyse (droit par écran)
-const analyseScreens = [
-  { key: "commerciaux", label: "Analyse Commerciaux" },
-  { key: "reapproLocal", label: "Reappro Local" },
-  { key: "debitComptant", label: "Débit / Comptant" },
-  { key: "doublonsGencode", label: "Doublons GENCODE" },
-  { key: "factures", label: "Analyse Factures" },
-  { key: "journalCaisse", label: "Journal de Caisse" },
-  { key: "topArticles", label: "Top Articles" },
-];
-// Analyse Filiales : droit PAR RÉSEAU (figés : DQ, QC, LD)
-const FILIALE_RESEAUX = ["DQ", "QC", "LD"];
-const getDefaultAnalyse = () => {
-  const a = analyseScreens.reduce((acc, sc) => ({ ...acc, [sc.key]: false }), {});
-  a.filiales = FILIALE_RESEAUX.reduce((acc, r) => ({ ...acc, [r]: false }), {});
-  return a;
-};
-
-// Sélecteur des codes commerciaux d'UNE entreprise (fiche utilisateur).
-// "NOM Prénom (code)" si le vendeur est renseigné, sinon juste le code.
-const commercialLabel = (r) => (r.nom ? `${r.nom} (${r.code})` : r.code);
-
-const CommerciauxEntreprisePicker = ({
-  entreprise,
-  selected,
-  onToggle,
-  onSelectAll,
-}) => {
-  const { data, isLoading } = useGetEntrepriseRepresentantsQuery(
-    entreprise.nomDossierDBF,
-  );
-  const reps = data?.representants || [];
-  const [open, setOpen] = useState(false);
-  const allCodes = reps.map((r) => r.code);
-  const allSelected =
-    allCodes.length > 0 && allCodes.every((c) => selected.includes(c));
-
-  const triggerText =
-    selected.length === 0
-      ? "Aucun commercial"
-      : reps
-          .filter((r) => selected.includes(r.code))
-          .map(commercialLabel)
-          .join(", ");
-
-  return (
-    <div className="commerciaux-ent">
-      <label className="commerciaux-ent-label">
-        {entreprise.trigramme} — {entreprise.nomComplet}
-      </label>
-
-      {isLoading ? (
-        <span className="permissions-hint">Chargement…</span>
-      ) : reps.length === 0 ? (
-        <span className="permissions-hint">Aucun commercial détecté</span>
-      ) : (
-        <div className="multi-select">
-          <div className="multi-select-trigger" onClick={() => setOpen(!open)}>
-            <span className="multi-select-text">
-              {triggerText || `${selected.length} sélectionné(s)`}
-            </span>
-            <HiChevronDown
-              className={`multi-select-icon ${open ? "open" : ""}`}
-            />
-          </div>
-
-          {open && (
-            <div className="multi-select-dropdown">
-              <div className="multi-select-header">
-                <button
-                  type="button"
-                  className="btn-select-all"
-                  onClick={() => onSelectAll(entreprise._id, allCodes)}
-                >
-                  {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
-                </button>
-                <span className="selected-count">
-                  {selected.length} sélectionné(s)
-                </span>
-              </div>
-
-              <div className="multi-select-options">
-                {reps.map((r) => {
-                  const checked = selected.includes(r.code);
-                  return (
-                    <div
-                      key={r.code}
-                      className={`multi-select-option ${
-                        checked ? "selected" : ""
-                      }`}
-                      onClick={() => onToggle(entreprise._id, r.code)}
-                    >
-                      <div className="option-checkbox">
-                        {checked && <HiCheck />}
-                      </div>
-                      <div className="option-content">
-                        <span className="option-trigramme">
-                          {commercialLabel(r)}
-                        </span>
-                        <span className="option-name">{r.count} factures</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 };
 
 const UserModal = ({ user, onClose }) => {
@@ -165,8 +49,6 @@ const UserModal = ({ user, onClose }) => {
       allModules: false,
       entreprises: [],
       modules: getDefaultModulePermissions(),
-      analyse: getDefaultAnalyse(),
-      commerciauxScope: {},
     },
   });
 
@@ -179,26 +61,18 @@ const UserModal = ({ user, onClose }) => {
 
   useEffect(() => {
     if (user) {
-      // Construire les permissions des modules en préservant les valeurs existantes
+      // Fusionne les permissions existantes avec les valeurs par défaut
+      // (toutes les clés du registre, y compris les nouvelles).
       const modulePermissions = getDefaultModulePermissions();
       modules.forEach((module) => {
-        if (user.permissions?.modules?.[module]) {
+        const src = user.permissions?.modules?.[module];
+        if (src) {
           modulePermissions[module] = {
-            read: user.permissions.modules[module].read || false,
-            write: user.permissions.modules[module].write || false,
-            delete: user.permissions.modules[module].delete || false,
+            read: src.read || false,
+            write: src.write || false,
+            delete: src.delete || false,
           };
         }
-      });
-
-      // Permissions d'analyse (écran par écran)
-      const analysePermissions = getDefaultAnalyse();
-      analyseScreens.forEach((sc) => {
-        analysePermissions[sc.key] = user.permissions?.analyse?.[sc.key] || false;
-      });
-      FILIALE_RESEAUX.forEach((r) => {
-        analysePermissions.filiales[r] =
-          user.permissions?.analyse?.filiales?.[r] || false;
       });
 
       setFormData({
@@ -214,8 +88,6 @@ const UserModal = ({ user, onClose }) => {
           entreprises:
             user.permissions?.entreprises?.map((e) => e._id || e) || [],
           modules: modulePermissions,
-          analyse: analysePermissions,
-          commerciauxScope: user.permissions?.commerciauxScope || {},
         },
       });
     }
@@ -223,26 +95,13 @@ const UserModal = ({ user, onClose }) => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    // Passage en administrateur : super-admin par défaut (tous modules + toutes
-    // entreprises). Décochez « Toutes les entreprises » pour le limiter ensuite.
-    if (name === "role" && value === "admin") {
-      setFormData((prev) => ({
-        ...prev,
-        role: "admin",
-        permissions: {
-          ...prev.permissions,
-          allModules: true,
-          allEntreprises: true,
-        },
-      }));
-      return;
-    }
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
+  // Bascule une action (read/write/delete) d'un module.
   const handlePermissionChange = (module, action) => {
     setFormData((prev) => ({
       ...prev,
@@ -252,11 +111,42 @@ const UserModal = ({ user, onClose }) => {
           ...prev.permissions.modules,
           [module]: {
             ...prev.permissions.modules[module],
-            [action]: !prev.permissions.modules[module][action],
+            [action]: !prev.permissions.modules[module]?.[action],
           },
         },
       },
     }));
+  };
+
+  // Bascule une action pour TOUS les modules d'un groupe.
+  const handleGroupActionToggle = (groupKey, action) => {
+    const keys = PERMISSION_MODULES.filter((m) => m.group === groupKey).map(
+      (m) => m.key,
+    );
+    setFormData((prev) => {
+      const allChecked = keys.every(
+        (k) => prev.permissions.modules[k]?.[action],
+      );
+      const nextModules = { ...prev.permissions.modules };
+      keys.forEach((k) => {
+        nextModules[k] = { ...nextModules[k], [action]: !allChecked };
+      });
+      return {
+        ...prev,
+        permissions: { ...prev.permissions, modules: nextModules },
+      };
+    });
+  };
+
+  // Un groupe a-t-il tous ses modules cochés pour une action ? (état du toggle)
+  const isGroupActionChecked = (groupKey, action) => {
+    const keys = PERMISSION_MODULES.filter((m) => m.group === groupKey).map(
+      (m) => m.key,
+    );
+    return (
+      keys.length > 0 &&
+      keys.every((k) => formData.permissions.modules[k]?.[action])
+    );
   };
 
   const handleGlobalPermissionChange = (field) => {
@@ -322,97 +212,25 @@ const UserModal = ({ user, onClose }) => {
     return names;
   };
 
-  const handleAnalyseChange = (key) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        analyse: {
-          ...prev.permissions.analyse,
-          [key]: !prev.permissions.analyse?.[key],
-        },
-      },
-    }));
-  };
-
-  const handleFilialeReseauChange = (reseau) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        analyse: {
-          ...prev.permissions.analyse,
-          filiales: {
-            ...prev.permissions.analyse.filiales,
-            [reseau]: !prev.permissions.analyse.filiales?.[reseau],
-          },
-        },
-      },
-    }));
-  };
-
-  const handleCommercialCodeToggle = (entrepriseId, code) => {
-    setFormData((prev) => {
-      const scope = { ...(prev.permissions.commerciauxScope || {}) };
-      const current = new Set(scope[entrepriseId] || []);
-      if (current.has(code)) current.delete(code);
-      else current.add(code);
-      scope[entrepriseId] = Array.from(current);
-      return {
-        ...prev,
-        permissions: { ...prev.permissions, commerciauxScope: scope },
-      };
-    });
-  };
-
-  const handleCommercialSelectAll = (entrepriseId, allCodes) => {
-    setFormData((prev) => {
-      const scope = { ...(prev.permissions.commerciauxScope || {}) };
-      const current = scope[entrepriseId] || [];
-      const allSelected =
-        allCodes.length > 0 && allCodes.every((c) => current.includes(c));
-      scope[entrepriseId] = allSelected ? [] : [...allCodes];
-      return {
-        ...prev,
-        permissions: { ...prev.permissions, commerciauxScope: scope },
-      };
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
     try {
-      const payload = {
-        ...formData,
-        permissions: {
-          ...formData.permissions,
-          // Un admin conserve l'accès à TOUS les modules ; seul le périmètre
-          // entreprise est ajustable (allEntreprises / liste de sociétés).
-          allModules:
-            formData.role === "admin"
-              ? true
-              : formData.permissions.allModules,
-        },
-      };
       if (isEdit) {
-        await updateUser({ id: user._id, ...payload }).unwrap();
+        await updateUser({ id: user._id, ...formData }).unwrap();
       } else {
-        if (!payload.password) {
+        if (!formData.password) {
           setError("Le mot de passe est requis");
           return;
         }
-        await createUser(payload).unwrap();
+        await createUser(formData).unwrap();
       }
       onClose();
     } catch (err) {
       setError(err?.data?.message || "Une erreur est survenue");
     }
   };
-
-  const actions = ["read", "write", "delete"];
-  const actionLabels = { read: "Lecture", write: "Écriture", delete: "Suppr." };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -506,44 +324,37 @@ const UserModal = ({ user, onClose }) => {
           </div>
 
           <div className="permissions-section">
-            <h3>
-              {formData.role === "admin"
-                ? "Périmètre d'accès (entreprises)"
-                : "Permissions"}
-            </h3>
+            <h3>Permissions</h3>
+
             {formData.role === "admin" && (
-              <p className="permissions-hint">
-                Un administrateur a accès à tous les modules. « Toutes les
-                entreprises » = super-admin (gestion des utilisateurs, des
-                entreprises et analyses multi-sociétés). Décochez pour limiter
-                cet administrateur à certaines sociétés.
+              <p className="admin-note">
+                Un administrateur a accès à tous les modules. Son périmètre reste
+                limité aux sociétés sélectionnées ci-dessous.
               </p>
             )}
 
-              <div className="global-permissions">
+            <div className="global-permissions">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.permissions.allEntreprises}
+                  onChange={() =>
+                    handleGlobalPermissionChange("allEntreprises")
+                  }
+                />
+                <span>Toutes les entreprises</span>
+              </label>
+              {formData.role !== "admin" && (
                 <label className="checkbox-label">
                   <input
                     type="checkbox"
-                    checked={formData.permissions.allEntreprises}
-                    onChange={() =>
-                      handleGlobalPermissionChange("allEntreprises")
-                    }
+                    checked={formData.permissions.allModules}
+                    onChange={() => handleGlobalPermissionChange("allModules")}
                   />
-                  <span>Toutes les entreprises</span>
+                  <span>Tous les modules</span>
                 </label>
-                {formData.role !== "admin" && (
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.permissions.allModules}
-                      onChange={() =>
-                        handleGlobalPermissionChange("allModules")
-                      }
-                    />
-                    <span>Tous les modules</span>
-                  </label>
-                )}
-              </div>
+              )}
+            </div>
 
               {/* Sélection des entreprises */}
               {!formData.permissions.allEntreprises && (
@@ -627,7 +438,8 @@ const UserModal = ({ user, onClose }) => {
                 </div>
               )}
 
-              {/* Modules (utilisateurs uniquement — un admin a tous les modules) */}
+              {/* Modules groupés (Gestion / Données / Analyse / Administration) */}
+              {/* Table masquée pour un admin (accès à tous les modules). */}
               {formData.role !== "admin" && !formData.permissions.allModules && (
                 <div className="modules-permissions">
                   <label>Modules accessibles</label>
@@ -640,108 +452,58 @@ const UserModal = ({ user, onClose }) => {
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      {modules.map((module) => (
-                        <tr key={module}>
-                          <td className="module-name">
-                            {moduleConfig[module]}
-                          </td>
+                    {GROUPS.map((grp) => (
+                      <tbody key={grp.group}>
+                        <tr className="module-group-row">
+                          <td className="module-group-name">{grp.label}</td>
                           {actions.map((action) => (
-                            <td key={action}>
-                              <input
-                                type="checkbox"
-                                checked={
-                                  formData.permissions.modules[module]?.[
-                                    action
-                                  ] || false
-                                }
-                                onChange={() =>
-                                  handlePermissionChange(module, action)
-                                }
-                              />
+                            <td key={action} className="module-group-toggle">
+                              <label
+                                className="checkbox-label checkbox-label-inline"
+                                title={`Tout ${actionLabels[action]} — ${grp.label}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isGroupActionChecked(
+                                    grp.group,
+                                    action,
+                                  )}
+                                  onChange={() =>
+                                    handleGroupActionToggle(grp.group, action)
+                                  }
+                                />
+                              </label>
                             </td>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
+                        {grp.items.map((mod) => (
+                          <tr key={mod.key}>
+                            <td className="module-name">
+                              {moduleLabel(mod.key)}
+                            </td>
+                            {actions.map((action) => (
+                              <td key={action}>
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    formData.permissions.modules[mod.key]?.[
+                                      action
+                                    ] || false
+                                  }
+                                  onChange={() =>
+                                    handlePermissionChange(mod.key, action)
+                                  }
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    ))}
                   </table>
                 </div>
               )}
             </div>
-
-          {/* Analyse — accès écran par écran (admins ET users) */}
-          <div className="permissions-section">
-            <h3>Analyse</h3>
-            <p className="permissions-hint">
-              Accès aux écrans d'analyse, écran par écran (admins et
-              utilisateurs). Un super-admin y accède d'office.
-            </p>
-            <div className="global-permissions">
-              {analyseScreens.map((sc) => (
-                <label key={sc.key} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={!!formData.permissions.analyse?.[sc.key]}
-                    onChange={() => handleAnalyseChange(sc.key)}
-                  />
-                  <span>{sc.label}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="form-group">
-              <label>Analyse Filiales (par réseau)</label>
-              <div className="global-permissions">
-                {FILIALE_RESEAUX.map((r) => (
-                  <label key={r} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={!!formData.permissions.analyse?.filiales?.[r]}
-                      onChange={() => handleFilialeReseauChange(r)}
-                    />
-                    <span>{r}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Commerciaux visibles par entreprise (si Analyse Commerciaux activée) */}
-          {formData.permissions.analyse?.commerciaux &&
-            !(
-              formData.role === "admin" &&
-              formData.permissions.allEntreprises
-            ) && (
-              <div className="permissions-section">
-                <h3>Commerciaux visibles (par entreprise)</h3>
-                <p className="permissions-hint">
-                  Coche les codes commerciaux que cet utilisateur peut voir
-                  dans « Analyse Commerciaux », entreprise par entreprise.
-                  Aucun code coché = aucun commercial pour cette société.
-                </p>
-                {formData.permissions.entreprises.length === 0 ? (
-                  <p className="permissions-hint">
-                    Sélectionne d'abord une ou plusieurs entreprises ci-dessus.
-                  </p>
-                ) : (
-                  (entreprises || [])
-                    .filter((e) =>
-                      formData.permissions.entreprises.includes(e._id),
-                    )
-                    .map((ent) => (
-                      <CommerciauxEntreprisePicker
-                        key={ent._id}
-                        entreprise={ent}
-                        selected={
-                          formData.permissions.commerciauxScope?.[ent._id] || []
-                        }
-                        onToggle={handleCommercialCodeToggle}
-                        onSelectAll={handleCommercialSelectAll}
-                      />
-                    ))
-                )}
-              </div>
-            )}
 
           <div className="modal-footer">
             <button type="button" className="btn-cancel" onClick={onClose}>

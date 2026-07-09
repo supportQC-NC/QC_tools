@@ -15,6 +15,7 @@ const permissionSchema = new mongoose.Schema(
       },
     ],
     modules: {
+      // ══════════ GESTION (utilisateur + écrans données admin partagés) ══════════
       // Recherche Article
       stock: {
         read: { type: Boolean, default: false },
@@ -33,36 +34,37 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
-      // proforma
+      // Proformas
       proforma: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
-      // CTRL Commandes
+      // Contrôle Commandes
       ctr_commande: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
-      // Réception de marchandises (contrôle sans réappro)
+      // Réception marchandises
       reception: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
-      // PREPA Commandes
+      // Préparation Commandes
       prep_commande: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
-      // CTRL Infos Produit
+      // Contrôle Infos Produit
       ctrl_info_produit: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Relevé de prix
       releve: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
@@ -70,6 +72,117 @@ const permissionSchema = new mongoose.Schema(
       },
       // Générateur d'étiquettes
       etiquettes: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // ══════════ DONNÉES (écrans admin) ══════════
+      // Clients
+      client: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Commandes
+      commandes: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Factures
+      facture: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Bipages
+      bipage: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Concurrents
+      concurrents: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Inventaire Proforma
+      inventaire_proforma_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Fiches de contrôle
+      fiches_controle_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // ══════════ ANALYSE (écrans admin) ══════════
+      // Analyse Commerciaux
+      commerciaux_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Analyse Filiales
+      filiales_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Reappro Local
+      reappro_local_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Débit / Comptant
+      debit_comptant_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Doublons GENCODE
+      gencod_doublons_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Analyse CA
+      analyse_ca_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Performance Dock
+      performance_dock_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Collecteurs
+      collecteurs_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // ══════════ ADMINISTRATION (dashboard, users, entreprises) ══════════
+      // Tableau de bord
+      dashboard_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Utilisateurs
+      users_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Entreprises
+      entreprises_admin: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
@@ -82,31 +195,6 @@ const permissionSchema = new mongoose.Schema(
     allModules: {
       type: Boolean,
       default: false,
-    },
-    // Accès aux écrans d'ANALYSE, réglable écran par écran (admins ET users).
-    // N'est PAS couvert par allModules : seul un super-admin (allEntreprises)
-    // y accède d'office ; sinon il faut cocher chaque écran.
-    analyse: {
-      commerciaux: { type: Boolean, default: false },
-      // Filiales : droit PAR RÉSEAU (DQ, QC, LD) — on peut n'en autoriser qu'un ou plusieurs.
-      filiales: {
-        DQ: { type: Boolean, default: false },
-        QC: { type: Boolean, default: false },
-        LD: { type: Boolean, default: false },
-      },
-      reapproLocal: { type: Boolean, default: false },
-      debitComptant: { type: Boolean, default: false },
-      doublonsGencode: { type: Boolean, default: false },
-      factures: { type: Boolean, default: false },
-      journalCaisse: { type: Boolean, default: false },
-      topArticles: { type: Boolean, default: false },
-    },
-    // Commerciaux visibles PAR ENTREPRISE : { "<entrepriseId>": ["01","03"], ... }
-    // Vide/absent pour une entreprise = AUCUN commercial (sauf super-admin = tout).
-    // Codes = REPRES détectés par getRepresentantsCodes (facture.dbf).
-    commerciauxScope: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
     },
   },
   {

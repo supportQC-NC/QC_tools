@@ -1,32 +1,47 @@
-// backend/routes/inventaireRoutes.js
+// backend/routes/inventaireZoneRoutes.js
 import express from "express";
 import {
-  createInventaire,
-  getInventaireEnCours,
-  scanArticle,
-  addLigne,
-  updateLigne,
-  deleteLigne,
-  exportInventaire,
-  downloadInventaire,
-  deleteInventaire,
+  initInventaireZone,
+  biperZone,
+  getActiveSession,
+  getProgress,
   getHistorique,
-} from "../controllers/inventaireController.js";
+  setPhaseManuelle,
+  deleteSession,
+} from "../controllers/inventaireZoneController.js";
 import { protect } from "../middleware/authMiddleware.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-router.route("/").post(protect, createInventaire);
-router.route("/historique").get(protect, getHistorique);
-router.route("/en-cours/:entrepriseId").get(protect, getInventaireEnCours);
-router.route("/:id").delete(protect, deleteInventaire);
-router.route("/:id/scan").post(protect, scanArticle);
-router.route("/:id/lignes").post(protect, addLigne);
-router
-  .route("/:id/lignes/:ligneId")
-  .put(protect, updateLigne)
-  .delete(protect, deleteLigne);
-router.route("/:id/export").post(protect, exportInventaire);
-router.route("/:id/download").post(protect, downloadInventaire);
+const canRead = checkModuleAccess("inventaire", "read");
+const canWrite = checkModuleAccess("inventaire", "write");
+const canDelete = checkModuleAccess("inventaire", "delete");
+
+// Toutes les routes : module "inventaire" + accès entreprise (param :entrepriseId)
+
+// Initialisation (archive l'actif puis crée)
+router.post("/init/:entrepriseId", protect, canWrite, checkEntrepriseAccess, initInventaireZone);
+
+// Bip d'un code-barres
+router.post("/:entrepriseId/bip", protect, canWrite, checkEntrepriseAccess, biperZone);
+
+// Session active détaillée
+router.get("/:entrepriseId/active", protect, canRead, checkEntrepriseAccess, getActiveSession);
+
+// Progression légère (% global + par phase)
+router.get("/:entrepriseId/progress", protect, canRead, checkEntrepriseAccess, getProgress);
+
+// Historique des sessions archivées
+router.get("/:entrepriseId/historique", protect, canRead, checkEntrepriseAccess, getHistorique);
+
+// Correction manuelle d'une phase
+router.put("/:entrepriseId/zone/:code/:phase", protect, canWrite, checkEntrepriseAccess, setPhaseManuelle);
+
+// Suppression d'une session archivée
+router.delete("/:entrepriseId/:id", protect, canDelete, checkEntrepriseAccess, deleteSession);
 
 export default router;

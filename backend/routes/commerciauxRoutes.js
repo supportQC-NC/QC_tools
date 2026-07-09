@@ -7,42 +7,25 @@ import {
   refreshCommerciaux,
 } from "../controllers/commerciauxController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
-import { checkAnalyseAccess } from "../middleware/accessControl.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Accès : droit d'analyse « commerciaux » (admins ET users) + accès à l'entreprise.
-const analyse = checkAnalyseAccess("commerciaux");
+const canRead = checkModuleAccess("commerciaux_admin", "read");
 
 // Liste des commerciaux + KPI agrégés
-router.get("/:nomDossierDBF", protect, analyse, checkEntrepriseAccess, getCommerciaux);
+router.get("/:nomDossierDBF", protect, canRead, checkEntrepriseAccess, getCommerciaux);
 
 // Analyse complète (avec clients) — AVANT la route générique /:code
-router.get(
-  "/:nomDossierDBF/full",
-  protect,
-  analyse,
-  checkEntrepriseAccess,
-  getCommerciauxFull,
-);
+router.get("/:nomDossierDBF/full", protect, canRead, checkEntrepriseAccess, getCommerciauxFull);
 
 // Invalidation du cache — AVANT la route générique /:code
-router.post(
-  "/:nomDossierDBF/refresh",
-  protect,
-  analyse,
-  checkEntrepriseAccess,
-  refreshCommerciaux,
-);
+router.post("/:nomDossierDBF/refresh", protect, canRead, checkEntrepriseAccess, refreshCommerciaux);
 
 // Détail d'un commercial — DOIT RESTER EN DERNIER (route générique)
-router.get(
-  "/:nomDossierDBF/:code",
-  protect,
-  analyse,
-  checkEntrepriseAccess,
-  getCommercialDetail,
-);
+router.get("/:nomDossierDBF/:code", protect, canRead, checkEntrepriseAccess, getCommercialDetail);
 
 export default router;
