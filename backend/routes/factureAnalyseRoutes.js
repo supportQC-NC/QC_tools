@@ -2,16 +2,19 @@
 import express from "express";
 import { getReport } from "../controllers/factureAnalyseController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
-import { checkAnalyseAccess } from "../middleware/accessControl.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Accès : droit d'analyse « factures » (admins ET users) + accès à l'entreprise.
+// Accès : module "facture_analyse_admin" (lecture) + accès à l'entreprise.
+// Aligné sur les autres écrans d'analyse (commerciaux, filiales, etc.).
 router.get(
   "/:nomDossierDBF",
   protect,
-  checkAnalyseAccess("factures"),
+  checkModuleAccess("facture_analyse_admin", "read"),
   checkEntrepriseAccess,
   getReport,
 );

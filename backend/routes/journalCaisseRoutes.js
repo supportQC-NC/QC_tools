@@ -2,16 +2,18 @@
 import express from "express";
 import { getJournal } from "../controllers/journalCaisseController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
-import { checkAnalyseAccess } from "../middleware/accessControl.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Accès : droit d'analyse « journalCaisse » (admins ET users) + accès entreprise.
+// Accès : module "journal_caisse_admin" (lecture) + accès à l'entreprise.
 router.get(
   "/:nomDossierDBF",
   protect,
-  checkAnalyseAccess("journalCaisse"),
+  checkModuleAccess("journal_caisse_admin", "read"),
   checkEntrepriseAccess,
   getJournal,
 );

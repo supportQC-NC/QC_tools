@@ -2,16 +2,18 @@
 import express from "express";
 import { getTopArticles } from "../controllers/topArticlesController.js";
 import { protect } from "../middleware/authMiddleware.js";
-import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
-import { checkAnalyseAccess } from "../middleware/accessControl.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
-// Accès : droit d'analyse « topArticles » (admins ET users) + accès entreprise.
+// Accès : module "top_articles_admin" (lecture) + accès à l'entreprise.
 router.get(
   "/:nomDossierDBF",
   protect,
-  checkAnalyseAccess("topArticles"),
+  checkModuleAccess("top_articles_admin", "read"),
   checkEntrepriseAccess,
   getTopArticles,
 );

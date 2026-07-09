@@ -38,6 +38,9 @@ export const PERMISSION_MODULES = [
   { key: "analyse_ca_admin", label: "Analyse CA", group: "analyse" },
   { key: "performance_dock_admin", label: "Performance Dock", group: "analyse" },
   { key: "collecteurs_admin", label: "Collecteurs", group: "analyse" },
+  { key: "facture_analyse_admin", label: "Analyse Facturation", group: "analyse" },
+  { key: "journal_caisse_admin", label: "Journal de Caisse", group: "analyse" },
+  { key: "top_articles_admin", label: "Top Articles", group: "analyse" },
   { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
   { key: "users_admin", label: "Utilisateurs", group: "administration" },
   { key: "entreprises_admin", label: "Entreprises", group: "administration" },
@@ -81,6 +84,9 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/analyse-ca", key: "analyse_ca_admin" },
   { path: "/admin/performance-dock", key: "performance_dock_admin" },
   { path: "/admin/collecteurs", key: "collecteurs_admin" },
+  { path: "/admin/facture-analyse", key: "facture_analyse_admin" },
+  { path: "/admin/journal-caisse", key: "journal_caisse_admin" },
+  { path: "/admin/top-articles", key: "top_articles_admin" },
 ];
 
 // L'utilisateur a-t-il l'action demandée sur ce module ?
