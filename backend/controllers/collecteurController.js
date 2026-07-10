@@ -52,7 +52,7 @@ const getPositions = asyncHandler(async (req, res) => {
     "lastPosition.lat": { $ne: null },
   })
     .populate(POPULATE)
-    .select("identifiant nom statut entreprise agent lastPosition")
+    .select("identifiant nom statut versionApp entreprise agent lastPosition")
     .sort({ identifiant: 1 });
 
   res.json(collecteurs);

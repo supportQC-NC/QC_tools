@@ -42,11 +42,17 @@ const markerSvg = (color) => `
     <circle cx="15" cy="20" r="0.9" fill="${color}"/>
   </svg>`;
 
+const fmtCoord = (n) => Number(n).toFixed(5);
+
 const popupHtml = (c) => {
   const agent = c.agent
     ? `${c.agent.prenom || ""} ${c.agent.nom || ""}`.trim()
     : "—";
   const ent = c.entreprise?.trigramme || c.entreprise?.nomDossierDBF || "—";
+  const { lat, lng, accuracy } = c.lastPosition || {};
+  const coords = `${fmtCoord(lat)}, ${fmtCoord(lng)}`;
+  const prec = accuracy != null ? `± ${Math.round(accuracy)} m` : "—";
+  const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   return `
     <div class="cm-popup">
       <div class="cm-popup-id">${c.identifiant}</div>
@@ -54,7 +60,11 @@ const popupHtml = (c) => {
       <div class="cm-popup-row"><span>Agent</span> ${agent}</div>
       <div class="cm-popup-row"><span>Entreprise</span> ${ent}</div>
       <div class="cm-popup-row"><span>Statut</span> ${c.statut || "—"}</div>
+      <div class="cm-popup-row"><span>Version app</span> ${c.versionApp || "—"}</div>
+      <div class="cm-popup-row"><span>Précision</span> ${prec}</div>
+      <div class="cm-popup-coord">${coords}</div>
       <div class="cm-popup-seen">Vu ${ago(c.lastPosition.at)}</div>
+      <a class="cm-popup-btn" href="${gmaps}" target="_blank" rel="noopener noreferrer">Itinéraire (Google Maps)</a>
     </div>`;
 };
 
