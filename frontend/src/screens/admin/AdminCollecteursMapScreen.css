@@ -1,0 +1,134 @@
+/* src/screens/admin/AdminCollecteursMapScreen.css */
+
+.cm-page {
+  padding: 24px 28px 32px;
+}
+
+.cm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cm-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.cm-sub {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 4px 0 0;
+}
+
+.cm-stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.cm-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.cm-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.cm-dot.ok {
+  background: var(--success);
+}
+
+.cm-dot.ko {
+  background: var(--danger);
+}
+
+.cm-map {
+  width: 100%;
+  height: calc(100vh - 190px);
+  min-height: 460px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.cm-message {
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  margin-bottom: 12px;
+}
+
+.cm-message.error {
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.35);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.cm-message code {
+  background: var(--bg-tertiary);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+/* Marqueur personnalisé */
+.cm-marker {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+/* Popup (contenu injecté en HTML) */
+.cm-popup {
+  font-size: 0.85rem;
+  min-width: 160px;
+}
+
+.cm-popup-id {
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 2px;
+}
+
+.cm-popup-nom {
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.cm-popup-row {
+  color: #222;
+  margin: 2px 0;
+}
+
+.cm-popup-row span {
+  display: inline-block;
+  width: 74px;
+  color: #888;
+}
+
+.cm-popup-seen {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #2563eb;
+  font-weight: 600;
+}

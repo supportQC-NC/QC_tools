@@ -26,17 +26,19 @@ export const apiSlice = createApi({
     "Commande",
     "CommandeDetail",
     // ====================================
-        // ========== TAGS PROFORMAS ==========
+    // ========== TAGS PROFORMAS ==========
     "Proforma",
     // ====================================
-        // ========== TAGS PROFORMAS ==========
+    // ========== TAGS FOURNISSEURS ==========
     "Fournisseurs",
     // ====================================
-        // ========== TAGS Facture ==========
+    // ========== TAGS FACTURE ==========
     "Factures",
     // ====================================
     "Collecteur",
-    "AppRelease"
+    "AppRelease",
+    // ========== TAGS ABONNEMENTS RAPPORTS ==========
+    "ReportSubscription",
   ],
   endpoints: (builder) => ({}),
 });

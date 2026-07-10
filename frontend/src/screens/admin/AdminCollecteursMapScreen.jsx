@@ -1,0 +1,199 @@
+// src/screens/admin/AdminCollecteursMapScreen.jsx
+//
+// Carte Mapbox des collecteurs (centrée sur la Nouvelle-Calédonie).
+// Mode SATELLITE + RELIEF 3D. Un marqueur par collecteur ayant une dernière
+// position connue ; popup au clic. Rafraîchi toutes les 20 s.
+
+import React, { useEffect, useRef } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { useGetCollecteurPositionsQuery } from "../../slices/collecteurApiSlice";
+import "./AdminCollecteursMapScreen.css";
+
+mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN || "";
+
+// Centre : 13 rue Ampère, Nouméa (Ducos) — base / dépôt.
+const NC_CENTER = [166.4468049, -22.2338406];
+const NC_ZOOM = 14;
+const NC_PITCH = 50; // inclinaison pour voir le relief
+
+const minutesSince = (at) => (Date.now() - new Date(at).getTime()) / 60000;
+
+const ago = (at) => {
+  const m = Math.floor(minutesSince(at));
+  if (m < 1) return "à l'instant";
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.floor(h / 24);
+  return `il y a ${j} j`;
+};
+
+// Vert si relevé récent (<15 min), rouge sinon.
+const couleur = (at) => (minutesSince(at) < 15 ? "#4ade80" : "#ff6b6b");
+
+const popupHtml = (c) => {
+  const agent = c.agent
+    ? `${c.agent.prenom || ""} ${c.agent.nom || ""}`.trim()
+    : "—";
+  const ent = c.entreprise?.trigramme || c.entreprise?.nomDossierDBF || "—";
+  return `
+    <div class="cm-popup">
+      <div class="cm-popup-id">${c.identifiant}</div>
+      ${c.nom ? `<div class="cm-popup-nom">${c.nom}</div>` : ""}
+      <div class="cm-popup-row"><span>Agent</span> ${agent}</div>
+      <div class="cm-popup-row"><span>Entreprise</span> ${ent}</div>
+      <div class="cm-popup-row"><span>Statut</span> ${c.statut || "—"}</div>
+      <div class="cm-popup-seen">Vu ${ago(c.lastPosition.at)}</div>
+    </div>`;
+};
+
+const AdminCollecteursMapScreen = () => {
+  const mapContainer = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef({}); // id -> mapboxgl.Marker
+
+  const { data: positions = [], isLoading, error } =
+    useGetCollecteurPositionsQuery(undefined, { pollingInterval: 20000 });
+
+  const hasToken = !!mapboxgl.accessToken;
+
+  // Init de la carte (une seule fois).
+  useEffect(() => {
+    if (!hasToken || mapRef.current || !mapContainer.current) return;
+
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/satellite-streets-v12",
+      center: NC_CENTER,
+      zoom: NC_ZOOM,
+      pitch: NC_PITCH,
+      bearing: 0,
+      antialias: true,
+    });
+
+    map.addControl(
+      new mapboxgl.NavigationControl({ visualizePitch: true }),
+      "top-right",
+    );
+
+    map.on("load", () => {
+      // Relief 3D : modèle numérique de terrain Mapbox.
+      if (!map.getSource("mapbox-dem")) {
+        map.addSource("mapbox-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
+
+      // Ciel / atmosphère pour l'horizon.
+      if (!map.getLayer("sky")) {
+        map.addLayer({
+          id: "sky",
+          type: "sky",
+          paint: {
+            "sky-type": "atmosphere",
+            "sky-atmosphere-sun": [0.0, 90.0],
+            "sky-atmosphere-sun-intensity": 15,
+          },
+        });
+      }
+    });
+
+    mapRef.current = map;
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markersRef.current = {};
+    };
+  }, [hasToken]);
+
+  // Sync des marqueurs à chaque nouvelle donnée.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const vus = new Set();
+
+    positions.forEach((c) => {
+      const { lat, lng } = c.lastPosition || {};
+      if (lat == null || lng == null) return;
+      vus.add(c._id);
+
+      const html = popupHtml(c);
+      const existing = markersRef.current[c._id];
+
+      if (existing) {
+        existing.setLngLat([lng, lat]);
+        existing.getElement().style.background = couleur(c.lastPosition.at);
+        existing.getPopup().setHTML(html);
+      } else {
+        const el = document.createElement("div");
+        el.className = "cm-marker";
+        el.style.background = couleur(c.lastPosition.at);
+
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .setPopup(new mapboxgl.Popup({ offset: 16 }).setHTML(html))
+          .addTo(map);
+
+        markersRef.current[c._id] = marker;
+      }
+    });
+
+    // Retirer les marqueurs disparus.
+    Object.keys(markersRef.current).forEach((id) => {
+      if (!vus.has(id)) {
+        markersRef.current[id].remove();
+        delete markersRef.current[id];
+      }
+    });
+  }, [positions]);
+
+  const actifs = positions.filter((c) => minutesSince(c.lastPosition.at) < 15).length;
+
+  return (
+    <div className="cm-page">
+      <div className="cm-header">
+        <div>
+          <h1>Carte des collecteurs</h1>
+          <p className="cm-sub">
+            Vue satellite avec relief — position rafraîchie toutes les 20 s.
+          </p>
+        </div>
+        <div className="cm-stats">
+          <span className="cm-stat">
+            <span className="cm-dot ok" /> {actifs} actif(s)
+          </span>
+          <span className="cm-stat">
+            <span className="cm-dot ko" /> {positions.length - actifs} inactif(s)
+          </span>
+        </div>
+      </div>
+
+      {!hasToken ? (
+        <div className="cm-message error">
+          Token Mapbox manquant. Ajoutez <code>REACT_APP_MAPBOX_TOKEN</code> dans
+          votre <code>.env</code> puis relancez le build.
+        </div>
+      ) : (
+        <>
+          {error && (
+            <div className="cm-message error">
+              Impossible de charger les positions.
+            </div>
+          )}
+          {isLoading && positions.length === 0 && (
+            <div className="cm-message">Chargement des positions…</div>
+          )}
+          <div ref={mapContainer} className="cm-map" />
+        </>
+      )}
+    </div>
+  );
+};
+
+export default AdminCollecteursMapScreen;

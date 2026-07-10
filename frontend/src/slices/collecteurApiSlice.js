@@ -14,6 +14,15 @@ export const collecteurApiSlice = apiSlice.injectEndpoints({
       query: (id) => ({ url: `${URL}/${id}` }),
       providesTags: ["Collecteur"],
     }),
+    // Positions pour la carte (admin).
+    getCollecteurPositions: builder.query({
+      query: () => ({ url: `${URL}/positions` }),
+      providesTags: ["CollecteurPosition"],
+    }),
+    // Relevé de position envoyé par l'app (agent).
+    pingCollecteur: builder.mutation({
+      query: (data) => ({ url: `${URL}/ping`, method: "POST", body: data }),
+    }),
     createCollecteur: builder.mutation({
       query: (data) => ({ url: URL, method: "POST", body: data }),
       invalidatesTags: ["Collecteur"],
@@ -36,6 +45,8 @@ export const collecteurApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetCollecteursQuery,
   useGetCollecteurByIdQuery,
+  useGetCollecteurPositionsQuery,
+  usePingCollecteurMutation,
   useCreateCollecteurMutation,
   useUpdateCollecteurMutation,
   useDeleteCollecteurMutation,

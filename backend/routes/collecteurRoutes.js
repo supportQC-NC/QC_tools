@@ -3,6 +3,8 @@ import express from "express";
 import {
   getCollecteurs,
   getCollecteurById,
+  getPositions,
+  pingPosition,
   createCollecteur,
   updateCollecteur,
   deleteCollecteur,
@@ -15,6 +17,12 @@ const router = express.Router();
 const canRead = checkModuleAccess("collecteurs_admin", "read");
 const canWrite = checkModuleAccess("collecteurs_admin", "write");
 const canDelete = checkModuleAccess("collecteurs_admin", "delete");
+
+// ── Routes statiques AVANT /:id ──────────────────────────────────────────────
+// Relevé de position : accessible à tout agent connecté (pas de module admin).
+router.post("/ping", protect, pingPosition);
+// Positions pour la carte : réservé au module collecteurs_admin (lecture).
+router.get("/positions", protect, canRead, getPositions);
 
 router
   .route("/")

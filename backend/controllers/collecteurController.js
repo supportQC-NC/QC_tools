@@ -43,6 +43,68 @@ const getCollecteurById = asyncHandler(async (req, res) => {
   res.json(collecteur);
 });
 
+// @desc    Positions des collecteurs (pour la carte)
+// @route   GET /api/collecteurs/positions
+// @access  Private (module collecteurs_admin en lecture)
+const getPositions = asyncHandler(async (req, res) => {
+  const collecteurs = await Collecteur.find({
+    isActive: true,
+    "lastPosition.lat": { $ne: null },
+  })
+    .populate(POPULATE)
+    .select("identifiant nom statut entreprise agent lastPosition")
+    .sort({ identifiant: 1 });
+
+  res.json(collecteurs);
+});
+
+// @desc    Relevé de position envoyé par l'app (terrain)
+// @route   POST /api/collecteurs/ping
+// @access  Private (agent connecté). Identification par identifiant matériel.
+const pingPosition = asyncHandler(async (req, res) => {
+  const { identifiant, lat, lng, accuracy } = req.body;
+
+  const id = String(identifiant || "").trim().toUpperCase();
+  if (!id) {
+    res.status(400);
+    throw new Error("Identifiant du collecteur requis.");
+  }
+
+  const latN = Number(lat);
+  const lngN = Number(lng);
+  if (
+    !Number.isFinite(latN) ||
+    !Number.isFinite(lngN) ||
+    latN < -90 ||
+    latN > 90 ||
+    lngN < -180 ||
+    lngN > 180
+  ) {
+    res.status(400);
+    throw new Error("Coordonnées invalides.");
+  }
+
+  const collecteur = await Collecteur.findOne({ identifiant: id });
+  if (!collecteur) {
+    res.status(404);
+    throw new Error("Collecteur inconnu pour cet identifiant.");
+  }
+
+  collecteur.lastPosition = {
+    lat: latN,
+    lng: lngN,
+    accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : null,
+    at: new Date(),
+  };
+  // L'app connaît sa version : on en profite pour la tenir à jour si fournie.
+  if (req.body.versionApp) {
+    collecteur.versionApp = String(req.body.versionApp).trim();
+  }
+  await collecteur.save();
+
+  res.json({ ok: true, at: collecteur.lastPosition.at });
+});
+
 // @desc    Créer un collecteur
 // @route   POST /api/collecteurs
 // @access  Private/Admin
@@ -178,6 +240,8 @@ const deleteCollecteur = asyncHandler(async (req, res) => {
 export {
   getCollecteurs,
   getCollecteurById,
+  getPositions,
+  pingPosition,
   createCollecteur,
   updateCollecteur,
   deleteCollecteur,

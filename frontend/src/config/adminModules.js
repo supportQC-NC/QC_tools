@@ -84,6 +84,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/analyse-ca", key: "analyse_ca_admin" },
   { path: "/admin/performance-dock", key: "performance_dock_admin" },
   { path: "/admin/collecteurs", key: "collecteurs_admin" },
+  { path: "/admin/collecteurs-carte", key: "collecteurs_admin" },
   { path: "/admin/facture-analyse", key: "facture_analyse_admin" },
   { path: "/admin/journal-caisse", key: "journal_caisse_admin" },
   { path: "/admin/top-articles", key: "top_articles_admin" },

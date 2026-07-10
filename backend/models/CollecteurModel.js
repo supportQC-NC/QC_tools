@@ -55,6 +55,15 @@ const collecteurSchema = new mongoose.Schema(
     emplacement: { type: String, default: "" },
     // Observations libres.
     observations: { type: String, default: "" },
+    // Dernière position connue (envoyée par l'app depuis le terrain).
+    // Identification par identifiant matériel ; mis à jour via POST /ping.
+    lastPosition: {
+      _id: false,
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+      accuracy: { type: Number, default: null }, // précision en mètres
+      at: { type: Date, default: null }, // horodatage du relevé
+    },
     // Actif (false = archivé, sans suppression).
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
