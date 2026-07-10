@@ -1,24 +1,22 @@
 // src/screens/admin/AdminCollecteursMapScreen.jsx
 //
-// Carte Mapbox des collecteurs (centrée sur le 13 rue Ampère, Ducos).
-// Vue satellite + relief, marqueur en forme de mobile coloré selon la fraîcheur.
-// Rafraîchi toutes les 20 s.
+// Carte des collecteurs. mapbox-gl est chargé via CDN (public/index.html) et lu
+// sur window.mapboxgl : cela évite le bug "ReferenceError: r is not defined"
+// causé par la minification de mapbox-gl par webpack/CRA en production.
 
 import React, { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
 import {
   useGetCollecteurPositionsQuery,
   useRequestSonnerieMutation,
 } from "../../slices/collecteurApiSlice";
 import "./AdminCollecteursMapScreen.css";
 
-mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN || "";
+// Objet global fourni par la balise <script> mapbox-gl dans public/index.html.
+const mapboxgl = typeof window !== "undefined" ? window.mapboxgl : null;
 
-// Centre : 13 rue Ampère, Nouméa (Ducos) — base / dépôt.
+// Centre : 13 rue Ampère, Nouméa (Ducos).
 const NC_CENTER = [166.4468049, -22.2338406];
 const NC_ZOOM = 14;
-const NC_PITCH = 0; // vue du dessus (carte à plat)
 const SEUIL_ACTIF_MIN = 5; // actif si vu il y a moins de 5 min
 
 const minutesSince = (at) => (Date.now() - new Date(at).getTime()) / 60000;
@@ -33,10 +31,8 @@ const ago = (at) => {
   return `il y a ${j} j`;
 };
 
-// Vert si relevé récent (<15 min), rouge sinon.
 const couleur = (at) => (minutesSince(at) < SEUIL_ACTIF_MIN ? "#22c55e" : "#ef4444");
 
-// Marqueur en forme de mobile (SVG inline), couleur dynamique.
 const markerSvg = (color) => `
   <svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg">
     <path d="M15 38C15 38 28 24 28 14A13 13 0 1 0 2 14C2 24 15 38 15 38Z"
@@ -83,33 +79,28 @@ const makeMarkerEl = (color) => {
 const AdminCollecteursMapScreen = () => {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef({}); // id -> mapboxgl.Marker
+  const markersRef = useRef({});
 
   const { data: positions = [], isLoading, error } =
     useGetCollecteurPositionsQuery(undefined, { pollingInterval: 20000 });
   const [requestSonnerie] = useRequestSonnerieMutation();
   const [ringMsg, setRingMsg] = useState(null);
 
-  const hasToken = !!mapboxgl.accessToken;
+  const token = (process.env.REACT_APP_MAPBOX_TOKEN || "").trim();
+  const ready = !!mapboxgl && !!token;
 
   // Init de la carte (une seule fois).
   useEffect(() => {
-    if (!hasToken || mapRef.current || !mapContainer.current) return;
+    if (!ready || mapRef.current || !mapContainer.current) return;
 
+    mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/outdoors-v11", // fond relief topographique (compatible mapbox-gl 1.13)
+      style: "mapbox://styles/mapbox/outdoors-v11",
       center: NC_CENTER,
       zoom: NC_ZOOM,
-      pitch: NC_PITCH,
-      bearing: 0,
-      antialias: true,
     });
-
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
-
-    // Style "outdoors-v12" : relief ombré + courbes de niveau + rues, vue à plat.
-    // (Pas de terrain 3D ni de ciel : on veut une carte lisible vue du dessus.)
 
     mapRef.current = map;
     return () => {
@@ -117,7 +108,7 @@ const AdminCollecteursMapScreen = () => {
       mapRef.current = null;
       markersRef.current = {};
     };
-  }, [hasToken]);
+  }, [ready, token]);
 
   // Clic sur "Faire sonner" (bouton injecté dans les popups).
   useEffect(() => {
@@ -145,7 +136,6 @@ const AdminCollecteursMapScreen = () => {
     if (!map) return;
 
     const vus = new Set();
-
     positions.forEach((c) => {
       const { lat, lng } = c.lastPosition || {};
       if (lat == null || lng == null) return;
@@ -162,17 +152,15 @@ const AdminCollecteursMapScreen = () => {
       } else {
         const marker = new mapboxgl.Marker({
           element: makeMarkerEl(col),
-          anchor: "bottom", // la pointe du repère est sur la position
+          anchor: "bottom",
         })
           .setLngLat([lng, lat])
           .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(html))
           .addTo(map);
-
         markersRef.current[c._id] = marker;
       }
     });
 
-    // Retirer les marqueurs disparus.
     Object.keys(markersRef.current).forEach((id) => {
       if (!vus.has(id)) {
         markersRef.current[id].remove();
@@ -181,7 +169,9 @@ const AdminCollecteursMapScreen = () => {
     });
   }, [positions]);
 
-  const actifs = positions.filter((c) => minutesSince(c.lastPosition.at) < SEUIL_ACTIF_MIN).length;
+  const actifs = positions.filter(
+    (c) => minutesSince(c.lastPosition.at) < SEUIL_ACTIF_MIN,
+  ).length;
 
   return (
     <div className="cm-page">
@@ -202,10 +192,15 @@ const AdminCollecteursMapScreen = () => {
         </div>
       </div>
 
-      {!hasToken ? (
+      {!mapboxgl ? (
+        <div className="cm-message error">
+          Mapbox n'est pas chargé. Ajoutez la balise &lt;script&gt; mapbox-gl dans{" "}
+          <code>public/index.html</code> puis rebuildez.
+        </div>
+      ) : !token ? (
         <div className="cm-message error">
           Token Mapbox manquant. Ajoutez <code>REACT_APP_MAPBOX_TOKEN</code> dans
-          votre <code>.env</code> puis relancez le build.
+          votre <code>.env</code> puis rebuildez.
         </div>
       ) : (
         <>
