@@ -1,172 +1,345 @@
-/* src/screens/admin/AdminCollecteursMapScreen.css */
-
-.cm-page {
-  padding: 24px 28px 32px;
+/* src/screens/admin/AdminCollecteursScreen.css */
+.admin-collecteurs {
+  padding: 20px;
+  color: var(--text-primary);
 }
 
-.cm-header {
+.admin-collecteurs .col-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
 }
-
-.cm-header h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
+.admin-collecteurs .col-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
   margin: 0;
 }
-
-.cm-sub {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin: 4px 0 0;
+.admin-collecteurs .col-header h1 svg {
+  color: var(--accent);
 }
-
-.cm-stats {
+.admin-collecteurs .col-actions {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   align-items: center;
 }
-
-.cm-stat {
-  display: flex;
+.admin-collecteurs .btn-primary,
+.admin-collecteurs .btn-secondary,
+.admin-collecteurs .btn-icon {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.cm-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.cm-dot.ok {
-  background: var(--success);
-}
-
-.cm-dot.ko {
-  background: var(--danger);
-}
-
-.cm-map {
-  width: 100%;
-  height: calc(100vh - 190px);
-  min-height: 460px;
-  border-radius: 12px;
-  overflow: hidden;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
   border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+.admin-collecteurs .btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.admin-collecteurs .btn-primary:hover {
+  background: var(--accent-hover, #3b8eea);
+}
+.admin-collecteurs .btn-secondary:hover {
+  border-color: var(--accent);
+}
+.admin-collecteurs .btn-icon {
+  padding: 9px 11px;
+}
+.admin-collecteurs .btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.cm-message {
-  padding: 14px 16px;
-  border-radius: 8px;
+/* Compteurs */
+.admin-collecteurs .col-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.admin-collecteurs .col-stat {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 0.92rem;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-collecteurs .col-stat .v {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+.admin-collecteurs .col-stat .l {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.admin-collecteurs .col-stat.total .v {
+  color: var(--accent);
+}
+.admin-collecteurs .col-stat.st-service .v {
+  color: #10b981;
+}
+.admin-collecteurs .col-stat.st-stock .v {
+  color: #3b82f6;
+}
+.admin-collecteurs .col-stat.st-panne .v {
+  color: #ef4444;
+}
+.admin-collecteurs .col-stat.st-reparation .v {
+  color: #f59e0b;
+}
+.admin-collecteurs .col-stat.st-reforme .v {
+  color: #6b7280;
+}
+.admin-collecteurs .col-stat.st-perdu .v {
+  color: #b91c1c;
+}
+
+/* Filtres */
+.admin-collecteurs .col-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
-
-.cm-message.error {
-  color: var(--danger);
-  border-color: rgba(255, 107, 107, 0.35);
-  background: rgba(255, 107, 107, 0.08);
+.admin-collecteurs .col-filters .search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 240px;
+}
+.admin-collecteurs .col-filters .search-box svg {
+  color: var(--text-muted);
+}
+.admin-collecteurs .col-filters .search-box input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  width: 100%;
+  font-size: 13px;
+}
+.admin-collecteurs .col-filters select {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
 }
 
-.cm-message code {
+/* Table */
+.admin-collecteurs .col-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.admin-collecteurs .col-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 900px;
+}
+.admin-collecteurs .col-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--border);
   background: var(--bg-tertiary);
-  padding: 1px 6px;
-  border-radius: 4px;
+  white-space: nowrap;
+}
+.admin-collecteurs .col-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
   color: var(--text-primary);
 }
-
-/* Marqueur personnalisé (icône mobile SVG) */
-.cm-marker {
-  cursor: pointer;
-  line-height: 0;
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+.admin-collecteurs .col-table tr:last-child td {
+  border-bottom: none;
 }
-.cm-marker svg {
-  display: block;
+.admin-collecteurs .col-table tr.row-inactive {
+  opacity: 0.5;
+}
+.admin-collecteurs .col-table .mono {
+  font-family: ui-monospace, Menlo, monospace;
+  font-weight: 600;
+}
+.admin-collecteurs .acc-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Popup (contenu injecté en HTML) */
-.cm-popup {
-  font-size: 0.85rem;
-  min-width: 160px;
-}
-
-.cm-popup-id {
+.admin-collecteurs .ga {
   font-weight: 700;
-  color: #111;
-  margin-bottom: 2px;
+  font-size: 11px;
+}
+.admin-collecteurs .ga.oui {
+  color: #10b981;
+}
+.admin-collecteurs .ga.non {
+  color: var(--text-muted);
 }
 
-.cm-popup-nom {
-  color: #555;
-  margin-bottom: 6px;
-}
-
-.cm-popup-row {
-  color: #222;
-  margin: 2px 0;
-}
-
-.cm-popup-row span {
+/* Badges statut */
+.admin-collecteurs .statut-badge {
   display: inline-block;
-  width: 74px;
-  color: #888;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.admin-collecteurs .statut-badge.st-stock {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+.admin-collecteurs .statut-badge.st-service {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: #10b981;
+}
+.admin-collecteurs .statut-badge.st-panne {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+.admin-collecteurs .statut-badge.st-reparation {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+.admin-collecteurs .statut-badge.st-reforme {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border-color: #6b7280;
+}
+.admin-collecteurs .statut-badge.st-perdu {
+  background: rgba(185, 28, 28, 0.15);
+  color: #f87171;
+  border-color: #b91c1c;
 }
 
-.cm-popup-seen {
-  margin-top: 6px;
-  font-size: 0.8rem;
-  color: #2563eb;
-  font-weight: 600;
+/* Actions ligne */
+.admin-collecteurs .col-row-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
 }
-
-
-.cm-popup-coord {
-  margin-top: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.78rem;
-  color: #333;
-  user-select: all;
-}
-
-.cm-popup-btn {
-  display: block;
-  margin-top: 8px;
-  text-align: center;
-  background: #2563eb;
-  color: #fff;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.8rem;
-  padding: 7px 10px;
+.admin-collecteurs .btn-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
-}
-
-.cm-popup-btn:hover {
-  background: #1d4ed8;
-}
-
-.cm-popup-btn.ring {
-  background: #f59e0b;
-  margin-top: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   cursor: pointer;
-  border: none;
-  width: 100%;
+  transition: all 0.2s;
+}
+.admin-collecteurs .btn-row:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.admin-collecteurs .btn-row.danger:hover {
+  border-color: var(--danger, #ef4444);
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.12);
 }
 
-.cm-popup-btn.ring:hover {
-  background: #d97706;
+.admin-collecteurs .col-empty,
+.admin-collecteurs .col-error {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.admin-collecteurs .col-error {
+  border-color: var(--danger, #ef4444);
+  color: #fca5a5;
+}
+
+@media (max-width: 600px) {
+  .admin-collecteurs {
+    padding: 12px;
+  }
+}
+
+/* Légende version */
+.admin-collecteurs .col-legend {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 12px;
+}
+.admin-collecteurs .col-legend strong {
+  color: var(--accent);
+}
+
+/* Badge de version app */
+.admin-collecteurs .ver-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, Menlo, monospace;
+  border: 1px solid transparent;
+}
+.admin-collecteurs .ver-badge.uptodate {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: #10b981;
+}
+.admin-collecteurs .ver-badge.outdated {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border-color: #ef4444;
+}
+.admin-collecteurs .ver-badge.unknown {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border-color: #6b7280;
+}
+
+/* Ligne d'un collecteur pas à jour : liseré rouge + fond légèrement teinté */
+.admin-collecteurs .col-table tr.row-outdated td {
+  background: rgba(239, 68, 68, 0.07);
+}
+.admin-collecteurs .col-table tr.row-outdated td:first-child {
+  box-shadow: inset 3px 0 0 0 #ef4444;
 }
