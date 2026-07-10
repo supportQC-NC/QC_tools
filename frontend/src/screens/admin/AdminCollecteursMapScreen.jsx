@@ -18,7 +18,7 @@ mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN || "";
 // Centre : 13 rue Ampère, Nouméa (Ducos) — base / dépôt.
 const NC_CENTER = [166.4468049, -22.2338406];
 const NC_ZOOM = 14;
-const NC_PITCH = 45; // inclinaison modérée pour le relief
+const NC_PITCH = 0; // vue du dessus (carte à plat)
 const SEUIL_ACTIF_MIN = 5; // actif si vu il y a moins de 5 min
 
 const minutesSince = (at) => (Date.now() - new Date(at).getTime()) / 60000;
@@ -111,31 +111,8 @@ const AdminCollecteursMapScreen = () => {
       "top-right",
     );
 
-    map.on("load", () => {
-      // Relief 3D (exagération douce pour ne pas masquer les rues).
-      if (!map.getSource("mapbox-dem")) {
-        map.addSource("mapbox-dem", {
-          type: "raster-dem",
-          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-          tileSize: 512,
-          maxzoom: 14,
-        });
-      }
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.3 });
-
-      if (!map.getLayer("sky")) {
-        map.addLayer({
-          id: "sky",
-          type: "sky",
-          paint: {
-            "sky-type": "atmosphere",
-            "sky-atmosphere-sun": [0.0, 90.0],
-            "sky-atmosphere-sun-intensity": 15,
-          },
-        });
-      }
-
-    });
+    // Style "outdoors-v12" : relief ombré + courbes de niveau + rues, vue à plat.
+    // (Pas de terrain 3D ni de ciel : on veut une carte lisible vue du dessus.)
 
     mapRef.current = map;
     return () => {
