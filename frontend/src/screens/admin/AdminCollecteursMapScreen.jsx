@@ -98,7 +98,7 @@ const AdminCollecteursMapScreen = () => {
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/outdoors-v12", // fond relief topographique
+      style: "mapbox://styles/mapbox/outdoors-v11", // fond relief topographique (compatible mapbox-gl 1.13)
       center: NC_CENTER,
       zoom: NC_ZOOM,
       pitch: NC_PITCH,
@@ -106,10 +106,7 @@ const AdminCollecteursMapScreen = () => {
       antialias: true,
     });
 
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right",
-    );
+    map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     // Style "outdoors-v12" : relief ombré + courbes de niveau + rues, vue à plat.
     // (Pas de terrain 3D ni de ciel : on veut une carte lisible vue du dessus.)
