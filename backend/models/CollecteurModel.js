@@ -64,6 +64,9 @@ const collecteurSchema = new mongoose.Schema(
       accuracy: { type: Number, default: null }, // précision en mètres
       at: { type: Date, default: null }, // horodatage du relevé
     },
+    // Demande de sonnerie : passée à true côté admin, remise à false au prochain
+    // ping (l'app fait vibrer/sonner le collecteur). Sert à le retrouver.
+    sonnerie: { type: Boolean, default: false },
     // Actif (false = archivé, sans suppression).
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

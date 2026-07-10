@@ -100,9 +100,30 @@ const pingPosition = asyncHandler(async (req, res) => {
   if (req.body.versionApp) {
     collecteur.versionApp = String(req.body.versionApp).trim();
   }
+  // Sonnerie demandée ? On l'indique à l'app et on remet le drapeau à false.
+  const ring = collecteur.sonnerie === true;
+  if (ring) collecteur.sonnerie = false;
+
   await collecteur.save();
 
-  res.json({ ok: true, at: collecteur.lastPosition.at });
+  res.json({ ok: true, at: collecteur.lastPosition.at, ring });
+});
+
+// @desc    Demander la sonnerie d'un collecteur (déclenchée au prochain ping)
+// @route   POST /api/collecteurs/:id/sonnerie
+// @access  Private (module collecteurs_admin en écriture)
+const requestSonnerie = asyncHandler(async (req, res) => {
+  const collecteur = await Collecteur.findById(req.params.id);
+  if (!collecteur) {
+    res.status(404);
+    throw new Error("Collecteur non trouvé");
+  }
+  collecteur.sonnerie = true;
+  await collecteur.save();
+  res.json({
+    ok: true,
+    message: "Sonnerie demandée : le collecteur sonnera à son prochain relevé.",
+  });
 });
 
 // @desc    Créer un collecteur
@@ -242,6 +263,7 @@ export {
   getCollecteurById,
   getPositions,
   pingPosition,
+  requestSonnerie,
   createCollecteur,
   updateCollecteur,
   deleteCollecteur,

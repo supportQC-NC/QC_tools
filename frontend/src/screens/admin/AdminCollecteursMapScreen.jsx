@@ -4,10 +4,13 @@
 // Vue satellite + relief, marqueur en forme de mobile coloré selon la fraîcheur.
 // Rafraîchi toutes les 20 s.
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { useGetCollecteurPositionsQuery } from "../../slices/collecteurApiSlice";
+import {
+  useGetCollecteurPositionsQuery,
+  useRequestSonnerieMutation,
+} from "../../slices/collecteurApiSlice";
 import "./AdminCollecteursMapScreen.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN || "";
@@ -16,6 +19,7 @@ mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN || "";
 const NC_CENTER = [166.4468049, -22.2338406];
 const NC_ZOOM = 14;
 const NC_PITCH = 45; // inclinaison modérée pour le relief
+const SEUIL_ACTIF_MIN = 5; // actif si vu il y a moins de 5 min
 
 const minutesSince = (at) => (Date.now() - new Date(at).getTime()) / 60000;
 
@@ -30,7 +34,7 @@ const ago = (at) => {
 };
 
 // Vert si relevé récent (<15 min), rouge sinon.
-const couleur = (at) => (minutesSince(at) < 15 ? "#22c55e" : "#ef4444");
+const couleur = (at) => (minutesSince(at) < SEUIL_ACTIF_MIN ? "#22c55e" : "#ef4444");
 
 // Marqueur en forme de mobile (SVG inline), couleur dynamique.
 const markerSvg = (color) => `
@@ -65,6 +69,7 @@ const popupHtml = (c) => {
       <div class="cm-popup-coord">${coords}</div>
       <div class="cm-popup-seen">Vu ${ago(c.lastPosition.at)}</div>
       <a class="cm-popup-btn" href="${gmaps}" target="_blank" rel="noopener noreferrer">Itinéraire (Google Maps)</a>
+      <button class="cm-popup-btn ring" data-ring="${c._id}">🔔 Faire sonner</button>
     </div>`;
 };
 
@@ -82,6 +87,8 @@ const AdminCollecteursMapScreen = () => {
 
   const { data: positions = [], isLoading, error } =
     useGetCollecteurPositionsQuery(undefined, { pollingInterval: 20000 });
+  const [requestSonnerie] = useRequestSonnerieMutation();
+  const [ringMsg, setRingMsg] = useState(null);
 
   const hasToken = !!mapboxgl.accessToken;
 
@@ -91,7 +98,7 @@ const AdminCollecteursMapScreen = () => {
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/satellite-streets-v12",
+      style: "mapbox://styles/mapbox/outdoors-v12", // fond relief topographique
       center: NC_CENTER,
       zoom: NC_ZOOM,
       pitch: NC_PITCH,
@@ -114,7 +121,7 @@ const AdminCollecteursMapScreen = () => {
           maxzoom: 14,
         });
       }
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.1 });
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.3 });
 
       if (!map.getLayer("sky")) {
         map.addLayer({
@@ -128,20 +135,6 @@ const AdminCollecteursMapScreen = () => {
         });
       }
 
-      // Remonter tous les labels (rues, lieux) au-dessus du terrain pour
-      // qu'ils restent lisibles en satellite.
-      const labelColor = "#ffffff";
-      const haloColor = "rgba(0,0,0,0.85)";
-      map.getStyle().layers.forEach((layer) => {
-        if (layer.type === "symbol" && layer.layout?.["text-field"]) {
-          try {
-            map.setLayoutProperty(layer.id, "visibility", "visible");
-            map.setPaintProperty(layer.id, "text-color", labelColor);
-            map.setPaintProperty(layer.id, "text-halo-color", haloColor);
-            map.setPaintProperty(layer.id, "text-halo-width", 1.4);
-          } catch {}
-        }
-      });
     });
 
     mapRef.current = map;
@@ -151,6 +144,26 @@ const AdminCollecteursMapScreen = () => {
       markersRef.current = {};
     };
   }, [hasToken]);
+
+  // Clic sur "Faire sonner" (bouton injecté dans les popups).
+  useEffect(() => {
+    const el = mapContainer.current;
+    if (!el) return;
+    const onClick = async (e) => {
+      const btn = e.target.closest && e.target.closest("[data-ring]");
+      if (!btn) return;
+      const id = btn.getAttribute("data-ring");
+      try {
+        await requestSonnerie(id).unwrap();
+        setRingMsg("🔔 Sonnerie envoyée — le collecteur sonnera à son prochain relevé (≤ 60 s).");
+      } catch {
+        setRingMsg("Échec de l'envoi de la sonnerie.");
+      }
+      setTimeout(() => setRingMsg(null), 4000);
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+  }, [requestSonnerie]);
 
   // Sync des marqueurs à chaque nouvelle donnée.
   useEffect(() => {
@@ -194,7 +207,7 @@ const AdminCollecteursMapScreen = () => {
     });
   }, [positions]);
 
-  const actifs = positions.filter((c) => minutesSince(c.lastPosition.at) < 15).length;
+  const actifs = positions.filter((c) => minutesSince(c.lastPosition.at) < SEUIL_ACTIF_MIN).length;
 
   return (
     <div className="cm-page">
@@ -202,7 +215,7 @@ const AdminCollecteursMapScreen = () => {
         <div>
           <h1>Carte des collecteurs</h1>
           <p className="cm-sub">
-            Vue satellite avec relief — position rafraîchie toutes les 20 s.
+            Fond relief — position rafraîchie toutes les 20 s.
           </p>
         </div>
         <div className="cm-stats">
@@ -230,6 +243,7 @@ const AdminCollecteursMapScreen = () => {
           {isLoading && positions.length === 0 && (
             <div className="cm-message">Chargement des positions…</div>
           )}
+          {ringMsg && <div className="cm-message">{ringMsg}</div>}
           <div ref={mapContainer} className="cm-map" />
         </>
       )}

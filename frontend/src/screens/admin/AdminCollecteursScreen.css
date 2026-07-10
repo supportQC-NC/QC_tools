@@ -132,3 +132,41 @@
   color: #2563eb;
   font-weight: 600;
 }
+
+
+.cm-popup-coord {
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #333;
+  user-select: all;
+}
+
+.cm-popup-btn {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  background: #2563eb;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 7px 10px;
+  border-radius: 6px;
+}
+
+.cm-popup-btn:hover {
+  background: #1d4ed8;
+}
+
+.cm-popup-btn.ring {
+  background: #f59e0b;
+  margin-top: 6px;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+}
+
+.cm-popup-btn.ring:hover {
+  background: #d97706;
+}

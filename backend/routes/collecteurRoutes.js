@@ -5,6 +5,7 @@ import {
   getCollecteurById,
   getPositions,
   pingPosition,
+  requestSonnerie,
   createCollecteur,
   updateCollecteur,
   deleteCollecteur,
@@ -34,5 +35,8 @@ router
   .get(protect, canRead, getCollecteurById)
   .put(protect, canWrite, updateCollecteur)
   .delete(protect, canDelete, deleteCollecteur);
+
+// Faire sonner un collecteur (pour le retrouver).
+router.post("/:id/sonnerie", protect, canWrite, requestSonnerie);
 
 export default router;

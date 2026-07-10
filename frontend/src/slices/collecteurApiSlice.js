@@ -23,6 +23,9 @@ export const collecteurApiSlice = apiSlice.injectEndpoints({
     pingCollecteur: builder.mutation({
       query: (data) => ({ url: `${URL}/ping`, method: "POST", body: data }),
     }),
+    requestSonnerie: builder.mutation({
+      query: (id) => ({ url: `${URL}/${id}/sonnerie`, method: "POST" }),
+    }),
     createCollecteur: builder.mutation({
       query: (data) => ({ url: URL, method: "POST", body: data }),
       invalidatesTags: ["Collecteur"],
@@ -47,6 +50,7 @@ export const {
   useGetCollecteurByIdQuery,
   useGetCollecteurPositionsQuery,
   usePingCollecteurMutation,
+  useRequestSonnerieMutation,
   useCreateCollecteurMutation,
   useUpdateCollecteurMutation,
   useDeleteCollecteurMutation,
