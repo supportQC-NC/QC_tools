@@ -1,8 +1,8 @@
 // src/screens/admin/AdminCollecteursMapScreen.jsx
 //
-// Carte Mapbox des collecteurs (centrée sur la Nouvelle-Calédonie).
-// Mode SATELLITE + RELIEF 3D. Un marqueur par collecteur ayant une dernière
-// position connue ; popup au clic. Rafraîchi toutes les 20 s.
+// Carte Mapbox des collecteurs (centrée sur le 13 rue Ampère, Ducos).
+// Vue satellite + relief, marqueur en forme de mobile coloré selon la fraîcheur.
+// Rafraîchi toutes les 20 s.
 
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
@@ -15,7 +15,7 @@ mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN || "";
 // Centre : 13 rue Ampère, Nouméa (Ducos) — base / dépôt.
 const NC_CENTER = [166.4468049, -22.2338406];
 const NC_ZOOM = 14;
-const NC_PITCH = 50; // inclinaison pour voir le relief
+const NC_PITCH = 45; // inclinaison modérée pour le relief
 
 const minutesSince = (at) => (Date.now() - new Date(at).getTime()) / 60000;
 
@@ -30,7 +30,17 @@ const ago = (at) => {
 };
 
 // Vert si relevé récent (<15 min), rouge sinon.
-const couleur = (at) => (minutesSince(at) < 15 ? "#4ade80" : "#ff6b6b");
+const couleur = (at) => (minutesSince(at) < 15 ? "#22c55e" : "#ef4444");
+
+// Marqueur en forme de mobile (SVG inline), couleur dynamique.
+const markerSvg = (color) => `
+  <svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15 38C15 38 28 24 28 14A13 13 0 1 0 2 14C2 24 15 38 15 38Z"
+          fill="${color}" stroke="#ffffff" stroke-width="2"/>
+    <rect x="9" y="6" width="12" height="16" rx="2.2" fill="#ffffff"/>
+    <rect x="10.5" y="8" width="9" height="10.5" rx="0.8" fill="${color}" opacity="0.85"/>
+    <circle cx="15" cy="20" r="0.9" fill="${color}"/>
+  </svg>`;
 
 const popupHtml = (c) => {
   const agent = c.agent
@@ -46,6 +56,13 @@ const popupHtml = (c) => {
       <div class="cm-popup-row"><span>Statut</span> ${c.statut || "—"}</div>
       <div class="cm-popup-seen">Vu ${ago(c.lastPosition.at)}</div>
     </div>`;
+};
+
+const makeMarkerEl = (color) => {
+  const el = document.createElement("div");
+  el.className = "cm-marker";
+  el.innerHTML = markerSvg(color);
+  return el;
 };
 
 const AdminCollecteursMapScreen = () => {
@@ -78,7 +95,7 @@ const AdminCollecteursMapScreen = () => {
     );
 
     map.on("load", () => {
-      // Relief 3D : modèle numérique de terrain Mapbox.
+      // Relief 3D (exagération douce pour ne pas masquer les rues).
       if (!map.getSource("mapbox-dem")) {
         map.addSource("mapbox-dem", {
           type: "raster-dem",
@@ -87,9 +104,8 @@ const AdminCollecteursMapScreen = () => {
           maxzoom: 14,
         });
       }
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.5 });
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.1 });
 
-      // Ciel / atmosphère pour l'horizon.
       if (!map.getLayer("sky")) {
         map.addLayer({
           id: "sky",
@@ -101,6 +117,21 @@ const AdminCollecteursMapScreen = () => {
           },
         });
       }
+
+      // Remonter tous les labels (rues, lieux) au-dessus du terrain pour
+      // qu'ils restent lisibles en satellite.
+      const labelColor = "#ffffff";
+      const haloColor = "rgba(0,0,0,0.85)";
+      map.getStyle().layers.forEach((layer) => {
+        if (layer.type === "symbol" && layer.layout?.["text-field"]) {
+          try {
+            map.setLayoutProperty(layer.id, "visibility", "visible");
+            map.setPaintProperty(layer.id, "text-color", labelColor);
+            map.setPaintProperty(layer.id, "text-halo-color", haloColor);
+            map.setPaintProperty(layer.id, "text-halo-width", 1.4);
+          } catch {}
+        }
+      });
     });
 
     mapRef.current = map;
@@ -124,20 +155,20 @@ const AdminCollecteursMapScreen = () => {
       vus.add(c._id);
 
       const html = popupHtml(c);
+      const col = couleur(c.lastPosition.at);
       const existing = markersRef.current[c._id];
 
       if (existing) {
         existing.setLngLat([lng, lat]);
-        existing.getElement().style.background = couleur(c.lastPosition.at);
+        existing.getElement().innerHTML = markerSvg(col);
         existing.getPopup().setHTML(html);
       } else {
-        const el = document.createElement("div");
-        el.className = "cm-marker";
-        el.style.background = couleur(c.lastPosition.at);
-
-        const marker = new mapboxgl.Marker({ element: el })
+        const marker = new mapboxgl.Marker({
+          element: makeMarkerEl(col),
+          anchor: "bottom", // la pointe du repère est sur la position
+        })
           .setLngLat([lng, lat])
-          .setPopup(new mapboxgl.Popup({ offset: 16 }).setHTML(html))
+          .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(html))
           .addTo(map);
 
         markersRef.current[c._id] = marker;
