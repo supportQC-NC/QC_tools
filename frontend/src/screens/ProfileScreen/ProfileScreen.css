@@ -1,5 +1,5 @@
 /* src/screens/ProfileScreen/ProfileScreen.css
-   Thème sombre aligné sur les variables globales de l'app (index.css). */
+   Thème sombre. Tout est confiné sous .profile-page pour ne rien faire fuir. */
 
 .profile-page {
   max-width: 1500px;
@@ -7,14 +7,69 @@
   padding: 24px 28px 56px;
 }
 
-.profile-page .profile-title {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 22px;
+/* ─── Bandeau de profil ─── */
+.profile-page .profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28);
 }
 
-/* Les deux cartes côte à côte (compte à gauche, rapports à droite). */
+.profile-page .profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #7c5cff);
+  box-shadow: 0 4px 14px rgba(77, 166, 255, 0.35);
+  letter-spacing: 1px;
+}
+
+.profile-page .profile-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-page .profile-hero-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.profile-page .profile-hero-email {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.profile-page .profile-role {
+  flex-shrink: 0;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.14);
+  border: 1px solid rgba(77, 166, 255, 0.35);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+/* ─── Colonnes ─── */
 .profile-page .profile-columns {
   display: flex;
   gap: 24px;
@@ -25,9 +80,9 @@
 .profile-page .profile-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
 }
 
 .profile-page .profile-card-account {
@@ -39,21 +94,42 @@
   flex: 2 1 620px;
 }
 
-.profile-page .profile-card h2 {
-  font-size: 1.15rem;
-  font-weight: 600;
+/* En-tête de carte avec icône */
+.profile-page .card-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 6px;
+}
+
+.profile-page .card-head-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+.profile-page .card-head h2 {
+  font-size: 1.12rem;
+  font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .profile-page .profile-sub {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin: 0 0 16px;
+  margin: 2px 0 16px;
 }
 
+/* ─── Formulaires ─── */
 .profile-page .profile-form {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .profile-page .profile-grid {
@@ -83,7 +159,7 @@
 .profile-page .form-group select {
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 0.95rem;
   background: var(--bg-tertiary);
   color: var(--text-primary);
@@ -117,15 +193,19 @@
   color: #0f0f1a;
   border: none;
   padding: 11px 22px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.05s;
 }
 
 .profile-page .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
+}
+
+.profile-page .btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .profile-page .btn-primary:disabled {
@@ -135,7 +215,7 @@
 
 .profile-page .profile-banner {
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 0.9rem;
   margin-bottom: 14px;
   border: 1px solid transparent;
@@ -164,7 +244,7 @@
   color: var(--accent);
   border: 1px solid var(--accent);
   padding: 11px 22px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -189,65 +269,126 @@
   font-style: italic;
 }
 
-/* ─── Liste des abonnements ─── */
+/* ─── Abonnements ─── */
+.profile-page .sub-section-title {
+  margin-top: 26px;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
 .profile-page .sub-list {
-  margin-top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .profile-page .sub-item {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  justify-content: space-between;
+  border-radius: 12px;
+  padding: 16px;
   background: var(--bg-tertiary);
+  transition: border-color 0.15s;
+}
+
+.profile-page .sub-item:hover {
+  border-color: rgba(77, 166, 255, 0.4);
 }
 
 .profile-page .sub-item.paused {
-  opacity: 0.7;
+  opacity: 0.68;
 }
 
-.profile-page .sub-main {
+.profile-page .sub-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.profile-page .sub-report-wrap {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 220px;
-  flex: 1;
+  min-width: 0;
 }
 
 .profile-page .sub-report {
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 1rem;
   color: var(--text-primary);
 }
 
 .profile-page .sub-ent {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--accent);
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.profile-page .sub-plan,
-.profile-page .sub-periode {
-  font-size: 0.82rem;
+.profile-page .sub-freq-pill {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #0f0f1a;
+  background: var(--accent);
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+
+.profile-page .sub-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.profile-page .sub-line {
+  display: flex;
+  gap: 8px;
+  font-size: 0.84rem;
   color: var(--text-secondary);
+}
+
+.profile-page .sub-key {
+  min-width: 78px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.profile-page .sub-email {
+  color: var(--accent);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.profile-page .sub-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 .profile-page .sub-meta {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .profile-page .sub-badge {
   font-size: 0.72rem;
-  font-weight: 600;
-  padding: 3px 9px;
+  font-weight: 700;
+  padding: 4px 10px;
   border-radius: 999px;
 }
 
@@ -269,23 +410,25 @@
 .profile-page .sub-actions {
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 
 .profile-page .btn-mini {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   color: var(--text-secondary);
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .profile-page .btn-mini:hover:not(:disabled) {
   background: var(--bg-primary);
   color: var(--text-primary);
+  border-color: var(--accent);
 }
 
 .profile-page .btn-mini.danger {
@@ -295,6 +438,7 @@
 
 .profile-page .btn-mini.danger:hover {
   background: rgba(255, 107, 107, 0.1);
+  border-color: var(--danger);
 }
 
 .profile-page .btn-mini:disabled {
@@ -302,10 +446,38 @@
   cursor: not-allowed;
 }
 
-/* Empilement sur écrans étroits */
+/* État vide */
+.profile-page .sub-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 30px 20px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.profile-page .sub-empty svg {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.profile-page .sub-empty span {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-page .sub-empty small {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ─── Responsive ─── */
 @media (max-width: 1024px) {
   .profile-page .profile-card-account,
-.profile-page .profile-card-reports {
+  .profile-page .profile-card-reports {
     flex: 1 1 100%;
     max-width: none;
   }
@@ -315,8 +487,14 @@
   .profile-page .profile-grid {
     grid-template-columns: 1fr;
   }
-  .profile-page .sub-item {
+  .profile-page .profile-hero {
+    flex-wrap: wrap;
+  }
+  .profile-page .sub-foot {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .profile-page .sub-actions {
+    margin-left: 0;
   }
 }
