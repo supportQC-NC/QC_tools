@@ -1,256 +1,337 @@
-// src/screens/admin/AdminCollecteursMapScreen.jsx
-//
-// Carte des collecteurs. mapbox-gl est chargé via CDN (public/index.html) et lu
-// sur window.mapboxgl : cela évite le bug "ReferenceError: r is not defined"
-// causé par la minification de mapbox-gl par webpack/CRA en production.
-
-import React, { useEffect, useRef, useState } from "react";
+// src/screens/admin/AdminCollecteursScreen.jsx
+import React, { useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import {
-  useGetCollecteurPositionsQuery,
-  useRequestSonnerieMutation,
+  HiPlus,
+  HiRefresh,
+  HiDownload,
+  HiSearch,
+  HiPencil,
+  HiTrash,
+  HiDeviceMobile,
+} from "react-icons/hi";
+import {
+  useGetCollecteursQuery,
+  useDeleteCollecteurMutation,
 } from "../../slices/collecteurApiSlice";
-import "./AdminCollecteursMapScreen.css";
+import CollecteurModal, { STATUTS } from "../../components/Admin/CollecteurModal";
+import { useGetCurrentAppReleaseQuery } from "../../slices/appReleaseApiSlice";
+import "./AdminCollecteursScreen.css";
 
-// Objet global fourni par la balise <script> mapbox-gl dans public/index.html.
-const mapboxgl = typeof window !== "undefined" ? window.mapboxgl : null;
+const statutLabel = (v) => STATUTS.find((s) => s.value === v)?.label || v || "—";
 
-// Centre : 13 rue Ampère, Nouméa (Ducos).
-const NC_CENTER = [166.4468049, -22.2338406];
-const NC_ZOOM = 14;
-const SEUIL_ACTIF_MIN = 5; // actif si vu il y a moins de 5 min
-
-const minutesSince = (at) => (Date.now() - new Date(at).getTime()) / 60000;
-
-const ago = (at) => {
-  const m = Math.floor(minutesSince(at));
-  if (m < 1) return "à l'instant";
-  if (m < 60) return `il y a ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `il y a ${h} h`;
-  const j = Math.floor(h / 24);
-  return `il y a ${j} j`;
+const fmtDate = (d) => {
+  if (!d) return "";
+  const dd = new Date(d);
+  if (isNaN(dd.getTime())) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(dd.getDate())}/${p(dd.getMonth() + 1)}/${dd.getFullYear()}`;
 };
 
-const couleur = (at) => (minutesSince(at) < SEUIL_ACTIF_MIN ? "#22c55e" : "#ef4444");
+const AdminCollecteursScreen = () => {
+  const { data: collecteurs, isLoading, error, refetch } =
+    useGetCollecteursQuery();
+  const [deleteCollecteur] = useDeleteCollecteurMutation();
+  const { data: currentRelease } = useGetCurrentAppReleaseQuery();
+  const latestVersion =
+    currentRelease && !currentRelease.empty ? currentRelease.version : null;
+  const isOutdated = (c) =>
+    !!latestVersion && (c.versionApp || "") !== latestVersion;
 
-const markerSvg = (color) => `
-  <svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15 38C15 38 28 24 28 14A13 13 0 1 0 2 14C2 24 15 38 15 38Z"
-          fill="${color}" stroke="#ffffff" stroke-width="2"/>
-    <rect x="9" y="6" width="12" height="16" rx="2.2" fill="#ffffff"/>
-    <rect x="10.5" y="8" width="9" height="10.5" rx="0.8" fill="${color}" opacity="0.85"/>
-    <circle cx="15" cy="20" r="0.9" fill="${color}"/>
-  </svg>`;
+  const [search, setSearch] = useState("");
+  const [fStatut, setFStatut] = useState("");
+  const [fEntreprise, setFEntreprise] = useState("");
+  const [fGachette, setFGachette] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
 
-const fmtCoord = (n) => Number(n).toFixed(5);
+  const list = useMemo(() => collecteurs || [], [collecteurs]);
 
-const popupHtml = (c) => {
-  const agent = c.agent
-    ? `${c.agent.prenom || ""} ${c.agent.nom || ""}`.trim()
-    : "—";
-  const ent = c.entreprise?.trigramme || c.entreprise?.nomDossierDBF || "—";
-  const { lat, lng, accuracy } = c.lastPosition || {};
-  const coords = `${fmtCoord(lat)}, ${fmtCoord(lng)}`;
-  const prec = accuracy != null ? `± ${Math.round(accuracy)} m` : "—";
-  const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-  return `
-    <div class="cm-popup">
-      <div class="cm-popup-id">${c.identifiant}</div>
-      ${c.nom ? `<div class="cm-popup-nom">${c.nom}</div>` : ""}
-      <div class="cm-popup-row"><span>Agent</span> ${agent}</div>
-      <div class="cm-popup-row"><span>Entreprise</span> ${ent}</div>
-      <div class="cm-popup-row"><span>Statut</span> ${c.statut || "—"}</div>
-      <div class="cm-popup-row"><span>Version app</span> ${c.versionApp || "—"}</div>
-      <div class="cm-popup-row"><span>Précision</span> ${prec}</div>
-      <div class="cm-popup-coord">${coords}</div>
-      <div class="cm-popup-seen">Vu ${ago(c.lastPosition.at)}</div>
-      <a class="cm-popup-btn" href="${gmaps}" target="_blank" rel="noopener noreferrer">Itinéraire (Google Maps)</a>
-      <button class="cm-popup-btn ring" data-ring="${c._id}">🔔 Faire sonner</button>
-    </div>`;
-};
+  // Options entreprises (à partir des collecteurs présents)
+  const entreprisesOptions = useMemo(() => {
+    const map = new Map();
+    list.forEach((c) => {
+      if (c.entreprise?._id) {
+        map.set(c.entreprise._id, c.entreprise.trigramme || c.entreprise.nomComplet);
+      }
+    });
+    return [...map.entries()];
+  }, [list]);
 
-// Écarte les marqueurs qui partagent (quasi) la même position, en petit cercle,
-// pour qu'ils restent tous visibles (ex. plusieurs collecteurs au même dépôt).
-const OFFSET_DEG = 0.00009; // ~10 m
+  const filtered = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return list.filter((c) => {
+      if (fStatut && c.statut !== fStatut) return false;
+      if (fEntreprise && (c.entreprise?._id || "") !== fEntreprise) return false;
+      if (fGachette === "oui" && !c.gachette) return false;
+      if (fGachette === "non" && c.gachette) return false;
+      if (s) {
+        const hay = [
+          c.identifiant,
+          c.emplacement,
+          c.entreprise?.trigramme,
+          c.entreprise?.nomComplet,
+          c.agent ? `${c.agent.prenom} ${c.agent.nom}` : "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(s)) return false;
+      }
+      return true;
+    });
+  }, [list, search, fStatut, fEntreprise, fGachette]);
 
-const computeDisplayCoords = (positions) => {
-  const groups = {};
-  positions.forEach((c) => {
-    const { lat, lng } = c.lastPosition || {};
-    if (lat == null || lng == null) return;
-    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`; // regroupe ~11 m
-    (groups[key] = groups[key] || []).push(c);
-  });
-  const out = {};
-  Object.values(groups).forEach((arr) => {
-    if (arr.length === 1) {
-      const { lat, lng } = arr[0].lastPosition;
-      out[arr[0]._id] = [lng, lat];
-    } else {
-      arr.forEach((c, i) => {
-        const { lat, lng } = c.lastPosition;
-        const angle = (2 * Math.PI * i) / arr.length;
-        out[c._id] = [
-          lng + OFFSET_DEG * Math.cos(angle),
-          lat + OFFSET_DEG * Math.sin(angle),
-        ];
-      });
+  const compteurs = useMemo(() => {
+    const c = { total: list.length };
+    STATUTS.forEach((s) => (c[s.value] = 0));
+    list.forEach((it) => {
+      if (c[it.statut] !== undefined) c[it.statut] += 1;
+    });
+    return c;
+  }, [list]);
+
+  const handleNew = () => {
+    setEditing(null);
+    setModalOpen(true);
+  };
+  const handleEdit = (c) => {
+    setEditing(c);
+    setModalOpen(true);
+  };
+  const handleDelete = async (c) => {
+    if (!window.confirm(`Supprimer le collecteur "${c.identifiant}" ?`)) return;
+    try {
+      await deleteCollecteur(c._id).unwrap();
+    } catch (e) {
+      /* ignore */
     }
-  });
-  return out;
-};
+  };
 
-const makeMarkerEl = (color) => {
-  const el = document.createElement("div");
-  el.className = "cm-marker";
-  el.innerHTML = markerSvg(color);
-  return el;
-};
-
-const AdminCollecteursMapScreen = () => {
-  const mapContainer = useRef(null);
-  const mapRef = useRef(null);
-  const markersRef = useRef({});
-
-  const { data: positions = [], isLoading, error } =
-    useGetCollecteurPositionsQuery(undefined, { pollingInterval: 20000 });
-  const [requestSonnerie] = useRequestSonnerieMutation();
-  const [ringMsg, setRingMsg] = useState(null);
-
-  const token = (process.env.REACT_APP_MAPBOX_TOKEN || "").trim();
-  const ready = !!mapboxgl && !!token;
-
-  // Init de la carte (une seule fois).
-  useEffect(() => {
-    if (!ready || mapRef.current || !mapContainer.current) return;
-
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/outdoors-v11",
-      center: NC_CENTER,
-      zoom: NC_ZOOM,
-    });
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
-
-    mapRef.current = map;
-    return () => {
-      map.remove();
-      mapRef.current = null;
-      markersRef.current = {};
-    };
-  }, [ready, token]);
-
-  // Clic sur "Faire sonner" (bouton injecté dans les popups).
-  useEffect(() => {
-    const el = mapContainer.current;
-    if (!el) return;
-    const onClick = async (e) => {
-      const btn = e.target.closest && e.target.closest("[data-ring]");
-      if (!btn) return;
-      const id = btn.getAttribute("data-ring");
-      try {
-        await requestSonnerie(id).unwrap();
-        setRingMsg("🔔 Sonnerie envoyée — le collecteur sonnera à son prochain relevé (≤ 60 s).");
-      } catch {
-        setRingMsg("Échec de l'envoi de la sonnerie.");
-      }
-      setTimeout(() => setRingMsg(null), 4000);
-    };
-    el.addEventListener("click", onClick);
-    return () => el.removeEventListener("click", onClick);
-  }, [requestSonnerie]);
-
-  // Sync des marqueurs à chaque nouvelle donnée.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const vus = new Set();
-    const displayCoords = computeDisplayCoords(positions);
-    positions.forEach((c) => {
-      const { lat, lng } = c.lastPosition || {};
-      if (lat == null || lng == null) return;
-      vus.add(c._id);
-
-      const lngLat = displayCoords[c._id] || [lng, lat];
-      const html = popupHtml(c);
-      const col = couleur(c.lastPosition.at);
-      const existing = markersRef.current[c._id];
-
-      if (existing) {
-        existing.setLngLat(lngLat);
-        existing.getElement().innerHTML = markerSvg(col);
-        existing.getPopup().setHTML(html);
-      } else {
-        const marker = new mapboxgl.Marker({
-          element: makeMarkerEl(col),
-          anchor: "bottom",
-        })
-          .setLngLat(lngLat)
-          .setPopup(new mapboxgl.Popup({ offset: 24 }).setHTML(html))
-          .addTo(map);
-        markersRef.current[c._id] = marker;
-      }
-    });
-
-    Object.keys(markersRef.current).forEach((id) => {
-      if (!vus.has(id)) {
-        markersRef.current[id].remove();
-        delete markersRef.current[id];
-      }
-    });
-  }, [positions]);
-
-  const actifs = positions.filter(
-    (c) => minutesSince(c.lastPosition.at) < SEUIL_ACTIF_MIN,
-  ).length;
+  const handleExport = () => {
+    const aoa = [
+      [
+        "IDENTIFIANT",
+        "NOM",
+        "RECU",
+        "GACHETTE",
+        "MISE EN SERVICE",
+        "STATUT",
+        "VERSION APP",
+        "ENTREPRISE",
+        "AGENT",
+        "EMPLACEMENT",
+        "ACCESSOIRES",
+        "OBSERVATIONS",
+        "ACTIF",
+      ],
+    ];
+    filtered.forEach((c) =>
+      aoa.push([
+        c.identifiant,
+        c.nom || "",
+        fmtDate(c.recu),
+        c.gachette ? "OUI" : "NON",
+        fmtDate(c.miseEnService),
+        statutLabel(c.statut),
+        c.versionApp || "",
+        c.entreprise?.trigramme || c.entreprise?.nomComplet || "",
+        c.agent ? `${c.agent.prenom} ${c.agent.nom}` : "",
+        c.emplacement || "",
+        (c.accessoires || []).join(", "),
+        c.observations || "",
+        c.isActive ? "OUI" : "NON",
+      ]),
+    );
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Collecteurs");
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `collecteurs_${today}.xlsx`);
+  };
 
   return (
-    <div className="cm-page">
-      <div className="cm-header">
-        <div>
-          <h1>Carte des collecteurs</h1>
-          <p className="cm-sub">
-            Fond relief — position rafraîchie toutes les 20 s.
-          </p>
-        </div>
-        <div className="cm-stats">
-          <span className="cm-stat">
-            <span className="cm-dot ok" /> {actifs} actif(s)
-          </span>
-          <span className="cm-stat">
-            <span className="cm-dot ko" /> {positions.length - actifs} inactif(s)
-          </span>
+    <div className="admin-collecteurs">
+      <div className="col-header">
+        <h1>
+          <HiDeviceMobile /> Flotte de collecteurs
+        </h1>
+        <div className="col-actions">
+          <button className="btn-icon" onClick={refetch} title="Rafraîchir">
+            <HiRefresh />
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={handleExport}
+            disabled={!filtered.length}
+          >
+            <HiDownload /> Excel
+          </button>
+          <button className="btn-primary" onClick={handleNew}>
+            <HiPlus /> Nouveau
+          </button>
         </div>
       </div>
 
-      {!mapboxgl ? (
-        <div className="cm-message error">
-          Mapbox n'est pas chargé. Ajoutez la balise &lt;script&gt; mapbox-gl dans{" "}
-          <code>public/index.html</code> puis rebuildez.
+      {/* Compteurs par statut */}
+      <div className="col-stats">
+        <div className="col-stat total">
+          <span className="v">{compteurs.total}</span>
+          <span className="l">Total</span>
         </div>
-      ) : !token ? (
-        <div className="cm-message error">
-          Token Mapbox manquant. Ajoutez <code>REACT_APP_MAPBOX_TOKEN</code> dans
-          votre <code>.env</code> puis rebuildez.
+        {STATUTS.map((s) => (
+          <div className={`col-stat st-${s.value}`} key={s.value}>
+            <span className="v">{compteurs[s.value]}</span>
+            <span className="l">{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtres */}
+      <div className="col-filters">
+        <div className="search-box">
+          <HiSearch />
+          <input
+            type="text"
+            placeholder="Rechercher (identifiant, agent, emplacement…)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
+        <select value={fStatut} onChange={(e) => setFStatut(e.target.value)}>
+          <option value="">Tous statuts</option>
+          {STATUTS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={fEntreprise}
+          onChange={(e) => setFEntreprise(e.target.value)}
+        >
+          <option value="">Toutes entreprises</option>
+          {entreprisesOptions.map(([id, label]) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select value={fGachette} onChange={(e) => setFGachette(e.target.value)}>
+          <option value="">Gâchette : toutes</option>
+          <option value="oui">Gâchette : Oui</option>
+          <option value="non">Gâchette : Non</option>
+        </select>
+      </div>
+
+      {latestVersion && (
+        <div className="col-legend">
+          Dernière version&nbsp;: <strong>{latestVersion}</strong> — les
+          collecteurs en{" "}
+          <span className="ver-badge outdated">rouge</span> ne l'ont pas.
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="col-empty">Chargement…</div>
+      ) : error ? (
+        <div className="col-error">
+          {error?.data?.message || "Erreur de chargement."}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="col-empty">Aucun collecteur.</div>
       ) : (
-        <>
-          {error && (
-            <div className="cm-message error">
-              Impossible de charger les positions.
-            </div>
-          )}
-          {isLoading && positions.length === 0 && (
-            <div className="cm-message">Chargement des positions…</div>
-          )}
-          {ringMsg && <div className="cm-message">{ringMsg}</div>}
-          <div ref={mapContainer} className="cm-map" />
-        </>
+        <div className="col-table-wrap">
+          <table className="col-table">
+            <thead>
+              <tr>
+                <th>Identifiant</th>
+                <th>Nom</th>
+                <th>Reçu</th>
+                <th>Gâchette</th>
+                <th>Mise en service</th>
+                <th>Statut</th>
+                <th>Version</th>
+                <th>Entreprise</th>
+                <th>Agent</th>
+                <th>Emplacement</th>
+                <th>Accessoires</th>
+                <th>Actif</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr
+                  key={c._id}
+                  className={`${!c.isActive ? "row-inactive" : ""} ${
+                    isOutdated(c) ? "row-outdated" : ""
+                  }`.trim()}
+                >
+                  <td className="mono">{c.identifiant}</td>
+                  <td>{c.nom || "—"}</td>
+                  <td>{fmtDate(c.recu)}</td>
+                  <td>
+                    <span className={`ga ${c.gachette ? "oui" : "non"}`}>
+                      {c.gachette ? "OUI" : "NON"}
+                    </span>
+                  </td>
+                  <td>{fmtDate(c.miseEnService)}</td>
+                  <td>
+                    <span className={`statut-badge st-${c.statut}`}>
+                      {statutLabel(c.statut)}
+                    </span>
+                  </td>
+                  <td>
+                    {c.versionApp ? (
+                      <span
+                        className={`ver-badge ${
+                          isOutdated(c) ? "outdated" : "uptodate"
+                        }`}
+                      >
+                        {c.versionApp}
+                      </span>
+                    ) : (
+                      <span className="ver-badge unknown">—</span>
+                    )}
+                  </td>
+                  <td>{c.entreprise?.trigramme || c.entreprise?.nomComplet || "—"}</td>
+                  <td>{c.agent ? `${c.agent.prenom} ${c.agent.nom}` : "—"}</td>
+                  <td>{c.emplacement || "—"}</td>
+                  <td className="acc-cell" title={(c.accessoires || []).join(", ")}>
+                    {(c.accessoires || []).join(", ") || "—"}
+                  </td>
+                  <td>{c.isActive ? "Oui" : "Non"}</td>
+                  <td className="col-row-actions">
+                    <button
+                      className="btn-row"
+                      onClick={() => handleEdit(c)}
+                      title="Modifier"
+                    >
+                      <HiPencil />
+                    </button>
+                    <button
+                      className="btn-row danger"
+                      onClick={() => handleDelete(c)}
+                      title="Supprimer"
+                    >
+                      <HiTrash />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {modalOpen && (
+        <CollecteurModal
+          collecteur={editing}
+          onClose={() => setModalOpen(false)}
+        />
       )}
     </div>
   );
 };
 
-export default AdminCollecteursMapScreen;
+export default AdminCollecteursScreen;
