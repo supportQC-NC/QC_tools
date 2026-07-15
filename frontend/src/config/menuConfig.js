@@ -137,8 +137,7 @@ export const adminMenuStructure = [
       { label: "Top Articles", path: "/admin/top-articles", icon: HiChartBar },
       { label: "Performance Dock", path: "/admin/performance-dock", icon: HiClipboardCheck },
       { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
-      { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
-      { label: "Carte Collecteurs", path: "/admin/collecteurs-carte", icon: HiLocationMarker },
+
     ],
   },
 ];
