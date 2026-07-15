@@ -2,9 +2,8 @@
    Thème sombre. Tout est confiné sous .profile-page pour ne rien faire fuir. */
 
 .profile-page {
-  max-width: 1500px;
-  margin: 0 auto;
-  padding: 24px 28px 56px;
+  padding: 26px 40px 56px;
+  box-sizing: border-box;
 }
 
 /* ─── Bandeau de profil ─── */
@@ -70,7 +69,7 @@
 }
 
 /* ─── Colonnes ─── */
-.profile-page .profile-columns {
+.profile-page .profile-layout {
   display: flex;
   gap: 24px;
   align-items: flex-start;
@@ -85,13 +84,18 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
 }
 
-.profile-page .profile-card-account {
-  flex: 1 1 380px;
-  max-width: 480px;
+.profile-page .profile-area-account {
+  flex: 1 1 320px;
+  max-width: 460px;
 }
 
-.profile-page .profile-card-reports {
-  flex: 2 1 620px;
+.profile-page .profile-area-collecteurs {
+  flex: 1 1 320px;
+  max-width: 460px;
+}
+
+.profile-page .profile-area-reports {
+  flex: 2.4 1 560px;
 }
 
 /* En-tête de carte avec icône */
@@ -475,9 +479,10 @@
 }
 
 /* ─── Responsive ─── */
-@media (max-width: 1024px) {
-  .profile-page .profile-card-account,
-  .profile-page .profile-card-reports {
+@media (max-width: 1100px) {
+  .profile-page .profile-area-account,
+  .profile-page .profile-area-collecteurs,
+  .profile-page .profile-area-reports {
     flex: 1 1 100%;
     max-width: none;
   }
@@ -497,4 +502,82 @@
   .profile-page .sub-actions {
     margin-left: 0;
   }
+}
+
+/* ─── Carte « Mes collecteurs » ─── */
+.profile-page .col-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.profile-page .col-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  transition: border-color 0.15s;
+}
+
+.profile-page .col-item:hover {
+  border-color: rgba(77, 166, 255, 0.4);
+}
+
+.profile-page .col-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.profile-page .col-ident {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.profile-page .col-nom {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.profile-page .col-ent {
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.profile-page .col-statut {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.profile-page .col-statut.ok {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--success);
+}
+
+.profile-page .col-statut.info {
+  background: rgba(77, 166, 255, 0.15);
+  color: var(--accent);
+}
+
+.profile-page .col-statut.warn {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--warning);
+}
+
+.profile-page .col-statut.ko {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--danger);
 }

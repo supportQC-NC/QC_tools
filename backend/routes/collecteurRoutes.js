@@ -4,6 +4,7 @@ import {
   getCollecteurs,
   getCollecteurById,
   getPositions,
+  getMyCollecteurs,
   pingPosition,
   requestSonnerie,
   createCollecteur,
@@ -24,6 +25,8 @@ const canDelete = checkModuleAccess("collecteurs_admin", "delete");
 router.post("/ping", protect, pingPosition);
 // Positions pour la carte : réservé au module collecteurs_admin (lecture).
 router.get("/positions", protect, canRead, getPositions);
+// Collecteurs de l'utilisateur connecté (profil) — pas de module requis.
+router.get("/mine", protect, getMyCollecteurs);
 
 router
   .route("/")

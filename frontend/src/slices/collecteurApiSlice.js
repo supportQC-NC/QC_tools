@@ -19,6 +19,10 @@ export const collecteurApiSlice = apiSlice.injectEndpoints({
       query: () => ({ url: `${URL}/positions` }),
       providesTags: ["CollecteurPosition"],
     }),
+    getMyCollecteurs: builder.query({
+      query: () => ({ url: `${URL}/mine` }),
+      providesTags: ["Collecteur"],
+    }),
     // Relevé de position envoyé par l'app (agent).
     pingCollecteur: builder.mutation({
       query: (data) => ({ url: `${URL}/ping`, method: "POST", body: data }),
@@ -49,6 +53,7 @@ export const {
   useGetCollecteursQuery,
   useGetCollecteurByIdQuery,
   useGetCollecteurPositionsQuery,
+  useGetMyCollecteursQuery,
   usePingCollecteurMutation,
   useRequestSonnerieMutation,
   useCreateCollecteurMutation,

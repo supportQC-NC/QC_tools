@@ -14,6 +14,7 @@ import {
   useUpdateSubscriptionMutation,
   useTestSubscriptionMutation,
 } from "../../slices/reportSubscriptionApiSlice";
+import { useGetMyCollecteursQuery } from "../../slices/collecteurApiSlice";
 import { setCredentials } from "../../slices/authSlice";
 import "./ProfileScreen.css";
 
@@ -84,6 +85,25 @@ const IconInbox = () => (
   </svg>
 );
 
+const IconDevice = () => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="6" y="2" width="12" height="20" rx="2" />
+    <path d="M11 18h2" />
+  </svg>
+);
+
+const STATUT_LABELS = {
+  stock: "En stock",
+  service: "En service",
+  panne: "En panne",
+  reparation: "En réparation",
+  reforme: "Réformé",
+  perdu: "Perdu / Volé",
+};
+const statutClass = (st) =>
+  ({ service: "ok", stock: "info", panne: "warn", reparation: "warn", reforme: "ko", perdu: "ko" }[st] || "info");
+
 const ProfileScreen = () => {
   const dispatch = useDispatch();
 
@@ -139,6 +159,7 @@ const ProfileScreen = () => {
   // ─────────────────────────── Rapports ───────────────────────────
   const { data: options } = useGetReportOptionsQuery();
   const { data: subscriptions } = useGetMySubscriptionsQuery();
+  const { data: myCollecteurs = [] } = useGetMyCollecteursQuery();
   const [testConfig, { isLoading: testingConfig }] = useTestConfigMutation();
   const [createSub, { isLoading: creating }] = useCreateSubscriptionMutation();
   const [deleteSub] = useDeleteSubscriptionMutation();
@@ -289,9 +310,9 @@ const ProfileScreen = () => {
         <span className="profile-role">{roleLabel}</span>
       </div>
 
-      <div className="profile-columns">
+      <div className="profile-layout">
         {/* ─── Carte : informations du compte ─── */}
-        <section className="profile-card profile-card-account">
+        <section className="profile-card profile-area-account">
           <div className="card-head">
             <span className="card-head-icon"><IconUser /></span>
             <h2>Informations du compte</h2>
@@ -340,9 +361,44 @@ const ProfileScreen = () => {
           </form>
         </section>
 
+        {/* ─── Carte : mes collecteurs ─── */}
+        <section className="profile-card profile-area-collecteurs">
+          <div className="card-head">
+            <span className="card-head-icon"><IconDevice /></span>
+            <h2>Mes collecteurs</h2>
+          </div>
+          {myCollecteurs.length > 0 ? (
+            <div className="col-list">
+              {myCollecteurs.map((c) => (
+                <div key={c._id} className="col-item">
+                  <div className="col-item-main">
+                    <span className="col-ident">{c.identifiant}</span>
+                    {c.nom && <span className="col-nom">{c.nom}</span>}
+                    <span className="col-ent">
+                      {c.entreprise?.trigramme ||
+                        c.entreprise?.nomComplet ||
+                        c.entreprise?.nomDossierDBF ||
+                        "—"}
+                    </span>
+                  </div>
+                  <span className={`col-statut ${statutClass(c.statut)}`}>
+                    {STATUT_LABELS[c.statut] || c.statut}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="sub-empty">
+              <IconDevice />
+              <span>Aucun collecteur affecté.</span>
+              <small>Les appareils qui vous sont attribués apparaîtront ici.</small>
+            </div>
+          )}
+        </section>
+
         {/* ─── Carte : abonnements aux rapports ─── */}
         {showReports && (
-          <section className="profile-card profile-card-reports">
+          <section className="profile-card profile-area-reports">
             <div className="card-head">
               <span className="card-head-icon"><IconMail /></span>
               <h2>Rapports par email</h2>

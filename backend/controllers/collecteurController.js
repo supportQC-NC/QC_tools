@@ -58,6 +58,17 @@ const getPositions = asyncHandler(async (req, res) => {
   res.json(collecteurs);
 });
 
+// @desc    Collecteurs affectés à l'utilisateur connecté (pour son profil)
+// @route   GET /api/collecteurs/mine
+// @access  Private (tout utilisateur connecté)
+const getMyCollecteurs = asyncHandler(async (req, res) => {
+  const collecteurs = await Collecteur.find({ agent: req.user._id })
+    .populate("entreprise", "trigramme nomComplet nomDossierDBF")
+    .select("identifiant nom statut entreprise versionApp lastPosition")
+    .sort({ identifiant: 1 });
+  res.json(collecteurs);
+});
+
 // @desc    Relevé de position envoyé par l'app (terrain)
 // @route   POST /api/collecteurs/ping
 // @access  Private (agent connecté). Identification par identifiant matériel.
@@ -262,6 +273,7 @@ export {
   getCollecteurs,
   getCollecteurById,
   getPositions,
+  getMyCollecteurs,
   pingPosition,
   requestSonnerie,
   createCollecteur,
