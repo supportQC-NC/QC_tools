@@ -70,6 +70,7 @@ import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen
 import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
+import AdminReceptionSuiviScreen from "./screens/admin/AdminReceptionSuiviScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -324,6 +325,14 @@ const router = createBrowserRouter(
         <Route
           path="/admin/analyse-reappro"
           element={<AdminAnalyseReapproScreen />}
+        />
+      </Route>
+
+      {/* Données · Suivi Réceptions -> module "reception_suivi_admin" */}
+      <Route element={<ModuleRoute module="reception_suivi_admin" />}>
+        <Route
+          path="/admin/suivi-receptions"
+          element={<AdminReceptionSuiviScreen />}
         />
       </Route>
 

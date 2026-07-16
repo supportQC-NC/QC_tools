@@ -1,0 +1,101 @@
+/* src/screens/admin/AdminReceptionSuiviScreen.css — scopé sous .reception-suivi */
+.reception-suivi { padding: 26px 32px 48px; color: var(--text-primary, #eee); box-sizing: border-box; }
+
+.reception-suivi .rs-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; padding: 18px 22px; margin-bottom: 22px; border-radius: 16px;
+  border: 1px solid var(--border, #333);
+  background: linear-gradient(135deg, var(--bg-secondary, #1a1a2e), var(--bg-tertiary, #252540));
+}
+.reception-suivi .rs-head-title { display: flex; align-items: center; gap: 14px; }
+.reception-suivi .rs-head-icon {
+  width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center;
+  justify-content: center; font-size: 24px; color: #fff;
+  background: linear-gradient(135deg, var(--accent, #4da6ff), #7c5cff);
+}
+.reception-suivi .rs-head-title h1 { margin: 0; font-size: 1.5rem; font-weight: 800; }
+.reception-suivi .rs-head-title p { margin: 2px 0 0; color: var(--text-secondary, #aaa); font-size: 0.88rem; }
+.reception-suivi .rs-head-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.reception-suivi .rs-select {
+  padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border, #333);
+  background: var(--bg-secondary, #1a1a2e); color: var(--text-primary, #eee);
+  font-size: 0.9rem; font-weight: 600; cursor: pointer; outline: none;
+}
+.reception-suivi .rs-refresh {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 10px;
+  border: 1px solid var(--border, #333); background: transparent; color: var(--text-secondary, #aaa);
+  cursor: pointer; font-size: 0.88rem; font-weight: 600;
+}
+.reception-suivi .rs-refresh:hover:not(:disabled) { border-color: var(--accent, #4da6ff); color: var(--accent, #4da6ff); }
+.reception-suivi .rs-refresh .spin { animation: rs-spin 1s linear infinite; }
+@keyframes rs-spin { to { transform: rotate(360deg); } }
+
+.reception-suivi .rs-empty, .reception-suivi .rs-none {
+  padding: 40px 20px; text-align: center; color: var(--text-muted, #888);
+}
+.reception-suivi .rs-none { padding: 14px; text-align: left; }
+
+.reception-suivi .rs-layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .reception-suivi .rs-layout { grid-template-columns: 1fr; } }
+
+.reception-suivi .rs-list { display: flex; flex-direction: column; gap: 10px; max-height: 74vh; overflow-y: auto; }
+.reception-suivi .rs-card {
+  text-align: left; background: var(--bg-secondary, #1a1a2e); border: 1px solid var(--border, #333);
+  border-radius: 12px; padding: 14px; cursor: pointer; color: inherit; width: 100%;
+}
+.reception-suivi .rs-card:hover { border-color: var(--accent, #4da6ff); }
+.reception-suivi .rs-card.active { border-color: var(--accent, #4da6ff); background: var(--bg-tertiary, #252540); }
+.reception-suivi .rs-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.reception-suivi .rs-cde { font-weight: 800; font-size: 1rem; }
+.reception-suivi .rs-card-meta { color: var(--text-secondary, #aaa); font-size: 0.85rem; margin-top: 3px; }
+.reception-suivi .rs-card-stats { display: flex; gap: 14px; margin-top: 6px; font-size: 0.82rem; color: var(--text-secondary, #aaa); }
+.reception-suivi .rs-card-stats span { display: inline-flex; align-items: center; gap: 4px; }
+.reception-suivi .rs-card-stats .rs-warn { color: #f59e0b; }
+.reception-suivi .rs-card-date { color: var(--text-muted, #777); font-size: 0.75rem; margin-top: 6px; }
+
+.reception-suivi .rs-badge { padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
+.reception-suivi .rs-st-cours { background: rgba(77,166,255,0.16); color: #4da6ff; }
+.reception-suivi .rs-st-ecarts { background: rgba(245,158,11,0.16); color: #f59e0b; }
+
+.reception-suivi .rs-detail {
+  background: var(--bg-secondary, #1a1a2e); border: 1px solid var(--border, #333);
+  border-radius: 16px; padding: 20px; min-height: 300px;
+}
+.reception-suivi .rs-detail-head h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
+.reception-suivi .rs-detail-sub { color: var(--text-secondary, #aaa); font-size: 0.9rem; }
+.reception-suivi .rs-section {
+  display: flex; align-items: center; gap: 8px; margin: 22px 0 12px;
+  font-size: 1rem; font-weight: 700; color: var(--text-primary, #eee);
+}
+
+.reception-suivi .rs-ano-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.reception-suivi .rs-ano { background: var(--bg-tertiary, #252540); border: 1px solid var(--border, #333); border-radius: 12px; overflow: hidden; }
+.reception-suivi .rs-ano-photo { width: 100%; height: 120px; object-fit: cover; cursor: pointer; display: block; background: #000; }
+.reception-suivi .rs-ano-nophoto { width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; color: var(--text-muted, #666); font-size: 32px; background: var(--bg-primary, #0f0f1a); }
+.reception-suivi .rs-ano-info { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.reception-suivi .rs-ano-nart { font-weight: 800; font-size: 0.9rem; }
+.reception-suivi .rs-ano-design { color: var(--text-secondary, #aaa); font-size: 0.78rem; }
+.reception-suivi .rs-ano-warn { background: rgba(245,158,11,0.16); color: #f59e0b; align-self: flex-start; }
+.reception-suivi .rs-ano-danger { background: rgba(239,68,68,0.16); color: #ef4444; align-self: flex-start; }
+
+.reception-suivi .rs-table-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+.reception-suivi .rs-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.reception-suivi .rs-table thead th {
+  position: sticky; top: 0; background: var(--bg-tertiary, #252540); color: var(--text-secondary, #aaa);
+  text-align: left; font-weight: 700; padding: 9px 12px; border-bottom: 1px solid var(--border, #333); white-space: nowrap;
+}
+.reception-suivi .rs-table th.num, .reception-suivi .rs-table td.num { text-align: right; }
+.reception-suivi .rs-table tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border, #333); }
+.reception-suivi .rs-table .mono { font-family: ui-monospace, Menlo, monospace; font-weight: 700; }
+.reception-suivi .rs-table .design { max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reception-suivi .rs-table .strong { font-weight: 800; color: var(--accent, #4da6ff); }
+.reception-suivi .rs-tag { padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: var(--bg-tertiary,#252540); color: var(--text-secondary,#aaa); }
+.reception-suivi .rs-tag-ok { background: rgba(34,197,94,0.14); color: #22c55e; }
+.reception-suivi .rs-tag-warn { background: rgba(245,158,11,0.16); color: #f59e0b; }
+
+.reception-suivi .rs-zoom {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(3,7,15,0.94);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; cursor: zoom-out;
+}
+.reception-suivi .rs-zoom img { max-width: 92%; max-height: 82%; object-fit: contain; border-radius: 8px; }
+.reception-suivi .rs-zoom-hint { color: var(--text-secondary, #aaa); font-size: 0.85rem; }

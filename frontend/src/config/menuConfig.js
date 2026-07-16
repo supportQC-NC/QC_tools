@@ -105,6 +105,11 @@ export const adminMenuStructure = [
         path: "/admin/factures",
         icon: HiTruck,
       },
+      {
+        label: "Suivi Réceptions",
+        path: "/admin/suivi-receptions",
+        icon: HiCube,
+      },
     ],
   },
   {
