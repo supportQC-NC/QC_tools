@@ -273,6 +273,7 @@ export const getMagasinArticlesByGisements = async (entreprise, gisements) => {
       design: safeTrim(a.DESIGN),
       fourn: a.FOURN != null ? String(a.FOURN).trim() : "",
       fournNom: fournM ? safeTrim(fournM.NOM) : "",
+      gencod: safeTrim(a.GENCOD),
       gisement: gLabel,
       s1,
       stock,

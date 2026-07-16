@@ -4,6 +4,7 @@ import DemandeReappro from "../models/DemandeReapproModel.js";
 import { getMagasinArticlesByGisements } from "../services/analyseReapproService.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
+import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
 
 const ACTIF = ["en_attente", "en_cours"];
 
@@ -168,6 +169,21 @@ const realiserDemande = asyncHandler(async (req, res) => {
     throw new Error("Demande introuvable");
   }
   if (d.statut !== "realisee") {
+    // Lignes réellement réassorties (scannées) : { nart, quantite }
+    const lignes = (Array.isArray(req.body?.lignes) ? req.body.lignes : [])
+      .map((l) => ({
+        nart: String(l.nart || "").trim(),
+        quantite: Math.round(Number(l.quantite) || 0),
+      }))
+      .filter((l) => l.nart && l.quantite > 0);
+
+    // Fichier de transfert (réserve -> rayon), même format/endroit que la prépa.
+    if (lignes.length > 0) {
+      const tsf = await ecrireTransfertMagasin(d, lignes);
+      d.lignesRealisees = lignes;
+      d.transfertFichier = tsf.fileName;
+    }
+
     d.statut = "realisee";
     d.realisedBy = req.user?._id;
     d.realisedByNom = nomUtilisateur(req.user);

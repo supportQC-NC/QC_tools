@@ -11,10 +11,17 @@ const articleSnapSchema = new mongoose.Schema(
     design: String,
     fourn: String,
     fournNom: String,
+    gencod: String,
     s1: Number,
     stock: Number, // stock en réserve (S2..S5)
     vteMoyMois: Number,
   },
+  { _id: false },
+);
+
+// Ligne réellement réassortie par l'agent (quantité prise au réassort).
+const ligneRealiseeSchema = new mongoose.Schema(
+  { nart: String, quantite: Number },
   { _id: false },
 );
 
@@ -44,6 +51,8 @@ const demandeReapproSchema = new mongoose.Schema(
     realisedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     realisedByNom: { type: String, default: "" },
     realisedAt: { type: Date },
+    lignesRealisees: [ligneRealiseeSchema],
+    transfertFichier: { type: String, default: "" },
   },
   { timestamps: true },
 );
