@@ -352,7 +352,7 @@ class CommandeCacheService {
         throw new Error(`Fichier DBF non trouvé: ${dbfPath}`);
       }
 
-      const dbf = await DBFFile.open(dbfPath);
+      const dbf = await DBFFile.open(dbfPath, { readMode: "loose" });
       const records = await dbf.readRecords();
       const stats = fs.statSync(dbfPath);
 
@@ -432,7 +432,7 @@ class CommandeCacheService {
         throw new Error(`Fichier DBF non trouvé: ${dbfPath}`);
       }
 
-      const dbf = await DBFFile.open(dbfPath);
+      const dbf = await DBFFile.open(dbfPath, { readMode: "loose" });
       const records = await dbf.readRecords();
       const stats = fs.statSync(dbfPath);
 

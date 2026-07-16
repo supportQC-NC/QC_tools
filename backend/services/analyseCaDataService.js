@@ -444,7 +444,7 @@ class AnalyseCaDataService {
     );
     if (!fs.existsSync(dbfPath)) return null;
 
-    const dbf = await DBFFile.open(dbfPath);
+    const dbf = await DBFFile.open(dbfPath, { readMode: "loose" });
     const records = await dbf.readRecords();
 
     const byNart = new Map();
