@@ -39,6 +39,11 @@ const joursRupture = (a) => {
 const stockTotal = (a) =>
   num(a.S1) + num(a.S2) + num(a.S3) + num(a.S4) + num(a.S5);
 
+// Stock détaillé par entrepôt (S1 = magasin, S2..S5 = entrepôts).
+const stockLieux = (a) => ({
+  s1: num(a.S1), s2: num(a.S2), s3: num(a.S3), s4: num(a.S4), s5: num(a.S5),
+});
+
 const vteMoyMois = (vAn, rup) => {
   const denom = 360 - rup;
   if (denom > 0) return Math.round(((vAn * 30) / denom) * 100) / 100;
@@ -135,7 +140,7 @@ export const buildAnalyseReappro = async (entreprise, opts = {}) => {
         pvte,
         venteAnnuelle: vAn,
         vteMoyMois: vmm,
-        s1, // = 0
+        ...stockLieux(a), // s1..s5 (s1 = 0 ici)
         stock, // = stock en réserve (S2..S5) puisque S1 = 0
       });
     }
@@ -218,6 +223,9 @@ export const buildAnalyseReappro = async (entreprise, opts = {}) => {
     rowsMagasin: magasinRows.slice(0, maxRows),
     totalMagasin: magasinRows.length,
     gisementsMagasin,
+    mappingEntrepots: entreprise?.mappingEntrepots || {
+      S1: "Magasin", S2: "S2", S3: "S3", S4: "S4", S5: "S5",
+    },
     generatedAt: new Date().toISOString(),
   };
 };
@@ -275,7 +283,7 @@ export const getMagasinArticlesByGisements = async (entreprise, gisements) => {
       fournNom: fournM ? safeTrim(fournM.NOM) : "",
       gencod: safeTrim(a.GENCOD),
       gisement: gLabel,
-      s1,
+      ...stockLieux(a),
       stock,
       vteMoyMois: vteMoyMois(venteAnnuelle(a), joursRupture(a)),
     });
@@ -283,4 +291,43 @@ export const getMagasinArticlesByGisements = async (entreprise, gisements) => {
   return out;
 };
 
-export default { buildAnalyseReappro, getMagasinArticlesByGisements };
+/**
+ * Résout un NART saisi à la main -> article (avec stock par entrepôt) pour
+ * l'ajout manuel à une demande. Renvoie null si le NART est inconnu.
+ */
+export const resolveArticleForReappro = async (entreprise, nart) => {
+  const wanted = cleanNart(nart);
+  if (!wanted) return null;
+  const [artCache, fourCache] = await Promise.all([
+    articleService.getArticles(entreprise),
+    fournissCacheService.getFournisseurs(entreprise),
+  ]);
+  const articles = artCache.records || [];
+  const fournByCode = new Map();
+  (fourCache.records || []).forEach((r) => {
+    if (r.FOURN !== undefined && r.FOURN !== null) {
+      fournByCode.set(String(r.FOURN).trim(), r);
+    }
+  });
+  const a = articles.find((x) => cleanNart(x.NART) === wanted);
+  if (!a) return null;
+  const fournM =
+    a.FOURN != null ? fournByCode.get(String(a.FOURN).trim()) : null;
+  return {
+    nart: cleanNart(a.NART),
+    design: safeTrim(a.DESIGN),
+    fourn: a.FOURN != null ? String(a.FOURN).trim() : "",
+    fournNom: fournM ? safeTrim(fournM.NOM) : "",
+    gencod: safeTrim(a.GENCOD),
+    gisement: gisement(a) || "(sans gisement)",
+    ...stockLieux(a),
+    stock: stockTotal(a),
+    vteMoyMois: vteMoyMois(venteAnnuelle(a), joursRupture(a)),
+  };
+};
+
+export default {
+  buildAnalyseReappro,
+  getMagasinArticlesByGisements,
+  resolveArticleForReappro,
+};

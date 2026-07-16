@@ -1,7 +1,10 @@
 // backend/controllers/demandeReapproController.js
 import asyncHandler from "../middleware/asyncHandler.js";
 import DemandeReappro from "../models/DemandeReapproModel.js";
-import { getMagasinArticlesByGisements } from "../services/analyseReapproService.js";
+import {
+  getMagasinArticlesByGisements,
+  resolveArticleForReappro,
+} from "../services/analyseReapproService.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
@@ -135,6 +138,88 @@ const deleteDemande = asyncHandler(async (req, res) => {
   res.json({ ok: true });
 });
 
+// @desc    Résout un NART (saisie manuelle) -> article + stock par entrepôt
+// @route   GET /api/demande-reappro/:nomDossierDBF/article/:nart
+// @access  Private — module analyse_reappro_admin (read) + accès entreprise
+const getArticleReappro = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const art = await resolveArticleForReappro(entreprise, req.params.nart);
+  if (!art) {
+    res.status(404);
+    throw new Error("Article introuvable (NART inconnu).");
+  }
+  res.json(art);
+});
+
+// @desc    Crée UNE demande à partir d'un panier d'articles + quantités
+// @route   POST /api/demande-reappro/:nomDossierDBF/panier
+// @access  Private — module analyse_reappro_admin (write) + accès entreprise
+// Body : { articles: [{ nart, quantite }], priorite?, commentaire? }
+// La quantité demandée est bornée au stock disponible (ΣS1..S5).
+const createDemandePanier = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const key = entreprise.nomDossierDBF;
+  const priorite = ["urgent", "a_faire", "normal"].includes(req.body.priorite)
+    ? req.body.priorite
+    : "a_faire";
+  const commentaire = String(req.body.commentaire || "").slice(0, 500);
+  const items = Array.isArray(req.body.articles) ? req.body.articles : [];
+  if (items.length === 0) {
+    res.status(400);
+    throw new Error("Panier vide.");
+  }
+
+  const articles = [];
+  const gisements = new Set();
+  for (const it of items) {
+    // eslint-disable-next-line no-await-in-loop
+    const art = await resolveArticleForReappro(entreprise, it.nart);
+    if (!art) continue; // NART inconnu -> ignoré
+    let q = Math.round(Number(it.quantite) || 0);
+    if (q <= 0) continue;
+    if (q > art.stock) q = art.stock; // borne au stock dispo
+    if (q <= 0) continue;
+    gisements.add(art.gisement);
+    articles.push({
+      nart: art.nart,
+      design: art.design,
+      fourn: art.fourn,
+      fournNom: art.fournNom,
+      gencod: art.gencod,
+      s1: art.s1, s2: art.s2, s3: art.s3, s4: art.s4, s5: art.s5,
+      stock: art.stock,
+      quantiteDemandee: q,
+      vteMoyMois: art.vteMoyMois,
+    });
+  }
+  if (articles.length === 0) {
+    res.status(400);
+    throw new Error("Aucun article valide (NART inconnu ou quantité nulle).");
+  }
+
+  const gisList = [...gisements].filter(Boolean);
+  const gisementLabel =
+    gisList.length === 1 ? gisList[0] : gisList.length > 1 ? "Multi-gisements" : "Manuelle";
+
+  const demande = await DemandeReappro.create({
+    entreprise: key,
+    type: "magasin",
+    gisement: gisementLabel,
+    priorite,
+    statut: "en_attente",
+    articles,
+    nbArticles: articles.length,
+    commentaire,
+    createdBy: req.user?._id,
+    createdByNom: nomUtilisateur(req.user),
+  });
+  res.status(201).json({ crees: 1, demande });
+});
+
 const PRIO_RANK = { urgent: 0, a_faire: 1, normal: 2 };
 
 // @desc    (MOBILE) Demandes actives pour les entreprises de l'agent
@@ -195,6 +280,8 @@ const realiserDemande = asyncHandler(async (req, res) => {
 
 export {
   createDemandes,
+  createDemandePanier,
+  getArticleReappro,
   getDemandes,
   getDemandeById,
   deleteDemande,

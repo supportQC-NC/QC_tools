@@ -13,7 +13,12 @@ const articleSnapSchema = new mongoose.Schema(
     fournNom: String,
     gencod: String,
     s1: Number,
-    stock: Number, // stock en réserve (S2..S5)
+    s2: Number,
+    s3: Number,
+    s4: Number,
+    s5: Number,
+    stock: Number, // stock total (ΣS1..S5)
+    quantiteDemandee: Number, // quantité demandée par l'utilisateur (≤ stock)
     vteMoyMois: Number,
   },
   { _id: false },

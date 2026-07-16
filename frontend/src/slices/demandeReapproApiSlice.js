@@ -19,6 +19,18 @@ export const demandeReapproApiSlice = apiSlice.injectEndpoints({
         body: { gisements, priorite, commentaire },
       }),
     }),
+    createDemandePanier: builder.mutation({
+      query: ({ nomDossierDBF, articles, priorite, commentaire }) => ({
+        url: `${URL}/${nomDossierDBF}/panier`,
+        method: "POST",
+        body: { articles, priorite, commentaire },
+      }),
+    }),
+    getArticleReappro: builder.query({
+      query: ({ nomDossierDBF, nart }) => ({
+        url: `${URL}/${nomDossierDBF}/article/${encodeURIComponent(nart)}`,
+      }),
+    }),
     deleteDemande: builder.mutation({
       query: (id) => ({ url: `${URL}/${id}`, method: "DELETE" }),
     }),
@@ -28,5 +40,7 @@ export const demandeReapproApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetDemandesQuery,
   useCreateDemandesMutation,
+  useCreateDemandePanierMutation,
+  useLazyGetArticleReapproQuery,
   useDeleteDemandeMutation,
 } = demandeReapproApiSlice;

@@ -211,3 +211,49 @@
   border-radius: 8px; padding: 5px 8px; cursor: pointer;
 }
 .analyse-reappro .ar-del:hover { background: rgba(239,68,68,0.12); }
+
+/* ── Saisie manuelle NART + panier ── */
+.analyse-reappro .ar-manual { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 4px; }
+.analyse-reappro .ar-manual-input {
+  flex: 1; min-width: 200px; padding: 9px 12px; border-radius: 8px;
+  border: 1px solid var(--border, #333); background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary, #eee); font-size: 0.9rem; font-weight: 600; text-transform: uppercase;
+}
+.analyse-reappro .ar-manual-input:focus { border-color: var(--accent, #4da6ff); outline: none; }
+.analyse-reappro .ar-manual-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 9px 14px; border-radius: 8px;
+  border: 1px solid var(--accent, #4da6ff); background: transparent; color: var(--accent, #4da6ff);
+  font-weight: 700; cursor: pointer; font-size: 0.88rem;
+}
+.analyse-reappro .ar-manual-btn:hover { background: rgba(77,166,255,0.12); }
+.analyse-reappro .ar-manual-msg { font-size: 0.82rem; font-weight: 600; }
+.analyse-reappro .ar-manual-msg.success { color: #22c55e; }
+.analyse-reappro .ar-manual-msg.error { color: #ef4444; }
+
+.analyse-reappro .ar-cart { margin-top: 12px; border-top: 1px solid var(--border, #333); padding-top: 12px; }
+.analyse-reappro .ar-cart-title { font-size: 0.85rem; font-weight: 800; color: var(--text-secondary, #aaa); margin-bottom: 8px; }
+.analyse-reappro .ar-cart-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--border, #333);
+}
+.analyse-reappro .ar-cart-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.analyse-reappro .ar-cart-nart { font-family: ui-monospace, Menlo, monospace; font-weight: 800; }
+.analyse-reappro .ar-cart-design { color: var(--text-primary, #eee); font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.analyse-reappro .ar-cart-stock { color: var(--text-muted, #888); font-size: 0.76rem; }
+.analyse-reappro .ar-cart-qty {
+  width: 74px; padding: 8px; border-radius: 8px; text-align: center;
+  border: 1px solid var(--accent, #4da6ff); background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary, #eee); font-weight: 800; font-size: 1rem;
+}
+.analyse-reappro .ar-cart-del {
+  background: transparent; border: 1px solid rgba(239,68,68,0.4); color: #ef4444;
+  border-radius: 8px; padding: 6px 8px; cursor: pointer; display: inline-flex;
+}
+.analyse-reappro .ar-cart-del:hover { background: rgba(239,68,68,0.12); }
+
+.analyse-reappro .ar-lieux { color: var(--text-secondary, #aaa); font-size: 0.8rem; white-space: nowrap; }
+.analyse-reappro .ar-add {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 8px;
+  border: none; background: var(--accent, #4da6ff); color: #0f0f1a; font-weight: 800; cursor: pointer; font-size: 0.82rem;
+}
+.analyse-reappro .ar-add:hover { filter: brightness(1.08); }

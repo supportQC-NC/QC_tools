@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   HiTruck, HiRefresh, HiExclamationCircle, HiTrendingDown, HiCube, HiShoppingCart,
-  HiPaperAirplane, HiTrash,
+  HiPaperAirplane, HiTrash, HiPlus, HiX,
 } from "react-icons/hi";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -11,7 +11,8 @@ import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { useGetAnalyseReapproQuery } from "../../slices/analyseReapproApiSlice";
 import {
   useGetDemandesQuery,
-  useCreateDemandesMutation,
+  useCreateDemandePanierMutation,
+  useLazyGetArticleReapproQuery,
   useDeleteDemandeMutation,
 } from "../../slices/demandeReapproApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
@@ -41,9 +42,11 @@ const AdminAnalyseReapproScreen = () => {
   );
   const [tab, setTab] = useState("fourn"); // fourn | magasin
   const [gisFilter, setGisFilter] = useState("");
-  const [selectedGis, setSelectedGis] = useState([]);
   const [priorite, setPriorite] = useState("a_faire");
   const [msg, setMsg] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [manualNart, setManualNart] = useState("");
+  const [manualMsg, setManualMsg] = useState(null);
 
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetEntreprisesQuery();
@@ -69,21 +72,18 @@ const AdminAnalyseReapproScreen = () => {
   const rows = data?.rows || [];
   const rowsMagasin = data?.rowsMagasin || [];
   const gisementsMagasin = data?.gisementsMagasin || [];
+  const mappingEntrepots = data?.mappingEntrepots || {
+    S1: "Magasin", S2: "S2", S3: "S3", S4: "S4", S5: "S5",
+  };
 
   const { data: demandes = [], refetch: refetchDemandes } = useGetDemandesQuery(
     { nomDossierDBF: selectedEntreprise },
     { skip: !selectedEntreprise },
   );
-  const [createDemandes, { isLoading: creating }] = useCreateDemandesMutation();
   const [deleteDemande] = useDeleteDemandeMutation();
+  const [createPanier, { isLoading: sendingPanier }] = useCreateDemandePanierMutation();
+  const [resolveArticle] = useLazyGetArticleReapproQuery();
 
-  const activeGis = useMemo(() => {
-    const set = new Set();
-    demandes.forEach((d) => {
-      if (d.statut === "en_attente" || d.statut === "en_cours") set.add(d.gisement);
-    });
-    return set;
-  }, [demandes]);
   const ruptureData = useMemo(
     () => (data?.ruptureParLieu || []).map((r) => ({ ...r })),
     [data],
@@ -95,35 +95,6 @@ const AdminAnalyseReapproScreen = () => {
     ? rowsMagasin.filter((r) => r.gisement === gisFilter)
     : rowsMagasin;
 
-  const toggleGis = (g) =>
-    setSelectedGis((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
-    );
-
-  const envoyerDemande = async () => {
-    setMsg(null);
-    const gis = selectedGis.filter((g) => !activeGis.has(g));
-    if (gis.length === 0) {
-      setMsg({ type: "error", text: "Sélectionnez au moins un gisement non déjà demandé." });
-      return;
-    }
-    try {
-      const r = await createDemandes({
-        nomDossierDBF: selectedEntreprise,
-        gisements: gis,
-        priorite,
-      }).unwrap();
-      setSelectedGis([]);
-      refetchDemandes();
-      const ign = r.ignores?.length
-        ? ` — ${r.ignores.length} ignoré(s) (déjà demandé)`
-        : "";
-      setMsg({ type: "success", text: `${r.crees} demande(s) créée(s)${ign}.` });
-    } catch (e) {
-      setMsg({ type: "error", text: e?.data?.message || "Échec de l'envoi." });
-    }
-  };
-
   const supprimerDemande = async (id) => {
     if (!window.confirm("Supprimer cette demande ?")) return;
     try {
@@ -131,6 +102,92 @@ const AdminAnalyseReapproScreen = () => {
       refetchDemandes();
     } catch (e) {
       /* ignore */
+    }
+  };
+
+  // --- Panier de demande (quantités bornées au stock) ---
+  const lieuxTxt = (c) =>
+    ["s1", "s2", "s3", "s4", "s5"]
+      .filter((k) => (c[k] || 0) > 0)
+      .map((k) => `${mappingEntrepots[k.toUpperCase()] || k.toUpperCase()}: ${fmtNb(c[k])}`)
+      .join(" · ") || "—";
+
+  const inCart = (nart) => cart.some((c) => c.nart === nart);
+
+  const addToCart = (art, qty) => {
+    if (inCart(art.nart)) return;
+    let q = Math.round(qty || art.stock);
+    if (q < 1) q = 1;
+    if (q > art.stock) q = art.stock;
+    setCart((c) => [
+      ...c,
+      {
+        nart: art.nart,
+        design: art.design,
+        fournNom: art.fournNom || art.fourn,
+        stock: art.stock,
+        s1: art.s1, s2: art.s2, s3: art.s3, s4: art.s4, s5: art.s5,
+        quantite: q,
+      },
+    ]);
+  };
+
+  const setCartQty = (nart, val) => {
+    setCart((c) =>
+      c.map((x) => {
+        if (x.nart !== nart) return x;
+        let q = Math.round(Number(val) || 0);
+        if (q < 1) q = 1;
+        if (q > x.stock) q = x.stock;
+        return { ...x, quantite: q };
+      }),
+    );
+  };
+
+  const removeCart = (nart) => setCart((c) => c.filter((x) => x.nart !== nart));
+
+  const addManual = async () => {
+    setManualMsg(null);
+    const nart = manualNart.trim().toUpperCase();
+    if (!nart) return;
+    if (inCart(nart)) {
+      setManualMsg({ type: "error", text: "Déjà dans la demande." });
+      return;
+    }
+    try {
+      const art = await resolveArticle({
+        nomDossierDBF: selectedEntreprise,
+        nart,
+      }).unwrap();
+      if (!art || art.stock <= 0) {
+        setManualMsg({ type: "error", text: "Stock nul — non ajoutable." });
+        return;
+      }
+      addToCart(art, art.stock);
+      setManualNart("");
+      setManualMsg({ type: "success", text: `${art.nart} ajouté.` });
+    } catch (e) {
+      setManualMsg({ type: "error", text: e?.data?.message || "NART introuvable." });
+    }
+  };
+
+  const validerPanier = async () => {
+    setMsg(null);
+    if (cart.length === 0) return;
+    try {
+      const r = await createPanier({
+        nomDossierDBF: selectedEntreprise,
+        articles: cart.map((c) => ({ nart: c.nart, quantite: c.quantite })),
+        priorite,
+      }).unwrap();
+      setCart([]);
+      refetchDemandes();
+      setMsg({
+        type: "success",
+        text: `Demande créée (${r.demande?.nbArticles ?? cart.length} article(s)).`,
+      });
+    } catch (e) {
+      setMsg({ type: "error", text: e?.data?.message || "Échec de la validation." });
     }
   };
 
@@ -310,10 +367,10 @@ const AdminAnalyseReapproScreen = () => {
                 </>
               ) : (
                 <>
-                  {/* Sélection de gisements à envoyer en demande */}
+                  {/* Nouvelle demande : panier + saisie NART manuelle */}
                   <div className="ar-gis-panel">
                     <div className="ar-gis-head">
-                      <span>Demander un réappro magasin par gisement (GISM1)</span>
+                      <span>Nouvelle demande de réappro magasin</span>
                       <div className="ar-gis-actions">
                         <select value={priorite} onChange={(e) => setPriorite(e.target.value)}>
                           <option value="urgent">Urgent</option>
@@ -322,33 +379,63 @@ const AdminAnalyseReapproScreen = () => {
                         </select>
                         <button
                           className="ar-send"
-                          disabled={creating || selectedGis.length === 0}
-                          onClick={envoyerDemande}
+                          disabled={sendingPanier || cart.length === 0}
+                          onClick={validerPanier}
                         >
-                          <HiPaperAirplane /> Envoyer ({selectedGis.length})
+                          <HiPaperAirplane /> Valider la demande ({cart.length})
                         </button>
                       </div>
                     </div>
                     {msg && <div className={`ar-msg ${msg.type}`}>{msg.text}</div>}
-                    <div className="ar-gis-chips">
-                      {gisementsMagasin.map((g) => {
-                        const actif = activeGis.has(g.gisement);
-                        const sel = selectedGis.includes(g.gisement);
-                        return (
-                          <button
-                            key={g.gisement}
-                            className={`ar-gis-chip ${sel ? "sel" : ""} ${actif ? "done" : ""}`}
-                            onClick={() => !actif && toggleGis(g.gisement)}
-                            disabled={actif}
-                            title={actif ? "Déjà demandé" : "Sélectionner ce gisement"}
-                          >
-                            <span className="ar-gis-name">{g.gisement}</span>
-                            <span className="ar-gis-nb">{fmtNb(g.nb)}</span>
-                            {actif && <span className="ar-gis-tag">Demandé</span>}
-                          </button>
-                        );
-                      })}
+
+                    {/* Ajout manuel par NART */}
+                    <div className="ar-manual">
+                      <input
+                        className="ar-manual-input"
+                        value={manualNart}
+                        onChange={(e) => setManualNart(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && addManual()}
+                        placeholder="Ajouter un article par NART…"
+                      />
+                      <button className="ar-manual-btn" onClick={addManual}>
+                        <HiPlus /> Ajouter
+                      </button>
+                      {manualMsg && (
+                        <span className={`ar-manual-msg ${manualMsg.type}`}>{manualMsg.text}</span>
+                      )}
                     </div>
+
+                    {/* Récap du panier (avant validation) */}
+                    {cart.length > 0 && (
+                      <div className="ar-cart">
+                        <div className="ar-cart-title">
+                          Articles de la demande ({cart.length})
+                        </div>
+                        {cart.map((c) => (
+                          <div key={c.nart} className="ar-cart-row">
+                            <div className="ar-cart-info">
+                              <span className="ar-cart-nart">{c.nart}</span>
+                              <span className="ar-cart-design" title={c.design}>{c.design}</span>
+                              <span className="ar-cart-stock">
+                                Stock {fmtNb(c.stock)} · {lieuxTxt(c)}
+                              </span>
+                            </div>
+                            <input
+                              className="ar-cart-qty"
+                              type="number"
+                              min="1"
+                              max={c.stock}
+                              value={c.quantite}
+                              onChange={(e) => setCartQty(c.nart, e.target.value)}
+                              title={`Max ${c.stock}`}
+                            />
+                            <button className="ar-cart-del" onClick={() => removeCart(c.nart)}>
+                              <HiX />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Filtre + tableau */}
@@ -374,15 +461,16 @@ const AdminAnalyseReapproScreen = () => {
                           <th>Désignation</th>
                           <th>Fournisseur</th>
                           <th>Gisement</th>
-                          <th className="num">Stock réserve</th>
+                          <th className="num">Stock</th>
+                          <th>Répartition</th>
                           <th className="num">Vte/mois</th>
-                          <th>Demande</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {magasinFiltres.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="ar-none">
+                            <td colSpan={8} className="ar-none">
                               Aucun article à réapprovisionner au magasin.
                             </td>
                           </tr>
@@ -394,12 +482,15 @@ const AdminAnalyseReapproScreen = () => {
                               <td>{r.fournNom || r.fourn}</td>
                               <td>{r.gisement}</td>
                               <td className="num strong">{fmtNb(r.stock)}</td>
+                              <td className="ar-lieux">{lieuxTxt(r)}</td>
                               <td className="num">{fmtNb(r.vteMoyMois)}</td>
                               <td>
-                                {activeGis.has(r.gisement) ? (
-                                  <span className="ar-badge-done">Déjà demandé</span>
+                                {inCart(r.nart) ? (
+                                  <span className="ar-badge-done">Ajouté</span>
                                 ) : (
-                                  <span className="ar-badge-todo">—</span>
+                                  <button className="ar-add" onClick={() => addToCart(r, r.stock)}>
+                                    <HiPlus /> Ajouter
+                                  </button>
                                 )}
                               </td>
                             </tr>

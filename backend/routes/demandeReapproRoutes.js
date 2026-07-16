@@ -2,6 +2,8 @@
 import express from "express";
 import {
   createDemandes,
+  createDemandePanier,
+  getArticleReappro,
   getDemandes,
   getDemandeById,
   deleteDemande,
@@ -30,7 +32,17 @@ const canReapproWrite = checkModuleAccess("reapro", "write");
 router.get("/mobile/list", protect, canReapproRead, getMobileDemandes);
 router.patch("/mobile/:id/realiser", protect, canReapproWrite, realiserDemande);
 
-// Liste + création (scopées entreprise)
+// Résolution d'un NART (saisie manuelle) + création par panier
+router.get(
+  "/:nomDossierDBF/article/:nart",
+  protect, canRead, checkEntrepriseAccess, getArticleReappro,
+);
+router.post(
+  "/:nomDossierDBF/panier",
+  protect, canWrite, checkEntrepriseAccess, createDemandePanier,
+);
+
+// Liste + création par gisements (scopées entreprise)
 router.get("/:nomDossierDBF", protect, canRead, checkEntrepriseAccess, getDemandes);
 router.post("/:nomDossierDBF", protect, canWrite, checkEntrepriseAccess, createDemandes);
 
