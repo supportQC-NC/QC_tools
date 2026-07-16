@@ -4,6 +4,8 @@ import {
   getMobileReceptionsEnCours,
   getReceptionProgress,
   getCommandesAgregats,
+  getRecentesControlees,
+  downloadFichierReception,
   getSignalementPhoto,
 } from "../controllers/receptionSuiviController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -25,6 +27,9 @@ router.get("/mobile/progress/:nomDossierDBF", protect, canRead, checkEntrepriseA
 router.get("/progress/:nomDossierDBF", protect, canReadWeb, checkEntrepriseAccess, getReceptionProgress);
 // Agrégats par commande (web) : nb articles, total unités, nouveautés
 router.get("/agregats/:nomDossierDBF", protect, canReadWeb, checkEntrepriseAccess, getCommandesAgregats);
+// 10 dernières réceptions terminées + téléchargement des fichiers (web)
+router.get("/recentes/:nomDossierDBF", protect, canReadWeb, checkEntrepriseAccess, getRecentesControlees);
+router.get("/:id/fichier/:filename", protect, canReadWeb, downloadFichierReception);
 router.get("/:id/signalement/:sigId/photo", protect, canRead, getSignalementPhoto);
 
 export default router;

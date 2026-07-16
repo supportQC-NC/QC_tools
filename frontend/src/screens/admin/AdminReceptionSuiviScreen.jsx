@@ -12,6 +12,7 @@ import {
   useGetCommandesAControlerQuery,
   useGetReceptionProgressQuery,
   useGetCommandesAgregatsQuery,
+  useGetRecentesControleesQuery,
 } from "../../slices/receptionSuiviApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
@@ -52,6 +53,8 @@ const AdminReceptionSuiviScreen = () => {
     useGetReceptionProgressQuery(selectedEnt, { skip: !selectedEnt });
   const { data: agregats = {}, refetch: refetchAgg } =
     useGetCommandesAgregatsQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: recentes = [], refetch: refetchRec } =
+    useGetRecentesControleesQuery(selectedEnt, { skip: !selectedEnt });
 
   // Entreprise par défaut : 1re active.
   useEffect(() => {
@@ -124,7 +127,28 @@ const AdminReceptionSuiviScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNumcde]);
 
-  const refresh = () => { refetchCmd(); refetchProg(); refetchAgg(); };
+  const refresh = () => { refetchCmd(); refetchProg(); refetchAgg(); refetchRec(); };
+
+  const downloadFile = async (id, name) => {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/reception-suivi/${id}/fichier/${encodeURIComponent(name)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <div className="reception-suivi">
@@ -334,6 +358,41 @@ const AdminReceptionSuiviScreen = () => {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {selectedEnt && recentes.length > 0 && (
+        <div className="rs-recentes">
+          <h3 className="rs-section">
+            <HiClipboardList /> Dernières réceptions contrôlées ({recentes.length})
+          </h3>
+          <div className="rs-rec-list">
+            {recentes.map((r) => (
+              <div key={r._id} className="rs-rec-row">
+                <div className="rs-rec-info">
+                  <span className="rs-rec-cde">Cmd {r.numcde}</span>
+                  <span className="rs-rec-four">{r.fournisseurNom || "—"}</span>
+                  <span className="rs-rec-date">{fmtDate(r.generatedAt)}</span>
+                </div>
+                <div className="rs-rec-files">
+                  {r.fichiers.length === 0 ? (
+                    <span className="rs-rec-nofile">Aucun fichier</span>
+                  ) : (
+                    r.fichiers.map((f) => (
+                      <button
+                        key={f.name}
+                        className={`rs-file rs-file-${f.ext}`}
+                        onClick={() => downloadFile(r._id, f.name)}
+                        title={f.name}
+                      >
+                        <HiDownload /> {f.ext.toUpperCase()}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

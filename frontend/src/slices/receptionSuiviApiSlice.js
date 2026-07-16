@@ -25,6 +25,13 @@ export const receptionSuiviApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 60,
     }),
+    // 10 dernières réceptions terminées + fichiers générés.
+    getRecentesControlees: builder.query({
+      query: (nomDossierDBF) => ({
+        url: `/api/reception-suivi/recentes/${nomDossierDBF}`,
+      }),
+      keepUnusedDataFor: 30,
+    }),
   }),
 });
 
@@ -32,4 +39,5 @@ export const {
   useGetCommandesAControlerQuery,
   useGetReceptionProgressQuery,
   useGetCommandesAgregatsQuery,
+  useGetRecentesControleesQuery,
 } = receptionSuiviApiSlice;

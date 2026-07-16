@@ -175,9 +175,71 @@ const getCommandesAgregats = asyncHandler(async (req, res) => {
   res.json(out);
 });
 
+// @desc    10 dernières réceptions TERMINÉES d'une entreprise + fichiers générés
+// @route   GET /api/reception-suivi/recentes/:nomDossierDBF
+// @access  Private — module reception_suivi_admin (read) + entreprise
+const getRecentesControlees = asyncHandler(async (req, res) => {
+  const nomDossierDBF =
+    req.entreprise?.nomDossierDBF || req.params.nomDossierDBF;
+
+  const receptions = await Reception.find({ nomDossierDBF, status: "termine" })
+    .sort({ "rapport.generatedAt": -1, updatedAt: -1 })
+    .limit(10)
+    .lean();
+
+  const out = receptions.map((r) => {
+    let fichiers = [];
+    const fp = r.rapport?.filePath;
+    if (fp) {
+      try {
+        const dir = path.dirname(fp);
+        if (fs.existsSync(dir)) {
+          fichiers = fs
+            .readdirSync(dir)
+            .filter((f) => /\.(pdf|csv|dat|xlsx)$/i.test(f))
+            .map((f) => ({ name: f, ext: path.extname(f).slice(1).toLowerCase() }));
+        }
+      } catch (e) {
+        /* dossier inaccessible -> pas de fichiers listés */
+      }
+    }
+    return {
+      _id: r._id,
+      numcde: r.numcde,
+      fournisseurNom: r.commandeInfo?.fournisseurNom || "",
+      generatedAt: r.rapport?.generatedAt || r.updatedAt,
+      emailSentAt: r.rapport?.emailSentAt || null,
+      fichiers,
+    };
+  });
+
+  res.json(out);
+});
+
+// @desc    Télécharge un fichier généré d'une réception (PDF / CSV / .dat)
+// @route   GET /api/reception-suivi/:id/fichier/:filename
+// @access  Private — module reception_suivi_admin (read)
+const downloadFichierReception = asyncHandler(async (req, res) => {
+  const reception = await Reception.findById(req.params.id).lean();
+  if (!reception?.rapport?.filePath) {
+    res.status(404);
+    throw new Error("Aucun fichier pour cette réception");
+  }
+  const dir = path.dirname(reception.rapport.filePath);
+  const safe = path.basename(req.params.filename); // anti path-traversal
+  const abs = path.join(dir, safe);
+  if (!fs.existsSync(abs)) {
+    res.status(404);
+    throw new Error("Fichier introuvable");
+  }
+  res.download(abs, safe);
+});
+
 export {
   getMobileReceptionsEnCours,
   getReceptionProgress,
   getCommandesAgregats,
+  getRecentesControlees,
+  downloadFichierReception,
   getSignalementPhoto,
 };
