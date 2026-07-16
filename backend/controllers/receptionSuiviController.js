@@ -79,4 +79,53 @@ const getSignalementPhoto = asyncHandler(async (req, res) => {
   res.sendFile(abs);
 });
 
-export { getMobileReceptionsEnCours, getSignalementPhoto };
+// @desc    Progression des contrôles EN COURS d'une entreprise, indexée par numcde.
+//          Sert à superposer l'état du contrôle sur la liste des commandes à
+//          contrôler (/a-controler), pour un suivi identique au module réception.
+// @route   GET /api/reception-suivi/(mobile/)progress/:nomDossierDBF
+// @access  Private — reception (mobile) ou reception_suivi_admin (web) + entreprise
+const getReceptionProgress = asyncHandler(async (req, res) => {
+  const nomDossierDBF =
+    req.entreprise?.nomDossierDBF || req.params.nomDossierDBF;
+
+  const receptions = await Reception.find({
+    nomDossierDBF,
+    status: { $in: EN_COURS },
+  })
+    .sort({ updatedAt: -1 })
+    .limit(300)
+    .lean();
+
+  const out = receptions.map((r) => ({
+    receptionId: r._id,
+    numcde: r.numcde,
+    status: r.status,
+    updatedAt: r.updatedAt,
+    nbComptages: (r.comptages || []).length,
+    nbSignalements: (r.signalements || []).length,
+    comptages: (r.comptages || []).map((c) => ({
+      nart: c.nart,
+      gencod: c.gencod,
+      designation: c.designation,
+      qteComptee: c.qteComptee,
+      qteValidee: c.qteValidee,
+      dansCommande: c.dansCommande,
+      isInconnu: c.isInconnu,
+    })),
+    signalements: (r.signalements || []).map((sig) => ({
+      _id: sig._id,
+      nart: sig.nart,
+      designation: sig.designation,
+      type: sig.type,
+      hasPhoto: !!(sig.photoFileName || sig.photoPath),
+    })),
+  }));
+
+  res.json(out);
+});
+
+export {
+  getMobileReceptionsEnCours,
+  getReceptionProgress,
+  getSignalementPhoto,
+};

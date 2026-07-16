@@ -1,75 +1,96 @@
 // src/screens/admin/AdminReceptionSuiviScreen.jsx
+//
+// Suivi des réceptions : MÊME liste que le module Réception mobile (commandes
+// à contrôler, ETAT >= 4, via /api/receptions/a-controler) + superposition de
+// la PROGRESSION du contrôle (articles contrôlés, anomalies, photos, statut).
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph,
 } from "react-icons/hi";
-import { useGetReceptionsSuiviQuery } from "../../slices/receptionSuiviApiSlice";
+import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import {
+  useGetCommandesAControlerQuery,
+  useGetReceptionProgressQuery,
+} from "../../slices/receptionSuiviApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
 import "./AdminReceptionSuiviScreen.css";
 
-const STATUT = {
-  en_cours: { label: "En cours", cls: "rs-st-cours" },
-  analyse_ecarts: { label: "Analyse écarts", cls: "rs-st-ecarts" },
-};
+const STORAGE_KEY = "receptionSuivi.entreprise";
+
 const ANOMALIE = {
   avarie: { label: "Avarie", cls: "rs-ano-warn" },
   cassee: { label: "Cassée", cls: "rs-ano-danger" },
   manquant: { label: "Manquant", cls: "rs-ano-danger" },
   abimee: { label: "Abîmée", cls: "rs-ano-warn" },
 };
+const up = (v) => String(v || "").trim().toUpperCase();
 const fmtDate = (iso) => {
-  if (!iso) return "";
+  if (!iso) return "—";
   const d = new Date(iso);
-  return isNaN(d.getTime())
-    ? ""
-    : d.toLocaleDateString("fr-FR") +
-        " " +
-        d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("fr-FR");
 };
-
 const photoSrc = (recId, sigId) =>
   `${BASE_URL}/api/reception-suivi/${recId}/signalement/${sigId}/photo`;
 
 const AdminReceptionSuiviScreen = () => {
-  const { data: list = [], isLoading, isFetching, refetch } =
-    useGetReceptionsSuiviQuery();
-  const [selectedId, setSelectedId] = useState(null);
-  const [entFilter, setEntFilter] = useState("");
+  const [selectedEnt, setSelectedEnt] = useState(
+    localStorage.getItem(STORAGE_KEY) || "",
+  );
+  const [selectedNumcde, setSelectedNumcde] = useState(null);
   const [zoom, setZoom] = useState(null);
-  const [photoUrls, setPhotoUrls] = useState({}); // sigId -> objectURL | 'error'
+  const [photoUrls, setPhotoUrls] = useState({});
   const urlsRef = useRef({});
 
-  const entreprises = useMemo(
-    () => [...new Set(list.map((r) => r.entrepriseNom).filter(Boolean))].sort(),
-    [list],
+  const { data: entreprises, isLoading: loadingEnt } = useGetEntreprisesQuery();
+
+  const { data: cmdData, isFetching: fCmd, refetch: refetchCmd } =
+    useGetCommandesAControlerQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: progressList = [], isFetching: fProg, refetch: refetchProg } =
+    useGetReceptionProgressQuery(selectedEnt, { skip: !selectedEnt });
+
+  // Entreprise par défaut : 1re active.
+  useEffect(() => {
+    if (!selectedEnt && entreprises && entreprises.length > 0) {
+      const a = entreprises.find((e) => e.isActive) || entreprises[0];
+      if (a) setSelectedEnt(a.nomDossierDBF);
+    }
+  }, [entreprises, selectedEnt]);
+  useEffect(() => {
+    if (selectedEnt) localStorage.setItem(STORAGE_KEY, selectedEnt);
+    setSelectedNumcde(null);
+  }, [selectedEnt]);
+
+  const commandes = cmdData?.commandes || [];
+  const progressByNumcde = useMemo(() => {
+    const m = new Map();
+    progressList.forEach((p) => m.set(up(p.numcde), p));
+    return m;
+  }, [progressList]);
+
+  const merged = useMemo(
+    () => commandes.map((c) => ({ ...c, progress: progressByNumcde.get(up(c.numcde)) || null })),
+    [commandes, progressByNumcde],
   );
 
-  const filtered = entFilter
-    ? list.filter((r) => r.entrepriseNom === entFilter)
-    : list;
+  const selected = merged.find((c) => c.numcde === selectedNumcde) || null;
+  const busy = Boolean(selectedEnt) && (fCmd || fProg);
 
-  const selected = list.find((r) => r._id === selectedId) || null;
-
-  // Charge les photos des anomalies via fetch (cookie d'auth envoyé) -> blob URL.
+  // Photos des anomalies du contrôle sélectionné (fetch + cookie -> blob URL).
   useEffect(() => {
-    // Révoque les URLs précédentes
     Object.values(urlsRef.current).forEach((u) => {
       if (typeof u === "string" && u.startsWith("blob:")) URL.revokeObjectURL(u);
     });
     urlsRef.current = {};
     setPhotoUrls({});
-
-    if (!selectedId) return undefined;
-    const rec = list.find((r) => r._id === selectedId);
-    if (!rec) return undefined;
-
+    const prog = selected?.progress;
+    if (!prog?.receptionId) return undefined;
     let alive = true;
-    (rec.signalements || [])
+    (prog.signalements || [])
       .filter((s) => s.hasPhoto)
       .forEach(async (s) => {
         try {
-          const res = await fetch(photoSrc(rec._id, s._id), {
+          const res = await fetch(photoSrc(prog.receptionId, s._id), {
             credentials: "include",
           });
           if (!res.ok) throw new Error("http " + res.status);
@@ -82,12 +103,11 @@ const AdminReceptionSuiviScreen = () => {
           if (alive) setPhotoUrls((p) => ({ ...p, [s._id]: "error" }));
         }
       });
-
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId]);
+  }, [selectedNumcde]);
+
+  const refresh = () => { refetchCmd(); refetchProg(); };
 
   return (
     <div className="reception-suivi">
@@ -96,55 +116,70 @@ const AdminReceptionSuiviScreen = () => {
           <span className="rs-head-icon"><HiClipboardList /></span>
           <div>
             <h1>Suivi des réceptions</h1>
-            <p>Contrôles en cours (non finalisés) : contrôlés, anomalies et photos.</p>
+            <p>Commandes à contrôler (ETAT ≥ 4) + progression, anomalies et photos.</p>
           </div>
         </div>
         <div className="rs-head-actions">
           <select
             className="rs-select"
-            value={entFilter}
-            onChange={(e) => setEntFilter(e.target.value)}
+            value={selectedEnt}
+            onChange={(e) => setSelectedEnt(e.target.value)}
+            disabled={loadingEnt}
           >
-            <option value="">Toutes les entreprises</option>
-            {entreprises.map((e) => (
-              <option key={e} value={e}>{e}</option>
+            <option value="">— Entreprise —</option>
+            {(entreprises || []).map((e) => (
+              <option key={e._id || e.nomDossierDBF} value={e.nomDossierDBF}>
+                {e.nom || e.nomComplet || e.nomDossierDBF}
+              </option>
             ))}
           </select>
-          <button className="rs-refresh" onClick={() => refetch()} disabled={isFetching}>
-            <HiRefresh className={isFetching ? "spin" : ""} /> Rafraîchir
+          <button className="rs-refresh" onClick={refresh} disabled={busy}>
+            <HiRefresh className={busy ? "spin" : ""} /> Rafraîchir
           </button>
         </div>
       </div>
 
-      {isLoading ? (
+      {!selectedEnt ? (
+        <div className="rs-empty">Choisissez une entreprise.</div>
+      ) : busy && merged.length === 0 ? (
         <Loader />
       ) : (
         <div className="rs-layout">
-          {/* Liste */}
+          {/* Liste des commandes à contrôler */}
           <div className="rs-list">
-            {filtered.length === 0 ? (
-              <div className="rs-empty">Aucun contrôle en cours.</div>
+            {merged.length === 0 ? (
+              <div className="rs-empty">Aucune commande à contrôler.</div>
             ) : (
-              filtered.map((r) => {
-                const st = STATUT[r.status] || STATUT.en_cours;
+              merged.map((c) => {
+                const p = c.progress;
                 return (
                   <button
-                    key={r._id}
-                    className={`rs-card ${selectedId === r._id ? "active" : ""}`}
-                    onClick={() => setSelectedId(r._id)}
+                    key={c.numcde}
+                    className={`rs-card ${selectedNumcde === c.numcde ? "active" : ""}`}
+                    onClick={() => setSelectedNumcde(c.numcde)}
                   >
                     <div className="rs-card-top">
-                      <span className="rs-cde">Cmd {r.numcde}</span>
-                      <span className={`rs-badge ${st.cls}`}>{st.label}</span>
-                    </div>
-                    <div className="rs-card-meta">{r.fournisseurNom || "—"} · {r.entrepriseNom}</div>
-                    <div className="rs-card-stats">
-                      <span><HiCube /> {r.nbComptages} contrôlé(s)</span>
-                      {r.nbSignalements > 0 && (
-                        <span className="rs-warn"><HiExclamation /> {r.nbSignalements} anomalie(s)</span>
+                      <span className="rs-cde">Cmd {c.numcde}</span>
+                      {p ? (
+                        <span className="rs-badge rs-st-cours">En cours</span>
+                      ) : (
+                        <span className="rs-badge rs-st-todo">À contrôler</span>
                       )}
                     </div>
-                    <div className="rs-card-date">{fmtDate(r.updatedAt)}</div>
+                    <div className="rs-card-meta">{c.fournisseurNom || "—"}</div>
+                    <div className="rs-card-stats">
+                      {c.etatLabel ? <span>{c.etatLabel}</span> : c.etat != null && <span>ETAT {c.etat}</span>}
+                      {!!c.bateau && <span>🚢 {c.bateau}</span>}
+                      {c.arrivee && <span>Arr. {fmtDate(c.arrivee)}</span>}
+                    </div>
+                    {p && (
+                      <div className="rs-card-stats">
+                        <span><HiCube /> {p.nbComptages} contrôlé(s)</span>
+                        {p.nbSignalements > 0 && (
+                          <span className="rs-warn"><HiExclamation /> {p.nbSignalements} anomalie(s)</span>
+                        )}
+                      </div>
+                    )}
                   </button>
                 );
               })
@@ -154,93 +189,97 @@ const AdminReceptionSuiviScreen = () => {
           {/* Détail */}
           <div className="rs-detail">
             {!selected ? (
-              <div className="rs-empty">Sélectionnez un contrôle à gauche.</div>
+              <div className="rs-empty">Sélectionnez une commande à gauche.</div>
             ) : (
               <>
                 <div className="rs-detail-head">
                   <h2>Cmd {selected.numcde}</h2>
                   <span className="rs-detail-sub">
-                    {selected.fournisseurNom || "—"} · {selected.entrepriseNom}
+                    {selected.fournisseurNom || "—"}
+                    {selected.bateau ? ` · 🚢 ${selected.bateau}` : ""}
+                    {selected.arrivee ? ` · Arrivée ${fmtDate(selected.arrivee)}` : ""}
+                    {selected.etatLabel ? ` · ${selected.etatLabel}` : ""}
                   </span>
                 </div>
 
-                {/* Anomalies */}
-                <h3 className="rs-section">
-                  <HiExclamation /> Anomalies ({(selected.signalements || []).length})
-                </h3>
-                {(selected.signalements || []).length === 0 ? (
-                  <p className="rs-none">Aucune anomalie signalée.</p>
+                {!selected.progress ? (
+                  <p className="rs-none">Contrôle non commencé pour cette commande.</p>
                 ) : (
-                  <div className="rs-ano-grid">
-                    {selected.signalements.map((s) => {
-                      const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
-                      const pu = photoUrls[s._id];
-                      return (
-                        <div key={s._id} className="rs-ano">
-                          {s.hasPhoto ? (
-                            pu && pu !== "error" ? (
-                              <img
-                                className="rs-ano-photo"
-                                src={pu}
-                                alt={s.nart}
-                                onClick={() => setZoom(pu)}
-                              />
-                            ) : (
-                              <div className="rs-ano-nophoto">
-                                {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
-                              </div>
-                            )
-                          ) : (
-                            <div className="rs-ano-nophoto"><HiPhotograph /></div>
-                          )}
-                          <div className="rs-ano-info">
-                            <span className={`rs-badge ${a.cls}`}>{a.label}</span>
-                            <span className="rs-ano-nart">{s.nart || "—"}</span>
-                            {!!s.designation && <span className="rs-ano-design">{s.designation}</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Contrôlés */}
-                <h3 className="rs-section">
-                  <HiCube /> Articles contrôlés ({(selected.comptages || []).length})
-                </h3>
-                {(selected.comptages || []).length === 0 ? (
-                  <p className="rs-none">Aucun article compté.</p>
-                ) : (
-                  <div className="rs-table-wrap">
-                    <table className="rs-table">
-                      <thead>
-                        <tr>
-                          <th>NART</th>
-                          <th>Désignation</th>
-                          <th className="num">Compté</th>
-                          <th>État</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selected.comptages.map((c, i) => (
-                          <tr key={`${c.nart}-${i}`}>
-                            <td className="mono">{c.nart || (c.isInconnu ? "Inconnu" : "—")}</td>
-                            <td className="design" title={c.designation}>{c.designation || c.gencod}</td>
-                            <td className="num strong">{c.qteValidee != null ? c.qteValidee : c.qteComptee}</td>
-                            <td>
-                              {c.isInconnu ? (
-                                <span className="rs-tag rs-tag-warn">hors base</span>
-                              ) : !c.dansCommande ? (
-                                <span className="rs-tag">hors cmd</span>
+                  <>
+                    {/* Anomalies */}
+                    <h3 className="rs-section">
+                      <HiExclamation /> Anomalies ({(selected.progress.signalements || []).length})
+                    </h3>
+                    {(selected.progress.signalements || []).length === 0 ? (
+                      <p className="rs-none">Aucune anomalie signalée.</p>
+                    ) : (
+                      <div className="rs-ano-grid">
+                        {selected.progress.signalements.map((s) => {
+                          const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
+                          const pu = photoUrls[s._id];
+                          return (
+                            <div key={s._id} className="rs-ano">
+                              {s.hasPhoto ? (
+                                pu && pu !== "error" ? (
+                                  <img className="rs-ano-photo" src={pu} alt={s.nart} onClick={() => setZoom(pu)} />
+                                ) : (
+                                  <div className="rs-ano-nophoto">
+                                    {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
+                                  </div>
+                                )
                               ) : (
-                                <span className="rs-tag rs-tag-ok">commande</span>
+                                <div className="rs-ano-nophoto"><HiPhotograph /></div>
                               )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              <div className="rs-ano-info">
+                                <span className={`rs-badge ${a.cls}`}>{a.label}</span>
+                                <span className="rs-ano-nart">{s.nart || "—"}</span>
+                                {!!s.designation && <span className="rs-ano-design">{s.designation}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Articles contrôlés */}
+                    <h3 className="rs-section">
+                      <HiCube /> Articles contrôlés ({(selected.progress.comptages || []).length})
+                    </h3>
+                    {(selected.progress.comptages || []).length === 0 ? (
+                      <p className="rs-none">Aucun article compté.</p>
+                    ) : (
+                      <div className="rs-table-wrap">
+                        <table className="rs-table">
+                          <thead>
+                            <tr>
+                              <th>NART</th>
+                              <th>Désignation</th>
+                              <th className="num">Compté</th>
+                              <th>État</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selected.progress.comptages.map((c, i) => (
+                              <tr key={`${c.nart}-${i}`}>
+                                <td className="mono">{c.nart || (c.isInconnu ? "Inconnu" : "—")}</td>
+                                <td className="design" title={c.designation}>{c.designation || c.gencod}</td>
+                                <td className="num strong">{c.qteValidee != null ? c.qteValidee : c.qteComptee}</td>
+                                <td>
+                                  {c.isInconnu ? (
+                                    <span className="rs-tag rs-tag-warn">hors base</span>
+                                  ) : !c.dansCommande ? (
+                                    <span className="rs-tag">hors cmd</span>
+                                  ) : (
+                                    <span className="rs-tag rs-tag-ok">commande</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

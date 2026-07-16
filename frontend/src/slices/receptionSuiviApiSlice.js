@@ -1,15 +1,27 @@
 // src/slices/receptionSuiviApiSlice.js
 import { apiSlice } from "./apiSlice";
 
-const URL = "/api/reception-suivi";
-
 export const receptionSuiviApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getReceptionsSuivi: builder.query({
-      query: () => ({ url: `${URL}/en-cours` }),
+    // Même source que le module Réception mobile (commandes ETAT >= 4).
+    getCommandesAControler: builder.query({
+      query: (nomDossierDBF) => ({
+        url: `/api/receptions/a-controler/${nomDossierDBF}`,
+        params: { limit: 300 },
+      }),
       keepUnusedDataFor: 30,
+    }),
+    // Progression des contrôles en cours (indexée par numcde) à superposer.
+    getReceptionProgress: builder.query({
+      query: (nomDossierDBF) => ({
+        url: `/api/reception-suivi/progress/${nomDossierDBF}`,
+      }),
+      keepUnusedDataFor: 15,
     }),
   }),
 });
 
-export const { useGetReceptionsSuiviQuery } = receptionSuiviApiSlice;
+export const {
+  useGetCommandesAControlerQuery,
+  useGetReceptionProgressQuery,
+} = receptionSuiviApiSlice;

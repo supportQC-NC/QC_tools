@@ -106,3 +106,6 @@
   border: 3px solid var(--border, #333); border-top-color: var(--accent, #4da6ff);
   display: inline-block; animation: rs-spin 0.8s linear infinite;
 }
+
+/* Badge "à contrôler" (non commencé) */
+.reception-suivi .rs-st-todo { background: rgba(148,166,196,0.16); color: #94a6c4; }
