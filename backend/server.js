@@ -63,6 +63,7 @@ import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
 import topArticlesRoutes from "./routes/topArticlesRoutes.js";
 import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
 import demandeReapproRoutes from "./routes/demandeReapproRoutes.js";
+import receptionSuiviRoutes from "./routes/receptionSuiviRoutes.js";
 // ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 // =======================================
@@ -170,6 +171,7 @@ app.use("/api/journal-caisse", journalCaisseRoutes);
 app.use("/api/top-articles", topArticlesRoutes);
 app.use("/api/analyse-reappro", analyseReapproRoutes);
 app.use("/api/demande-reappro", demandeReapproRoutes);
+app.use("/api/reception-suivi", receptionSuiviRoutes);
 // ========== ROUTES ANALYSE CA ==========
 app.use("/api/analyse-ca", analyseCaRoutes);
 // =======================================
