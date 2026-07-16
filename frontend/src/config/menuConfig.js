@@ -66,6 +66,7 @@ export const adminMenuStructure = [
         icon: HiUserGroup,
       },
            { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
+           { label: "Carte des collecteurs", path: "/admin/collecteurs-carte", icon: HiDeviceMobile },
      { label: "Installation app", path: "/install", icon: HiQrcode },
     ],
   },
@@ -139,6 +140,7 @@ export const adminMenuStructure = [
        { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
          { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
             { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
+            { label: "Carte des collecteurs", path: "/admin/collecteurs-carte", icon: HiDeviceMobile },
          
  
     ],
