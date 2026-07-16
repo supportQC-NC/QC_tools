@@ -2,6 +2,8 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import DemandeReappro from "../models/DemandeReapproModel.js";
 import { getMagasinArticlesByGisements } from "../services/analyseReapproService.js";
+import { getAccessibleEntreprises } from "../middleware/accessControl.js";
+import Entreprise from "../models/EntrepriseModel.js";
 
 const ACTIF = ["en_attente", "en_cours"];
 
@@ -132,4 +134,54 @@ const deleteDemande = asyncHandler(async (req, res) => {
   res.json({ ok: true });
 });
 
-export { createDemandes, getDemandes, getDemandeById, deleteDemande };
+const PRIO_RANK = { urgent: 0, a_faire: 1, normal: 2 };
+
+// @desc    (MOBILE) Demandes actives pour les entreprises de l'agent
+// @route   GET /api/demande-reappro/mobile/list
+// @access  Private — module reapro (read)
+// Triées par priorité (urgent d'abord) puis ancienneté. Articles inclus.
+const getMobileDemandes = asyncHandler(async (req, res) => {
+  const scope = await getAccessibleEntreprises(req.user);
+  const filter = { type: "magasin", statut: { $in: ACTIF } };
+  if (!scope.all) {
+    const ents = await Entreprise.find({ _id: { $in: scope.ids } }).select(
+      "nomDossierDBF",
+    );
+    filter.entreprise = { $in: ents.map((e) => e.nomDossierDBF) };
+  }
+  const demandes = await DemandeReappro.find(filter).limit(200).lean();
+  demandes.sort(
+    (a, b) =>
+      (PRIO_RANK[a.priorite] ?? 9) - (PRIO_RANK[b.priorite] ?? 9) ||
+      new Date(a.createdAt) - new Date(b.createdAt),
+  );
+  res.json(demandes);
+});
+
+// @desc    (MOBILE) Marquer une demande comme réalisée par l'agent
+// @route   PATCH /api/demande-reappro/mobile/:id/realiser
+// @access  Private — module reapro (write)
+const realiserDemande = asyncHandler(async (req, res) => {
+  const d = await DemandeReappro.findById(req.params.id);
+  if (!d) {
+    res.status(404);
+    throw new Error("Demande introuvable");
+  }
+  if (d.statut !== "realisee") {
+    d.statut = "realisee";
+    d.realisedBy = req.user?._id;
+    d.realisedByNom = nomUtilisateur(req.user);
+    d.realisedAt = new Date();
+    await d.save();
+  }
+  res.json(d);
+});
+
+export {
+  createDemandes,
+  getDemandes,
+  getDemandeById,
+  deleteDemande,
+  getMobileDemandes,
+  realiserDemande,
+};
