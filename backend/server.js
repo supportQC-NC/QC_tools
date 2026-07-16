@@ -65,6 +65,10 @@ import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
 import demandeReapproRoutes from "./routes/demandeReapproRoutes.js";
 import receptionSuiviRoutes from "./routes/receptionSuiviRoutes.js";
 import ficheArticleRoutes from "./routes/ficheArticleRoutes.js";
+// ⚠️ ABONNEMENTS AUX RAPPORTS — remonté (avait été retiré par erreur).
+//    Vérifie le nom exact du fichier dans backend/routes/ ; si ce n'est pas
+//    "reportSubscriptionRoutes.js", corrige juste cette ligne.
+import reportSubscriptionRoutes from "./routes/reportSubscriptionRoutes.js";
 // ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 // =======================================
@@ -174,6 +178,8 @@ app.use("/api/analyse-reappro", analyseReapproRoutes);
 app.use("/api/demande-reappro", demandeReapproRoutes);
 app.use("/api/reception-suivi", receptionSuiviRoutes);
 app.use("/api/fiche-article", ficheArticleRoutes);
+// ⚠️ ABONNEMENTS AUX RAPPORTS (répare /api/report-subscriptions/available)
+app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 // ========== ROUTES ANALYSE CA ==========
 app.use("/api/analyse-ca", analyseCaRoutes);
 // =======================================
