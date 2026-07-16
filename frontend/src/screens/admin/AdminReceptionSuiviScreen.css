@@ -219,3 +219,24 @@
 .reception-suivi .rs-detail-empty svg { font-size: 46px; color: #3a3a55; }
 .reception-suivi .rs-detail-empty p { margin: 6px 0 0; font-size: 1.05rem; font-weight: 700; color: var(--text-secondary, #aaa); }
 .reception-suivi .rs-detail-empty span { font-size: 0.85rem; max-width: 320px; line-height: 1.4; }
+
+/* Photos d'anomalies dans "dernières réceptions contrôlées" */
+.reception-suivi .rs-rec-item {
+  border-radius: 10px; background: var(--bg-tertiary, #252540); border: 1px solid var(--border, #333);
+}
+.reception-suivi .rs-rec-item .rs-rec-row { background: transparent; border: none; }
+.reception-suivi .rs-file-ano { color: #f59e0b; border-color: rgba(245,158,11,0.4); }
+.reception-suivi .rs-file-ano.on { background: rgba(245,158,11,0.16); }
+.reception-suivi .rs-rec-photos {
+  display: flex; flex-wrap: wrap; gap: 12px; padding: 0 12px 14px;
+}
+.reception-suivi .rs-rec-thumb-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 110px; }
+.reception-suivi .rs-rec-thumb {
+  width: 110px; height: 90px; object-fit: cover; border-radius: 8px; cursor: pointer;
+  background: #000; border: 1px solid var(--border, #333);
+}
+.reception-suivi .rs-rec-thumb-ph {
+  display: flex; align-items: center; justify-content: center; color: var(--text-muted, #666);
+  font-size: 24px; background: var(--bg-primary, #0f0f1a);
+}
+.reception-suivi .rs-rec-thumb-nart { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary, #aaa); }

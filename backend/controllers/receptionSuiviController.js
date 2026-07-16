@@ -210,6 +210,13 @@ const getRecentesControlees = asyncHandler(async (req, res) => {
       generatedAt: r.rapport?.generatedAt || r.updatedAt,
       emailSentAt: r.rapport?.emailSentAt || null,
       fichiers,
+      signalements: (r.signalements || []).map((sig) => ({
+        _id: sig._id,
+        nart: sig.nart,
+        designation: sig.designation,
+        type: sig.type,
+        hasPhoto: !!(sig.photoFileName || sig.photoPath),
+      })),
     };
   });
 

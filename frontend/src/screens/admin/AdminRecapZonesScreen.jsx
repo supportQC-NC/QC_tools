@@ -1,636 +1,530 @@
-// src/screens/admin/AdminRecapZonesScreen.jsx
-import React, { useState, useMemo, useCallback } from "react";
+// src/screens/admin/AdminReceptionSuiviScreen.jsx
+//
+// Suivi des réceptions : MÊME liste que le module Réception mobile (commandes
+// à contrôler, ETAT >= 4, via /api/receptions/a-controler) + superposition de
+// la PROGRESSION du contrôle (articles contrôlés, anomalies, photos, statut).
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  HiViewGrid,
-  HiRefresh,
-  HiSearch,
-  HiX,
-  HiDownload,
-  HiDocumentDownload,
-  HiExclamation,
-  HiCheckCircle,
-  HiChevronDown,
-  HiChevronRight,
+  HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph, HiDownload, HiX, HiSparkles,
 } from "react-icons/hi";
-import { useGetRecapZonesQuery } from "../../slices/inventaireCollecteApiSlice";
-import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
-import * as XLSX from "xlsx";
-import "./AdminRecapZonesScreen.css";
+import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import {
+  useGetCommandesAControlerQuery,
+  useGetReceptionProgressQuery,
+  useGetCommandesAgregatsQuery,
+  useGetRecentesControleesQuery,
+} from "../../slices/receptionSuiviApiSlice";
+import Loader from "../../components/Shared/Loader/Loader";
+import { BASE_URL } from "../../constants";
+import "./AdminReceptionSuiviScreen.css";
 
-// Base API (proxy en dev, même origine en prod)
-const API_BASE = process.env.REACT_APP_API_URL || "";
+const STORAGE_KEY = "receptionSuivi.entreprise";
 
-const AdminRecapZonesScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
-  const [search, setSearch] = useState("");
-  const [filterEcart, setFilterEcart] = useState("TOUT"); // TOUT | ECARTS
-  const [groupBy, setGroupBy] = useState("ZONE"); // ZONE | FOURN
-  const [seuilXpf, setSeuilXpf] = useState(""); // filtre export : |écart XPF| >= seuil
-  const [openGroups, setOpenGroups] = useState(() => new Set());
-  const [isExporting, setIsExporting] = useState(false);
+const ANOMALIE = {
+  avarie: { label: "Avarie", cls: "rs-ano-warn" },
+  cassee: { label: "Cassée", cls: "rs-ano-danger" },
+  manquant: { label: "Manquant", cls: "rs-ano-danger" },
+  abimee: { label: "Abîmée", cls: "rs-ano-warn" },
+};
+const up = (v) => String(v || "").trim().toUpperCase();
+const fmtNb = (n) => (n ?? 0).toLocaleString("fr-FR");
+const fmtDate = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("fr-FR");
+};
+const photoSrc = (recId, sigId) =>
+  `${BASE_URL}/api/reception-suivi/${recId}/signalement/${sigId}/photo`;
 
-  const { data: entreprises } = useGetMyEntreprisesQuery();
+const AdminReceptionSuiviScreen = () => {
+  const [selectedEnt, setSelectedEnt] = useState(
+    localStorage.getItem(STORAGE_KEY) || "",
+  );
+  const [selectedNumcde, setSelectedNumcde] = useState(null);
+  const [filter, setFilter] = useState("tous"); // tous | encours
+  const [zoom, setZoom] = useState(null);
+  const [photoUrls, setPhotoUrls] = useState({});
+  const urlsRef = useRef({});
+  const [openRec, setOpenRec] = useState(null);
+  const [recPhotos, setRecPhotos] = useState({});
+  const recUrlsRef = useRef({});
 
-  const {
-    data: recap,
-    isLoading,
-    isFetching,
-    error,
-    refetch,
-  } = useGetRecapZonesQuery(selectedEntreprise, {
-    skip: !selectedEntreprise,
-  });
+  const { data: entreprises, isLoading: loadingEnt } = useGetEntreprisesQuery();
 
-  const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
+  const { data: cmdData, isFetching: fCmd, refetch: refetchCmd } =
+    useGetCommandesAControlerQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: progressList = [], isFetching: fProg, refetch: refetchProg } =
+    useGetReceptionProgressQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: agregats = {}, refetch: refetchAgg } =
+    useGetCommandesAgregatsQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: recentes = [], refetch: refetchRec } =
+    useGetRecentesControleesQuery(selectedEnt, { skip: !selectedEnt });
 
-  const totaux = recap?.totaux || null;
-  const session = recap?.session || null;
-
-  // Source selon le regroupement choisi
-  const groupesBruts = useMemo(() => {
-    if (!recap) return [];
-    if (groupBy === "FOURN") {
-      return (recap.fournisseurs || []).map((f) => ({
-        key: f.fourn,
-        titre: f.fourn,
-        sousTitre: "",
-        ...f,
-      }));
+  // Entreprise par défaut : 1re active.
+  useEffect(() => {
+    if (!selectedEnt && entreprises && entreprises.length > 0) {
+      const a = entreprises.find((e) => e.isActive) || entreprises[0];
+      if (a) setSelectedEnt(a.nomDossierDBF);
     }
-    return (recap.zones || []).map((z) => ({
-      key: z.zoneCode,
-      titre: z.zoneCode,
-      sousTitre: z.zoneLibelle || "",
-      ...z,
-    }));
-  }, [recap, groupBy]);
+  }, [entreprises, selectedEnt]);
+  useEffect(() => {
+    if (selectedEnt) localStorage.setItem(STORAGE_KEY, selectedEnt);
+    setSelectedNumcde(null);
+  }, [selectedEnt]);
 
-  // Filtrage affichage (recherche + écarts seulement)
-  const groupes = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return groupesBruts
-      .map((g) => {
-        let lignes = g.lignes;
-        if (filterEcart === "ECARTS") {
-          lignes = lignes.filter((l) => l.ecart !== 0);
-        }
-        if (q) {
-          lignes = lignes.filter(
-            (l) =>
-              (l.nart || "").toLowerCase().includes(q) ||
-              (l.gencod || "").toLowerCase().includes(q) ||
-              (l.designation || "").toLowerCase().includes(q) ||
-              (l.fourn || "").toLowerCase().includes(q),
-          );
-        }
-        return { ...g, lignesFiltrees: lignes };
-      })
-      .filter((g) => {
-        if (q || filterEcart === "ECARTS") return g.lignesFiltrees.length > 0;
-        return true;
-      });
-  }, [groupesBruts, search, filterEcart]);
+  const commandes = cmdData?.commandes || [];
+  const progressByNumcde = useMemo(() => {
+    const m = new Map();
+    progressList.forEach((p) => m.set(up(p.numcde), p));
+    return m;
+  }, [progressList]);
 
-  const toggleGroup = useCallback((key) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
-
-  const expandAll = useCallback(() => {
-    setOpenGroups(new Set(groupes.map((g) => g.key)));
-  }, [groupes]);
-
-  const collapseAll = useCallback(() => {
-    setOpenGroups(new Set());
-  }, []);
-
-  const handleEntrepriseChange = (e) => {
-    setSelectedEntreprise(e.target.value);
-    setSearch("");
-    setFilterEcart("TOUT");
-    setSeuilXpf("");
-    setOpenGroups(new Set());
-  };
-
-  // === FORMAT ===
-  const fmt = (n, decimals = 0) => {
-    const v = parseFloat(n);
-    if (isNaN(v)) return "0";
-    return v.toLocaleString("fr-FR", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-  };
-
-  const fmtXpf = (n) => `${fmt(Math.round(n))} XPF`;
-
-  const ecartClass = (ecart) => {
-    if (ecart > 0) return "ecart-positif";
-    if (ecart < 0) return "ecart-negatif";
-    return "ecart-nul";
-  };
-
-  // Seuil numérique pour l'export (0 = pas de filtre)
-  const seuilNum = useMemo(() => {
-    const v = Math.abs(parseFloat(seuilXpf) || 0);
-    return isNaN(v) ? 0 : v;
-  }, [seuilXpf]);
-
-  // Applique le filtre seuil XPF (uniquement export/PDF)
-  const filtreExport = useCallback(
-    (lignes) => {
-      if (seuilNum <= 0) return lignes;
-      return lignes.filter((l) => Math.abs(l.ecartXpf) >= seuilNum);
-    },
-    [seuilNum],
+  const merged = useMemo(
+    () =>
+      commandes.map((c) => ({
+        ...c,
+        progress: progressByNumcde.get(up(c.numcde)) || null,
+        agg: agregats[up(c.numcde)] || null,
+      })),
+    [commandes, progressByNumcde, agregats],
   );
 
-  // =============================================
-  // EXPORT EXCEL : 1 onglet récap + 1 onglet par groupe
-  // (respecte le filtre seuil XPF)
-  // =============================================
-  const handleExportExcel = useCallback(() => {
-    if (!recap || !groupesBruts.length) return;
-    setIsExporting(true);
+  const controlledCount = (c) =>
+    (c.progress?.comptages || []).filter((x) => x.dansCommande).length;
+  const pctControle = (c) => {
+    const total = c.agg?.nbArticles || 0;
+    if (!c.progress || total === 0) return null;
+    return Math.min(100, Math.round((controlledCount(c) / total) * 100));
+  };
+
+  const nbEnCours = merged.filter((c) => c.progress).length;
+  const nbTodo = merged.length - nbEnCours;
+  const displayed = useMemo(() => {
+    const base = filter === "encours" ? merged.filter((c) => c.progress) : merged;
+    return [...base].sort((a, b) => (a.progress ? 0 : 1) - (b.progress ? 0 : 1));
+  }, [merged, filter]);
+
+  const selected = merged.find((c) => c.numcde === selectedNumcde) || null;
+  const busy = Boolean(selectedEnt) && (fCmd || fProg);
+
+  // Photos des anomalies du contrôle sélectionné (fetch + cookie -> blob URL).
+  useEffect(() => {
+    Object.values(urlsRef.current).forEach((u) => {
+      if (typeof u === "string" && u.startsWith("blob:")) URL.revokeObjectURL(u);
+    });
+    urlsRef.current = {};
+    setPhotoUrls({});
+    const prog = selected?.progress;
+    if (!prog?.receptionId) return undefined;
+    let alive = true;
+    (prog.signalements || [])
+      .filter((s) => s.hasPhoto)
+      .forEach(async (s) => {
+        try {
+          const res = await fetch(photoSrc(prog.receptionId, s._id), {
+            credentials: "include",
+          });
+          if (!res.ok) throw new Error("http " + res.status);
+          const blob = await res.blob();
+          if (!alive || !blob || blob.size === 0) return;
+          const url = URL.createObjectURL(blob);
+          urlsRef.current[s._id] = url;
+          setPhotoUrls((p) => ({ ...p, [s._id]: url }));
+        } catch {
+          if (alive) setPhotoUrls((p) => ({ ...p, [s._id]: "error" }));
+        }
+      });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNumcde]);
+
+  // Photos des anomalies dans "dernières contrôlées" (chargées à l'ouverture).
+  useEffect(() => {
+    if (!openRec) return undefined;
+    const rec = recentes.find((r) => r._id === openRec);
+    if (!rec) return undefined;
+    let alive = true;
+    (rec.signalements || [])
+      .filter((s) => s.hasPhoto)
+      .forEach(async (s) => {
+        if (recUrlsRef.current[s._id]) return;
+        try {
+          const res = await fetch(photoSrc(rec._id, s._id), { credentials: "include" });
+          if (!res.ok) throw new Error("http");
+          const blob = await res.blob();
+          if (!alive || !blob || !blob.size) return;
+          const url = URL.createObjectURL(blob);
+          recUrlsRef.current[s._id] = url;
+          setRecPhotos((p) => ({ ...p, [s._id]: url }));
+        } catch {
+          if (alive) setRecPhotos((p) => ({ ...p, [s._id]: "error" }));
+        }
+      });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRec]);
+
+  useEffect(
+    () => () => {
+      Object.values(recUrlsRef.current).forEach(
+        (u) => typeof u === "string" && u.startsWith("blob:") && URL.revokeObjectURL(u),
+      );
+    },
+    [],
+  );
+
+  const refresh = () => { refetchCmd(); refetchProg(); refetchAgg(); refetchRec(); };
+
+  const downloadFile = async (id, name) => {
     try {
-      const wb = XLSX.utils.book_new();
-      const libGroupe = groupBy === "FOURN" ? "Fournisseur" : "Zone";
-
-      // ----- Onglet RÉCAP -----
-      const recapRows = [
-        [`RÉCAP PAR ${libGroupe.toUpperCase()}`],
-        [
-          "Entreprise",
-          entrepriseObj
-            ? `${entrepriseObj.trigramme} - ${entrepriseObj.nomComplet}`
-            : "",
-        ],
-        ["Session", session?.nom || "(session active)"],
-        seuilNum > 0 ? ["Filtre écart", `|écart XPF| >= ${fmt(seuilNum)}`] : [],
-        [],
-        [
-          libGroupe,
-          "Articles",
-          "Qté bipée",
-          "Stock théorique",
-          "Écart qté",
-          "Écart XPF",
-          "Nb écarts",
-        ],
-      ];
-      groupesBruts.forEach((g) => {
-        const lignes = filtreExport(g.lignes);
-        if (!lignes.length) return;
-        const eQte = lignes.reduce((s, l) => s + l.ecart, 0);
-        const eXpf = lignes.reduce((s, l) => s + l.ecartXpf, 0);
-        const qte = lignes.reduce((s, l) => s + l.qteBipee, 0);
-        const stock = lignes.reduce((s, l) => s + l.stockTheorique, 0);
-        const nbE = lignes.filter((l) => l.ecart !== 0).length;
-        recapRows.push([
-          g.titre,
-          lignes.length,
-          qte,
-          stock,
-          eQte,
-          Math.round(eXpf),
-          nbE,
-        ]);
-      });
-      const wsRecap = XLSX.utils.aoa_to_sheet(recapRows);
-      XLSX.utils.book_append_sheet(wb, wsRecap, "Récap");
-
-      // ----- Un onglet par groupe -----
-      const usedNames = new Set(["Récap"]);
-      groupesBruts.forEach((g) => {
-        const lignes = filtreExport(g.lignes);
-        if (!lignes.length) return;
-
-        const rows = [
-          [`${libGroupe.toUpperCase()} ${g.titre}`, g.sousTitre || ""],
-          [],
-          [
-            "NART",
-            "GENCOD",
-            "Désignation",
-            "Fourn.",
-            "Qté bipée",
-            "Stock théo.",
-            "Écart qté",
-            "PA",
-            "Écart XPF",
-          ],
-        ];
-        lignes.forEach((l) => {
-          rows.push([
-            l.nart,
-            l.gencod,
-            l.designation,
-            l.fourn,
-            l.qteBipee,
-            l.stockTheorique,
-            l.ecart,
-            l.prixAchat,
-            Math.round(l.ecartXpf),
-          ]);
-        });
-        const eQte = lignes.reduce((s, l) => s + l.ecart, 0);
-        const eXpf = lignes.reduce((s, l) => s + l.ecartXpf, 0);
-        rows.push([]);
-        rows.push([
-          "TOTAL",
-          "",
-          "",
-          "",
-          lignes.reduce((s, l) => s + l.qteBipee, 0),
-          lignes.reduce((s, l) => s + l.stockTheorique, 0),
-          eQte,
-          "",
-          Math.round(eXpf),
-        ]);
-
-        let base = `${groupBy === "FOURN" ? "F" : "Z"}_${String(
-          g.titre,
-        ).replace(/[\\/?*[\]:]/g, "_")}`.slice(0, 28);
-        let name = base;
-        let i = 1;
-        while (usedNames.has(name)) {
-          name = `${base}_${i++}`.slice(0, 31);
-        }
-        usedNames.add(name);
-
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        XLSX.utils.book_append_sheet(wb, ws, name);
-      });
-
-      const trig = entrepriseObj?.trigramme || "inv";
-      const now = new Date();
-      const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-      const suff = groupBy === "FOURN" ? "fourn" : "zones";
-      XLSX.writeFile(wb, `recap_${suff}_${trig}_${stamp}.xlsx`);
-    } finally {
-      setIsExporting(false);
+      const res = await fetch(
+        `${BASE_URL}/api/reception-suivi/${id}/fichier/${encodeURIComponent(name)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch {
+      /* ignore */
     }
-  }, [
-    recap,
-    groupesBruts,
-    groupBy,
-    totaux,
-    session,
-    entrepriseObj,
-    filtreExport,
-    seuilNum,
-  ]);
-
-  // =============================================
-  // PDF d'UNE zone (vrai PDF backend = feuille de contrôle)
-  // =============================================
-  const openZonePdf = useCallback(
-    (zoneCode) => {
-      if (!selectedEntreprise || !zoneCode) return;
-      const url = `${API_BASE}/api/inventaires-collecte/recap-zones/${selectedEntreprise}/pdf?zoneCode=${encodeURIComponent(
-        zoneCode,
-      )}`;
-      window.open(url, "_blank");
-    },
-    [selectedEntreprise],
-  );
+  };
 
   return (
-    <div className="admin-recap-zones-page">
-      {/* HEADER */}
-      <div className="recap-header">
-        <div className="header-title">
-          <HiViewGrid className="title-icon" />
-          <h1>Récap par {groupBy === "FOURN" ? "fournisseur" : "zone"}</h1>
-        </div>
-
-        <div className="header-center">
-          <div className="entreprise-selector">
-            <select value={selectedEntreprise} onChange={handleEntrepriseChange}>
-              <option value="">— Choisir une entreprise —</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e._id}>
-                  {e.trigramme} — {e.nomComplet}
-                </option>
-              ))}
-            </select>
+    <div className="reception-suivi">
+      <div className="rs-header">
+        <div className="rs-head-title">
+          <span className="rs-head-icon"><HiClipboardList /></span>
+          <div>
+            <h1>Suivi des réceptions</h1>
+            <p>Commandes à contrôler (ETAT ≥ 4) + progression, anomalies et photos.</p>
           </div>
         </div>
-
-        <div className="header-actions">
-          <button
-            className="btn-action"
-            onClick={() => refetch()}
-            disabled={!selectedEntreprise || isFetching}
-            title="Rafraîchir"
+        <div className="rs-head-actions">
+          <select
+            className="rs-select"
+            value={selectedEnt}
+            onChange={(e) => setSelectedEnt(e.target.value)}
+            disabled={loadingEnt}
           >
-            <HiRefresh className={isFetching ? "spinning" : ""} />
-          </button>
-          <button
-            className="btn-action primary"
-            onClick={handleExportExcel}
-            disabled={!groupesBruts.length || isExporting}
-            title="Exporter en Excel"
-          >
-            <HiDownload />
+            <option value="">— Entreprise —</option>
+            {(entreprises || []).map((e) => (
+              <option key={e._id || e.nomDossierDBF} value={e.nomDossierDBF}>
+                {e.nom || e.nomComplet || e.nomDossierDBF}
+              </option>
+            ))}
+          </select>
+          <button className="rs-refresh" onClick={refresh} disabled={busy}>
+            <HiRefresh className={busy ? "spin" : ""} /> Rafraîchir
           </button>
         </div>
       </div>
 
-      {/* CORPS */}
-      <div className="recap-content">
-        {!selectedEntreprise && (
-          <div className="empty-state">
-            <HiViewGrid className="empty-icon" />
-            <h2>Sélectionnez une entreprise</h2>
-            <p>
-              Le récap affiche la session d'inventaire active, regroupée par zone
-              ou par fournisseur, avec les écarts en quantité et en valeur (XPF).
-            </p>
-          </div>
-        )}
+      {selectedEnt && merged.length > 0 && (
+        <div className="rs-toolbar">
+          <button
+            className={`rs-chip ${filter === "tous" ? "on" : ""}`}
+            onClick={() => setFilter("tous")}
+          >
+            Toutes <span>{merged.length}</span>
+          </button>
+          <button
+            className={`rs-chip rs-chip-cours ${filter === "encours" ? "on" : ""}`}
+            onClick={() => setFilter("encours")}
+          >
+            <span className="rs-dot" /> En cours <span>{nbEnCours}</span>
+          </button>
+          {nbTodo > 0 && <span className="rs-toolbar-info">{nbTodo} à contrôler</span>}
+        </div>
+      )}
 
-        {selectedEntreprise && isLoading && (
-          <div className="loading-state">
-            <div className="loading-spinner" />
-            <p>Chargement du récap…</p>
-          </div>
-        )}
-
-        {selectedEntreprise && error && (
-          <div className="error-state">
-            <HiExclamation className="error-icon" />
-            <h2>Erreur</h2>
-            <p>{error?.data?.message || "Impossible de charger le récap."}</p>
-            <button onClick={() => refetch()}>Réessayer</button>
-          </div>
-        )}
-
-        {selectedEntreprise && !isLoading && !error && (
-          <>
-            {/* Barre de totaux */}
-            {totaux && (
-              <div className="totaux-bar">
-                <div className="totaux-card">
-                  <span className="t-label">
-                    {groupBy === "FOURN" ? "Fournisseurs" : "Zones"}
-                  </span>
-                  <span className="t-value">
-                    {groupBy === "FOURN"
-                      ? totaux.totalFournisseurs
-                      : totaux.totalZones}
-                  </span>
-                </div>
-                <div className="totaux-card">
-                  <span className="t-label">Articles</span>
-                  <span className="t-value">{fmt(totaux.totalArticles)}</span>
-                </div>
-                <div className="totaux-card">
-                  <span className="t-label">Qté bipée</span>
-                  <span className="t-value">{fmt(totaux.totalQteBipee)}</span>
-                </div>
-                <div className="totaux-card">
-                  <span className="t-label">Écart qté</span>
-                  <span className={`t-value ${ecartClass(totaux.totalEcart)}`}>
-                    {fmt(totaux.totalEcart)}
-                  </span>
-                </div>
-                <div className="totaux-card highlight">
-                  <span className="t-label">Écart valeur</span>
-                  <span
-                    className={`t-value ${ecartClass(totaux.totalEcartXpf)}`}
-                  >
-                    {fmtXpf(totaux.totalEcartXpf)}
-                  </span>
-                </div>
-                <div className="totaux-card">
-                  <span className="t-label">Nb écarts</span>
-                  <span className="t-value">{fmt(totaux.nbEcarts)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Outils */}
-            <div className="tools-bar">
-              <div className="search-box">
-                <HiSearch className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="Rechercher (NART, code-barres, désignation, fourn.)…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                {search && (
-                  <button className="clear-search" onClick={() => setSearch("")}>
-                    <HiX />
-                  </button>
-                )}
-              </div>
-
-              <div className="filter-group">
-                <button
-                  className={groupBy === "ZONE" ? "active" : ""}
-                  onClick={() => {
-                    setGroupBy("ZONE");
-                    setOpenGroups(new Set());
-                  }}
-                >
-                  Par zone
-                </button>
-                <button
-                  className={groupBy === "FOURN" ? "active" : ""}
-                  onClick={() => {
-                    setGroupBy("FOURN");
-                    setOpenGroups(new Set());
-                  }}
-                >
-                  Par fournisseur
-                </button>
-              </div>
-
-              <div className="filter-group">
-                <button
-                  className={filterEcart === "TOUT" ? "active" : ""}
-                  onClick={() => setFilterEcart("TOUT")}
-                >
-                  Tout
-                </button>
-                <button
-                  className={filterEcart === "ECARTS" ? "active" : ""}
-                  onClick={() => setFilterEcart("ECARTS")}
-                >
-                  Écarts seulement
-                </button>
-              </div>
-
-              <div className="seuil-box" title="Filtre appliqué à l'export Excel uniquement">
-                <label>Export si |écart| ≥</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  placeholder="0"
-                  value={seuilXpf}
-                  onChange={(e) => setSeuilXpf(e.target.value)}
-                />
-                <span className="seuil-unit">XPF</span>
-              </div>
-
-              <div className="expand-group">
-                <button onClick={expandAll}>Tout déplier</button>
-                <button onClick={collapseAll}>Tout replier</button>
-              </div>
-            </div>
-
-            {/* Liste des groupes */}
-            {groupes.length === 0 ? (
-              <div className="empty-state small">
-                <HiCheckCircle className="empty-icon" />
-                <p>
-                  Aucun élément à afficher (ou aucune collecte sur la session
-                  active).
-                </p>
+      {!selectedEnt ? (
+        <div className="rs-empty">Choisissez une entreprise.</div>
+      ) : busy && merged.length === 0 ? (
+        <Loader />
+      ) : (
+        <div className="rs-layout">
+          {/* Liste des commandes à contrôler */}
+          <div className="rs-list">
+            {displayed.length === 0 ? (
+              <div className="rs-empty">
+                {filter === "encours" ? "Aucun contrôle en cours." : "Aucune commande à contrôler."}
               </div>
             ) : (
-              <div className="zones-list">
-                {groupes.map((g) => {
-                  const isOpen = openGroups.has(g.key);
-                  const lignes = g.lignesFiltrees;
-                  return (
-                    <div className="zone-card" key={g.key}>
-                      <div className="zone-head-row">
-                        <button
-                          className="zone-head"
-                          onClick={() => toggleGroup(g.key)}
-                        >
-                          <span className="zone-toggle">
-                            {isOpen ? <HiChevronDown /> : <HiChevronRight />}
-                          </span>
-                          <span className="zone-code">{g.titre}</span>
-                          {g.sousTitre && (
-                            <span className="zone-libelle">{g.sousTitre}</span>
-                          )}
-                          <span className="zone-stats">
-                            <span className="zs">{g.totalArticles} art.</span>
-                            <span className="zs">
-                              bipé&nbsp;{fmt(g.totalQteBipee)}
-                            </span>
-                            <span className={`zs ecart ${ecartClass(g.totalEcart)}`}>
-                              éc.&nbsp;{fmt(g.totalEcart)}
-                            </span>
-                            <span
-                              className={`zs ecart ${ecartClass(g.totalEcartXpf)}`}
-                            >
-                              {fmtXpf(g.totalEcartXpf)}
-                            </span>
-                            {g.nbEcarts > 0 && (
-                              <span className="zs badge-ecart">
-                                {g.nbEcarts} écart(s)
-                              </span>
-                            )}
-                          </span>
-                        </button>
-
-                        {/* Bouton PDF : seulement en regroupement par zone */}
-                        {groupBy === "ZONE" && (
-                          <button
-                            className="btn-pdf-zone"
-                            onClick={() => openZonePdf(g.titre)}
-                            title="Feuille de contrôle PDF de cette zone"
-                          >
-                            <HiDocumentDownload />
-                            <span>PDF</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {isOpen && (
-                        <div className="zone-body">
-                          <table className="lignes-table">
-                            <thead>
-                              <tr>
-                                <th>NART</th>
-                                <th>GENCOD</th>
-                                <th>Désignation</th>
-                                {groupBy === "FOURN" ? (
-                                  <th>Zone</th>
-                                ) : (
-                                  <th>Fourn.</th>
-                                )}
-                                <th className="num">Qté bipée</th>
-                                <th className="num">Stock théo.</th>
-                                <th className="num">Écart</th>
-                                <th className="num">PA</th>
-                                <th className="num">Écart XPF</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {lignes.map((l, idx) => (
-                                <tr key={`${l.nart}-${idx}`}>
-                                  <td className="mono">{l.nart}</td>
-                                  <td className="mono">{l.gencod}</td>
-                                  <td className="design">
-                                    {l.designation}
-                                    {l.isRenvoi && (
-                                      <span className="tag renvoi">renvoi</span>
-                                    )}
-                                    {l.isUnknown && (
-                                      <span className="tag unknown">inconnu</span>
-                                    )}
-                                    {!l.articleTrouve && (
-                                      <span className="tag absent">hors DBF</span>
-                                    )}
-                                  </td>
-                                  <td className="mono">
-                                    {groupBy === "FOURN" ? l.zoneCode : l.fourn}
-                                  </td>
-                                  <td className="num">{fmt(l.qteBipee)}</td>
-                                  <td className="num">{fmt(l.stockTheorique)}</td>
-                                  <td className={`num ${ecartClass(l.ecart)}`}>
-                                    {fmt(l.ecart)}
-                                  </td>
-                                  <td className="num">{fmt(l.prixAchat)}</td>
-                                  <td className={`num ${ecartClass(l.ecartXpf)}`}>
-                                    {fmt(Math.round(l.ecartXpf))}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot>
-                              <tr>
-                                <td colSpan={4}>Total</td>
-                                <td className="num">{fmt(g.totalQteBipee)}</td>
-                                <td className="num">
-                                  {fmt(g.totalStockTheorique)}
-                                </td>
-                                <td className={`num ${ecartClass(g.totalEcart)}`}>
-                                  {fmt(g.totalEcart)}
-                                </td>
-                                <td className="num"></td>
-                                <td
-                                  className={`num ${ecartClass(g.totalEcartXpf)}`}
-                                >
-                                  {fmt(Math.round(g.totalEcartXpf))}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
+              displayed.map((c) => {
+                const p = c.progress;
+                return (
+                  <button
+                    key={c.numcde}
+                    className={`rs-card ${c.progress ? "encours" : "todo"} ${selectedNumcde === c.numcde ? "active" : ""}`}
+                    onClick={() => setSelectedNumcde(c.numcde)}
+                  >
+                    <div className="rs-card-top">
+                      <span className="rs-cde">Cmd {c.numcde}</span>
+                      {p ? (
+                        <span className="rs-badge rs-st-cours"><span className="rs-dot" /> En cours</span>
+                      ) : (
+                        <span className="rs-badge rs-st-todo">À contrôler</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="rs-card-meta">{c.fournisseurNom || "—"}</div>
+                    <div className="rs-card-stats">
+                      {c.etatLabel ? <span>{c.etatLabel}</span> : c.etat != null && <span>ETAT {c.etat}</span>}
+                      {!!c.bateau && <span>🚢 {c.bateau}</span>}
+                      {c.arrivee && <span>Arr. {fmtDate(c.arrivee)}</span>}
+                    </div>
+                    {c.agg && (
+                      <div className="rs-card-stats">
+                        <span><HiCube /> {fmtNb(c.agg.nbArticles)} art.</span>
+                        <span>{fmtNb(c.agg.totalUnites)} u.</span>
+                        {c.agg.nbNouveautes > 0 && (
+                          <span className="rs-nouv"><HiSparkles /> {c.agg.nbNouveautes} nouv.</span>
+                        )}
+                      </div>
+                    )}
+                    {p && (
+                      <div className="rs-card-stats">
+                        <span><HiCube /> {p.nbComptages} contrôlé(s)</span>
+                        {p.nbSignalements > 0 && (
+                          <span className="rs-warn"><HiExclamation /> {p.nbSignalements} anomalie(s)</span>
+                        )}
+                      </div>
+                    )}
+                    {pctControle(c) != null && (
+                      <div className="rs-progress">
+                        <div className="rs-progress-bar">
+                          <div className="rs-progress-fill" style={{ width: `${pctControle(c)}%` }} />
+                        </div>
+                        <span className="rs-progress-txt">{pctControle(c)}%</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })
             )}
-          </>
-        )}
-      </div>
+          </div>
+
+          {/* Détail */}
+          <div className="rs-detail">
+            {!selected ? (
+              <div className="rs-detail-empty">
+                <HiClipboardList />
+                <p>Sélectionnez une commande</p>
+                <span>Cliquez une commande à gauche pour voir sa progression, ses anomalies et ses photos.</span>
+              </div>
+            ) : (
+              <>
+                <div className="rs-detail-head">
+                  <h2>Cmd {selected.numcde}</h2>
+                  <span className="rs-detail-sub">
+                    {selected.fournisseurNom || "—"}
+                    {selected.bateau ? ` · 🚢 ${selected.bateau}` : ""}
+                    {selected.arrivee ? ` · Arrivée ${fmtDate(selected.arrivee)}` : ""}
+                    {selected.etatLabel ? ` · ${selected.etatLabel}` : ""}
+                  </span>
+                  {selected.agg && (
+                    <div className="rs-detail-agg">
+                      <span><HiCube /> {fmtNb(selected.agg.nbArticles)} articles</span>
+                      <span>{fmtNb(selected.agg.totalUnites)} unités</span>
+                      {selected.agg.nbNouveautes > 0 && (
+                        <span className="rs-nouv"><HiSparkles /> {selected.agg.nbNouveautes} nouveautés</span>
+                      )}
+                    </div>
+                  )}
+                  {pctControle(selected) != null && (
+                    <div className="rs-progress rs-progress-lg">
+                      <div className="rs-progress-bar">
+                        <div className="rs-progress-fill" style={{ width: `${pctControle(selected)}%` }} />
+                      </div>
+                      <span className="rs-progress-txt">{pctControle(selected)}% contrôlé</span>
+                    </div>
+                  )}
+                </div>
+
+                {!selected.progress ? (
+                  <p className="rs-none">Contrôle non commencé pour cette commande.</p>
+                ) : (
+                  <>
+                    {/* Anomalies */}
+                    <h3 className="rs-section">
+                      <HiExclamation /> Anomalies ({(selected.progress.signalements || []).length})
+                    </h3>
+                    {(selected.progress.signalements || []).length === 0 ? (
+                      <p className="rs-none">Aucune anomalie signalée.</p>
+                    ) : (
+                      <div className="rs-ano-grid">
+                        {selected.progress.signalements.map((s) => {
+                          const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
+                          const pu = photoUrls[s._id];
+                          return (
+                            <div key={s._id} className="rs-ano">
+                              {s.hasPhoto ? (
+                                pu && pu !== "error" ? (
+                                  <img className="rs-ano-photo" src={pu} alt={s.nart} onClick={() => setZoom({ url: pu, name: `anomalie_${up(s.nart) || "photo"}.jpg` })} />
+                                ) : (
+                                  <div className="rs-ano-nophoto">
+                                    {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
+                                  </div>
+                                )
+                              ) : (
+                                <div className="rs-ano-nophoto"><HiPhotograph /></div>
+                              )}
+                              <div className="rs-ano-info">
+                                <span className={`rs-badge ${a.cls}`}>{a.label}</span>
+                                <span className="rs-ano-nart">{s.nart || "—"}</span>
+                                {!!s.designation && <span className="rs-ano-design">{s.designation}</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Articles contrôlés */}
+                    <h3 className="rs-section">
+                      <HiCube /> Articles contrôlés ({(selected.progress.comptages || []).length})
+                    </h3>
+                    {(selected.progress.comptages || []).length === 0 ? (
+                      <p className="rs-none">Aucun article compté.</p>
+                    ) : (
+                      <div className="rs-table-wrap">
+                        <table className="rs-table">
+                          <thead>
+                            <tr>
+                              <th>NART</th>
+                              <th>Désignation</th>
+                              <th className="num">Compté</th>
+                              <th>État</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selected.progress.comptages.map((c, i) => (
+                              <tr key={`${c.nart}-${i}`}>
+                                <td className="mono">{c.nart || (c.isInconnu ? "Inconnu" : "—")}</td>
+                                <td className="design" title={c.designation}>{c.designation || c.gencod}</td>
+                                <td className="num strong">{c.qteValidee != null ? c.qteValidee : c.qteComptee}</td>
+                                <td>
+                                  {c.isInconnu ? (
+                                    <span className="rs-tag rs-tag-warn">hors base</span>
+                                  ) : !c.dansCommande ? (
+                                    <span className="rs-tag">hors cmd</span>
+                                  ) : (
+                                    <span className="rs-tag rs-tag-ok">commande</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {selectedEnt && recentes.length > 0 && (
+        <div className="rs-recentes">
+          <h3 className="rs-section">
+            <HiClipboardList /> Dernières réceptions contrôlées ({recentes.length})
+          </h3>
+          <div className="rs-rec-list">
+            {recentes.map((r) => {
+              const anoPhotos = (r.signalements || []).filter((s) => s.hasPhoto);
+              const isOpen = openRec === r._id;
+              return (
+                <div key={r._id} className="rs-rec-item">
+                  <div className="rs-rec-row">
+                    <div className="rs-rec-info">
+                      <span className="rs-rec-cde">Cmd {r.numcde}</span>
+                      <span className="rs-rec-four">{r.fournisseurNom || "—"}</span>
+                      <span className="rs-rec-date">{fmtDate(r.generatedAt)}</span>
+                    </div>
+                    <div className="rs-rec-files">
+                      {anoPhotos.length > 0 && (
+                        <button
+                          className={`rs-file rs-file-ano ${isOpen ? "on" : ""}`}
+                          onClick={() => setOpenRec(isOpen ? null : r._id)}
+                          title="Voir les photos d'anomalies"
+                        >
+                          <HiPhotograph /> {anoPhotos.length} photo{anoPhotos.length > 1 ? "s" : ""}
+                        </button>
+                      )}
+                      {r.fichiers.length === 0 ? (
+                        <span className="rs-rec-nofile">Aucun fichier</span>
+                      ) : (
+                        r.fichiers.map((f) => (
+                          <button
+                            key={f.name}
+                            className={`rs-file rs-file-${f.ext}`}
+                            onClick={() => downloadFile(r._id, f.name)}
+                            title={f.name}
+                          >
+                            <HiDownload /> {f.ext.toUpperCase()}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  {isOpen && anoPhotos.length > 0 && (
+                    <div className="rs-rec-photos">
+                      {anoPhotos.map((s) => {
+                        const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
+                        const pu = recPhotos[s._id];
+                        return (
+                          <div key={s._id} className="rs-rec-thumb-wrap">
+                            {pu && pu !== "error" ? (
+                              <img
+                                className="rs-rec-thumb"
+                                src={pu}
+                                alt={s.nart}
+                                onClick={() => setZoom({ url: pu, name: `anomalie_${up(s.nart) || "photo"}.jpg` })}
+                              />
+                            ) : (
+                              <div className="rs-rec-thumb rs-rec-thumb-ph">
+                                {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
+                              </div>
+                            )}
+                            <span className={`rs-badge ${a.cls}`}>{a.label}</span>
+                            <span className="rs-rec-thumb-nart">{s.nart || "—"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {zoom && (
+        <div className="rs-zoom" onClick={() => setZoom(null)}>
+          <div className="rs-zoom-box" onClick={(e) => e.stopPropagation()}>
+            <img src={zoom.url} alt="" />
+            <div className="rs-zoom-actions">
+              <a className="rs-zoom-btn dl" href={zoom.url} download={zoom.name}>
+                <HiDownload /> Télécharger
+              </a>
+              <button className="rs-zoom-btn" onClick={() => setZoom(null)}>
+                <HiX /> Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default AdminRecapZonesScreen;
+export default AdminReceptionSuiviScreen;
