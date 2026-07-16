@@ -95,6 +95,7 @@ export const ANALYSE_KEYS = [
   "factures",
   "journalCaisse",
   "topArticles",
+  "analyseReappro",
 ];
 
 // Réseaux de l'analyse Filiales (figés côté service : DQ, QC, LD).

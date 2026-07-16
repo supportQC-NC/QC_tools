@@ -1,0 +1,213 @@
+/* src/screens/admin/AdminAnalyseReapproScreen.css
+   Tout est scopé sous .analyse-reappro pour éviter toute fuite de styles. */
+
+.analyse-reappro {
+  padding: 26px 32px 48px;
+  box-sizing: border-box;
+  color: var(--text-primary, #eee);
+}
+
+.analyse-reappro .ar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  border-radius: 16px;
+  border: 1px solid var(--border, #333);
+  background: linear-gradient(135deg, var(--bg-secondary, #1a1a2e), var(--bg-tertiary, #252540));
+}
+.analyse-reappro .ar-head-title { display: flex; align-items: center; gap: 14px; }
+.analyse-reappro .ar-head-icon {
+  width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+  color: #fff; background: linear-gradient(135deg, var(--accent, #4da6ff), #7c5cff);
+}
+.analyse-reappro .ar-head-title h1 { margin: 0; font-size: 1.5rem; font-weight: 800; }
+.analyse-reappro .ar-head-title p { margin: 2px 0 0; color: var(--text-secondary, #aaa); font-size: 0.88rem; }
+
+.analyse-reappro .ar-head-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.analyse-reappro .ar-select {
+  padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border, #333);
+  background: var(--bg-secondary, #1a1a2e); color: var(--text-primary, #eee);
+  font-size: 0.9rem; font-weight: 600; cursor: pointer; min-width: 200px; outline: none;
+}
+.analyse-reappro .ar-select:focus { border-color: var(--accent, #4da6ff); }
+.analyse-reappro .ar-refresh {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 10px;
+  border: 1px solid var(--border, #333); background: transparent; color: var(--text-secondary, #aaa);
+  cursor: pointer; font-size: 0.88rem; font-weight: 600;
+}
+.analyse-reappro .ar-refresh:hover:not(:disabled) { border-color: var(--accent, #4da6ff); color: var(--accent, #4da6ff); }
+.analyse-reappro .ar-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.analyse-reappro .ar-refresh .spin { animation: ar-spin 1s linear infinite; }
+@keyframes ar-spin { to { transform: rotate(360deg); } }
+
+.analyse-reappro .ar-empty {
+  padding: 60px 20px; text-align: center; color: var(--text-muted, #888);
+  border: 1px dashed var(--border, #333); border-radius: 14px;
+}
+
+/* KPIs */
+.analyse-reappro .ar-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px; margin-bottom: 22px;
+}
+.analyse-reappro .ar-kpi {
+  display: flex; align-items: center; gap: 14px; padding: 18px;
+  border-radius: 14px; background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid var(--border, #333); border-left-width: 4px;
+}
+.analyse-reappro .ar-kpi-icon {
+  width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+}
+.analyse-reappro .ar-kpi-value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.analyse-reappro .ar-kpi-label { font-size: 0.82rem; color: var(--text-secondary, #aaa); margin-top: 2px; }
+
+.analyse-reappro .ar-kpi-blue { border-left-color: #4da6ff; }
+.analyse-reappro .ar-kpi-blue .ar-kpi-icon { background: rgba(77,166,255,0.14); color: #4da6ff; }
+.analyse-reappro .ar-kpi-red { border-left-color: #ef4444; }
+.analyse-reappro .ar-kpi-red .ar-kpi-icon { background: rgba(239,68,68,0.14); color: #ef4444; }
+.analyse-reappro .ar-kpi-amber { border-left-color: #f59e0b; }
+.analyse-reappro .ar-kpi-amber .ar-kpi-icon { background: rgba(245,158,11,0.14); color: #f59e0b; }
+.analyse-reappro .ar-kpi-green { border-left-color: #22c55e; }
+.analyse-reappro .ar-kpi-green .ar-kpi-icon { background: rgba(34,197,94,0.14); color: #22c55e; }
+
+/* Zone principale */
+.analyse-reappro .ar-main { display: flex; flex-direction: column; gap: 20px; }
+.analyse-reappro .ar-card {
+  background: var(--bg-secondary, #1a1a2e); border: 1px solid var(--border, #333);
+  border-radius: 16px; padding: 20px;
+}
+.analyse-reappro .ar-card h3 {
+  margin: 0 0 14px; font-size: 1rem; font-weight: 700; color: var(--text-primary, #eee);
+}
+.analyse-reappro .ar-count { color: var(--text-muted, #888); font-weight: 500; font-size: 0.82rem; }
+.analyse-reappro .ar-chart { width: 100%; }
+
+/* Tableau */
+.analyse-reappro .ar-table-wrap { overflow-x: auto; max-height: 620px; overflow-y: auto; }
+.analyse-reappro .ar-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.analyse-reappro .ar-table thead th {
+  position: sticky; top: 0; background: var(--bg-tertiary, #252540);
+  color: var(--text-secondary, #aaa); text-align: left; font-weight: 700;
+  padding: 10px 12px; border-bottom: 1px solid var(--border, #333); white-space: nowrap;
+}
+.analyse-reappro .ar-table th.num, .analyse-reappro .ar-table td.num { text-align: right; }
+.analyse-reappro .ar-table tbody td {
+  padding: 9px 12px; border-bottom: 1px solid var(--border, #333); color: var(--text-primary, #eee);
+}
+.analyse-reappro .ar-table tbody tr:hover { background: var(--bg-tertiary, #252540); }
+.analyse-reappro .ar-table tr.rupture td.mono { color: #ef4444; font-weight: 800; }
+.analyse-reappro .ar-table .mono { font-family: ui-monospace, Menlo, monospace; font-weight: 700; }
+.analyse-reappro .ar-table .design {
+  max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.analyse-reappro .ar-table .strong { font-weight: 800; color: var(--accent, #4da6ff); }
+.analyse-reappro .ar-table .danger { color: #ef4444; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .analyse-reappro { padding: 18px 14px 40px; }
+  .analyse-reappro .ar-table .design { max-width: 160px; }
+}
+
+/* KPI magasin (violet) */
+.analyse-reappro .ar-kpi-purple { border-left-color: #a855f7; }
+.analyse-reappro .ar-kpi-purple .ar-kpi-icon { background: rgba(168,85,247,0.14); color: #a855f7; }
+
+/* Onglets de filtre (Fournisseur / Magasin) */
+.analyse-reappro .ar-tabs {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;
+}
+.analyse-reappro .ar-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border, #333); background: var(--bg-tertiary, #252540);
+  color: var(--text-secondary, #aaa); font-size: 0.9rem; font-weight: 700;
+}
+.analyse-reappro .ar-tab:hover { color: var(--text-primary, #eee); }
+.analyse-reappro .ar-tab.active {
+  background: var(--accent, #4da6ff); border-color: var(--accent, #4da6ff); color: #0f0f1a;
+}
+.analyse-reappro .ar-tab-count {
+  background: rgba(0,0,0,0.18); border-radius: 999px; padding: 1px 8px; font-size: 0.78rem;
+}
+.analyse-reappro .ar-tab.active .ar-tab-count { background: rgba(0,0,0,0.25); }
+.analyse-reappro .ar-tab-help {
+  color: var(--text-muted, #888); font-size: 0.82rem; margin: 8px 0 12px;
+}
+.analyse-reappro .ar-none {
+  text-align: center; color: var(--text-muted, #888); padding: 24px 12px;
+}
+
+/* ── Demandes de réappro magasin ── */
+.analyse-reappro .ar-gis-panel {
+  background: var(--bg-tertiary, #252540); border: 1px solid var(--border, #333);
+  border-radius: 12px; padding: 14px; margin-bottom: 14px;
+}
+.analyse-reappro .ar-gis-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 10px; font-weight: 700; color: var(--text-primary, #eee);
+  font-size: 0.92rem;
+}
+.analyse-reappro .ar-gis-actions { display: flex; gap: 8px; align-items: center; }
+.analyse-reappro .ar-gis-actions select {
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border, #333);
+  background: var(--bg-secondary, #1a1a2e); color: var(--text-primary, #eee); font-weight: 600;
+}
+.analyse-reappro .ar-send {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px;
+  border: none; background: var(--accent, #4da6ff); color: #0f0f1a; font-weight: 800; cursor: pointer;
+}
+.analyse-reappro .ar-send:disabled { opacity: 0.45; cursor: not-allowed; }
+.analyse-reappro .ar-msg { padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 10px; }
+.analyse-reappro .ar-msg.success { background: rgba(34,197,94,0.14); color: #22c55e; }
+.analyse-reappro .ar-msg.error { background: rgba(239,68,68,0.14); color: #ef4444; }
+
+.analyse-reappro .ar-gis-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.analyse-reappro .ar-gis-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
+  border: 1px solid var(--border, #333); background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary, #eee); cursor: pointer; font-size: 0.85rem; font-weight: 600;
+}
+.analyse-reappro .ar-gis-chip:hover:not(:disabled) { border-color: var(--accent, #4da6ff); }
+.analyse-reappro .ar-gis-chip.sel { background: var(--accent, #4da6ff); border-color: var(--accent, #4da6ff); color: #0f0f1a; }
+.analyse-reappro .ar-gis-chip.done { opacity: 0.6; cursor: not-allowed; }
+.analyse-reappro .ar-gis-nb { background: rgba(0,0,0,0.2); border-radius: 999px; padding: 1px 8px; font-size: 0.76rem; }
+.analyse-reappro .ar-gis-chip.sel .ar-gis-nb { background: rgba(0,0,0,0.25); }
+.analyse-reappro .ar-gis-tag {
+  background: rgba(245,158,11,0.18); color: #f59e0b; border-radius: 999px; padding: 1px 8px;
+  font-size: 0.72rem; font-weight: 800;
+}
+
+.analyse-reappro .ar-tab-filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
+.analyse-reappro .ar-tab-filter label { color: var(--text-secondary, #aaa); font-size: 0.85rem; font-weight: 600; }
+.analyse-reappro .ar-tab-filter select {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border, #333);
+  background: var(--bg-secondary, #1a1a2e); color: var(--text-primary, #eee); font-weight: 600;
+}
+
+.analyse-reappro .ar-badge-done {
+  background: rgba(245,158,11,0.18); color: #f59e0b; border-radius: 999px; padding: 2px 10px;
+  font-size: 0.74rem; font-weight: 800;
+}
+.analyse-reappro .ar-badge-todo { color: var(--text-muted, #888); }
+
+.analyse-reappro .ar-prio, .analyse-reappro .ar-statut {
+  border-radius: 999px; padding: 2px 10px; font-size: 0.74rem; font-weight: 800; white-space: nowrap;
+}
+.analyse-reappro .ar-prio-urgent { background: rgba(239,68,68,0.16); color: #ef4444; }
+.analyse-reappro .ar-prio-a_faire { background: rgba(245,158,11,0.16); color: #f59e0b; }
+.analyse-reappro .ar-prio-normal { background: rgba(148,166,196,0.16); color: #94a6c4; }
+.analyse-reappro .ar-statut-en_attente { background: rgba(148,166,196,0.16); color: #94a6c4; }
+.analyse-reappro .ar-statut-en_cours { background: rgba(77,166,255,0.16); color: #4da6ff; }
+.analyse-reappro .ar-statut-realisee { background: rgba(34,197,94,0.16); color: #22c55e; }
+.analyse-reappro .ar-date { color: var(--text-muted, #888); font-size: 0.76rem; }
+.analyse-reappro .ar-del {
+  background: transparent; border: 1px solid rgba(239,68,68,0.4); color: #ef4444;
+  border-radius: 8px; padding: 5px 8px; cursor: pointer;
+}
+.analyse-reappro .ar-del:hover { background: rgba(239,68,68,0.12); }

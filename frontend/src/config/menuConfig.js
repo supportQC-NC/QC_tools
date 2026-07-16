@@ -22,8 +22,7 @@ import {
   HiTemplate,
   HiTag,
   HiQrcode,
-  HiDeviceMobile,
-  HiLocationMarker
+  HiDeviceMobile
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -67,7 +66,6 @@ export const adminMenuStructure = [
         icon: HiUserGroup,
       },
            { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
-      { label: "Carte Collecteurs", path: "/admin/collecteurs-carte", icon: HiLocationMarker },
      { label: "Installation app", path: "/install", icon: HiQrcode },
     ],
   },
@@ -121,9 +119,9 @@ export const adminMenuStructure = [
         icon: HiUserGroup,
       },
       {
-        label: "Analyse Facturation",
-        path: "/admin/facture-analyse",
-        icon: HiDocumentReport,
+        label: "Analyse facturation",
+        path: "/admin/commerciaux",
+        icon: HiUserGroup,
       },
       {
         label: "Analyse Filiales",
@@ -131,13 +129,13 @@ export const adminMenuStructure = [
         icon: HiOfficeBuilding,
       },
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
-      { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
-      { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
-      { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
-      { label: "Top Articles", path: "/admin/top-articles", icon: HiChartBar },
-      { label: "Performance Dock", path: "/admin/performance-dock", icon: HiClipboardCheck },
-      { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
-
+      { label: "Analyse Réappro", path: "/admin/analyse-reappro", icon: HiTruck },
+       { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
+       { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
+         { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
+            { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
+         
+ 
     ],
   },
 ];

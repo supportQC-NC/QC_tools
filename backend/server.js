@@ -49,23 +49,22 @@ import fournissRoutes from "./routes/fournissRoutes.js";
 import factureRoutes from "./routes/factureRoutes.js";
 import clientRoutes from "./routes/clientRoutes.js";
 import filialesRoutes from "./routes/filialesRoutes.js";
-import reapproLocalRoutes from "./routes/reapproLocalRoutes.js";
+ import reapproLocalRoutes from "./routes/reapproLocalRoutes.js";
 import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import debitComptantRoutes from "./routes/debitComptantRoutes.js";
-import gencodDoublonsRoutes from "./routes/gencodDoublonsRoutes.js";
-import performanceDockRoutes from "./routes/performanceDockRoutes.js";
-import collecteurRoutes from "./routes/collecteurRoutes.js";
-import appReleaseRoutes from "./routes/appReleaseRoutes.js";
-import bipageCollecteRoutes from "./routes/bipageCollecteRoutes.js";
+   import gencodDoublonsRoutes from "./routes/gencodDoublonsRoutes.js";
+ import performanceDockRoutes from "./routes/performanceDockRoutes.js";
+  import collecteurRoutes from "./routes/collecteurRoutes.js";
+       import appReleaseRoutes from "./routes/appReleaseRoutes.js";
+       import bipageCollecteRoutes from "./routes/bipageCollecteRoutes.js";
 
-import factureAnalyseRoutes from "./routes/factureAnalyseRoutes.js";
+       import factureAnalyseRoutes from "./routes/factureAnalyseRoutes.js";
 import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
 import topArticlesRoutes from "./routes/topArticlesRoutes.js";
+import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
+import demandeReapproRoutes from "./routes/demandeReapproRoutes.js";
 // ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
-// ========== ROUTES ABONNEMENTS RAPPORTS (envoi Excel planifié) ==========
-import reportSubscriptionRoutes from "./routes/reportSubscriptionRoutes.js";
-import { startReportScheduler } from "./services/reportScheduler.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -88,7 +87,7 @@ app.use(
 app.use(cookieParser());
 
 // Middleware pour parser le JSON
-app.use(express.json({ limit: "5mb" }));
+  app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Servir les fichiers statiques du dossier uploads
@@ -96,7 +95,10 @@ const __dirname = path.resolve();
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Créer les dossiers uploads si nécessaire
-const uploadDirs = ["./uploads", "./uploads/temp"];
+const uploadDirs = [
+  "./uploads",
+  "./uploads/temp",
+];
 
 uploadDirs.forEach((dir) => {
   if (!fs.existsSync(dir)) {
@@ -143,7 +145,7 @@ app.use("/api/fiches-controle", ficheControleRoutes);
 // ========== ROUTES DÉTAIL DES BIPAGES ==========
 app.use("/api/bipages", bipageRoutes);
 // ========== ROUTES FACTURES ==========
-app.use("/api/factures", factureRoutes);
+app.use("/api/factures", factureRoutes );
 // ========== ROUTES PROFORMAS ==========
 app.use("/api/proformas", proformaRoutes);
 // ========== ROUTES INVENTAIRE PROFORMA (admin, lecture) ==========
@@ -156,20 +158,20 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/commerciaux", commerciauxRoutes);
 app.use("/api/filiales", filialesRoutes);
 app.use("/api/reappro-local", reapproLocalRoutes);
-app.use("/api/debit-comptant", debitComptantRoutes);
-app.use("/api/gencod-doublons", gencodDoublonsRoutes);
-app.use("/api/performance-dock", performanceDockRoutes);
-app.use("/api/collecteurs", collecteurRoutes);
-app.use("/api/app-release", appReleaseRoutes);
-app.use("/api/bipage-collecte", bipageCollecteRoutes);
+  app.use("/api/debit-comptant", debitComptantRoutes);
+   app.use("/api/gencod-doublons", gencodDoublonsRoutes);
+ app.use("/api/performance-dock", performanceDockRoutes);
+  app.use("/api/collecteurs", collecteurRoutes);
+    app.use("/api/app-release", appReleaseRoutes);
+    app.use("/api/bipage-collecte", bipageCollecteRoutes);
 
-app.use("/api/facture-analyse", factureAnalyseRoutes);
+    app.use("/api/facture-analyse", factureAnalyseRoutes);
 app.use("/api/journal-caisse", journalCaisseRoutes);
 app.use("/api/top-articles", topArticlesRoutes);
+app.use("/api/analyse-reappro", analyseReapproRoutes);
+app.use("/api/demande-reappro", demandeReapproRoutes);
 // ========== ROUTES ANALYSE CA ==========
 app.use("/api/analyse-ca", analyseCaRoutes);
-// ========== ROUTES ABONNEMENTS RAPPORTS ==========
-app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 // =======================================
 
 // ==========================================
@@ -208,5 +210,4 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   startInventaireWatcher();
-  startReportScheduler();
 });

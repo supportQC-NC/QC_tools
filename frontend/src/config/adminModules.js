@@ -41,6 +41,7 @@ export const PERMISSION_MODULES = [
   { key: "facture_analyse_admin", label: "Analyse Facturation", group: "analyse" },
   { key: "journal_caisse_admin", label: "Journal de Caisse", group: "analyse" },
   { key: "top_articles_admin", label: "Top Articles", group: "analyse" },
+  { key: "analyse_reappro_admin", label: "Analyse Réappro", group: "analyse" },
   { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
   { key: "users_admin", label: "Utilisateurs", group: "administration" },
   { key: "entreprises_admin", label: "Entreprises", group: "administration" },
@@ -88,6 +89,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/facture-analyse", key: "facture_analyse_admin" },
   { path: "/admin/journal-caisse", key: "journal_caisse_admin" },
   { path: "/admin/top-articles", key: "top_articles_admin" },
+  { path: "/admin/analyse-reappro", key: "analyse_reappro_admin" },
 ];
 
 // L'utilisateur a-t-il l'action demandée sur ce module ?

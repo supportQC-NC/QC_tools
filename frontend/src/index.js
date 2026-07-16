@@ -69,6 +69,7 @@ import AdminAnalyseCaScreen from "./screens/admin/AdminAnalyseCaScreen";
 import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
 import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
+import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -316,6 +317,14 @@ const router = createBrowserRouter(
       {/* Analyse · Top Articles -> module "top_articles_admin" */}
       <Route element={<ModuleRoute module="top_articles_admin" />}>
         <Route path="/admin/top-articles" element={<AdminTopArticlesScreen />} />
+      </Route>
+
+      {/* Analyse · Analyse Réappro -> module "analyse_reappro_admin" */}
+      <Route element={<ModuleRoute module="analyse_reappro_admin" />}>
+        <Route
+          path="/admin/analyse-reappro"
+          element={<AdminAnalyseReapproScreen />}
+        />
       </Route>
 
       <Route path="*" element={<NotFound />} />
