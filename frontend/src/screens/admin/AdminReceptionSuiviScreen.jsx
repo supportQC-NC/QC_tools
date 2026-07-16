@@ -5,12 +5,13 @@
 // la PROGRESSION du contrôle (articles contrôlés, anomalies, photos, statut).
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph,
+  HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph, HiDownload, HiX, HiSparkles,
 } from "react-icons/hi";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetCommandesAControlerQuery,
   useGetReceptionProgressQuery,
+  useGetCommandesAgregatsQuery,
 } from "../../slices/receptionSuiviApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
@@ -25,6 +26,7 @@ const ANOMALIE = {
   abimee: { label: "Abîmée", cls: "rs-ano-warn" },
 };
 const up = (v) => String(v || "").trim().toUpperCase();
+const fmtNb = (n) => (n ?? 0).toLocaleString("fr-FR");
 const fmtDate = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -48,6 +50,8 @@ const AdminReceptionSuiviScreen = () => {
     useGetCommandesAControlerQuery(selectedEnt, { skip: !selectedEnt });
   const { data: progressList = [], isFetching: fProg, refetch: refetchProg } =
     useGetReceptionProgressQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: agregats = {}, refetch: refetchAgg } =
+    useGetCommandesAgregatsQuery(selectedEnt, { skip: !selectedEnt });
 
   // Entreprise par défaut : 1re active.
   useEffect(() => {
@@ -69,9 +73,22 @@ const AdminReceptionSuiviScreen = () => {
   }, [progressList]);
 
   const merged = useMemo(
-    () => commandes.map((c) => ({ ...c, progress: progressByNumcde.get(up(c.numcde)) || null })),
-    [commandes, progressByNumcde],
+    () =>
+      commandes.map((c) => ({
+        ...c,
+        progress: progressByNumcde.get(up(c.numcde)) || null,
+        agg: agregats[up(c.numcde)] || null,
+      })),
+    [commandes, progressByNumcde, agregats],
   );
+
+  const controlledCount = (c) =>
+    (c.progress?.comptages || []).filter((x) => x.dansCommande).length;
+  const pctControle = (c) => {
+    const total = c.agg?.nbArticles || 0;
+    if (!c.progress || total === 0) return null;
+    return Math.min(100, Math.round((controlledCount(c) / total) * 100));
+  };
 
   const selected = merged.find((c) => c.numcde === selectedNumcde) || null;
   const busy = Boolean(selectedEnt) && (fCmd || fProg);
@@ -107,7 +124,7 @@ const AdminReceptionSuiviScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNumcde]);
 
-  const refresh = () => { refetchCmd(); refetchProg(); };
+  const refresh = () => { refetchCmd(); refetchProg(); refetchAgg(); };
 
   return (
     <div className="reception-suivi">
@@ -172,12 +189,29 @@ const AdminReceptionSuiviScreen = () => {
                       {!!c.bateau && <span>🚢 {c.bateau}</span>}
                       {c.arrivee && <span>Arr. {fmtDate(c.arrivee)}</span>}
                     </div>
+                    {c.agg && (
+                      <div className="rs-card-stats">
+                        <span><HiCube /> {fmtNb(c.agg.nbArticles)} art.</span>
+                        <span>{fmtNb(c.agg.totalUnites)} u.</span>
+                        {c.agg.nbNouveautes > 0 && (
+                          <span className="rs-nouv"><HiSparkles /> {c.agg.nbNouveautes} nouv.</span>
+                        )}
+                      </div>
+                    )}
                     {p && (
                       <div className="rs-card-stats">
                         <span><HiCube /> {p.nbComptages} contrôlé(s)</span>
                         {p.nbSignalements > 0 && (
                           <span className="rs-warn"><HiExclamation /> {p.nbSignalements} anomalie(s)</span>
                         )}
+                      </div>
+                    )}
+                    {pctControle(c) != null && (
+                      <div className="rs-progress">
+                        <div className="rs-progress-bar">
+                          <div className="rs-progress-fill" style={{ width: `${pctControle(c)}%` }} />
+                        </div>
+                        <span className="rs-progress-txt">{pctControle(c)}%</span>
                       </div>
                     )}
                   </button>
@@ -200,6 +234,23 @@ const AdminReceptionSuiviScreen = () => {
                     {selected.arrivee ? ` · Arrivée ${fmtDate(selected.arrivee)}` : ""}
                     {selected.etatLabel ? ` · ${selected.etatLabel}` : ""}
                   </span>
+                  {selected.agg && (
+                    <div className="rs-detail-agg">
+                      <span><HiCube /> {fmtNb(selected.agg.nbArticles)} articles</span>
+                      <span>{fmtNb(selected.agg.totalUnites)} unités</span>
+                      {selected.agg.nbNouveautes > 0 && (
+                        <span className="rs-nouv"><HiSparkles /> {selected.agg.nbNouveautes} nouveautés</span>
+                      )}
+                    </div>
+                  )}
+                  {pctControle(selected) != null && (
+                    <div className="rs-progress rs-progress-lg">
+                      <div className="rs-progress-bar">
+                        <div className="rs-progress-fill" style={{ width: `${pctControle(selected)}%` }} />
+                      </div>
+                      <span className="rs-progress-txt">{pctControle(selected)}% contrôlé</span>
+                    </div>
+                  )}
                 </div>
 
                 {!selected.progress ? (
@@ -221,7 +272,7 @@ const AdminReceptionSuiviScreen = () => {
                             <div key={s._id} className="rs-ano">
                               {s.hasPhoto ? (
                                 pu && pu !== "error" ? (
-                                  <img className="rs-ano-photo" src={pu} alt={s.nart} onClick={() => setZoom(pu)} />
+                                  <img className="rs-ano-photo" src={pu} alt={s.nart} onClick={() => setZoom({ url: pu, name: `anomalie_${up(s.nart) || "photo"}.jpg` })} />
                                 ) : (
                                   <div className="rs-ano-nophoto">
                                     {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
@@ -289,8 +340,17 @@ const AdminReceptionSuiviScreen = () => {
 
       {zoom && (
         <div className="rs-zoom" onClick={() => setZoom(null)}>
-          <img src={zoom} alt="" />
-          <span className="rs-zoom-hint">Cliquer pour fermer</span>
+          <div className="rs-zoom-box" onClick={(e) => e.stopPropagation()}>
+            <img src={zoom.url} alt="" />
+            <div className="rs-zoom-actions">
+              <a className="rs-zoom-btn dl" href={zoom.url} download={zoom.name}>
+                <HiDownload /> Télécharger
+              </a>
+              <button className="rs-zoom-btn" onClick={() => setZoom(null)}>
+                <HiX /> Fermer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

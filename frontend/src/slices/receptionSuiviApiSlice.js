@@ -18,10 +18,18 @@ export const receptionSuiviApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 15,
     }),
+    // Agrégats par commande : nb articles distincts, total unités, nouveautés.
+    getCommandesAgregats: builder.query({
+      query: (nomDossierDBF) => ({
+        url: `/api/reception-suivi/agregats/${nomDossierDBF}`,
+      }),
+      keepUnusedDataFor: 60,
+    }),
   }),
 });
 
 export const {
   useGetCommandesAControlerQuery,
   useGetReceptionProgressQuery,
+  useGetCommandesAgregatsQuery,
 } = receptionSuiviApiSlice;

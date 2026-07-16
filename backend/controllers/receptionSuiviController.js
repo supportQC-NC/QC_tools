@@ -9,6 +9,8 @@ import path from "path";
 import asyncHandler from "../middleware/asyncHandler.js";
 import Reception from "../models/ReceptionModel.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
+import commandeCacheService from "../services/commandeService.js";
+import articleService from "../services/articleService.js";
 
 const EN_COURS = ["en_cours", "analyse_ecarts"];
 
@@ -124,8 +126,58 @@ const getReceptionProgress = asyncHandler(async (req, res) => {
   res.json(out);
 });
 
+const estCommentaire = (r) => String(r?.NART || "").includes("!");
+const estNouveauArticle = (art) => {
+  if (!art) return false;
+  for (let i = 1; i <= 12; i += 1) {
+    const v =
+      parseFloat(art[`V${i}`] ?? art[`V${String(i).padStart(2, "0")}`]) || 0;
+    if (v !== 0) return false; // au moins une vente -> pas une nouveauté
+  }
+  return true;
+};
+
+// @desc    Agrégats par commande (nb articles distincts, total unités, nouveautés)
+// @route   GET /api/reception-suivi/agregats/:nomDossierDBF
+// @access  Private — module reception_suivi_admin (read) + entreprise
+// Renvoie un objet { NUMCDE(maj): { nbArticles, totalUnites, nbNouveautes } }.
+const getCommandesAgregats = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+
+  const [detail, artCache] = await Promise.all([
+    commandeCacheService.getCmdDetail(entreprise),
+    articleService.getArticles(entreprise),
+  ]);
+
+  const nartMap = new Map();
+  (artCache.records || []).forEach((a) => {
+    if (a.NART != null) nartMap.set(String(a.NART).trim().toUpperCase(), a);
+  });
+
+  const out = {};
+  for (const [numcde, indices] of detail.indexByNumcde.entries()) {
+    let nbArticles = 0;
+    let totalUnites = 0;
+    let nbNouveautes = 0;
+    indices.forEach((i) => {
+      const r = detail.records[i];
+      if (estCommentaire(r)) return; // ligne commentaire
+      nbArticles += 1;
+      totalUnites += parseFloat(r.QTE) || 0;
+      const art = nartMap.get(String(r.NART || "").trim().toUpperCase());
+      if (estNouveauArticle(art)) nbNouveautes += 1;
+    });
+    out[numcde] = { nbArticles, totalUnites: Math.round(totalUnites), nbNouveautes };
+  }
+
+  res.json(out);
+});
+
 export {
   getMobileReceptionsEnCours,
   getReceptionProgress,
+  getCommandesAgregats,
   getSignalementPhoto,
 };

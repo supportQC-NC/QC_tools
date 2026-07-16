@@ -3,6 +3,7 @@ import express from "express";
 import {
   getMobileReceptionsEnCours,
   getReceptionProgress,
+  getCommandesAgregats,
   getSignalementPhoto,
 } from "../controllers/receptionSuiviController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -22,6 +23,8 @@ router.get("/en-cours", protect, canReadWeb, getMobileReceptionsEnCours);
 // Progression des contrôles en cours d'une entreprise (superposée à /a-controler)
 router.get("/mobile/progress/:nomDossierDBF", protect, canRead, checkEntrepriseAccess, getReceptionProgress);
 router.get("/progress/:nomDossierDBF", protect, canReadWeb, checkEntrepriseAccess, getReceptionProgress);
+// Agrégats par commande (web) : nb articles, total unités, nouveautés
+router.get("/agregats/:nomDossierDBF", protect, canReadWeb, checkEntrepriseAccess, getCommandesAgregats);
 router.get("/:id/signalement/:sigId/photo", protect, canRead, getSignalementPhoto);
 
 export default router;

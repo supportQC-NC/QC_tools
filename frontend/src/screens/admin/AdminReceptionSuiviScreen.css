@@ -109,3 +109,38 @@
 
 /* Badge "à contrôler" (non commencé) */
 .reception-suivi .rs-st-todo { background: rgba(148,166,196,0.16); color: #94a6c4; }
+
+/* Agrégats commande (nouveautés) */
+.reception-suivi .rs-nouv { color: #a855f7; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+
+/* Barre de progression du contrôle */
+.reception-suivi .rs-progress { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.reception-suivi .rs-progress-bar {
+  flex: 1; height: 7px; border-radius: 999px; background: var(--bg-tertiary, #252540); overflow: hidden;
+}
+.reception-suivi .rs-progress-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #4da6ff, #22c55e); transition: width 0.3s ease;
+}
+.reception-suivi .rs-progress-txt { font-size: 0.72rem; font-weight: 800; color: var(--text-secondary, #aaa); min-width: 34px; text-align: right; }
+.reception-suivi .rs-progress-lg { margin-top: 12px; }
+.reception-suivi .rs-progress-lg .rs-progress-bar { height: 10px; }
+.reception-suivi .rs-progress-lg .rs-progress-txt { font-size: 0.82rem; min-width: 90px; }
+
+.reception-suivi .rs-detail-agg {
+  display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px;
+  color: var(--text-secondary, #aaa); font-size: 0.85rem; font-weight: 600;
+}
+.reception-suivi .rs-detail-agg span { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Modale photo + téléchargement */
+.reception-suivi .rs-zoom-box { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 92%; max-height: 92%; }
+.reception-suivi .rs-zoom-box img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+.reception-suivi .rs-zoom-actions { display: flex; gap: 12px; }
+.reception-suivi .rs-zoom-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 10px;
+  border: 1px solid var(--border, #333); background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary, #eee); font-weight: 700; cursor: pointer; font-size: 0.9rem; text-decoration: none;
+}
+.reception-suivi .rs-zoom-btn:hover { border-color: var(--accent, #4da6ff); }
+.reception-suivi .rs-zoom-btn.dl { background: var(--accent, #4da6ff); color: #0f0f1a; border-color: var(--accent, #4da6ff); }
