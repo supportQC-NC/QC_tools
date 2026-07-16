@@ -1,5 +1,5 @@
 // src/screens/admin/AdminReceptionSuiviScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph,
 } from "react-icons/hi";
@@ -37,6 +37,8 @@ const AdminReceptionSuiviScreen = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [entFilter, setEntFilter] = useState("");
   const [zoom, setZoom] = useState(null);
+  const [photoUrls, setPhotoUrls] = useState({}); // sigId -> objectURL | 'error'
+  const urlsRef = useRef({});
 
   const entreprises = useMemo(
     () => [...new Set(list.map((r) => r.entrepriseNom).filter(Boolean))].sort(),
@@ -48,6 +50,44 @@ const AdminReceptionSuiviScreen = () => {
     : list;
 
   const selected = list.find((r) => r._id === selectedId) || null;
+
+  // Charge les photos des anomalies via fetch (cookie d'auth envoyé) -> blob URL.
+  useEffect(() => {
+    // Révoque les URLs précédentes
+    Object.values(urlsRef.current).forEach((u) => {
+      if (typeof u === "string" && u.startsWith("blob:")) URL.revokeObjectURL(u);
+    });
+    urlsRef.current = {};
+    setPhotoUrls({});
+
+    if (!selectedId) return undefined;
+    const rec = list.find((r) => r._id === selectedId);
+    if (!rec) return undefined;
+
+    let alive = true;
+    (rec.signalements || [])
+      .filter((s) => s.hasPhoto)
+      .forEach(async (s) => {
+        try {
+          const res = await fetch(photoSrc(rec._id, s._id), {
+            credentials: "include",
+          });
+          if (!res.ok) throw new Error("http " + res.status);
+          const blob = await res.blob();
+          if (!alive || !blob || blob.size === 0) return;
+          const url = URL.createObjectURL(blob);
+          urlsRef.current[s._id] = url;
+          setPhotoUrls((p) => ({ ...p, [s._id]: url }));
+        } catch {
+          if (alive) setPhotoUrls((p) => ({ ...p, [s._id]: "error" }));
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   return (
     <div className="reception-suivi">
@@ -126,25 +166,30 @@ const AdminReceptionSuiviScreen = () => {
 
                 {/* Anomalies */}
                 <h3 className="rs-section">
-                  <HiExclamation /> Anomalies ({selected.signalements.length})
+                  <HiExclamation /> Anomalies ({(selected.signalements || []).length})
                 </h3>
-                {selected.signalements.length === 0 ? (
+                {(selected.signalements || []).length === 0 ? (
                   <p className="rs-none">Aucune anomalie signalée.</p>
                 ) : (
                   <div className="rs-ano-grid">
                     {selected.signalements.map((s) => {
                       const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
-                      const src = photoSrc(selected._id, s._id);
+                      const pu = photoUrls[s._id];
                       return (
                         <div key={s._id} className="rs-ano">
                           {s.hasPhoto ? (
-                            <img
-                              className="rs-ano-photo"
-                              src={src}
-                              alt={s.nart}
-                              onClick={() => setZoom(src)}
-                              onError={(e) => { e.currentTarget.style.display = "none"; }}
-                            />
+                            pu && pu !== "error" ? (
+                              <img
+                                className="rs-ano-photo"
+                                src={pu}
+                                alt={s.nart}
+                                onClick={() => setZoom(pu)}
+                              />
+                            ) : (
+                              <div className="rs-ano-nophoto">
+                                {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
+                              </div>
+                            )
                           ) : (
                             <div className="rs-ano-nophoto"><HiPhotograph /></div>
                           )}
@@ -161,9 +206,9 @@ const AdminReceptionSuiviScreen = () => {
 
                 {/* Contrôlés */}
                 <h3 className="rs-section">
-                  <HiCube /> Articles contrôlés ({selected.comptages.length})
+                  <HiCube /> Articles contrôlés ({(selected.comptages || []).length})
                 </h3>
-                {selected.comptages.length === 0 ? (
+                {(selected.comptages || []).length === 0 ? (
                   <p className="rs-none">Aucun article compté.</p>
                 ) : (
                   <div className="rs-table-wrap">

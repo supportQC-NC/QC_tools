@@ -99,3 +99,10 @@
 }
 .reception-suivi .rs-zoom img { max-width: 92%; max-height: 82%; object-fit: contain; border-radius: 8px; }
 .reception-suivi .rs-zoom-hint { color: var(--text-secondary, #aaa); font-size: 0.85rem; }
+
+/* Indicateur de chargement d'une vignette photo */
+.reception-suivi .rs-spin-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 3px solid var(--border, #333); border-top-color: var(--accent, #4da6ff);
+  display: inline-block; animation: rs-spin 0.8s linear infinite;
+}
