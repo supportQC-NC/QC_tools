@@ -64,6 +64,7 @@ import topArticlesRoutes from "./routes/topArticlesRoutes.js";
 import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
 import demandeReapproRoutes from "./routes/demandeReapproRoutes.js";
 import receptionSuiviRoutes from "./routes/receptionSuiviRoutes.js";
+import ficheArticleRoutes from "./routes/ficheArticleRoutes.js";
 // ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 // =======================================
@@ -172,6 +173,7 @@ app.use("/api/top-articles", topArticlesRoutes);
 app.use("/api/analyse-reappro", analyseReapproRoutes);
 app.use("/api/demande-reappro", demandeReapproRoutes);
 app.use("/api/reception-suivi", receptionSuiviRoutes);
+app.use("/api/fiche-article", ficheArticleRoutes);
 // ========== ROUTES ANALYSE CA ==========
 app.use("/api/analyse-ca", analyseCaRoutes);
 // =======================================

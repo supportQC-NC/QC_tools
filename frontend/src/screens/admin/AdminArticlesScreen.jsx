@@ -31,6 +31,7 @@ import {
   HiTrendingDown,
   HiArchive,
   HiExternalLink,
+  HiDownload,
 } from "react-icons/hi";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
@@ -38,6 +39,7 @@ import {
   useGetGroupesQuery,
   getPhotoUrl,
 } from "../../slices/articleApiSlice";
+import { BASE_URL } from "../../constants";
 import "./AdminArticlesScreen.css";
 
 // Clé pour le localStorage
@@ -104,6 +106,7 @@ const AdminArticlesScreen = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [photoError, setPhotoError] = useState(false);
   const [photoLoaded, setPhotoLoaded] = useState(false);
+  const [fichePdfLoading, setFichePdfLoading] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     identification: true,
     stock: true,
@@ -371,6 +374,30 @@ const AdminArticlesScreen = () => {
       </div>
     );
   }
+
+  const downloadFichePdf = async (nart) => {
+    setFichePdfLoading(true);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/fiche-article/${selectedEntreprise}/${encodeURIComponent(String(nart).trim())}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `fiche_article_${String(nart).trim()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch {
+      /* ignore */
+    } finally {
+      setFichePdfLoading(false);
+    }
+  };
 
   return (
     <div className="admin-articles-page">
@@ -1048,6 +1075,15 @@ const AdminArticlesScreen = () => {
                 </div>
               </div>
               <div className="modal-header-actions">
+                <button
+                  className="btn-view-full btn-fiche-pdf"
+                  title="Télécharger la fiche article PDF"
+                  disabled={fichePdfLoading}
+                  onClick={() => downloadFichePdf(selectedArticle.NART)}
+                >
+                  <HiDownload />
+                  <span>{fichePdfLoading ? "Génération…" : "Fiche PDF"}</span>
+                </button>
                 <Link
                   to={`/admin/articles/${selectedEntreprise}/${safeTrim(selectedArticle.NART)}`}
                   className="btn-view-full"
