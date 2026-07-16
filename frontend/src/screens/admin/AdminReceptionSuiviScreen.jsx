@@ -41,6 +41,7 @@ const AdminReceptionSuiviScreen = () => {
     localStorage.getItem(STORAGE_KEY) || "",
   );
   const [selectedNumcde, setSelectedNumcde] = useState(null);
+  const [filter, setFilter] = useState("tous"); // tous | encours
   const [zoom, setZoom] = useState(null);
   const [photoUrls, setPhotoUrls] = useState({});
   const urlsRef = useRef({});
@@ -92,6 +93,13 @@ const AdminReceptionSuiviScreen = () => {
     if (!c.progress || total === 0) return null;
     return Math.min(100, Math.round((controlledCount(c) / total) * 100));
   };
+
+  const nbEnCours = merged.filter((c) => c.progress).length;
+  const nbTodo = merged.length - nbEnCours;
+  const displayed = useMemo(() => {
+    const base = filter === "encours" ? merged.filter((c) => c.progress) : merged;
+    return [...base].sort((a, b) => (a.progress ? 0 : 1) - (b.progress ? 0 : 1));
+  }, [merged, filter]);
 
   const selected = merged.find((c) => c.numcde === selectedNumcde) || null;
   const busy = Boolean(selectedEnt) && (fCmd || fProg);
@@ -180,6 +188,24 @@ const AdminReceptionSuiviScreen = () => {
         </div>
       </div>
 
+      {selectedEnt && merged.length > 0 && (
+        <div className="rs-toolbar">
+          <button
+            className={`rs-chip ${filter === "tous" ? "on" : ""}`}
+            onClick={() => setFilter("tous")}
+          >
+            Toutes <span>{merged.length}</span>
+          </button>
+          <button
+            className={`rs-chip rs-chip-cours ${filter === "encours" ? "on" : ""}`}
+            onClick={() => setFilter("encours")}
+          >
+            <span className="rs-dot" /> En cours <span>{nbEnCours}</span>
+          </button>
+          {nbTodo > 0 && <span className="rs-toolbar-info">{nbTodo} à contrôler</span>}
+        </div>
+      )}
+
       {!selectedEnt ? (
         <div className="rs-empty">Choisissez une entreprise.</div>
       ) : busy && merged.length === 0 ? (
@@ -188,21 +214,23 @@ const AdminReceptionSuiviScreen = () => {
         <div className="rs-layout">
           {/* Liste des commandes à contrôler */}
           <div className="rs-list">
-            {merged.length === 0 ? (
-              <div className="rs-empty">Aucune commande à contrôler.</div>
+            {displayed.length === 0 ? (
+              <div className="rs-empty">
+                {filter === "encours" ? "Aucun contrôle en cours." : "Aucune commande à contrôler."}
+              </div>
             ) : (
-              merged.map((c) => {
+              displayed.map((c) => {
                 const p = c.progress;
                 return (
                   <button
                     key={c.numcde}
-                    className={`rs-card ${selectedNumcde === c.numcde ? "active" : ""}`}
+                    className={`rs-card ${c.progress ? "encours" : "todo"} ${selectedNumcde === c.numcde ? "active" : ""}`}
                     onClick={() => setSelectedNumcde(c.numcde)}
                   >
                     <div className="rs-card-top">
                       <span className="rs-cde">Cmd {c.numcde}</span>
                       {p ? (
-                        <span className="rs-badge rs-st-cours">En cours</span>
+                        <span className="rs-badge rs-st-cours"><span className="rs-dot" /> En cours</span>
                       ) : (
                         <span className="rs-badge rs-st-todo">À contrôler</span>
                       )}
@@ -247,7 +275,11 @@ const AdminReceptionSuiviScreen = () => {
           {/* Détail */}
           <div className="rs-detail">
             {!selected ? (
-              <div className="rs-empty">Sélectionnez une commande à gauche.</div>
+              <div className="rs-detail-empty">
+                <HiClipboardList />
+                <p>Sélectionnez une commande</p>
+                <span>Cliquez une commande à gauche pour voir sa progression, ses anomalies et ses photos.</span>
+              </div>
             ) : (
               <>
                 <div className="rs-detail-head">

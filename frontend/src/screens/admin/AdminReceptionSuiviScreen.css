@@ -144,3 +144,78 @@
 }
 .reception-suivi .rs-zoom-btn:hover { border-color: var(--accent, #4da6ff); }
 .reception-suivi .rs-zoom-btn.dl { background: var(--accent, #4da6ff); color: #0f0f1a; border-color: var(--accent, #4da6ff); }
+
+/* Dernières réceptions contrôlées + téléchargements */
+.reception-suivi .rs-recentes {
+  margin-top: 20px; background: var(--bg-secondary, #1a1a2e);
+  border: 1px solid var(--border, #333); border-radius: 16px; padding: 20px;
+}
+.reception-suivi .rs-rec-list { display: flex; flex-direction: column; gap: 8px; }
+.reception-suivi .rs-rec-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: 10px; background: var(--bg-tertiary, #252540);
+  border: 1px solid var(--border, #333);
+}
+.reception-suivi .rs-rec-info { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.reception-suivi .rs-rec-cde { font-weight: 800; }
+.reception-suivi .rs-rec-four { color: var(--text-secondary, #aaa); font-size: 0.88rem; }
+.reception-suivi .rs-rec-date { color: var(--text-muted, #777); font-size: 0.78rem; }
+.reception-suivi .rs-rec-files { display: flex; gap: 8px; flex-wrap: wrap; }
+.reception-suivi .rs-rec-nofile { color: var(--text-muted, #777); font-size: 0.8rem; font-style: italic; }
+.reception-suivi .rs-file {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border, #333); background: var(--bg-secondary, #1a1a2e);
+  color: var(--text-primary, #eee); font-weight: 700; font-size: 0.78rem; cursor: pointer;
+}
+.reception-suivi .rs-file:hover { border-color: var(--accent, #4da6ff); }
+.reception-suivi .rs-file-pdf { color: #ef4444; border-color: rgba(239,68,68,0.4); }
+.reception-suivi .rs-file-csv { color: #22c55e; border-color: rgba(34,197,94,0.4); }
+.reception-suivi .rs-file-dat, .reception-suivi .rs-file-xlsx { color: #4da6ff; border-color: rgba(77,166,255,0.4); }
+
+/* ═══ UX : mise en valeur des contrôles en cours ═══ */
+.reception-suivi .rs-card { position: relative; transition: transform .12s ease, border-color .12s ease; }
+.reception-suivi .rs-card:hover { transform: translateY(-1px); }
+.reception-suivi .rs-card.todo { opacity: 0.9; }
+.reception-suivi .rs-card.todo .rs-cde { color: var(--text-secondary, #aaa); }
+.reception-suivi .rs-card.encours {
+  border-left: 3px solid var(--accent, #4da6ff);
+  background: linear-gradient(90deg, rgba(77,166,255,0.10), var(--bg-secondary, #1a1a2e) 55%);
+}
+.reception-suivi .rs-card.encours::before {
+  content: ""; position: absolute; inset: 0; border-radius: 12px; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(77,166,255,0.22);
+}
+.reception-suivi .rs-card.active { border-color: var(--accent, #4da6ff); background: var(--bg-tertiary, #252540); }
+.reception-suivi .rs-card.encours.active {
+  background: linear-gradient(90deg, rgba(77,166,255,0.16), var(--bg-tertiary, #252540) 55%);
+}
+
+/* Point pulsant "en cours" */
+.reception-suivi .rs-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; animation: rs-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.reception-suivi .rs-st-cours { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Barre d'outils / filtres */
+.reception-suivi .rs-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.reception-suivi .rs-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border, #333); background: var(--bg-secondary, #1a1a2e); color: var(--text-secondary, #aaa);
+  font-weight: 700; font-size: 0.86rem;
+}
+.reception-suivi .rs-chip > span { background: rgba(0,0,0,0.25); border-radius: 999px; padding: 1px 8px; font-size: 0.76rem; }
+.reception-suivi .rs-chip:hover { color: var(--text-primary, #eee); border-color: var(--accent, #4da6ff); }
+.reception-suivi .rs-chip.on { background: var(--accent, #4da6ff); border-color: var(--accent, #4da6ff); color: #0f0f1a; }
+.reception-suivi .rs-chip.on > span { background: rgba(0,0,0,0.2); }
+.reception-suivi .rs-toolbar-info { color: var(--text-muted, #777); font-size: 0.82rem; margin-left: auto; }
+
+/* État vide du détail (accueillant) */
+.reception-suivi .rs-detail-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  min-height: 280px; text-align: center; color: var(--text-muted, #777);
+}
+.reception-suivi .rs-detail-empty svg { font-size: 46px; color: #3a3a55; }
+.reception-suivi .rs-detail-empty p { margin: 6px 0 0; font-size: 1.05rem; font-weight: 700; color: var(--text-secondary, #aaa); }
+.reception-suivi .rs-detail-empty span { font-size: 0.85rem; max-width: 320px; line-height: 1.4; }
