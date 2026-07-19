@@ -17,13 +17,17 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { hasModuleAccess } from "../../config/adminModules";
 
-const ModuleRoute = ({ module, action = "read" }) => {
+const ModuleRoute = ({ module, action = "read", roles = [] }) => {
   const { userInfo } = useSelector((state) => state.auth);
 
   if (!userInfo) return <Navigate to="/login" replace />;
 
   // Admin : accès total.
   if (userInfo.role === "admin") return <Outlet />;
+
+  // Rôles explicitement autorisés (ex. "responsable" pour /admin/users, dont
+  // les données sont scopées côté API).
+  if (roles.includes(userInfo.role)) return <Outlet />;
 
   // Utilisateur : nécessite la permission sur le module.
   if (hasModuleAccess(userInfo, module, action)) return <Outlet />;

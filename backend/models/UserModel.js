@@ -27,9 +27,15 @@ const userSchema = new mongoose.Schema(
       required: [true, "Prénom requis"],
       trim: true,
     },
+    // Rôles :
+    //  - "admin"       : tous les modules, scopé à ses sociétés (super-admin si allEntreprises).
+    //  - "responsable" : comme un "user" (grants explicites) + gère une/plusieurs équipes
+    //                    (voir TeamModel). Peut créer/gérer des membres avec des permissions
+    //                    ATTÉNUÉES (⊆ les siennes). Voir accessControl.js.
+    //  - "user"        : membre, grants explicites uniquement.
     role: {
       type: String,
-      enum: ["admin", "user"],
+      enum: ["admin", "responsable", "user"],
       default: "user",
     },
     isActive: {

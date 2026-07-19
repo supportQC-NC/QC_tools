@@ -65,6 +65,10 @@ import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
 import demandeReapproRoutes from "./routes/demandeReapproRoutes.js";
 import receptionSuiviRoutes from "./routes/receptionSuiviRoutes.js";
 import ficheArticleRoutes from "./routes/ficheArticleRoutes.js";
+// ========== ROUTES ÉQUIPES (hiérarchie responsables) ==========
+import teamRoutes from "./routes/teamRoutes.js";
+// ========== ROUTES TÂCHES ==========
+import taskRoutes from "./routes/taskRoutes.js";
 // ⚠️ ABONNEMENTS AUX RAPPORTS — remonté (avait été retiré par erreur).
 //    Vérifie le nom exact du fichier dans backend/routes/ ; si ce n'est pas
 //    "reportSubscriptionRoutes.js", corrige juste cette ligne.
@@ -178,6 +182,10 @@ app.use("/api/analyse-reappro", analyseReapproRoutes);
 app.use("/api/demande-reappro", demandeReapproRoutes);
 app.use("/api/reception-suivi", receptionSuiviRoutes);
 app.use("/api/fiche-article", ficheArticleRoutes);
+// ========== ROUTES ÉQUIPES ==========
+app.use("/api/teams", teamRoutes);
+// ========== ROUTES TÂCHES ==========
+app.use("/api/tasks", taskRoutes);
 // ⚠️ ABONNEMENTS AUX RAPPORTS (répare /api/report-subscriptions/available)
 app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 // ========== ROUTES ANALYSE CA ==========

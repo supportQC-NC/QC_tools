@@ -1,13 +1,33 @@
 // src/components/admin/UserModal.jsx
-import React, { useState, useEffect } from "react";
-import { HiX, HiChevronDown, HiCheck } from "react-icons/hi";
+import React, { useState, useEffect, useMemo } from "react";
+import { useSelector } from "react-redux";
+import {
+  HiX,
+  HiCheck,
+  HiSearch,
+  HiUser,
+  HiUserGroup,
+  HiShieldCheck,
+} from "react-icons/hi";
 import {
   useCreateUserMutation,
   useUpdateUserMutation,
 } from "../../slices/userApiSlice";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
-import { PERMISSION_MODULES, MODULE_GROUPS } from "../../config/adminModules";
+import {
+  PERMISSION_MODULES,
+  MODULE_GROUPS,
+  assignableRoles,
+  actorCanGrantAllModules,
+  actorCanGrantAllEntreprises,
+  actorGrantableEntrepriseIds,
+  actorCanGrantModuleAction,
+  isSuperAdminClient,
+} from "../../config/adminModules";
 import "./UserModal.css";
+
+// Réseaux de l'analyse Filiales (figés côté backend : DQ, QC, LD).
+const FILIALE_RESEAUX = ["DQ", "QC", "LD"];
 
 // Source de vérité : registre partagé (frontend/src/config/adminModules.js).
 const modules = PERMISSION_MODULES.map((m) => m.key);
@@ -23,6 +43,18 @@ const GROUPS = Object.keys(MODULE_GROUPS).map((g) => ({
 
 const actions = ["read", "write", "delete"];
 const actionLabels = { read: "Lecture", write: "Écriture", delete: "Suppr." };
+const ROLE_LABELS = {
+  user: "Utilisateur",
+  responsable: "Responsable",
+  admin: "Administrateur",
+};
+
+// Icône + courte description par rôle (pour les cartes de sélection).
+const ROLE_META = {
+  user: { Icon: HiUser, desc: "Accès aux modules accordés" },
+  responsable: { Icon: HiUserGroup, desc: "Gère une équipe et ses membres" },
+  admin: { Icon: HiShieldCheck, desc: "Tous les modules, ses sociétés" },
+};
 
 // Permissions par défaut : toutes les clés du registre à false.
 const getDefaultModulePermissions = () => {
@@ -35,7 +67,10 @@ const getDefaultModulePermissions = () => {
 
 const UserModal = ({ user, onClose }) => {
   const isEdit = !!user;
-  const [entreprisesOpen, setEntreprisesOpen] = useState(false);
+  const [entSearch, setEntSearch] = useState("");
+
+  // Acteur courant (celui qui édite) — sert à borner ce qu'il peut accorder.
+  const { userInfo: actor } = useSelector((state) => state.auth);
 
   const [formData, setFormData] = useState({
     nom: "",
@@ -49,6 +84,8 @@ const UserModal = ({ user, onClose }) => {
       allModules: false,
       entreprises: [],
       modules: getDefaultModulePermissions(),
+      analyse: { filiales: { DQ: false, QC: false, LD: false } },
+      commerciauxScope: {},
     },
   });
 
@@ -58,6 +95,76 @@ const UserModal = ({ user, onClose }) => {
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const { data: entreprises, isLoading: isLoadingEntreprises } =
     useGetEntreprisesQuery();
+
+  // ── Atténuation (miroir client) : ce que l'ACTEUR a le droit d'accorder ──
+  const canGrantAllModules = actorCanGrantAllModules(actor);
+  const canGrantAllEntreprises = actorCanGrantAllEntreprises(actor);
+  const grantableEntIds = actorGrantableEntrepriseIds(actor); // null = toutes
+  const canGrantModule = (key, action) =>
+    actorCanGrantModuleAction(actor, key, action);
+
+  // Rôles proposables : ceux que l'acteur peut attribuer, + le rôle courant en
+  // édition (pour ne pas « perdre » un rôle qu'il ne pourrait pas réattribuer).
+  const roleOptions = useMemo(() => {
+    const base = assignableRoles(actor);
+    if (isEdit && user?.role && !base.includes(user.role)) {
+      return [user.role, ...base];
+    }
+    return base.length ? base : ["user"];
+  }, [actor, isEdit, user]);
+
+  // Entreprises que l'acteur peut proposer (borne la sélection).
+  const grantableEntreprises = useMemo(() => {
+    const list = entreprises || [];
+    if (grantableEntIds === null) return list;
+    return list.filter((e) => grantableEntIds.includes(e._id));
+  }, [entreprises, grantableEntIds]);
+
+  // Filtrage par la recherche (trigramme ou nom complet).
+  const filteredEntreprises = useMemo(() => {
+    const q = entSearch.trim().toLowerCase();
+    if (!q) return grantableEntreprises;
+    return grantableEntreprises.filter(
+      (e) =>
+        e.trigramme?.toLowerCase().includes(q) ||
+        e.nomComplet?.toLowerCase().includes(q),
+    );
+  }, [grantableEntreprises, entSearch]);
+
+  const allEntSelected =
+    grantableEntreprises.length > 0 &&
+    grantableEntreprises.every((e) =>
+      formData.permissions.entreprises.includes(e._id),
+    );
+
+  // ── Accès aux ANALYSES : réservé au super-admin (seul à le gérer). ──
+  const canEditAnalyse = isSuperAdminClient(actor);
+  // Sociétés concernées par les codes commerciaux : celles du périmètre du user
+  // édité qui ont des vendeurs déclarés.
+  const commEntreprises = useMemo(() => {
+    const base = formData.permissions.allEntreprises
+      ? grantableEntreprises
+      : grantableEntreprises.filter((e) =>
+          formData.permissions.entreprises.includes(e._id),
+        );
+    return base.filter((e) => (e.vendeurs?.length || 0) > 0);
+  }, [
+    grantableEntreprises,
+    formData.permissions.allEntreprises,
+    formData.permissions.entreprises,
+  ]);
+
+  // Groupes/modules visibles : seulement ceux où l'acteur peut accorder au
+  // moins une action (un admin/super-admin voit tout, comme avant).
+  const visibleGroups = useMemo(() => {
+    return GROUPS.map((g) => ({
+      ...g,
+      items: g.items.filter((m) =>
+        actions.some((a) => canGrantModule(m.key, a)),
+      ),
+    })).filter((g) => g.items.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor]);
 
   useEffect(() => {
     if (user) {
@@ -88,6 +195,14 @@ const UserModal = ({ user, onClose }) => {
           entreprises:
             user.permissions?.entreprises?.map((e) => e._id || e) || [],
           modules: modulePermissions,
+          analyse: {
+            filiales: {
+              DQ: user.permissions?.analyse?.filiales?.DQ || false,
+              QC: user.permissions?.analyse?.filiales?.QC || false,
+              LD: user.permissions?.analyse?.filiales?.LD || false,
+            },
+          },
+          commerciauxScope: user.permissions?.commerciauxScope || {},
         },
       });
     }
@@ -103,6 +218,7 @@ const UserModal = ({ user, onClose }) => {
 
   // Bascule une action (read/write/delete) d'un module.
   const handlePermissionChange = (module, action) => {
+    if (!canGrantModule(module, action)) return; // garde-fou UI
     setFormData((prev) => ({
       ...prev,
       permissions: {
@@ -118,11 +234,16 @@ const UserModal = ({ user, onClose }) => {
     }));
   };
 
-  // Bascule une action pour TOUS les modules d'un groupe.
+  // Clés d'un groupe que l'acteur peut réellement accorder pour une action.
+  const grantableKeysInGroup = (groupKey, action) =>
+    PERMISSION_MODULES.filter(
+      (m) => m.group === groupKey && canGrantModule(m.key, action),
+    ).map((m) => m.key);
+
+  // Bascule une action pour TOUS les modules (accordables) d'un groupe.
   const handleGroupActionToggle = (groupKey, action) => {
-    const keys = PERMISSION_MODULES.filter((m) => m.group === groupKey).map(
-      (m) => m.key,
-    );
+    const keys = grantableKeysInGroup(groupKey, action);
+    if (keys.length === 0) return;
     setFormData((prev) => {
       const allChecked = keys.every(
         (k) => prev.permissions.modules[k]?.[action],
@@ -138,11 +259,9 @@ const UserModal = ({ user, onClose }) => {
     });
   };
 
-  // Un groupe a-t-il tous ses modules cochés pour une action ? (état du toggle)
+  // Un groupe a-t-il tous ses modules (accordables) cochés pour une action ?
   const isGroupActionChecked = (groupKey, action) => {
-    const keys = PERMISSION_MODULES.filter((m) => m.group === groupKey).map(
-      (m) => m.key,
-    );
+    const keys = grantableKeysInGroup(groupKey, action);
     return (
       keys.length > 0 &&
       keys.every((k) => formData.permissions.modules[k]?.[action])
@@ -177,9 +296,9 @@ const UserModal = ({ user, onClose }) => {
     });
   };
 
-  // Sélectionner/Désélectionner toutes les entreprises
+  // Sélectionner/Désélectionner toutes les entreprises (accordables).
   const handleSelectAllEntreprises = () => {
-    const allIds = entreprises?.map((e) => e._id) || [];
+    const allIds = grantableEntreprises.map((e) => e._id);
     const allSelected =
       allIds.length > 0 &&
       allIds.every((id) => formData.permissions.entreprises.includes(id));
@@ -193,23 +312,59 @@ const UserModal = ({ user, onClose }) => {
     }));
   };
 
-  // Obtenir les noms des entreprises sélectionnées pour l'affichage
-  const getSelectedEntreprisesText = () => {
-    const selected = formData.permissions.entreprises;
-    if (selected.length === 0) return "Sélectionner les entreprises...";
-    if (selected.length === entreprises?.length)
-      return "Toutes les entreprises";
+  // (Analyse) Bascule un réseau Filiales (DQ/QC/LD).
+  const toggleFiliale = (reseau) => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        analyse: {
+          ...prev.permissions.analyse,
+          filiales: {
+            ...prev.permissions.analyse?.filiales,
+            [reseau]: !prev.permissions.analyse?.filiales?.[reseau],
+          },
+        },
+      },
+    }));
+  };
 
-    const names = entreprises
-      ?.filter((e) => selected.includes(e._id))
-      .map((e) => e.trigramme)
-      .slice(0, 3)
-      .join(", ");
+  // (Analyse) Bascule un code commercial autorisé pour une société.
+  const toggleCommercialCode = (entId, code) => {
+    setFormData((prev) => {
+      const current = prev.permissions.commerciauxScope?.[entId] || [];
+      const next = current.includes(code)
+        ? current.filter((c) => c !== code)
+        : [...current, code];
+      return {
+        ...prev,
+        permissions: {
+          ...prev.permissions,
+          commerciauxScope: {
+            ...prev.permissions.commerciauxScope,
+            [entId]: next,
+          },
+        },
+      };
+    });
+  };
 
-    if (selected.length > 3) {
-      return `${names} +${selected.length - 3}`;
-    }
-    return names;
+  // (Analyse) Tout / aucun code commercial pour une société.
+  const setAllCommercialCodes = (entId, codes) => {
+    setFormData((prev) => {
+      const current = prev.permissions.commerciauxScope?.[entId] || [];
+      const all = codes.length > 0 && codes.every((c) => current.includes(c));
+      return {
+        ...prev,
+        permissions: {
+          ...prev.permissions,
+          commerciauxScope: {
+            ...prev.permissions.commerciauxScope,
+            [entId]: all ? [] : [...codes],
+          },
+        },
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -302,25 +457,45 @@ const UserModal = ({ user, onClose }) => {
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Rôle</label>
-              <select name="role" value={formData.role} onChange={handleChange}>
-                <option value="user">Utilisateur</option>
-                <option value="admin">Administrateur</option>
-              </select>
+          <div className="form-group">
+            <label>Rôle</label>
+            <div className="role-cards">
+              {roleOptions.map((r) => {
+                const Icon = ROLE_META[r]?.Icon || HiUser;
+                const selected = formData.role === r;
+                return (
+                  <button
+                    type="button"
+                    key={r}
+                    className={`role-card ${selected ? "selected" : ""}`}
+                    onClick={() =>
+                      setFormData((prev) => ({ ...prev, role: r }))
+                    }
+                  >
+                    {selected && <HiCheck className="role-card-check" />}
+                    <span className="role-card-icon">
+                      <Icon />
+                    </span>
+                    <span className="role-card-label">
+                      {ROLE_LABELS[r] || r}
+                    </span>
+                    <span className="role-card-desc">{ROLE_META[r]?.desc}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="form-group form-group-checkbox">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="isActive"
-                  checked={formData.isActive}
-                  onChange={handleChange}
-                />
-                <span>Compte actif</span>
-              </label>
-            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="isActive"
+                checked={formData.isActive}
+                onChange={handleChange}
+              />
+              <span>Compte actif</span>
+            </label>
           </div>
 
           <div className="permissions-section">
@@ -333,18 +508,27 @@ const UserModal = ({ user, onClose }) => {
               </p>
             )}
 
+            {formData.role === "responsable" && (
+              <p className="admin-note">
+                Un responsable gère une équipe. Vous ne pouvez lui accorder que
+                des droits et des sociétés que vous possédez vous-même.
+              </p>
+            )}
+
             <div className="global-permissions">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.permissions.allEntreprises}
-                  onChange={() =>
-                    handleGlobalPermissionChange("allEntreprises")
-                  }
-                />
-                <span>Toutes les entreprises</span>
-              </label>
-              {formData.role !== "admin" && (
+              {canGrantAllEntreprises && (
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formData.permissions.allEntreprises}
+                    onChange={() =>
+                      handleGlobalPermissionChange("allEntreprises")
+                    }
+                  />
+                  <span>Toutes les entreprises</span>
+                </label>
+              )}
+              {formData.role !== "admin" && canGrantAllModules && (
                 <label className="checkbox-label">
                   <input
                     type="checkbox"
@@ -356,84 +540,65 @@ const UserModal = ({ user, onClose }) => {
               )}
             </div>
 
-              {/* Sélection des entreprises */}
+              {/* Sélection des entreprises — pastilles + recherche */}
               {!formData.permissions.allEntreprises && (
                 <div className="form-group">
                   <label>Entreprises accessibles</label>
-                  <div className="multi-select">
-                    <div
-                      className="multi-select-trigger"
-                      onClick={() => setEntreprisesOpen(!entreprisesOpen)}
-                    >
-                      <span className="multi-select-text">
-                        {isLoadingEntreprises
-                          ? "Chargement..."
-                          : getSelectedEntreprisesText()}
-                      </span>
-                      <HiChevronDown
-                        className={`multi-select-icon ${entreprisesOpen ? "open" : ""}`}
-                      />
+                  <div className="ent-picker">
+                    <div className="ent-picker-toolbar">
+                      <div className="ent-search">
+                        <HiSearch />
+                        <input
+                          type="text"
+                          placeholder="Rechercher une société..."
+                          value={entSearch}
+                          onChange={(e) => setEntSearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="ent-toolbar-right">
+                        <button
+                          type="button"
+                          className="btn-select-all"
+                          onClick={handleSelectAllEntreprises}
+                          disabled={grantableEntreprises.length === 0}
+                        >
+                          {allEntSelected ? "Aucun" : "Tout"}
+                        </button>
+                        <span className="selected-count">
+                          {formData.permissions.entreprises.length}/
+                          {grantableEntreprises.length}
+                        </span>
+                      </div>
                     </div>
 
-                    {entreprisesOpen && (
-                      <div className="multi-select-dropdown">
-                        <div className="multi-select-header">
-                          <button
-                            type="button"
-                            className="btn-select-all"
-                            onClick={handleSelectAllEntreprises}
-                          >
-                            {entreprises?.every((e) =>
-                              formData.permissions.entreprises.includes(e._id),
-                            )
-                              ? "Tout désélectionner"
-                              : "Tout sélectionner"}
-                          </button>
-                          <span className="selected-count">
-                            {formData.permissions.entreprises.length}{" "}
-                            sélectionnée(s)
-                          </span>
-                        </div>
-
-                        <div className="multi-select-options">
-                          {entreprises?.length === 0 ? (
-                            <div className="no-options">
-                              Aucune entreprise créée
-                            </div>
-                          ) : (
-                            entreprises?.map((entreprise) => (
-                              <div
-                                key={entreprise._id}
-                                className={`multi-select-option ${
-                                  formData.permissions.entreprises.includes(
-                                    entreprise._id,
-                                  )
-                                    ? "selected"
-                                    : ""
-                                }`}
-                                onClick={() =>
-                                  handleEntrepriseToggle(entreprise._id)
-                                }
-                              >
-                                <div className="option-checkbox">
-                                  {formData.permissions.entreprises.includes(
-                                    entreprise._id,
-                                  ) && <HiCheck />}
-                                </div>
-                                <div className="option-content">
-                                  <span className="option-trigramme">
-                                    {entreprise.trigramme}
-                                  </span>
-                                  <span className="option-name">
-                                    {entreprise.nomComplet}
-                                  </span>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <div className="ent-pills">
+                      {isLoadingEntreprises ? (
+                        <div className="no-options">Chargement...</div>
+                      ) : filteredEntreprises.length === 0 ? (
+                        <div className="no-options">Aucune société</div>
+                      ) : (
+                        filteredEntreprises.map((entreprise) => {
+                          const selected =
+                            formData.permissions.entreprises.includes(
+                              entreprise._id,
+                            );
+                          return (
+                            <button
+                              type="button"
+                              key={entreprise._id}
+                              className={`ent-pill ${selected ? "selected" : ""}`}
+                              onClick={() =>
+                                handleEntrepriseToggle(entreprise._id)
+                              }
+                              title={entreprise.nomComplet}
+                            >
+                              {selected && <HiCheck />}
+                              <span>{entreprise.trigramme}</span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -452,7 +617,7 @@ const UserModal = ({ user, onClose }) => {
                         ))}
                       </tr>
                     </thead>
-                    {GROUPS.map((grp) => (
+                    {visibleGroups.map((grp) => (
                       <tbody key={grp.group}>
                         <tr className="module-group-row">
                           <td className="module-group-name">{grp.label}</td>
@@ -468,6 +633,10 @@ const UserModal = ({ user, onClose }) => {
                                     grp.group,
                                     action,
                                   )}
+                                  disabled={
+                                    grantableKeysInGroup(grp.group, action)
+                                      .length === 0
+                                  }
                                   onChange={() =>
                                     handleGroupActionToggle(grp.group, action)
                                   }
@@ -490,6 +659,7 @@ const UserModal = ({ user, onClose }) => {
                                       action
                                     ] || false
                                   }
+                                  disabled={!canGrantModule(mod.key, action)}
                                   onChange={() =>
                                     handlePermissionChange(mod.key, action)
                                   }
@@ -501,6 +671,104 @@ const UserModal = ({ user, onClose }) => {
                       </tbody>
                     ))}
                   </table>
+                </div>
+              )}
+
+              {/* ── Accès aux analyses (super-admin uniquement) ── */}
+              {canEditAnalyse && (
+                <div className="analyse-section">
+                  <label className="analyse-title">Accès aux analyses</label>
+
+                  {/* Filiales : réseaux visibles */}
+                  <div className="analyse-block">
+                    <span className="analyse-block-label">
+                      Filiales — réseaux visibles
+                    </span>
+                    <div className="analyse-reseaux">
+                      {FILIALE_RESEAUX.map((r) => (
+                        <label
+                          key={r}
+                          className="checkbox-label checkbox-label-inline"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={
+                              !!formData.permissions.analyse?.filiales?.[r]
+                            }
+                            onChange={() => toggleFiliale(r)}
+                          />
+                          <span>{r}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Commerciaux : codes autorisés par société */}
+                  <div className="analyse-block">
+                    <span className="analyse-block-label">
+                      Commerciaux — codes autorisés par société
+                    </span>
+                    {commEntreprises.length === 0 ? (
+                      <div className="no-options">
+                        Sélectionnez des sociétés ayant des vendeurs déclarés.
+                      </div>
+                    ) : (
+                      commEntreprises.map((e) => {
+                        const codes = (e.vendeurs || [])
+                          .map((v) => v.code)
+                          .filter(Boolean);
+                        const selected =
+                          formData.permissions.commerciauxScope?.[e._id] || [];
+                        const allSel =
+                          codes.length > 0 &&
+                          codes.every((c) => selected.includes(c));
+                        return (
+                          <div key={e._id} className="comm-ent">
+                            <div className="comm-ent-head">
+                              <span className="comm-ent-trig">
+                                {e.trigramme}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn-select-all"
+                                onClick={() =>
+                                  setAllCommercialCodes(e._id, codes)
+                                }
+                              >
+                                {allSel ? "Aucun" : "Tous"}
+                              </button>
+                            </div>
+                            <div className="ent-pills">
+                              {codes.map((code) => {
+                                const v = e.vendeurs.find(
+                                  (x) => x.code === code,
+                                );
+                                const on = selected.includes(code);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={code}
+                                    className={`ent-pill ${on ? "selected" : ""}`}
+                                    onClick={() =>
+                                      toggleCommercialCode(e._id, code)
+                                    }
+                                    title={
+                                      v
+                                        ? `${v.prenom || ""} ${v.nom || ""}`.trim()
+                                        : code
+                                    }
+                                  >
+                                    {on && <HiCheck />}
+                                    <span>{code}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               )}
             </div>

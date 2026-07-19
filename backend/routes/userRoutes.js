@@ -16,11 +16,16 @@ import {
 } from "../controllers/userControlleur.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
+import { allowUserManagement } from "../middleware/accessControl.js";
 
 const router = express.Router();
 
-const canRead = checkModuleAccess("users_admin", "read");
-const canWrite = checkModuleAccess("users_admin", "write");
+// Lecture / création / mise à jour / (dés)activation : admins, détenteurs du
+// module users_admin, ET responsables (le périmètre fin est appliqué dans le
+// contrôleur : scope d'équipe + atténuation des permissions).
+const canRead = allowUserManagement("read");
+const canWrite = allowUserManagement("write");
+// Suppression de COMPTE : réservée aux admins / users_admin (PAS les responsables).
 const canDelete = checkModuleAccess("users_admin", "delete");
 
 // Public — DOIVENT être avant /:id

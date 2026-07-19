@@ -5,6 +5,35 @@ import Permission from "../models/PermissionModel.js";
 import generateToken from "../utils/generateToken.js";
 import sendEmail from "../utils/sendEmail.js";
 import crypto from "crypto";
+import {
+  getManageableUserScope,
+  canManageUser,
+  assertGrantWithinScope,
+  canAssignRole,
+  isSuperAdmin,
+} from "../middleware/accessControl.js";
+
+// Périmètre EFFECTIF de l'acteur pour l'atténuation des permissions accordées.
+// Un admin (rôle) possède TOUS les modules (cohérent avec checkModuleAccess) ;
+// son périmètre reste borné par ses SOCIÉTÉS. Un responsable est pris tel quel.
+const buildActorScope = (actorPerm, role) => {
+  if (role === "admin") {
+    return {
+      allModules: true,
+      allEntreprises: !!actorPerm?.allEntreprises,
+      entreprises: actorPerm?.entreprises || [],
+      modules: actorPerm?.modules || {},
+    };
+  }
+  return (
+    actorPerm || {
+      allModules: false,
+      allEntreprises: false,
+      entreprises: [],
+      modules: {},
+    }
+  );
+};
 
 // @desc    Auth user & get token
 // @route   POST /api/users/login
@@ -204,26 +233,53 @@ const createUser = asyncHandler(async (req, res) => {
     throw new Error("Cet email est déjà utilisé");
   }
 
+  const targetRole = role || "user";
+
+  // ── Hiérarchie : l'acteur peut-il attribuer ce rôle ? ─────────────────────
+  // (super-admin : tout ; admin scopé : responsable/user ; responsable : user)
+  if (!(await canAssignRole(req.user, targetRole))) {
+    res.status(403);
+    throw new Error("Vous ne pouvez pas attribuer ce rôle.");
+  }
+
+  // ── Hiérarchie : atténuation des permissions demandées (sauf super-admin) ──
+  // Un acteur ne peut accorder que ce qu'il possède lui-même (modules × actions
+  // × sociétés). Le super-admin n'est pas contraint (comportement historique).
+  const superA = await isSuperAdmin(req.user);
+  if (permissions && !superA) {
+    const actorPerm = await Permission.findOne({ user: req.user._id });
+    const check = assertGrantWithinScope(
+      buildActorScope(actorPerm, req.user.role),
+      permissions,
+    );
+    if (!check.ok) {
+      res.status(403);
+      throw new Error(check.message);
+    }
+  }
+
   const user = await User.create({
     email,
     password,
     nom,
     prenom,
-    role: role || "user",
+    role: targetRole,
     createdBy: req.user._id,
   });
 
   // Un compte ADMIN est super-admin par défaut (accès à toutes les entreprises +
   // tous les modules), sauf si l'UI restreint explicitement son périmètre.
-  const isAdminRole = (role || "user") === "admin";
+  const isAdminRole = targetRole === "admin";
 
   if (permissions) {
     await Permission.create({
       user: user._id,
       entreprises: permissions.entreprises || [],
       modules: permissions.modules || {},
-      analyse: permissions.analyse || {},
-      commerciauxScope: permissions.commerciauxScope || {},
+      // analyse / commerciauxScope : réservés au super-admin (sinon ignorés,
+      // pour empêcher toute injection/escalade par un acteur non super-admin).
+      analyse: superA ? permissions.analyse || {} : {},
+      commerciauxScope: superA ? permissions.commerciauxScope || {} : {},
       allEntreprises:
         permissions.allEntreprises !== undefined
           ? permissions.allEntreprises
@@ -281,7 +337,12 @@ const createUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users
 // @access  Private/Admin
 const getUsers = asyncHandler(async (req, res) => {
-  const users = await User.find({})
+  // Périmètre hiérarchique : super-admin -> tous ; admin scopé -> users de ses
+  // sociétés ; responsable -> membres de ses équipes + users qu'il a créés.
+  const scope = await getManageableUserScope(req.user);
+  const filter = scope.all ? {} : { _id: { $in: scope.userIds } };
+
+  const users = await User.find(filter)
     .select("-password")
     .populate("createdBy", "nom prenom email")
     .sort({ createdAt: -1 });
@@ -306,6 +367,12 @@ const getUsers = asyncHandler(async (req, res) => {
 // @route   GET /api/users/:id
 // @access  Private/Admin
 const getUserById = asyncHandler(async (req, res) => {
+  // Périmètre hiérarchique : interdit de consulter un user hors de son scope.
+  if (!(await canManageUser(req.user, req.params.id))) {
+    res.status(403);
+    throw new Error("Utilisateur hors de votre périmètre");
+  }
+
   const user = await User.findById(req.params.id)
     .select("-password")
     .populate("createdBy", "nom prenom email");
@@ -337,6 +404,36 @@ const updateUser = asyncHandler(async (req, res) => {
     throw new Error("Utilisateur non trouvé");
   }
 
+  // ── Hiérarchie : la cible doit être dans le périmètre de l'acteur ─────────
+  if (!(await canManageUser(req.user, user._id))) {
+    res.status(403);
+    throw new Error("Utilisateur hors de votre périmètre");
+  }
+
+  // ── Hiérarchie : changement de rôle contrôlé ─────────────────────────────
+  // On ne vérifie que si le rôle change réellement (sinon un PUT « normal »
+  // renvoyant le rôle courant resterait autorisé).
+  if (req.body.role && req.body.role !== user.role) {
+    if (!(await canAssignRole(req.user, req.body.role))) {
+      res.status(403);
+      throw new Error("Vous ne pouvez pas attribuer ce rôle.");
+    }
+  }
+
+  // ── Hiérarchie : atténuation des permissions demandées (sauf super-admin) ──
+  const superA = await isSuperAdmin(req.user);
+  if (req.body.permissions && !superA) {
+    const actorPerm = await Permission.findOne({ user: req.user._id });
+    const check = assertGrantWithinScope(
+      buildActorScope(actorPerm, req.user.role),
+      req.body.permissions,
+    );
+    if (!check.ok) {
+      res.status(403);
+      throw new Error(check.message);
+    }
+  }
+
   user.nom = req.body.nom || user.nom;
   user.prenom = req.body.prenom || user.prenom;
   user.email = req.body.email || user.email;
@@ -352,19 +449,23 @@ const updateUser = asyncHandler(async (req, res) => {
   if (req.body.permissions) {
     const p = req.body.permissions;
     const isAdminRole = updatedUser.role === "admin";
-    await Permission.findOneAndUpdate(
-      { user: user._id },
-      {
-        entreprises: p.entreprises || [],
-        modules: p.modules,
-        analyse: p.analyse || {},
-        commerciauxScope: p.commerciauxScope || {},
-        allEntreprises:
-          p.allEntreprises !== undefined ? p.allEntreprises : isAdminRole,
-        allModules: p.allModules !== undefined ? p.allModules : isAdminRole,
-      },
-      { new: true, upsert: true },
-    );
+    const update = {
+      entreprises: p.entreprises || [],
+      modules: p.modules,
+      allEntreprises:
+        p.allEntreprises !== undefined ? p.allEntreprises : isAdminRole,
+      allModules: p.allModules !== undefined ? p.allModules : isAdminRole,
+    };
+    // analyse / commerciauxScope : modifiables uniquement par un super-admin.
+    // Sinon on NE touche pas à ces champs (valeurs existantes préservées).
+    if (superA) {
+      update.analyse = p.analyse || {};
+      update.commerciauxScope = p.commerciauxScope || {};
+    }
+    await Permission.findOneAndUpdate({ user: user._id }, update, {
+      new: true,
+      upsert: true,
+    });
   }
 
   const permissions = await Permission.findOne({ user: user._id }).populate(
@@ -394,6 +495,12 @@ const deleteUser = asyncHandler(async (req, res) => {
     throw new Error("Utilisateur non trouvé");
   }
 
+  // Hiérarchie : la cible doit être dans le périmètre de l'acteur.
+  if (!(await canManageUser(req.user, user._id))) {
+    res.status(403);
+    throw new Error("Utilisateur hors de votre périmètre");
+  }
+
   if (
     user.role === "admin" &&
     req.user._id.toString() !== user._id.toString()
@@ -417,6 +524,12 @@ const toggleUserActive = asyncHandler(async (req, res) => {
   if (!user) {
     res.status(404);
     throw new Error("Utilisateur non trouvé");
+  }
+
+  // Hiérarchie : la cible doit être dans le périmètre de l'acteur.
+  if (!(await canManageUser(req.user, user._id))) {
+    res.status(403);
+    throw new Error("Utilisateur hors de votre périmètre");
   }
 
   user.isActive = !user.isActive;

@@ -298,7 +298,202 @@
 /* Ajouter à src/components/admin/UserModal.css */
 
 .modal-large {
-  max-width: 550px;
+  max-width: 600px;
+}
+
+/* ── Rôle : cartes cliquables ─────────────────────────────────────────── */
+.role-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.role-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.role-card:hover {
+  border-color: var(--accent);
+}
+
+.role-card.selected {
+  border-color: var(--accent);
+  background: rgba(77, 166, 255, 0.08);
+}
+
+.role-card-icon {
+  font-size: 20px;
+  color: var(--accent);
+  display: inline-flex;
+}
+
+.role-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.role-card-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.role-card-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+/* ── Entreprises : pastilles + recherche ──────────────────────────────── */
+.ent-picker {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.ent-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ent-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+}
+
+.ent-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 0;
+}
+
+.ent-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ent-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ent-pill:hover {
+  border-color: var(--accent);
+}
+
+.ent-pill.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Accès aux analyses ───────────────────────────────────────────────── */
+.analyse-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.analyse-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.analyse-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analyse-block-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.analyse-reseaux {
+  display: flex;
+  gap: 18px;
+}
+
+.comm-ent {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: var(--bg-primary);
+}
+
+.comm-ent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.comm-ent-trig {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.comm-ent .ent-pills {
+  padding: 0;
+  max-height: none;
 }
 
 /* Multi-select dropdown */

@@ -196,6 +196,22 @@ const permissionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // ══════════ ANALYSE — droit d'accès PAR ÉCRAN d'analyse ══════════
+    // Objet clé -> booléen (ex: { commerciaux: true, topArticles: false, ... }).
+    // Cas particulier `filiales` : objet { DQ, QC, LD } (accès par réseau).
+    // Voir middleware/accessControl.js (ANALYSE_KEYS, hasAnalyseAccess). Mixed
+    // car hétérogène (booléens + sous-objet filiales) et lu par accès direct.
+    analyse: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
+    // ══════════ COMMERCIAUX — codes autorisés PAR ENTREPRISE ══════════
+    // Objet entrepriseId(string) -> tableau de codes commerciaux (strings).
+    // Voir middleware/accessControl.js (getCommerciauxCodes).
+    commerciauxScope: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,

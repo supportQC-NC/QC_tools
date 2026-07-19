@@ -13,6 +13,7 @@ import App from "./App";
 
 import PrivateRoute from "./components/Utils/PrivateRoute";
 import ModuleRoute from "./components/Utils/ModuleRoute";
+import TeamRoute from "./components/Utils/TeamRoute";
 
 import Login from "./screens/LoginScreen/LoginScreen";
 import ForgotPassword from "./screens/ForgotPasswordScreen/ForgotPasswordScreen";
@@ -71,6 +72,9 @@ import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
 import AdminReceptionSuiviScreen from "./screens/admin/AdminReceptionSuiviScreen";
+import AdminEquipesScreen from "./screens/admin/AdminEquipesScreen";
+import AdminTachesScreen from "./screens/admin/AdminTachesScreen";
+import MesTachesScreen from "./screens/user/MesTachesScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -95,6 +99,7 @@ const router = createBrowserRouter(
           element={<UserPreparationCommande />}
         />
         <Route path="/etiquettes" element={<AdminEtiquettesScreen />} />
+        <Route path="/mes-taches" element={<MesTachesScreen />} />
       </Route>
 
       {/* ======= Écrans admin : garde par module (admin OU utilisateur
@@ -105,9 +110,16 @@ const router = createBrowserRouter(
         <Route path="/admin" element={<AdminDashboard />} />
       </Route>
 
-      {/* Administration · Utilisateurs -> module "users_admin" */}
-      <Route element={<ModuleRoute module="users_admin" />}>
+      {/* Administration · Utilisateurs -> module "users_admin" (ou responsable,
+          données scopées à son équipe côté API) */}
+      <Route element={<ModuleRoute module="users_admin" roles={["responsable"]} />}>
         <Route path="/admin/users" element={<AdminUsers />} />
+      </Route>
+
+      {/* Administration · Équipes & Tâches -> admins + responsables */}
+      <Route element={<TeamRoute />}>
+        <Route path="/admin/equipes" element={<AdminEquipesScreen />} />
+        <Route path="/admin/taches" element={<AdminTachesScreen />} />
       </Route>
 
       {/* Administration · Entreprises -> module "entreprises_admin" */}

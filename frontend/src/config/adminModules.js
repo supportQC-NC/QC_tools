@@ -117,6 +117,52 @@ export function moduleForPath(pathname) {
   return best ? best.key : null;
 }
 
+// ===========================================================================
+// HIÉRARCHIE — miroir CLIENT de l'atténuation serveur (assertGrantWithinScope).
+// Sert à l'UI (UserModal) : un acteur ne peut proposer/accorder que ce qu'il a.
+// La sécurité RÉELLE reste côté serveur ; ceci évite juste des tentatives vaines.
+// ===========================================================================
+
+// Super-admin côté client : admin + (aucune permission héritée OU allEntreprises).
+export function isSuperAdminClient(userInfo) {
+  if (!userInfo || userInfo.role !== "admin") return false;
+  const p = userInfo.permissions;
+  return !p || p.allEntreprises === true;
+}
+
+// Rôles que l'acteur peut attribuer (miroir de canAssignRole).
+export function assignableRoles(userInfo) {
+  if (isSuperAdminClient(userInfo)) return ["user", "responsable", "admin"];
+  if (userInfo?.role === "admin") return ["user", "responsable"];
+  if (userInfo?.role === "responsable") return ["user"];
+  return [];
+}
+
+// L'acteur peut-il accorder « tous les modules » ? (un admin a tous les modules)
+export function actorCanGrantAllModules(userInfo) {
+  if (isSuperAdminClient(userInfo)) return true;
+  if (userInfo?.role === "admin") return true;
+  return userInfo?.permissions?.allModules === true;
+}
+
+// L'acteur peut-il accorder « toutes les entreprises » ?
+export function actorCanGrantAllEntreprises(userInfo) {
+  if (isSuperAdminClient(userInfo)) return true;
+  return userInfo?.permissions?.allEntreprises === true;
+}
+
+// Ids des entreprises que l'acteur peut accorder (null = toutes).
+export function actorGrantableEntrepriseIds(userInfo) {
+  if (actorCanGrantAllEntreprises(userInfo)) return null;
+  return (userInfo?.permissions?.entreprises || []).map((e) => e._id || e);
+}
+
+// L'acteur peut-il accorder l'action `action` sur le module `key` ?
+export function actorCanGrantModuleAction(userInfo, key, action) {
+  if (actorCanGrantAllModules(userInfo)) return true;
+  return !!userInfo?.permissions?.modules?.[key]?.[action];
+}
+
 // L'utilisateur a-t-il accès à AU MOINS UNE action d'un des modules d'un groupe ?
 // (utile pour l'affichage des sections de menu)
 export function hasAnyModuleInGroup(userInfo, group) {

@@ -21,6 +21,7 @@ import {
   HiUserCircle,
   HiFolder,
 } from "react-icons/hi";
+import MesTachesWidget from "../../components/user/MesTachesWidget";
 import "./UserdashboardScreen.css";
 
 // ─── Config des modules USER (clé permission → label, route, icône, couleur) ──
@@ -296,6 +297,9 @@ const UserDashboard = () => {
           <span>Contactez votre administrateur pour obtenir des accès.</span>
         </div>
       )}
+
+      {/* Widget « Mes tâches » */}
+      <MesTachesWidget />
 
       {/* Bandeau sécurité */}
       <div className="ud-notice">

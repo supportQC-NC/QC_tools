@@ -1,5 +1,6 @@
 // src/screens/admin/AdminUsers.jsx
 import React, { useState } from "react";
+import { useSelector } from "react-redux";
 import {
   HiPlus,
   HiPencil,
@@ -21,6 +22,10 @@ const AdminUsers = () => {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // Un responsable ne supprime pas de compte (réservé aux admins côté API).
+  const { userInfo } = useSelector((state) => state.auth);
+  const canDeleteAccounts = userInfo?.role !== "responsable";
 
   const { data: users, isLoading, error, refetch } = useGetUsersQuery();
   const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
@@ -195,14 +200,16 @@ const AdminUsers = () => {
                       >
                         <HiPencil />
                       </button>
-                      <button
-                        className="btn-action btn-delete"
-                        onClick={() => handleDelete(user)}
-                        disabled={isDeleting || user.role === "admin"}
-                        title="Supprimer"
-                      >
-                        <HiTrash />
-                      </button>
+                      {canDeleteAccounts && (
+                        <button
+                          className="btn-action btn-delete"
+                          onClick={() => handleDelete(user)}
+                          disabled={isDeleting || user.role === "admin"}
+                          title="Supprimer"
+                        >
+                          <HiTrash />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

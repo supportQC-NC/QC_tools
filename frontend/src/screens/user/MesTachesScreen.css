@@ -1,0 +1,117 @@
+.mes-taches {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.mes-taches-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.mes-taches-header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.mes-taches-empty {
+  padding: 48px;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+.mes-taches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tache-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #64748b;
+  border-radius: 10px;
+  padding: 14px 18px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.tache-item.done {
+  opacity: 0.6;
+}
+
+.tache-item.done .tache-item-title strong {
+  text-decoration: line-through;
+}
+
+.tache-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tache-item-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tache-item-desc {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.tache-item-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  flex-wrap: wrap;
+}
+
+.tache-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.tache-overdue {
+  color: #ef4444 !important;
+  font-weight: 700;
+}
+
+.tache-item-statut {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.tache-item-statut label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.tache-item-statut select {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: #fff;
+}

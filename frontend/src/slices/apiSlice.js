@@ -39,6 +39,10 @@ export const apiSlice = createApi({
     "AppRelease",
     // ========== TAGS ABONNEMENTS RAPPORTS ==========
     "ReportSubscription",
+    // ========== TAGS ÉQUIPES ==========
+    "Team",
+    // ========== TAGS TÂCHES ==========
+    "Task",
   ],
   endpoints: (builder) => ({}),
 });

@@ -13,12 +13,14 @@
    SIDEBAR - Desktop
    ============================================= */
 .sidebar {
-  position: relative;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   width: var(--sidebar-width);
-  height: 150vh;
+  height: 100vh;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   padding: 8px;
@@ -26,8 +28,6 @@
   overflow-y: auto;
   overflow-x: hidden;
   flex-shrink: 0;
-
-  
 }
 
 /* =============================================
@@ -131,11 +131,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 12px 6px 12px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--text-muted);
-  letter-spacing: 0.8px;
+  letter-spacing: 1px;
   background: none;
   border: none;
   cursor: default;
@@ -144,15 +144,34 @@
 
 .sidebar-separator.clickable {
   cursor: pointer;
-  border-radius: 6px;
-  margin: 4px 0;
+  border-radius: 8px;
+  margin: 8px 0 2px;
   padding: 10px 12px;
-  background: var(--bg-tertiary);
+  background: transparent;
 }
 
 .sidebar-separator.clickable:hover {
-  background: var(--border);
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
+}
+
+/* Barre d'accent devant le titre de section */
+.sidebar-separator.clickable .separator-text {
+  position: relative;
+  padding-left: 12px;
+}
+
+.sidebar-separator.clickable .separator-text::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.7;
 }
 
 .separator-text {
@@ -301,9 +320,12 @@
   padding: 10px 12px;
   color: var(--text-secondary);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
-  transition: all 0.2s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
   white-space: nowrap;
 }
 
@@ -314,7 +336,13 @@
 
 .sidebar-link.active {
   color: var(--accent);
-  background: rgba(77, 166, 255, 0.15);
+  background: rgba(77, 166, 255, 0.12);
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-link.active .sidebar-icon {
+  color: var(--accent);
 }
 
 .sidebar-icon {

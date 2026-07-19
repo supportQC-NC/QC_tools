@@ -1,8 +1,6 @@
 import {
   HiUsers,
   HiOfficeBuilding,
-  HiLockClosed,
-  HiCog,
   HiChartBar,
   HiCube,
   HiViewGrid,
@@ -34,7 +32,7 @@ import { moduleForPath } from "./adminModules";
 export const adminMenuStructure = [
   {
     type: "item",
-    label: "Dashboard",
+    label: "Tableau de bord",
     path: "/admin",
     icon: HiViewGrid,
     exact: true,
@@ -45,29 +43,12 @@ export const adminMenuStructure = [
     icon: HiFolder,
     collapsible: true,
     items: [
-      {
-        label: "Utilisateurs",
-        path: "/admin/users",
-        icon: HiUsers,
-      },
-      {
-        label: "Entreprises",
-        path: "/admin/entreprises",
-        icon: HiOfficeBuilding,
-      },
-      // {
-      //   label: "Permissions",
-      //   path: "/admin/permissions",
-      //   icon: HiLockClosed,
-      // },
-      {
-        label: "Concurrents",
-        path: "/admin/concurrents",
-        icon: HiUserGroup,
-      },
-           { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
-           { label: "Carte des collecteurs", path: "/admin/collecteurs-carte", icon: HiDeviceMobile },
-     { label: "Installation app", path: "/install", icon: HiQrcode },
+      { label: "Utilisateurs", path: "/admin/users", icon: HiUsers },
+      { label: "Équipes", path: "/admin/equipes", icon: HiUserGroup },
+      { label: "Tâches", path: "/admin/taches", icon: HiClipboardCheck },
+      { label: "Entreprises", path: "/admin/entreprises", icon: HiOfficeBuilding },
+      { label: "Concurrents", path: "/admin/concurrents", icon: HiUserGroup },
+      { label: "Installation app", path: "/install", icon: HiQrcode },
     ],
   },
   {
@@ -76,73 +57,35 @@ export const adminMenuStructure = [
     icon: HiDatabase,
     collapsible: true,
     items: [
-      {
-        label: "Articles",
-        path: "/admin/articles",
-        icon: HiCube,
-      },
-      {
-        label: "Fournisseurs",
-        path: "/admin/fournisseurs",
-        icon: HiCube,
-      },
-      {
-        label: "Clients",
-        path: "/admin/clients",
-        icon: HiCube,
-      },
-      {
-        label: "Commandes",
-        path: "/admin/commandes",
-        icon: HiTruck,
-      },
-      {
-        label: "proformas",
-        path: "/admin/proformas",
-        icon: HiTruck,
-      },
-      {
-        label: "factures",
-        path: "/admin/factures",
-        icon: HiTruck,
-      },
-      {
-        label: "Suivi Réceptions",
-        path: "/admin/suivi-receptions",
-        icon: HiCube,
-      },
+      { label: "Articles", path: "/admin/articles", icon: HiCube },
+      { label: "Fournisseurs", path: "/admin/fournisseurs", icon: HiFolder },
+      { label: "Clients", path: "/admin/clients", icon: HiUserGroup },
+      { label: "Commandes", path: "/admin/commandes", icon: HiTruck },
+      { label: "Proformas", path: "/admin/proformas", icon: HiDocumentReport },
+      { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
+      { label: "Bipages", path: "/admin/bipages", icon: HiClipboardList },
+      { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
     ],
   },
   {
     type: "subgroup",
     label: "Analyse",
-    icon: HiCog,
+    icon: HiChartBar,
     collapsible: true,
     items: [
-      {
-        label: "Analyse Commerciaux",
-        path: "/admin/commerciaux",
-        icon: HiUserGroup,
-      },
-      {
-        label: "Analyse facturation",
-        path: "/admin/commerciaux",
-        icon: HiUserGroup,
-      },
-      {
-        label: "Analyse Filiales",
-        path: "/admin/filiales",
-        icon: HiOfficeBuilding,
-      },
+      { label: "Analyse Commerciaux", path: "/admin/commerciaux", icon: HiUserGroup },
+      { label: "Analyse Filiales", path: "/admin/filiales", icon: HiOfficeBuilding },
+      { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
+      { label: "Analyse Facturation", path: "/admin/facture-analyse", icon: HiDocumentReport },
+      { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
+      { label: "Top Articles", path: "/admin/top-articles", icon: HiChartBar },
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
-      { label: "Analyse Réappro", path: "/admin/analyse-reappro", icon: HiTruck },
-       { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
-       { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
-         { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
-            { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
-            { label: "Carte des collecteurs", path: "/admin/collecteurs-carte", icon: HiDeviceMobile },
-         
- 
+      { label: "Analyse Réappro", path: "/admin/analyse-reappro", icon: HiRefresh },
+      { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
+      { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
+      { label: "Performance Dock", path: "/admin/performance-dock", icon: HiClipboardCheck },
+      { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
+      { label: "Carte des collecteurs", path: "/admin/collecteurs-carte", icon: HiDeviceMobile },
     ],
   },
 ];
@@ -387,6 +330,16 @@ export const getUserMenus = (userInfo) => {
 
   const menus = [];
 
+  // 0. Espace personnel — « Mes tâches », visible par TOUT utilisateur connecté.
+  menus.push({
+    type: "section",
+    label: "Mon espace",
+    collapsible: true,
+    items: [
+      { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
+    ],
+  });
+
   // 1. Section Administration — filtrée par permission de module.
   //    Visible pour un admin OU tout utilisateur ayant au moins une entrée
   //    autorisée (chaque entrée -> clé via moduleForPath -> hasModulePermission).
@@ -414,11 +367,26 @@ export const getUserMenus = (userInfo) => {
   return menus;
 };
 
+// Écrans d'administration accessibles à un RESPONSABLE (gestion de son équipe).
+// Les données sont scopées côté API (users de son équipe / ses équipes).
+const RESPONSABLE_ADMIN_PATHS = [
+  "/admin/users",
+  "/admin/equipes",
+  "/admin/taches",
+];
+
 // Un utilisateur peut-il voir une entrée du menu admin ?
+// - responsable -> gestion d'équipe (utilisateurs scopés + équipes) ;
 // - entrée mappée à un module (via son path) -> permission requise ;
 // - entrée sans module (ex. /install) -> réservée aux admins.
 const canSeeAdminItem = (userInfo, item) => {
   if (!item?.path) return isAdmin(userInfo);
+  if (
+    userInfo?.role === "responsable" &&
+    RESPONSABLE_ADMIN_PATHS.includes(item.path)
+  ) {
+    return true;
+  }
   const key = moduleForPath(item.path);
   if (key) return hasModulePermission(userInfo, key, "read");
   return isAdmin(userInfo);
