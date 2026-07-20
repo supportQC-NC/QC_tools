@@ -25,10 +25,11 @@
 .equipes-empty {
   padding: 48px;
   text-align: center;
-  color: #64748b;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
+  color: #b98599;
+  background: #596068;
+  border: 1px dashed #dfe4eb;
   border-radius: 12px;
+  font-size: large;
 }
 
 .equipes-grid {
@@ -38,7 +39,7 @@
 }
 
 .equipe-card {
-  background: #fff;
+  background: #292727;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 18px;
@@ -46,6 +47,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  
 }
 
 .equipe-card-head {
@@ -53,11 +55,12 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+
 }
 
 .equipe-card-head h3 {
   margin: 0 0 4px;
-  font-size: 1.05rem;
+  font-size: 1.50rem;
 }
 
 .equipe-ent {
@@ -78,8 +81,8 @@
 
 .equipe-desc {
   margin: 0;
-  font-size: 0.85rem;
-  color: #64748b;
+  font-size: 1.20rem;
+  color: #bdc7d4;
 }
 
 .equipe-resp {
@@ -104,6 +107,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+ 
 }
 
 .equipe-membres li {
@@ -111,15 +115,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: #f8fafc;
+  background: #454647;
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 0.88rem;
 }
 
 .equipe-no-member {
-  color: #94a3b8;
-  font-style: italic;
+  color: #e21654;
+ 
+  font-size: 1.20rem !important;
   justify-content: flex-start !important;
 }
 
@@ -149,6 +154,7 @@
   padding: 6px 8px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  font-size: 0.85rem;
-  background: #fff;
+  font-size: 1.0rem;
+  background: #93da84;
+  font-weight: bolder;
 }

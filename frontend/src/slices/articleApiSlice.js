@@ -108,6 +108,15 @@ export const articleApiSlice = apiSlice.injectEndpoints({
       keepUnusedDataFor: 300, // Cache 5 min car change rarement
     }),
 
+    // Liste des GISM1 (gisements)
+    getGism1: builder.query({
+      query: (nomDossierDBF) => ({
+        url: `${ARTICLES_URL}/${nomDossierDBF}/gism1`,
+      }),
+      providesTags: ["Article"],
+      keepUnusedDataFor: 300, // Cache 5 min car change rarement
+    }),
+
     // Liste des taux TGC distincts
     getTgcRates: builder.query({
       query: (nomDossierDBF) => ({
@@ -188,6 +197,7 @@ export const {
   useGetAdjacentArticlesQuery, // NOUVEAU
   useSearchArticlesQuery,
   useGetGroupesQuery,
+  useGetGism1Query,
   useGetTgcRatesQuery,
   useGetArticlesStructureQuery,
   useGetArticlePhotoQuery,

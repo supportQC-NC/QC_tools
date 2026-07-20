@@ -161,6 +161,136 @@
   font-weight: 600;
 }
 
+/* Multi-select recherchable GISM1 */
+.etiq-gism1 {
+  position: relative;
+}
+
+.etiq-gism1-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  cursor: text;
+  transition: border-color 0.15s;
+}
+
+.etiq-gism1-control:focus-within {
+  border-color: var(--accent);
+}
+
+.etiq-gism1-placeholder {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.etiq-gism1-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.etiq-gism1-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.85;
+}
+
+.etiq-gism1-chip-x:hover {
+  opacity: 1;
+}
+
+.etiq-gism1-search {
+  flex: 1;
+  min-width: 120px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 4px 2px;
+}
+
+.etiq-gism1-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+}
+
+.etiq-gism1-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.etiq-gism1-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.etiq-gism1-option:hover {
+  background: var(--bg-tertiary);
+}
+
+.etiq-gism1-option.checked {
+  background: rgba(77, 166, 255, 0.12);
+}
+
+.etiq-gism1-check {
+  width: 16px;
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.etiq-gism1-code {
+  font-weight: 600;
+  flex: 1;
+}
+
+.etiq-gism1-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Cartes de type */
 .etiq-types {
   display: grid;

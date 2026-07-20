@@ -6,8 +6,15 @@ import {
   HiPencilAlt,
   HiUpload,
   HiTruck,
+  HiLocationMarker,
+  HiCollection,
+  HiX,
 } from "react-icons/hi";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import {
+  useGetGism1Query,
+  useGetGroupesQuery,
+} from "../../slices/articleApiSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminEtiquettesScreen.css";
 
@@ -50,15 +57,113 @@ const LABEL_TYPES = [
   },
 ];
 
+/**
+ * Menu déroulant recherchable à sélection multiple ({ code, count }).
+ * Réutilisé pour les gisements (GISM1) et les groupes/familles (GROUPE).
+ */
+const SearchableMultiSelect = ({
+  items,
+  selected,
+  onToggle,
+  loading,
+  placeholder,
+}) => {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (boxRef.current && !boxRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filtered = (items || []).filter((g) =>
+    g.code.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  return (
+    <div className="etiq-gism1" ref={boxRef}>
+      <div className="etiq-gism1-control" onClick={() => setOpen(true)}>
+        {selected.length === 0 && !search && (
+          <span className="etiq-gism1-placeholder">{placeholder}</span>
+        )}
+        {selected.map((code) => (
+          <span key={code} className="etiq-gism1-chip">
+            {code}
+            <button
+              type="button"
+              className="etiq-gism1-chip-x"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle(code);
+              }}
+              aria-label={`Retirer ${code}`}
+            >
+              <HiX />
+            </button>
+          </span>
+        ))}
+        <input
+          className="etiq-gism1-search"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={selected.length ? "Ajouter…" : ""}
+        />
+      </div>
+
+      {open && (
+        <div className="etiq-gism1-menu">
+          {loading ? (
+            <div className="etiq-gism1-empty">Chargement…</div>
+          ) : filtered.length === 0 ? (
+            <div className="etiq-gism1-empty">
+              {search ? "Aucun résultat correspondant" : "Aucune valeur disponible"}
+            </div>
+          ) : (
+            filtered.map((g) => {
+              const checked = selected.includes(g.code);
+              return (
+                <button
+                  type="button"
+                  key={g.code}
+                  className={`etiq-gism1-option ${checked ? "checked" : ""}`}
+                  onClick={() => onToggle(g.code)}
+                >
+                  <span className="etiq-gism1-check">{checked ? "✓" : ""}</span>
+                  <span className="etiq-gism1-code">{g.code}</span>
+                  <span className="etiq-gism1-count">
+                    {g.count} article{g.count > 1 ? "s" : ""}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminEtiquettesScreen = () => {
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetMyEntreprisesQuery();
 
   const [selectedEntreprise, setSelectedEntreprise] = useState("");
-  const [mode, setMode] = useState("proforma"); // proforma | commande | nart
+  const [mode, setMode] = useState("proforma"); // proforma | commande | nart | gism1
   const [numfact, setNumfact] = useState("");
   const [numcde, setNumcde] = useState("");
   const [nartText, setNartText] = useState("");
+  const [selectedGism1, setSelectedGism1] = useState([]); // liste de codes GISM1
+  const [selectedGroupe, setSelectedGroupe] = useState([]); // liste de codes GROUPE
   const [type, setType] = useState("standard");
   const [format, setFormat] = useState("a4"); // a4 | demi (types pleine page)
   const [loading, setLoading] = useState(false);
@@ -131,6 +236,34 @@ const AdminEtiquettesScreen = () => {
   const entrepriseData = entreprises?.find((e) => e._id === selectedEntreprise);
   const nomDossierDBF = entrepriseData?.nomDossierDBF;
 
+  // Listes GISM1 / GROUPE de l'entreprise (chargées à la demande, cache 5 min)
+  const { data: gism1Data, isLoading: loadingGism1 } = useGetGism1Query(
+    nomDossierDBF,
+    { skip: !nomDossierDBF || mode !== "gism1" },
+  );
+  const { data: groupeData, isLoading: loadingGroupe } = useGetGroupesQuery(
+    nomDossierDBF,
+    { skip: !nomDossierDBF || mode !== "groupe" },
+  );
+
+  // Réinitialise les sélections si on change d'entreprise
+  useEffect(() => {
+    setSelectedGism1([]);
+    setSelectedGroupe([]);
+  }, [nomDossierDBF]);
+
+  const toggleGism1 = (code) => {
+    setSelectedGism1((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+  };
+
+  const toggleGroupe = (code) => {
+    setSelectedGroupe((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+  };
+
   const genererEtiquettes = async () => {
     setError("");
     setInfo(null);
@@ -155,6 +288,14 @@ const AdminEtiquettesScreen = () => {
       setError("Saisissez au moins un NART.");
       return;
     }
+    if (mode === "gism1" && selectedGism1.length === 0) {
+      setError("Sélectionnez au moins un gisement (GISM1).");
+      return;
+    }
+    if (mode === "groupe" && selectedGroupe.length === 0) {
+      setError("Sélectionnez au moins un groupe/famille (GROUPE).");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -163,6 +304,10 @@ const AdminEtiquettesScreen = () => {
         body = { type, mode: "proforma", numfact: numfact.trim() };
       } else if (mode === "commande") {
         body = { type, mode: "commande", numcde: numcde.trim() };
+      } else if (mode === "gism1") {
+        body = { type, mode: "gism1", gism1: selectedGism1 };
+      } else if (mode === "groupe") {
+        body = { type, mode: "groupe", groupe: selectedGroupe };
       } else {
         body = { type, mode: "nart", narts };
       }
@@ -240,8 +385,9 @@ const AdminEtiquettesScreen = () => {
           <HiTag /> Générateur d'étiquettes
         </h1>
         <p>
-          Générez vos étiquettes PDF (code-barres EAN-13) depuis une proforma ou
-          une liste de NART.
+          Générez vos étiquettes PDF (code-barres EAN-13) depuis une proforma,
+          une commande, une liste de NART, un gisement (GISM1) ou un groupe
+          (GROUPE).
         </p>
       </div>
 
@@ -288,6 +434,20 @@ const AdminEtiquettesScreen = () => {
             onClick={() => setMode("nart")}
           >
             <HiPencilAlt /> Saisie manuelle (NART)
+          </button>
+          <button
+            type="button"
+            className={`etiq-mode-btn ${mode === "gism1" ? "active" : ""}`}
+            onClick={() => setMode("gism1")}
+          >
+            <HiLocationMarker /> Par gisement (GISM1)
+          </button>
+          <button
+            type="button"
+            className={`etiq-mode-btn ${mode === "groupe" ? "active" : ""}`}
+            onClick={() => setMode("groupe")}
+          >
+            <HiCollection /> Par groupe (GROUPE)
           </button>
         </div>
 
@@ -360,6 +520,44 @@ const AdminEtiquettesScreen = () => {
             <span className="etiq-hint">
               Les NART sont traités dans l'ordre. L'import CSV détecte le
               séparateur automatiquement et prend la première colonne.
+            </span>
+          </div>
+        )}
+
+        {mode === "gism1" && (
+          <div className="etiq-field">
+            <label className="etiq-label">Gisement(s) GISM1</label>
+            <SearchableMultiSelect
+              key={`gism1-${nomDossierDBF || ""}`}
+              items={gism1Data?.gism1}
+              selected={selectedGism1}
+              onToggle={toggleGism1}
+              loading={loadingGism1}
+              placeholder="Rechercher et sélectionner un ou plusieurs gisements…"
+            />
+            <span className="etiq-hint">
+              {selectedGism1.length > 0
+                ? `${selectedGism1.length} gisement(s) sélectionné(s). Toutes les étiquettes des articles rangés dans ce(s) gisement(s) seront générées.`
+                : "Toutes les étiquettes des articles rangés dans le(s) gisement(s) sélectionné(s) seront générées."}
+            </span>
+          </div>
+        )}
+
+        {mode === "groupe" && (
+          <div className="etiq-field">
+            <label className="etiq-label">Groupe(s) / Famille(s)</label>
+            <SearchableMultiSelect
+              key={`groupe-${nomDossierDBF || ""}`}
+              items={groupeData?.groupes}
+              selected={selectedGroupe}
+              onToggle={toggleGroupe}
+              loading={loadingGroupe}
+              placeholder="Rechercher et sélectionner un ou plusieurs groupes…"
+            />
+            <span className="etiq-hint">
+              {selectedGroupe.length > 0
+                ? `${selectedGroupe.length} groupe(s) sélectionné(s). Toutes les étiquettes des articles de ce(s) groupe(s) seront générées.`
+                : "Toutes les étiquettes des articles du/des groupe(s) sélectionné(s) seront générées."}
             </span>
           </div>
         )}

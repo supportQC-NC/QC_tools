@@ -28,6 +28,8 @@ class ArticleCacheService {
     const indexByGencod = new Map();
     // Index par GROUPE pour filtrage rapide
     const indexByGroupe = new Map();
+    // Index par GISM1 (gisement / emplacement principal) pour filtrage rapide
+    const indexByGism1 = new Map();
     // Index par FOURN pour filtrage rapide
     const indexByFourn = new Map();
     // Liste des articles avec stock > 0 (stock total S1+S2+S3+S4+S5)
@@ -60,6 +62,17 @@ class ArticleCacheService {
         }
       }
 
+      // Index GISM1
+      if (record.GISM1) {
+        const gism1 = record.GISM1.trim();
+        if (gism1) {
+          if (!indexByGism1.has(gism1)) {
+            indexByGism1.set(gism1, []);
+          }
+          indexByGism1.get(gism1).push(idx);
+        }
+      }
+
       // Index FOURN
       if (record.FOURN !== undefined && record.FOURN !== null) {
         const fourn = record.FOURN;
@@ -86,6 +99,7 @@ class ArticleCacheService {
       indexByNart,
       indexByGencod,
       indexByGroupe,
+      indexByGism1,
       indexByFourn,
       articlesEnStock,
       searchIndex,
@@ -629,6 +643,70 @@ class ArticleCacheService {
     }
 
     return groupes.sort((a, b) => a.code.localeCompare(b.code));
+  }
+
+  /**
+   * Obtenir les GISM1 (gisement principal) avec comptage
+   */
+  async getGism1(entreprise) {
+    const cache = await this.getArticles(entreprise);
+    const gisements = [];
+
+    for (const [code, indices] of cache.indexByGism1) {
+      gisements.push({ code, count: indices.length });
+    }
+
+    return gisements.sort((a, b) => a.code.localeCompare(b.code));
+  }
+
+  /**
+   * Récupérer les articles d'un ou plusieurs GISM1.
+   * Ordre : selon l'ordre des GISM1 fournis, puis ordre du fichier (par NART).
+   * Les doublons (article présent via plusieurs GISM1) sont dédupliqués.
+   */
+  async findArticlesByGism1(entreprise, gism1List) {
+    const cache = await this.getArticles(entreprise);
+    const codes = (Array.isArray(gism1List) ? gism1List : [gism1List])
+      .map((c) => (c == null ? "" : String(c)).trim())
+      .filter(Boolean);
+
+    const articles = [];
+    const seen = new Set();
+    for (const code of codes) {
+      const indices = cache.indexByGism1.get(code);
+      if (!indices) continue;
+      for (const idx of indices) {
+        if (seen.has(idx)) continue;
+        seen.add(idx);
+        articles.push(cache.records[idx]);
+      }
+    }
+    return articles;
+  }
+
+  /**
+   * Récupérer les articles d'un ou plusieurs GROUPE (famille).
+   * Ordre : selon l'ordre des groupes fournis, puis ordre du fichier (par NART).
+   * Les doublons sont dédupliqués.
+   */
+  async findArticlesByGroupe(entreprise, groupeList) {
+    const cache = await this.getArticles(entreprise);
+    const codes = (Array.isArray(groupeList) ? groupeList : [groupeList])
+      .map((c) => (c == null ? "" : String(c)).trim())
+      .filter(Boolean);
+
+    const articles = [];
+    const seen = new Set();
+    for (const code of codes) {
+      const indices = cache.indexByGroupe.get(code);
+      if (!indices) continue;
+      for (const idx of indices) {
+        if (seen.has(idx)) continue;
+        seen.add(idx);
+        articles.push(cache.records[idx]);
+      }
+    }
+    return articles;
   }
 
   /**

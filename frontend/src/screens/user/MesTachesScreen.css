@@ -36,7 +36,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: #fff;
+  background: #2c2a2a;
   border: 1px solid #e2e8f0;
   border-left: 4px solid #64748b;
   border-radius: 10px;
@@ -67,7 +67,7 @@
 .tache-item-desc {
   margin: 4px 0 0;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #c8d3e2;
 }
 
 .tache-item-meta {

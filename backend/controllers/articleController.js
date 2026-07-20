@@ -489,6 +489,50 @@ const getGroupes = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Obtenir la liste des GISM1 (gisements) d'articles (avec cache)
+ * @route   GET /api/articles/:nomDossierDBF/gism1
+ * @access  Private
+ */
+const getGism1 = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const startTime = Date.now();
+
+  const dbfPath = path.join(
+    entreprise.cheminBase,
+    entreprise.nomDossierDBF,
+    "article.dbf",
+  );
+
+  if (!fs.existsSync(dbfPath)) {
+    res.status(404);
+    throw new Error(
+      `Fichier articles non trouvé pour l'entreprise ${entreprise.nomComplet}`,
+    );
+  }
+
+  try {
+    const gisements = await articleCacheService.getGism1(entreprise);
+    const queryTime = Date.now() - startTime;
+
+    res.json({
+      entreprise: {
+        _id: entreprise._id,
+        nomDossierDBF: entreprise.nomDossierDBF,
+        trigramme: entreprise.trigramme,
+        nomComplet: entreprise.nomComplet,
+      },
+      totalGism1: gisements.length,
+      _queryTime: `${queryTime}ms`,
+      gism1: gisements,
+    });
+  } catch (error) {
+    console.error("Erreur lecture GISM1:", error);
+    res.status(500);
+    throw new Error(`Erreur lors de la lecture des GISM1: ${error.message}`);
+  }
+});
+
+/**
  * @desc    Obtenir la liste des taux TGC distincts
  * @route   GET /api/articles/:nomDossierDBF/tgc-rates
  * @access  Private
@@ -624,6 +668,7 @@ export {
   getArticlesStructure,
   searchArticles,
   getGroupes,
+  getGism1,
   getTgcRates,
   getAdjacentArticles,
   invalidateCache,

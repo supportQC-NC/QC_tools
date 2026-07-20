@@ -18,9 +18,9 @@ const toNum = (v) => {
 };
 
 /**
- * @desc    Génère un PDF d'étiquettes (proforma ou liste de NART manuelle).
+ * @desc    Génère un PDF d'étiquettes (proforma, commande, NART manuel ou GISM1).
  * @route   POST /api/etiquettes/:nomDossierDBF/generer
- * @body    { type, mode: "proforma"|"nart", numfact?, narts? }
+ * @body    { type, mode: "proforma"|"commande"|"nart"|"gism1"|"groupe", numfact?, numcde?, narts?, gism1?, groupe? }
  * @access  Private (module etiquettes, read) — entreprise via :nomDossierDBF
  */
 const genererEtiquettes = asyncHandler(async (req, res) => {
@@ -77,9 +77,57 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error("Aucun NART fourni");
     }
+  } else if (mode === "gism1") {
+    const { gism1 } = req.body;
+    let codes = [];
+    if (Array.isArray(gism1)) {
+      codes = gism1.map((c) => safeTrim(c)).filter(Boolean);
+    } else if (typeof gism1 === "string") {
+      codes = gism1.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+    }
+    if (codes.length === 0) {
+      res.status(400);
+      throw new Error("Aucun GISM1 fourni");
+    }
+    const arts = await articleCacheService.findArticlesByGism1(
+      entreprise,
+      codes,
+    );
+    nartList = arts.map((a) => safeTrim(a.NART)).filter(Boolean);
+    if (nartList.length === 0) {
+      res.status(404);
+      throw new Error(
+        `Aucun article pour le(s) gisement(s) : ${codes.join(", ")}`,
+      );
+    }
+  } else if (mode === "groupe") {
+    const { groupe } = req.body;
+    let codes = [];
+    if (Array.isArray(groupe)) {
+      codes = groupe.map((c) => safeTrim(c)).filter(Boolean);
+    } else if (typeof groupe === "string") {
+      codes = groupe.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+    }
+    if (codes.length === 0) {
+      res.status(400);
+      throw new Error("Aucun groupe fourni");
+    }
+    const arts = await articleCacheService.findArticlesByGroupe(
+      entreprise,
+      codes,
+    );
+    nartList = arts.map((a) => safeTrim(a.NART)).filter(Boolean);
+    if (nartList.length === 0) {
+      res.status(404);
+      throw new Error(
+        `Aucun article pour le(s) groupe(s) : ${codes.join(", ")}`,
+      );
+    }
   } else {
     res.status(400);
-    throw new Error('Mode invalide (attendu "proforma", "commande" ou "nart")');
+    throw new Error(
+      'Mode invalide (attendu "proforma", "commande", "nart", "gism1" ou "groupe")',
+    );
   }
 
   // 2) Récupération des enregistrements article (dans l'ordre, on garde ceux trouvés)

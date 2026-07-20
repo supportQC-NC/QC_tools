@@ -7,6 +7,7 @@ import {
   getArticlesStructure,
   searchArticles,
   getGroupes,
+  getGism1,
   getTgcRates,
   invalidateCache,
   getCacheStats,
@@ -57,6 +58,15 @@ router.get(
   checkEntrepriseAccess,
   checkModuleAccess("stock", "read"),
   getGroupes,
+);
+
+// Liste des GISM1 (gisements)
+router.get(
+  "/:nomDossierDBF/gism1",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("stock", "read"),
+  getGism1,
 );
 
 // Liste des taux TGC distincts
