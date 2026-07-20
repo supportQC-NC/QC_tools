@@ -290,30 +290,26 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   rl.setFont("Helvetica", 6);
   rl.drawString(x + 2, y + labelH - 8, safe(record.NART));
 
-  // Sans prix : on grossit la désignation pour occuper l'espace libéré par le prix.
-  const designFont = showPrice ? 7 : 10;
-  const designWrap = showPrice ? 28 : 20;
-  const designLead = showPrice ? 8 : 12;
-  const designMaxLines = showPrice ? 2 : 3;
-  rl.setFont("Helvetica-Bold", designFont);
+  rl.setFont("Helvetica-Bold", 7);
   const product = safe(record.DESIGN || "Désignation non spécifié").slice(0, 80);
-  let wrapped = wrapText(product, designWrap);
-  if (wrapped.length > designMaxLines) {
-    wrapped = wrapped.slice(0, designMaxLines);
-    wrapped[designMaxLines - 1] = wrapped[designMaxLines - 1] + "...";
-  }
+  let wrapped = wrapText(product, 28);
+  if (wrapped.length > 2) { wrapped = wrapped.slice(0, 2); wrapped[1] = wrapped[1] + "..."; }
   let yp = y + labelH - 23;
-  for (const line of wrapped) { rl.drawString(x + 5, yp, line); yp -= designLead; }
+  for (const line of wrapped) { rl.drawString(x + 5, yp, line); yp -= 8; }
+
+  // Bloc central : prix (Standard) ou NART (Standard sans prix), même emplacement.
+  rl.setFillColorRGB(0.95, 0.95, 0.95);
+  const pbh = 15;
+  rl.rect(x + 5, yp - pbh, labelW - 10, pbh, { fill: true, stroke: false });
+  rl.setFillColorRGB(0, 0, 0);
+  rl.setFont("Helvetica-Bold", 12);
+  const centralText = showPrice
+    ? `${fmtInt(record.PVTETTC || 0)} XPF`
+    : safe(record.NART);
+  rl.drawCentredString(x + labelW / 2, yp - pbh + 3, centralText);
+  yp -= pbh;
 
   if (showPrice) {
-    rl.setFillColorRGB(0.95, 0.95, 0.95);
-    const pbh = 15;
-    rl.rect(x + 5, yp - pbh, labelW - 10, pbh, { fill: true, stroke: false });
-    rl.setFillColorRGB(0, 0, 0);
-    rl.setFont("Helvetica-Bold", 12);
-    rl.drawCentredString(x + labelW / 2, yp - pbh + 3, `${fmtInt(record.PVTETTC || 0)} XPF`);
-    yp -= pbh;
-
     let klText = "";
     if (record.VOL && Number(record.VOL) !== 0) {
       const ppu = (Number(record.PVTETTC) || 0) / Number(record.VOL);

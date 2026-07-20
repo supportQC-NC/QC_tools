@@ -51,21 +51,21 @@ router.get(
   searchArticles,
 );
 
-// Liste des groupes/familles
+// Liste des groupes/familles (partagée avec le générateur d'étiquettes)
 router.get(
   "/:nomDossierDBF/groupes",
   protect,
   checkEntrepriseAccess,
-  checkModuleAccess("stock", "read"),
+  checkModuleAccess(["stock", "etiquettes"], "read"),
   getGroupes,
 );
 
-// Liste des GISM1 (gisements)
+// Liste des GISM1 (gisements) (partagée avec le générateur d'étiquettes)
 router.get(
   "/:nomDossierDBF/gism1",
   protect,
   checkEntrepriseAccess,
-  checkModuleAccess("stock", "read"),
+  checkModuleAccess(["stock", "etiquettes"], "read"),
   getGism1,
 );
 

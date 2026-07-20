@@ -63,8 +63,13 @@ const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
  * Vérifie l'accès en lecture/écriture/suppression à un MODULE.
  * Ici l'admin conserve son bypass : un administrateur a accès à tous les modules
  * (le périmètre par société est géré séparément par checkEntrepriseAccess).
+ *
+ * `moduleName` accepte une chaîne OU un tableau de modules : dans ce dernier cas
+ * l'accès est accordé si l'utilisateur possède l'action demandée sur AU MOINS UN
+ * des modules (ex. une donnée partagée entre "stock" et "etiquettes").
  */
 const checkModuleAccess = (moduleName, action = "read") => {
+  const moduleNames = Array.isArray(moduleName) ? moduleName : [moduleName];
   return asyncHandler(async (req, res, next) => {
     // Admin : accès à tous les modules
     if (req.user.role === "admin") {
@@ -83,13 +88,15 @@ const checkModuleAccess = (moduleName, action = "read") => {
       return next();
     }
 
-    // Module spécifique
-    const modulePermission = permission.modules?.[moduleName];
+    // Accès accordé si AU MOINS UN des modules autorise l'action
+    const hasAccess = moduleNames.some(
+      (name) => permission.modules?.[name]?.[action],
+    );
 
-    if (!modulePermission || !modulePermission[action]) {
+    if (!hasAccess) {
       res.status(403);
       throw new Error(
-        `Vous n'avez pas la permission de ${action === "read" ? "lire" : action === "write" ? "modifier" : "supprimer"} les ${moduleName}`,
+        `Vous n'avez pas la permission de ${action === "read" ? "lire" : action === "write" ? "modifier" : "supprimer"} les ${moduleNames.join(" / ")}`,
       );
     }
 
