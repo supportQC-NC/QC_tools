@@ -9,12 +9,11 @@ import {
   useGetReapproLocalQuery,
   useRefreshReapproLocalMutation,
 } from "../../slices/reapproLocalApiSlice";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
 import "./AdminReapproLocalScreen.css";
-
-const STORAGE_KEY = "reappro_local_entreprise";
 
 const r0 = (n) => Math.round(Number(n) || 0);
 const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
@@ -26,28 +25,14 @@ const qtyFmt = (p) =>
 const num = { type: "rightAligned" };
 
 const AdminReapproLocalScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [tab, setTab] = useState("groupe"); // groupe | autres | corrections
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
   const { data, isLoading, isFetching, error, refetch } =
     useGetReapproLocalQuery(selectedEntreprise, { skip: !selectedEntreprise });
   const [refreshReapproLocal, { isLoading: refreshing }] =
     useRefreshReapproLocalMutation();
-
-  useEffect(() => {
-    if (!selectedEntreprise && entreprises && entreprises.length > 0) {
-      const active = entreprises.find((e) => e.isActive) || entreprises[0];
-      if (active) setSelectedEntreprise(active.nomDossierDBF);
-    }
-  }, [entreprises, selectedEntreprise]);
-
-  useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY, selectedEntreprise);
-  }, [selectedEntreprise]);
 
   // Progression
   const [progress, setProgress] = useState(null);
@@ -270,20 +255,6 @@ const AdminReapproLocalScreen = () => {
           <HiTruck /> Reappro Local
         </h1>
         <div className="rl-actions">
-          <select
-            className="rl-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme ? `${e.trigramme} - ` : ""}
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <button
             className="rl-btn"
             onClick={handleRefresh}

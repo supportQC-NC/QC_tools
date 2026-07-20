@@ -19,8 +19,10 @@ import {
 
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { useSelector } from "react-redux";
 
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetArticlesQuery,
   useInvalidateArticleCacheMutation,
@@ -35,8 +37,8 @@ const AdminMeilleuresVentesScreen = () => {
   /* =======================
      STATES
   ======================= */
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
-  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [fournisseurFilter, setFournisseurFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -66,20 +68,13 @@ const AdminMeilleuresVentesScreen = () => {
   /* =======================
      INIT ENTREPRISE
   ======================= */
-  useEffect(() => {
-    if (entreprises?.length && !selectedEntreprise) {
-      setSelectedEntreprise(entreprises[0].nomDossierDBF);
-      setSelectedEntrepriseData(entreprises[0]);
-    }
-  }, [entreprises, selectedEntreprise]);
+  const selectedEntrepriseData =
+    entreprises?.find((e) => e.nomDossierDBF === selectedEntreprise) || null;
 
-  const handleEntrepriseChange = (e) => {
-    const value = e.target.value;
-    const ent = entreprises.find((e) => e.nomDossierDBF === value);
-    setSelectedEntreprise(value);
-    setSelectedEntrepriseData(ent);
+  // Réinitialise le filtre fournisseur quand on change de société
+  useEffect(() => {
     setFournisseurFilter("");
-  };
+  }, [selectedEntreprise]);
 
   const handleInvalidateCache = async () => {
     if (!selectedEntreprise) return;
@@ -204,16 +199,6 @@ const AdminMeilleuresVentesScreen = () => {
           <h1>
             <HiChartBar /> Meilleures ventes
           </h1>
-        </div>
-
-        <div className="header-center">
-          <select value={selectedEntreprise} onChange={handleEntrepriseChange}>
-            {entreprises.map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
         </div>
 
         <div className="header-actions">

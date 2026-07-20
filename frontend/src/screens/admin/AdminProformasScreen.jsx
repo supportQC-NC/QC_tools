@@ -1,18 +1,12 @@
 // src/screens/admin/AdminProformasScreen.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HiSearch,
   HiRefresh,
   HiFilter,
   HiChevronLeft,
   HiChevronRight,
-  HiOfficeBuilding,
   HiEye,
   HiX,
   HiChevronDown,
@@ -29,15 +23,13 @@ import {
   HiUser,
   HiUserGroup,
 } from "react-icons/hi";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
 import {
   useGetProformasQuery,
   useGetRepresentantsQuery,
 } from "../../slices/proformaApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import "./AdminProformasScreen.css";
-
-// Clé pour le localStorage
-const STORAGE_KEY_ENTREPRISE = "admin_proformas_selected_entreprise";
 
 // Debounce hook
 const useDebounce = (value, delay) => {
@@ -58,19 +50,10 @@ const ETAT_CONFIG = {
 
 const AdminProformasScreen = () => {
   const navigate = useNavigate();
-  const { nomDossierDBF: urlNomDossier } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const getInitialEntreprise = () => {
-    if (urlNomDossier) return urlNomDossier;
-    const saved = localStorage.getItem(STORAGE_KEY_ENTREPRISE);
-    return saved || "";
-  };
-
-  // État principal
-  const [selectedEntreprise, setSelectedEntreprise] =
-    useState(getInitialEntreprise);
-  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
   const [limit] = useState(50);
 
@@ -96,9 +79,6 @@ const AdminProformasScreen = () => {
   });
 
   // Queries
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
-
   const {
     data: proformasData,
     isLoading: loadingProformas,
@@ -127,17 +107,18 @@ const AdminProformasScreen = () => {
   );
 
   // Effets
+  // Réinitialise filtres et pagination quand la société globale change.
   useEffect(() => {
-    if (entreprises && selectedEntreprise) {
-      const entreprise = entreprises.find(
-        (e) => e.nomDossierDBF === selectedEntreprise,
-      );
-      if (entreprise) {
-        setSelectedEntrepriseData(entreprise);
-        localStorage.setItem(STORAGE_KEY_ENTREPRISE, selectedEntreprise);
-      }
-    }
-  }, [entreprises, selectedEntreprise]);
+    setFilters({
+      search: "",
+      tiers: "",
+      repres: "",
+      etat: "TOUT",
+      dateDebut: "",
+      dateFin: "",
+    });
+    setPage(1);
+  }, [selectedEntreprise]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -155,23 +136,6 @@ const AdminProformasScreen = () => {
   const proformas = proformasData?.proformas || [];
 
   // Handlers
-  const handleEntrepriseChange = (e) => {
-    const nomDossier = e.target.value;
-    setSelectedEntreprise(nomDossier);
-    if (nomDossier) {
-      const entreprise = entreprises?.find(
-        (ent) => ent.nomDossierDBF === nomDossier,
-      );
-      setSelectedEntrepriseData(entreprise);
-      localStorage.setItem(STORAGE_KEY_ENTREPRISE, nomDossier);
-    } else {
-      setSelectedEntrepriseData(null);
-      localStorage.removeItem(STORAGE_KEY_ENTREPRISE);
-    }
-    setPage(1);
-    resetFilters();
-  };
-
   const resetFilters = () => {
     setFilters({
       search: "",
@@ -253,17 +217,6 @@ const AdminProformasScreen = () => {
     );
   };
 
-  if (loadingEntreprises) {
-    return (
-      <div className="admin-proformas-page">
-        <div className="admin-loading-state">
-          <div className="loading-spinner"></div>
-          <p>Chargement des entreprises...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="admin-proformas-page">
       {/* Header */}
@@ -279,24 +232,6 @@ const AdminProformasScreen = () => {
             </p>
           </div>
         </div>
-
-        <div className="header-actions">
-          <div className="entreprise-selector">
-            <HiOfficeBuilding className="selector-icon" />
-            <select
-              value={selectedEntreprise}
-              onChange={handleEntrepriseChange}
-            >
-              <option value="">Sélectionner une entreprise</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e.nomDossierDBF}>
-                  {e.trigramme} - {e.nomComplet}
-                </option>
-              ))}
-            </select>
-            <HiChevronDown className="selector-arrow" />
-          </div>
-        </div>
       </header>
 
       {!selectedEntreprise ? (
@@ -305,7 +240,10 @@ const AdminProformasScreen = () => {
             <HiDocumentText />
           </div>
           <h2>Sélectionnez une entreprise</h2>
-          <p>Choisissez une entreprise pour consulter ses proformas</p>
+          <p>
+            Choisissez une entreprise dans l'en-tête pour consulter ses
+            proformas
+          </p>
         </div>
       ) : (
         <div className="admin-proformas-content">

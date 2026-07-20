@@ -22,12 +22,12 @@ import {
   HiCreditCard,
   HiCollection,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetJournalCaisseQuery } from "../../slices/journalCaisseApiSlice";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminJournalCaisseScreen.css";
-
-const STORAGE_KEY = "journal_caisse_entreprise";
 
 const ymd = (d) => {
   const p = (n) => String(n).padStart(2, "0");
@@ -103,24 +103,17 @@ const FacturesTable = ({ factures, avecMoyen = false }) => (
 );
 
 const AdminJournalCaisseScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [date, setDate] = useState(today);
   const [filtreDetail, setFiltreDetail] = useState("");
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
+  const { data: entreprises } = useGetEntreprisesQuery();
 
   const { data, isLoading, isFetching, error } = useGetJournalCaisseQuery(
     { nomDossierDBF: selectedEntreprise, date },
     { skip: !selectedEntreprise || !date },
   );
-
-  const onEntreprise = (val) => {
-    setSelectedEntreprise(val);
-    localStorage.setItem(STORAGE_KEY, val);
-  };
 
   const totaux = data?.totaux;
   const groupes = useMemo(() => data?.groupes || [], [data]);
@@ -336,21 +329,6 @@ const AdminJournalCaisseScreen = () => {
           <HiCash /> Journal de Caisse
         </h1>
         <div className="jc-actions">
-          <select
-            className="jc-select"
-            value={selectedEntreprise}
-            onChange={(e) => onEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme ? `${e.trigramme} - ` : ""}
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
-
           <div className="jc-day-picker">
             <button
               type="button"
@@ -397,7 +375,9 @@ const AdminJournalCaisseScreen = () => {
       </div>
 
       {!selectedEntreprise ? (
-        <div className="jc-empty">Choisissez une entreprise et un jour.</div>
+        <div className="jc-empty">
+          Sélectionnez une société dans l'en-tête et choisissez un jour.
+        </div>
       ) : loading ? (
         <div className="jc-loading">
           <Loader />

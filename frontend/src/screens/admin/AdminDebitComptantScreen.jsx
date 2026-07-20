@@ -9,12 +9,11 @@ import {
   useGetDebitComptantQuery,
   useRefreshDebitComptantMutation,
 } from "../../slices/debitComptantApiSlice";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
 import "./AdminDebitComptantScreen.css";
-
-const STORAGE_KEY = "debit_comptant_entreprise";
 
 const yesterdayYmd = () => {
   const d = new Date();
@@ -35,15 +34,12 @@ const pctFmt = (p) =>
 const num = { type: "rightAligned" };
 
 const AdminDebitComptantScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [dateFin, setDateFin] = useState(yesterdayYmd);
   const [nbJours, setNbJours] = useState(7);
   const [tab, setTab] = useState("vendeur"); // vendeur | client | detail | groupe
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
   const { data, isLoading, isFetching, error } = useGetDebitComptantQuery(
     { nomDossierDBF: selectedEntreprise, dateFin, nbJours },
     { skip: !selectedEntreprise },
@@ -88,18 +84,6 @@ const AdminDebitComptantScreen = () => {
       }
     };
   }, [selectedEntreprise, isLoading, isFetching]);
-
-  useEffect(() => {
-    if (!selectedEntreprise && entreprises && entreprises.length > 0) {
-      const qc = entreprises.find((e) => e.nomDossierDBF === "qc");
-      const active = qc || entreprises.find((e) => e.isActive) || entreprises[0];
-      if (active) setSelectedEntreprise(active.nomDossierDBF);
-    }
-  }, [entreprises, selectedEntreprise]);
-
-  useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY, selectedEntreprise);
-  }, [selectedEntreprise]);
 
   const handleRefresh = async () => {
     if (!selectedEntreprise) return;
@@ -265,20 +249,6 @@ const AdminDebitComptantScreen = () => {
           <HiCash /> Débit / Comptant
         </h1>
         <div className="dc-actions">
-          <select
-            className="dc-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme ? `${e.trigramme} - ` : ""}
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <label className="dc-field">
             Fin
             <input

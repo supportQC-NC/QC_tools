@@ -2,16 +2,15 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Link,
-  useParams,
   useSearchParams,
 } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   HiSearch,
   HiRefresh,
   HiFilter,
   HiChevronLeft,
   HiChevronRight,
-  HiOfficeBuilding,
   HiEye,
   HiX,
   HiChevronDown,
@@ -29,14 +28,12 @@ import {
   HiTag,
   HiCollection,
 } from "react-icons/hi";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetClientsQuery,
   useGetClientFilterValuesQuery,
 } from "../../slices/clientApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import "./AdminClientsScreen.css";
-
-const STORAGE_KEY_ENTREPRISE = "admin_clients_selected_entreprise";
 
 const DEFAULT_FILTERS = {
   search: "",
@@ -88,16 +85,10 @@ const FilterSelect = ({ label, icon, filterKey, value, options, onChange, displa
 };
 
 const AdminClientsScreen = () => {
-  const { nomDossierDBF: urlNomDossier } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const getInitialEntreprise = () => {
-    if (urlNomDossier) return urlNomDossier;
-    const saved = localStorage.getItem(STORAGE_KEY_ENTREPRISE);
-    return saved || "";
-  };
-
-  const [selectedEntreprise, setSelectedEntreprise] = useState(getInitialEntreprise);
+  // Société active : lue depuis la sélection GLOBALE (en-tête).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
   const [limit] = useState(50);
 
@@ -119,8 +110,6 @@ const AdminClientsScreen = () => {
     comptabilite: false,
     divers: false,
   });
-
-  const { data: entreprises, isLoading: loadingEntreprises } = useGetEntreprisesQuery();
 
   // UN SEUL appel pour toutes les valeurs de filtres
   const {
@@ -178,8 +167,10 @@ const AdminClientsScreen = () => {
     { skip: !selectedEntreprise },
   );
 
+  // Réinitialise page + filtres quand la société globale change.
   useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY_ENTREPRISE, selectedEntreprise);
+    setFilters({ ...DEFAULT_FILTERS });
+    setPage(1);
   }, [selectedEntreprise]);
 
   useEffect(() => {
@@ -194,15 +185,6 @@ const AdminClientsScreen = () => {
   }, [filters, page, setSearchParams]);
 
   const clients = clientsData?.clients || [];
-
-  const handleEntrepriseChange = (e) => {
-    const v = e.target.value;
-    setSelectedEntreprise(v);
-    if (v) localStorage.setItem(STORAGE_KEY_ENTREPRISE, v);
-    else localStorage.removeItem(STORAGE_KEY_ENTREPRISE);
-    setPage(1);
-    resetFilters();
-  };
 
   const resetFilters = () => {
     setFilters({ ...DEFAULT_FILTERS });
@@ -234,14 +216,6 @@ const AdminClientsScreen = () => {
     return String(value);
   };
 
-  if (loadingEntreprises) {
-    return (
-      <div className="admin-clients-page">
-        <div className="admin-loading-state"><div className="loading-spinner"></div><p>Chargement...</p></div>
-      </div>
-    );
-  }
-
   return (
     <div className="admin-clients-page">
       <header className="admin-clients-header">
@@ -252,25 +226,13 @@ const AdminClientsScreen = () => {
             <p className="header-subtitle">Consultation des fiches clients</p>
           </div>
         </div>
-        <div className="header-actions">
-          <div className="entreprise-selector">
-            <HiOfficeBuilding className="selector-icon" />
-            <select value={selectedEntreprise} onChange={handleEntrepriseChange}>
-              <option value="">Sélectionner une entreprise</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e.nomDossierDBF}>{e.trigramme} - {e.nomComplet}</option>
-              ))}
-            </select>
-            <HiChevronDown className="selector-arrow" />
-          </div>
-        </div>
       </header>
 
       {!selectedEntreprise ? (
         <div className="empty-state">
           <div className="empty-icon"><HiUser /></div>
           <h2>Sélectionnez une entreprise</h2>
-          <p>Choisissez une entreprise pour consulter ses clients</p>
+          <p>Choisissez une entreprise dans l'en-tête pour consulter ses clients</p>
         </div>
       ) : (
         <div className="admin-clients-content">

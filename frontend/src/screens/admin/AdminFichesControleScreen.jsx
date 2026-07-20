@@ -12,6 +12,7 @@ import {
   HiPlay,
   HiStop,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import {
   useGetFichesQuery,
   useScanFichesMutation,
@@ -22,16 +23,15 @@ import {
   useStopWatchMutation,
   getFichePdfUrl,
 } from "../../slices/ficheControleApiSlice";
-import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./AdminFichesControleScreen.css";
 
 const POLL = 5000;
 
 const AdminFichesControleScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [scanReport, setScanReport] = useState(null);
-
-  const { data: entreprises } = useGetMyEntreprisesQuery();
 
   const {
     data,
@@ -115,18 +115,6 @@ const AdminFichesControleScreen = () => {
           <HiDocumentReport /> Fiches de contrôle
         </h1>
         <div className="admin-fiches-actions">
-          <select
-            className="filter-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-          >
-            <option value="">Sélectionner une entreprise…</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
           <button
             className="btn-icon"
             onClick={refetch}
@@ -141,7 +129,10 @@ const AdminFichesControleScreen = () => {
       {!selectedEntreprise ? (
         <div className="admin-fiches-placeholder">
           <HiDocumentReport />
-          <p>Sélectionnez une entreprise pour voir les fiches de contrôle.</p>
+          <p>
+            Sélectionnez une société dans l'en-tête pour voir les fiches de
+            contrôle.
+          </p>
         </div>
       ) : isLoading ? (
         <div className="admin-loading">Chargement…</div>

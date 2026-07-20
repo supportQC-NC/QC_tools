@@ -6,6 +6,7 @@ import { useLogoutMutation } from "../../../slices/userApiSlice";
 import { logout } from "../../../slices/authSlice";
 import { HiLogout, HiMenu, HiMenuAlt2 } from "react-icons/hi";
 import { useSidebar } from "../../../contexte/SidebarContext";
+import EntrepriseSelector from "../EntrepriseSelector/EntrepriseSelector";
 import "./Header.css";
 
 const Header = () => {
@@ -70,6 +71,7 @@ const Header = () => {
       </div>
 
       <div className="header-right">
+        <EntrepriseSelector />
         <Link to="/profile" className="header-profile">
           <span className="header-avatar">
             {userInfo?.prenom?.charAt(0)}

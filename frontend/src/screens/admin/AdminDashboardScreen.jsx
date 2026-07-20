@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   HiUsers,
   HiOfficeBuilding,
@@ -35,6 +36,7 @@ import {
   useGetGlobalDashboardQuery,
   useGetEntrepriseDashboardQuery,
 } from "../../slices/dashboardApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminDashboardScreen.css";
 
@@ -104,12 +106,7 @@ const AdminDashboard = () => {
     () => (entreprises || []).filter((e) => e.isActive !== false),
     [entreprises],
   );
-  const [dossier, setDossier] = useState("");
-  useEffect(() => {
-    if (!dossier && entreprisesActives.length > 0) {
-      setDossier(entreprisesActives[0].nomDossierDBF);
-    }
-  }, [entreprisesActives, dossier]);
+  const dossier = useSelector(selectGlobalDossier) || "";
 
   const { data: entrepriseData, isFetching: loadingEntreprise } =
     useGetEntrepriseDashboardQuery(dossier, { skip: !dossier });
@@ -352,17 +349,6 @@ const AdminDashboard = () => {
         <h2>
           <HiOfficeBuilding /> Détail par entreprise
         </h2>
-        <select
-          className="dashboard-ent-select"
-          value={dossier}
-          onChange={(e) => setDossier(e.target.value)}
-        >
-          {entreprisesActives.map((e) => (
-            <option key={e._id} value={e.nomDossierDBF}>
-              {e.nomComplet || e.nom || e.nomDossierDBF}
-            </option>
-          ))}
-        </select>
       </div>
 
       {loadingEntreprise ? (
@@ -373,7 +359,7 @@ const AdminDashboard = () => {
       ) : !entrepriseData ? (
         <div className="chart-empty">
           <HiOfficeBuilding />
-          <p>Sélectionnez une entreprise</p>
+          <p>Sélectionnez une entreprise dans l'en-tête</p>
         </div>
       ) : (
         <>

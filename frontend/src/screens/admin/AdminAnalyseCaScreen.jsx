@@ -1,6 +1,8 @@
 // src/screens/admin/AdminAnalyseCaScreen.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetAnalyseCaApercuQuery,
   useGenererAnalyseCaMutation,
@@ -21,8 +23,6 @@ import {
   Cell,
 } from "recharts";
 import "./AdminAnalyseCaScreen.css";
-
-const STORAGE_KEY = "analyse_ca_entreprise";
 
 // Palette (cohérente avec les onglets Excel du module)
 const CHART_COLORS = [
@@ -80,13 +80,11 @@ const XpfTooltip = ({ active, payload, label }) => {
 };
 
 const AdminAnalyseCaScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [moisCoupure, setMoisCoupure] = useState(moisPrecedent);
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
+  const { data: entreprises } = useGetEntreprisesQuery();
 
   const {
     data: apercu,
@@ -102,19 +100,6 @@ const AdminAnalyseCaScreen = () => {
     useGenererAnalyseCaMutation();
   const [genError, setGenError] = useState(null);
   const [lastFile, setLastFile] = useState(null);
-
-  // Sélection par défaut : "qc" sinon 1re entreprise active.
-  useEffect(() => {
-    if (!selectedEntreprise && entreprises && entreprises.length > 0) {
-      const qc = entreprises.find((e) => e.nomDossierDBF === "qc");
-      const active = qc || entreprises.find((e) => e.isActive) || entreprises[0];
-      if (active) setSelectedEntreprise(active.nomDossierDBF);
-    }
-  }, [entreprises, selectedEntreprise]);
-
-  useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY, selectedEntreprise);
-  }, [selectedEntreprise]);
 
   const kpis = apercu?.kpis;
   const meta = apercu?.meta;
@@ -167,23 +152,6 @@ const AdminAnalyseCaScreen = () => {
       </header>
 
       <section className="aca-toolbar">
-        <label className="aca-field">
-          Entreprise
-          <select
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme ? `${e.trigramme} - ` : ""}
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label className="aca-field">
           Mois de coupure
           <input

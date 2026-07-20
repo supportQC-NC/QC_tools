@@ -1,17 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HiSearch,
   HiRefresh,
   HiFilter,
   HiChevronLeft,
   HiChevronRight,
-  HiOfficeBuilding,
   HiEye,
   HiX,
   HiChevronDown,
@@ -33,7 +27,9 @@ import {
   HiExclamation,
   HiArchive,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetCommandesQuery,
   useGetFournisseursCommandesQuery,
@@ -41,9 +37,6 @@ import {
   useGetEtatsCommandesQuery,
 } from "../../slices/commandeApiSlice";
 import "./AdminCommandesScreen.css";
-
-// Clé pour le localStorage
-const STORAGE_KEY_ENTREPRISE = "admin_commandes_selected_entreprise";
 
 // Debounce hook
 const useDebounce = (value, delay) => {
@@ -85,18 +78,10 @@ const DEFAULT_ETAT_LABELS = {
 
 const AdminCommandesScreen = () => {
   const navigate = useNavigate();
-  const { nomDossierDBF: urlNomDossier } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const getInitialEntreprise = () => {
-    if (urlNomDossier) return urlNomDossier;
-    const saved = localStorage.getItem(STORAGE_KEY_ENTREPRISE);
-    return saved || "";
-  };
-
-  // État principal
-  const [selectedEntreprise, setSelectedEntreprise] =
-    useState(getInitialEntreprise);
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
   const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
   const [limit] = useState(50);
@@ -193,7 +178,6 @@ const AdminCommandesScreen = () => {
       );
       if (entreprise) {
         setSelectedEntrepriseData(entreprise);
-        localStorage.setItem(STORAGE_KEY_ENTREPRISE, selectedEntreprise);
       }
     }
   }, [entreprises, selectedEntreprise]);
@@ -219,24 +203,20 @@ const AdminCommandesScreen = () => {
   // Les commandes viennent directement du serveur (déjà filtrées)
   const commandes = commandesData?.commandes || [];
 
-  // Handlers
-  const handleEntrepriseChange = (e) => {
-    const nomDossier = e.target.value;
-    setSelectedEntreprise(nomDossier);
-    if (nomDossier) {
-      const entreprise = entreprises?.find(
-        (ent) => ent.nomDossierDBF === nomDossier,
-      );
-      setSelectedEntrepriseData(entreprise);
-      localStorage.setItem(STORAGE_KEY_ENTREPRISE, nomDossier);
-    } else {
-      setSelectedEntrepriseData(null);
-      localStorage.removeItem(STORAGE_KEY_ENTREPRISE);
+  // Réinitialise page + filtres quand la société globale change
+  // (on ignore le tout premier rendu pour préserver la restauration depuis l'URL).
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-    setPage(1);
+    setSelectedEntrepriseData(null);
     resetFilters();
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntreprise]);
 
+  // Handlers
   const resetFilters = () => {
     setFilters({
       search: "",
@@ -360,24 +340,6 @@ const AdminCommandesScreen = () => {
             </p>
           </div>
         </div>
-
-        <div className="header-actions">
-          <div className="entreprise-selector">
-            <HiOfficeBuilding className="selector-icon" />
-            <select
-              value={selectedEntreprise}
-              onChange={handleEntrepriseChange}
-            >
-              <option value="">Sélectionner une entreprise</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e.nomDossierDBF}>
-                  {e.trigramme} - {e.nomComplet}
-                </option>
-              ))}
-            </select>
-            <HiChevronDown className="selector-arrow" />
-          </div>
-        </div>
       </header>
 
       {!selectedEntreprise ? (
@@ -386,7 +348,10 @@ const AdminCommandesScreen = () => {
             <HiClipboardList />
           </div>
           <h2>Sélectionnez une entreprise</h2>
-          <p>Choisissez une entreprise pour consulter ses commandes</p>
+          <p>
+            Choisissez une entreprise dans l'en-tête pour consulter ses
+            commandes
+          </p>
         </div>
       ) : (
         <div className="admin-commandes-content">

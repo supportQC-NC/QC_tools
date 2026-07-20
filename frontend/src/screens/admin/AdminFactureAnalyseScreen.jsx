@@ -1,5 +1,6 @@
 // src/screens/admin/AdminFactureAnalyseScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import * as XLSX from "xlsx";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
@@ -27,11 +28,9 @@ import {
   HiUsers,
 } from "react-icons/hi";
 import { useGetFactureAnalyseQuery } from "../../slices/factureAnalyseApiSlice";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminFactureAnalyseScreen.css";
-
-const STORAGE_KEY = "facture_analyse_entreprise";
 
 const ymd = (d) => {
   const p = (n) => String(n).padStart(2, "0");
@@ -56,26 +55,21 @@ const AXIS = "#9aa0b5";
 const TOOLTIP_STYLE = { background: "#12121a", border: "1px solid #2a2a3a" };
 
 const AdminFactureAnalyseScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [dateDebut, setDateDebut] = useState(startOfYear);
   const [dateFin, setDateFin] = useState(today);
   const [selectedVendeur, setSelectedVendeur] = useState("");
-
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
 
   const { data, isLoading, isFetching, error } = useGetFactureAnalyseQuery(
     { nomDossierDBF: selectedEntreprise, dateDebut, dateFin },
     { skip: !selectedEntreprise || !dateDebut || !dateFin },
   );
 
-  const onEntreprise = (val) => {
-    setSelectedEntreprise(val);
+  // Réinitialise le vendeur sélectionné quand on change d'entreprise
+  useEffect(() => {
     setSelectedVendeur("");
-    localStorage.setItem(STORAGE_KEY, val);
-  };
+  }, [selectedEntreprise]);
 
   const totaux = data?.totaux;
   const vendeurs = useMemo(() => data?.vendeurs || [], [data]);
@@ -207,20 +201,6 @@ const AdminFactureAnalyseScreen = () => {
           <HiDocumentText /> Analyse Factures
         </h1>
         <div className="fa-actions">
-          <select
-            className="fa-select"
-            value={selectedEntreprise}
-            onChange={(e) => onEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme ? `${e.trigramme} - ` : ""}
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <label className="fa-field">
             Du
             <input

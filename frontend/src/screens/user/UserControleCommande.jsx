@@ -20,7 +20,9 @@ import {
   HiCheckCircle,
   HiSwitchHorizontal,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetCommandeByNumcdeQuery,
 } from "../../slices/commandeApiSlice";
@@ -33,8 +35,15 @@ const UserControleCommande = () => {
   // ==========================================
   // ÉTATS
   // ==========================================
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
-  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
+  // Entreprise sélectionnée globalement (header)
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
+
+  // La société est choisie globalement (header) : on réinitialise le contrôle
+  // quand elle change (remplace l'ancien reset de handleEntrepriseChange).
+  useEffect(() => {
+    resetControle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntreprise]);
 
   // Commande
   const [numcdeInput, setNumcdeInput] = useState("");
@@ -73,6 +82,10 @@ const UserControleCommande = () => {
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetMyEntreprisesQuery();
 
+  // Données complètes de l'entreprise sélectionnée globalement
+  const selectedEntrepriseData =
+    entreprises?.find((e) => e._id === selectedEntreprise) || null;
+
   // Charger la commande quand numcdeLoaded est renseigné
   const {
     data: commandeData,
@@ -95,14 +108,6 @@ const UserControleCommande = () => {
   // ==========================================
   // EFFETS
   // ==========================================
-
-  // Auto-select si une seule entreprise
-  useEffect(() => {
-    if (entreprises?.length === 1) {
-      setSelectedEntreprise(entreprises[0]._id);
-      setSelectedEntrepriseData(entreprises[0]);
-    }
-  }, [entreprises]);
 
   // Mettre à jour le chemin serveur quand l'entreprise est chargée
   useEffect(() => {
@@ -194,15 +199,6 @@ const UserControleCommande = () => {
     if (value === null || value === undefined) return "";
     if (typeof value === "string") return value.trim();
     return String(value);
-  };
-
-  const handleEntrepriseChange = (e) => {
-    const entrepriseId = e.target.value;
-    setSelectedEntreprise(entrepriseId);
-    const ent = entreprises?.find((ent) => ent._id === entrepriseId);
-    setSelectedEntrepriseData(ent || null);
-    // Reset tout
-    resetControle();
   };
 
   const resetControle = () => {
@@ -481,21 +477,6 @@ const UserControleCommande = () => {
         <h1>
           <HiClipboardCheck /> Contrôle Commande
         </h1>
-        <div className="entreprise-selector">
-          <HiOfficeBuilding />
-          <select
-            value={selectedEntreprise}
-            onChange={handleEntrepriseChange}
-            disabled={!!commande}
-          >
-            <option value="">-- Choisir une entreprise --</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Message */}

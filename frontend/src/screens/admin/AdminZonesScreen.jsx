@@ -1,5 +1,5 @@
 // src/screens/admin/AdminZonesScreen.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   HiTemplate,
   HiUpload,
@@ -17,10 +17,12 @@ import {
   useDeleteAllZonesMutation,
 } from "../../slices/zoneApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./AdminZonesScreen.css";
 
 const AdminZonesScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [file, setFile] = useState(null);
   const [search, setSearch] = useState("");
   const [confirm, setConfirm] = useState(null); // "import" | "deleteAll" | null
@@ -63,15 +65,15 @@ const AdminZonesScreen = () => {
 
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
 
-  const handleEntrepriseChange = (e) => {
-    setSelectedEntreprise(e.target.value);
+  // Réinitialise l'état de la carte d'import quand la société globale change.
+  useEffect(() => {
     setImportResult(null);
     setErrorMsg("");
     setSearch("");
     setFile(null);
     const input = document.getElementById("zone-file-input");
     if (input) input.value = "";
-  };
+  }, [selectedEntreprise]);
 
   const handleFileChange = (e) => {
     const f = e.target.files?.[0] || null;
@@ -118,18 +120,6 @@ const AdminZonesScreen = () => {
           <HiTemplate /> Fiches inventaires (Zones)
         </h1>
         <div className="admin-zones-actions">
-          <select
-            className="filter-select"
-            value={selectedEntreprise}
-            onChange={handleEntrepriseChange}
-          >
-            <option value="">Sélectionner une entreprise…</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
           <button
             className="btn-icon"
             onClick={refetch}

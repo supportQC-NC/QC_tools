@@ -20,19 +20,28 @@ import {
   HiCheckCircle,
   HiClock,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetCommandesQuery,
   useGetCommandeByNumcdeQuery,
 } from "../../slices/commandeApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./UserPreparationCommande.css";
 
 const UserPreparationCommande = () => {
   // ==========================================
   // ÉTATS
   // ==========================================
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
-  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
+  // Entreprise sélectionnée globalement (Header) — _id Mongo.
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
+
+  // La société est choisie globalement (header) : on réinitialise la préparation
+  // quand elle change (remplace l'ancien reset de handleEntrepriseChange).
+  useEffect(() => {
+    resetPreparation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntreprise]);
 
   // Commande
   const [selectedNumcde, setSelectedNumcde] = useState("");
@@ -64,6 +73,13 @@ const UserPreparationCommande = () => {
   // ==========================================
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetMyEntreprisesQuery();
+
+  // Objet entreprise complet dérivé de la sélection globale (contient
+  // nomDossierDBF, cheminExportInventaire, etc. utilisés en aval).
+  const selectedEntrepriseData = useMemo(
+    () => entreprises?.find((e) => e._id === selectedEntreprise) || null,
+    [entreprises, selectedEntreprise],
+  );
 
   // Charger les commandes ETAT=1 (à préparer)
   const {
@@ -104,14 +120,6 @@ const UserPreparationCommande = () => {
   // ==========================================
   // EFFETS
   // ==========================================
-
-  // Auto-select si une seule entreprise
-  useEffect(() => {
-    if (entreprises?.length === 1) {
-      setSelectedEntreprise(entreprises[0]._id);
-      setSelectedEntrepriseData(entreprises[0]);
-    }
-  }, [entreprises]);
 
   // Chemin serveur
   useEffect(() => {
@@ -205,14 +213,6 @@ const UserPreparationCommande = () => {
   const showMsg = (text, type = "info") => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 4000);
-  };
-
-  const handleEntrepriseChange = (e) => {
-    const entrepriseId = e.target.value;
-    setSelectedEntreprise(entrepriseId);
-    const ent = entreprises?.find((en) => en._id === entrepriseId);
-    setSelectedEntrepriseData(ent || null);
-    resetPreparation();
   };
 
   const resetPreparation = () => {
@@ -388,20 +388,6 @@ const UserPreparationCommande = () => {
         <h1>
           <HiShoppingCart /> Préparation Commande
         </h1>
-        <div className="entreprise-selector">
-          <HiOfficeBuilding />
-          <select
-            value={selectedEntreprise}
-            onChange={handleEntrepriseChange}
-          >
-            <option value="">-- Choisir une entreprise --</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Message */}

@@ -1,5 +1,6 @@
 // src/screens/user/InventaireScreen.jsx
 import React, { useState, useEffect, useRef } from "react";
+import { useSelector } from "react-redux";
 import {
   HiQrcode,
   HiOfficeBuilding,
@@ -16,6 +17,7 @@ import {
   HiFolder,
 } from "react-icons/hi";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
   useCreateInventaireMutation,
   useGetInventaireEnCoursQuery,
@@ -31,8 +33,13 @@ import "./UserInventaire.css";
 
 const InventaireScreen = () => {
   // États
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [scanValue, setScanValue] = useState("");
+
+  // Société choisie globalement (header) : on vide le champ scan à chaque changement.
+  useEffect(() => {
+    setScanValue("");
+  }, [selectedEntreprise]);
   const [currentArticle, setCurrentArticle] = useState(null);
   const [quantite, setQuantite] = useState("");
   const [editingLigne, setEditingLigne] = useState(null);
@@ -69,13 +76,6 @@ const InventaireScreen = () => {
   const [downloadInventaire, { isLoading: downloading }] =
     useDownloadInventaireMutation();
   const [deleteInventaire] = useDeleteInventaireMutation();
-
-  // Auto-select si une seule entreprise
-  useEffect(() => {
-    if (entreprises?.length === 1) {
-      setSelectedEntreprise(entreprises[0]._id);
-    }
-  }, [entreprises]);
 
   // Mettre à jour le chemin serveur quand l'inventaire est chargé
   useEffect(() => {
@@ -136,14 +136,6 @@ const InventaireScreen = () => {
   };
 
   // Handlers
-  const handleEntrepriseChange = async (e) => {
-    const entrepriseId = e.target.value;
-    setSelectedEntreprise(entrepriseId);
-    setCurrentArticle(null);
-    setScanValue("");
-    setQuantite("");
-  };
-
   const handleStartInventaire = async () => {
     if (!selectedEntreprise) return;
     try {
@@ -336,21 +328,6 @@ const InventaireScreen = () => {
         <h1>
           <HiClipboardList /> Mode Inventaire
         </h1>
-        <div className="entreprise-selector">
-          <HiOfficeBuilding />
-          <select
-            value={selectedEntreprise}
-            onChange={handleEntrepriseChange}
-            disabled={inventaire?.status === "en_cours"}
-          >
-            <option value="">-- Choisir une entreprise --</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Message */}

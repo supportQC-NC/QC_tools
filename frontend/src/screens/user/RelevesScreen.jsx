@@ -1,5 +1,6 @@
 // src/screens/user/ReleveScreen.jsx
 import React, { useState, useEffect, useRef } from "react";
+import { useSelector } from "react-redux";
 import {
   HiQrcode,
   HiOfficeBuilding,
@@ -19,6 +20,7 @@ import {
   HiCheckCircle,
 } from "react-icons/hi";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { useGetConcurrentsQuery } from "../../slices/concurrentApiSLice";
 import {
   useCreateReleveMutation,
@@ -33,9 +35,15 @@ import {
 import "./RelevesScreen.css";
 
 const ReleveScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [selectedConcurrent, setSelectedConcurrent] = useState("");
   const [scanValue, setScanValue] = useState("");
+
+  // Société choisie globalement (header) : on réinitialise la sélection au changement.
+  useEffect(() => {
+    setSelectedConcurrent("");
+    setScanValue("");
+  }, [selectedEntreprise]);
   const [currentArticle, setCurrentArticle] = useState(null);
   const [prixReleve, setPrixReleve] = useState("");
   const [editingLigne, setEditingLigne] = useState(null);
@@ -66,12 +74,6 @@ const ReleveScreen = () => {
   const [downloadReleve, { isLoading: downloading }] =
     useDownloadReleveMutation();
   const [deleteReleve] = useDeleteReleveMutation();
-
-  useEffect(() => {
-    if (entreprises?.length === 1) {
-      setSelectedEntreprise(entreprises[0]._id);
-    }
-  }, [entreprises]);
 
   useEffect(() => {
     if (
@@ -109,15 +111,6 @@ const ReleveScreen = () => {
       showMessage(err?.data?.message || "Article non trouvé", "error");
       setScanValue("");
     }
-  };
-
-  const handleEntrepriseChange = (e) => {
-    const entrepriseId = e.target.value;
-    setSelectedEntreprise(entrepriseId);
-    setSelectedConcurrent("");
-    setCurrentArticle(null);
-    setScanValue("");
-    setPrixReleve("");
   };
 
   const handleConcurrentChange = (e) => {
@@ -365,27 +358,6 @@ const ReleveScreen = () => {
       )}
 
       <div className="releve-selectors">
-        <div className="selector-card">
-          <label>
-            <HiOfficeBuilding /> Entreprise
-          </label>
-          <div className="select-wrapper">
-            <select
-              value={selectedEntreprise}
-              onChange={handleEntrepriseChange}
-              disabled={releve?.status === "en_cours"}
-            >
-              <option value="">Sélectionner...</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e._id}>
-                  {e.trigramme} - {e.nomComplet}
-                </option>
-              ))}
-            </select>
-            <HiChevronDown className="select-icon" />
-          </div>
-        </div>
-
         <div className="selector-card">
           <label>
             <HiShoppingCart /> Concurrent

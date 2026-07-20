@@ -393,3 +393,13 @@
   border: 1px dashed var(--border);
   border-radius: 10px;
 }
+
+.etiq-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}

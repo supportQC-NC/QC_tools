@@ -1,6 +1,7 @@
 // src/screens/admin/AdminCommerciauxScreen.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import * as XLSX from "xlsx";
 import {
   HiUserGroup,
@@ -19,16 +20,14 @@ import {
   HiUserAdd,
   HiStar,
 } from "react-icons/hi";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetCommerciauxQuery,
   useLazyGetCommerciauxFullQuery,
   useRefreshCommerciauxMutation,
 } from "../../slices/commerciauxApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminCommerciauxScreen.css";
-
-const STORAGE_KEY = "commerciaux_entreprise";
 
 const formatF = (n) => {
   const v = Math.round(Number(n) || 0);
@@ -90,12 +89,9 @@ const sanitizeSheet = (name) =>
 
 const AdminCommerciauxScreen = () => {
   const navigate = useNavigate();
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
 
   const {
     data,
@@ -111,18 +107,6 @@ const AdminCommerciauxScreen = () => {
     useLazyGetCommerciauxFullQuery();
   const [refreshCommerciaux, { isLoading: refreshing }] =
     useRefreshCommerciauxMutation();
-
-  // Sélectionne la première entreprise active si rien en mémoire
-  useEffect(() => {
-    if (!selectedEntreprise && entreprises && entreprises.length > 0) {
-      const active = entreprises.find((e) => e.isActive) || entreprises[0];
-      if (active) setSelectedEntreprise(active.nomDossierDBF);
-    }
-  }, [entreprises, selectedEntreprise]);
-
-  useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY, selectedEntreprise);
-  }, [selectedEntreprise]);
 
   const commerciaux = data?.commerciaux || [];
   const totaux = data?.totaux;
@@ -196,19 +180,6 @@ const AdminCommerciauxScreen = () => {
           <HiUserGroup /> Analyse Commerciaux
         </h1>
         <div className="ac-header-actions">
-          <select
-            className="ac-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Choisir une entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <button
             className="ac-btn"
             onClick={handleRefresh}

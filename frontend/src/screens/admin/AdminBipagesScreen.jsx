@@ -13,12 +13,14 @@ import {
   useRecommencerZoneMutation,
   getBipagesCsvUrl,
 } from "../../slices/bipageApiSlice";
-import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminBipagesScreen.css";
 
 const AdminBipagesScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [type, setType] = useState("");
   const [zone, setZone] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -27,8 +29,6 @@ const AdminBipagesScreen = () => {
   const [exporting, setExporting] = useState(false);
 
   const dirty = useRef(new Set());
-
-  const { data: entreprises } = useGetMyEntreprisesQuery();
 
   // debounce de la recherche
   useEffect(() => {
@@ -177,18 +177,6 @@ const AdminBipagesScreen = () => {
           <HiClipboardList /> Détail des bipages
         </h1>
         <div className="admin-bipages-actions">
-          <select
-            className="filter-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-          >
-            <option value="">Sélectionner une entreprise…</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
           <button
             className="btn-icon"
             onClick={refetch}

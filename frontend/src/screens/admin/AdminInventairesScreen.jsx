@@ -20,12 +20,14 @@ import {
   useDownloadInventaireMutation,
   useExportInventaireMutation,
 } from "../../slices/inventaireApiSlice";
-import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./AdminInventairesScreen.css";
 
 const AdminInventairesScreen = () => {
   const [search, setSearch] = useState("");
-  const [filterEntreprise, setFilterEntreprise] = useState("");
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const filterEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [selectedInventaire, setSelectedInventaire] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [exportPath, setExportPath] = useState("");
@@ -39,7 +41,6 @@ const AdminInventairesScreen = () => {
     refetch,
   } = useGetHistoriqueQuery(filterEntreprise || undefined);
 
-  const { data: entreprises } = useGetMyEntreprisesQuery();
   const [downloadInventaire, { isLoading: downloading }] =
     useDownloadInventaireMutation();
   const [exportInventaire, { isLoading: exporting }] =
@@ -181,18 +182,6 @@ const AdminInventairesScreen = () => {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select
-            className="filter-select"
-            value={filterEntreprise}
-            onChange={(e) => setFilterEntreprise(e.target.value)}
-          >
-            <option value="">Toutes les entreprises</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
           <button className="btn-icon" onClick={refetch} title="Rafraîchir">
             <HiRefresh />
           </button>

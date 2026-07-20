@@ -1,11 +1,13 @@
 // src/screens/admin/AdminArticlesScreen.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   HiSearch,
   HiRefresh,
@@ -39,11 +41,9 @@ import {
   useGetGroupesQuery,
   getPhotoUrl,
 } from "../../slices/articleApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminArticlesScreen.css";
-
-// Clé pour le localStorage
-const STORAGE_KEY_ENTREPRISE = "admin_articles_selected_entreprise";
 
 // Debounce hook pour éviter trop de requêtes
 const useDebounce = (value, delay) => {
@@ -64,19 +64,10 @@ const useDebounce = (value, delay) => {
 
 const AdminArticlesScreen = () => {
   const navigate = useNavigate();
-  const { nomDossierDBF: urlNomDossier } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Récupérer l'entreprise depuis l'URL, le localStorage ou vide
-  const getInitialEntreprise = () => {
-    if (urlNomDossier) return urlNomDossier;
-    const saved = localStorage.getItem(STORAGE_KEY_ENTREPRISE);
-    return saved || "";
-  };
-
-  // État principal
-  const [selectedEntreprise, setSelectedEntreprise] =
-    useState(getInitialEntreprise);
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
   const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
   const [limit] = useState(50);
@@ -154,18 +145,44 @@ const AdminArticlesScreen = () => {
     skip: !selectedEntreprise,
   });
 
-  // Effet pour mettre à jour l'entreprise sélectionnée quand les données sont chargées
+  // Effet pour mettre à jour les données de l'entreprise sélectionnée (globale)
   useEffect(() => {
     if (entreprises && selectedEntreprise) {
       const entreprise = entreprises.find(
         (e) => e.nomDossierDBF === selectedEntreprise,
       );
-      if (entreprise) {
-        setSelectedEntrepriseData(entreprise);
-        localStorage.setItem(STORAGE_KEY_ENTREPRISE, selectedEntreprise);
-      }
+      setSelectedEntrepriseData(entreprise || null);
+    } else {
+      setSelectedEntrepriseData(null);
     }
   }, [entreprises, selectedEntreprise]);
+
+  // Réinitialise la pagination et les filtres quand la société globale change.
+  // (Ancien comportement de handleEntrepriseChange : setPage(1) + resetFilters.)
+  // On ignore le premier rendu pour préserver les filtres seedés depuis l'URL.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    setPage(1);
+    setFilters({
+      nart: "",
+      search: "",
+      fourn: "",
+      stock: "TOUT",
+      gencod: "TOUT",
+      promo: "TOUT",
+      deprec: "TOUT",
+      web: "TOUT",
+      photo: "TOUT",
+      tgc: "TOUT",
+      reappro: "TOUT",
+      groupe: "",
+      gisement: "",
+    });
+  }, [selectedEntreprise]);
 
   // Effet pour synchroniser l'URL avec les filtres
   useEffect(() => {
@@ -228,25 +245,6 @@ const AdminArticlesScreen = () => {
   const articles = articlesData?.articles || [];
 
   // Handlers
-  const handleEntrepriseChange = (e) => {
-    const nomDossier = e.target.value;
-    setSelectedEntreprise(nomDossier);
-
-    if (nomDossier) {
-      const entreprise = entreprises?.find(
-        (ent) => ent.nomDossierDBF === nomDossier,
-      );
-      setSelectedEntrepriseData(entreprise);
-      localStorage.setItem(STORAGE_KEY_ENTREPRISE, nomDossier);
-    } else {
-      setSelectedEntrepriseData(null);
-      localStorage.removeItem(STORAGE_KEY_ENTREPRISE);
-    }
-
-    setPage(1);
-    resetFilters();
-  };
-
   const resetFilters = () => {
     setFilters({
       nart: "",
@@ -414,24 +412,6 @@ const AdminArticlesScreen = () => {
             </p>
           </div>
         </div>
-
-        <div className="header-actions">
-          <div className="entreprise-selector">
-            <HiOfficeBuilding className="selector-icon" />
-            <select
-              value={selectedEntreprise}
-              onChange={handleEntrepriseChange}
-            >
-              <option value="">Sélectionner une entreprise</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e.nomDossierDBF}>
-                  {e.trigramme} - {e.nomComplet}
-                </option>
-              ))}
-            </select>
-            <HiChevronDown className="selector-arrow" />
-          </div>
-        </div>
       </header>
 
       {!selectedEntreprise ? (
@@ -440,7 +420,9 @@ const AdminArticlesScreen = () => {
             <HiOfficeBuilding />
           </div>
           <h2>Sélectionnez une entreprise</h2>
-          <p>Choisissez une entreprise pour consulter ses articles</p>
+          <p>
+            Choisissez une entreprise dans l'en-tête pour consulter ses articles
+          </p>
         </div>
       ) : (
         <div className="admin-articles-content">

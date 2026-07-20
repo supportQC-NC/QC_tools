@@ -21,7 +21,9 @@ import {
   useGetZoneHistoriqueQuery,
   useDeleteZoneSessionMutation,
 } from "../../slices/inventaireZoneApiSlice";
+import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./AdminInventaireProgressionScreen.css";
 
 const POLL = 4000;
@@ -34,7 +36,7 @@ const PHASE_META = {
 };
 
 const AdminInventaireProgressionScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [bipCode, setBipCode] = useState("");
   const [bipFeedback, setBipFeedback] = useState(null); // { tone, message }
   const [search, setSearch] = useState("");
@@ -90,13 +92,13 @@ const AdminInventaireProgressionScreen = () => {
     }
   }, [session]);
 
-  const handleEntrepriseChange = (e) => {
-    setSelectedEntreprise(e.target.value);
+  // Réinitialise l'état local quand la société sélectionnée change
+  useEffect(() => {
     setBipFeedback(null);
     setBipCode("");
     setSearch("");
     setShowHistorique(false);
-  };
+  }, [selectedEntreprise]);
 
   const handleConfirmInit = async () => {
     setShowInitConfirm(false);
@@ -201,18 +203,6 @@ const AdminInventaireProgressionScreen = () => {
           <HiChartBar /> Progression d'inventaire
         </h1>
         <div className="admin-prog-actions">
-          <select
-            className="filter-select"
-            value={selectedEntreprise}
-            onChange={handleEntrepriseChange}
-          >
-            <option value="">Sélectionner une entreprise…</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
           <button
             className="btn-icon"
             onClick={refetch}
@@ -227,7 +217,9 @@ const AdminInventaireProgressionScreen = () => {
       {!selectedEntreprise ? (
         <div className="admin-prog-placeholder">
           <HiChartBar />
-          <p>Sélectionnez une entreprise pour suivre son inventaire.</p>
+          <p>
+            Sélectionnez une société dans l'en-tête pour suivre son inventaire.
+          </p>
         </div>
       ) : loadingActive ? (
         <div className="admin-loading">Chargement…</div>

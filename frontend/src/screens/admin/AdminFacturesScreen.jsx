@@ -1,8 +1,7 @@
 // src/screens/admin/AdminFacturesScreen.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Link,
-  useParams,
   useSearchParams,
 } from "react-router-dom";
 import {
@@ -11,7 +10,6 @@ import {
   HiFilter,
   HiChevronLeft,
   HiChevronRight,
-  HiOfficeBuilding,
   HiEye,
   HiX,
   HiChevronDown,
@@ -28,14 +26,14 @@ import {
   HiReply,
   HiClock,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetFacturesQuery,
   useGetFactureRepresentantsQuery,
 } from "../../slices/factureApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import "./AdminFacturesScreen.css";
-
-const STORAGE_KEY_ENTREPRISE = "admin_factures_selected_entreprise";
 
 const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -55,16 +53,10 @@ const TYPFACT_CONFIG = {
 };
 
 const AdminFacturesScreen = () => {
-  const { nomDossierDBF: urlNomDossier } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const getInitialEntreprise = () => {
-    if (urlNomDossier) return urlNomDossier;
-    const saved = localStorage.getItem(STORAGE_KEY_ENTREPRISE);
-    return saved || "";
-  };
-
-  const [selectedEntreprise, setSelectedEntreprise] = useState(getInitialEntreprise);
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
   const [limit] = useState(50);
 
@@ -124,11 +116,17 @@ const AdminFacturesScreen = () => {
     { skip: !selectedEntreprise },
   );
 
+  // Réinitialise page + filtres quand la société globale change (hors montage
+  // initial, pour préserver l'état restauré depuis l'URL).
+  const isFirstEntrepriseRun = useRef(true);
   useEffect(() => {
-    if (entreprises && selectedEntreprise) {
-      localStorage.setItem(STORAGE_KEY_ENTREPRISE, selectedEntreprise);
+    if (isFirstEntrepriseRun.current) {
+      isFirstEntrepriseRun.current = false;
+      return;
     }
-  }, [entreprises, selectedEntreprise]);
+    setPage(1);
+    setFilters({ search: "", tiers: "", repres: "", typfact: "TOUT", dateDebut: "", dateFin: "" });
+  }, [selectedEntreprise]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -143,18 +141,6 @@ const AdminFacturesScreen = () => {
   }, [filters, page, setSearchParams]);
 
   const factures = facturesData?.factures || [];
-
-  const handleEntrepriseChange = (e) => {
-    const nomDossier = e.target.value;
-    setSelectedEntreprise(nomDossier);
-    if (nomDossier) {
-      localStorage.setItem(STORAGE_KEY_ENTREPRISE, nomDossier);
-    } else {
-      localStorage.removeItem(STORAGE_KEY_ENTREPRISE);
-    }
-    setPage(1);
-    resetFilters();
-  };
 
   const resetFilters = () => {
     setFilters({ search: "", tiers: "", repres: "", typfact: "TOUT", dateDebut: "", dateFin: "" });
@@ -233,27 +219,13 @@ const AdminFacturesScreen = () => {
             <p className="header-subtitle">Consultation des factures — année en cours et précédente</p>
           </div>
         </div>
-        <div className="header-actions">
-          <div className="entreprise-selector">
-            <HiOfficeBuilding className="selector-icon" />
-            <select value={selectedEntreprise} onChange={handleEntrepriseChange}>
-              <option value="">Sélectionner une entreprise</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e.nomDossierDBF}>
-                  {e.trigramme} - {e.nomComplet}
-                </option>
-              ))}
-            </select>
-            <HiChevronDown className="selector-arrow" />
-          </div>
-        </div>
       </header>
 
       {!selectedEntreprise ? (
         <div className="empty-state">
           <div className="empty-icon"><HiReceiptTax /></div>
           <h2>Sélectionnez une entreprise</h2>
-          <p>Choisissez une entreprise pour consulter ses factures</p>
+          <p>Choisissez une entreprise dans l'en-tête pour consulter ses factures</p>
         </div>
       ) : (
         <div className="admin-factures-content">

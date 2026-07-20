@@ -3,6 +3,7 @@
 
 // src/screens/user/UserReappro.jsx
 import React, { useState, useEffect, useRef } from "react";
+import { useSelector } from "react-redux";
 import {
   HiQrcode,
   HiOfficeBuilding,
@@ -22,6 +23,7 @@ import {
   HiExclamation,
 } from "react-icons/hi";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
   useCreateReapproMutation,
   useGetReapproEnCoursQuery,
@@ -37,8 +39,13 @@ import "./UserReappro.css";
 
 const UserReappro = () => {
   // États
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [scanValue, setScanValue] = useState("");
+
+  // Société choisie globalement (header) : on vide le champ scan à chaque changement.
+  useEffect(() => {
+    setScanValue("");
+  }, [selectedEntreprise]);
   const [currentArticle, setCurrentArticle] = useState(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [quantite, setQuantite] = useState("");           // ← changé : vide au lieu de "1"
@@ -78,13 +85,6 @@ const UserReappro = () => {
   const [downloadReappro, { isLoading: downloading }] =
     useDownloadReapproMutation();
   const [deleteReappro] = useDeleteReapproMutation();
-
-  // Auto-select si une seule entreprise
-  useEffect(() => {
-    if (entreprises?.length === 1) {
-      setSelectedEntreprise(entreprises[0]._id);
-    }
-  }, [entreprises]);
 
   // Mettre à jour le chemin serveur quand le réappro est chargé
   useEffect(() => {
@@ -140,15 +140,6 @@ const UserReappro = () => {
   };
 
   // Handlers
-  const handleEntrepriseChange = async (e) => {
-    const entrepriseId = e.target.value;
-    setSelectedEntreprise(entrepriseId);
-    setCurrentArticle(null);
-    setShowConfirmation(false);
-    setScanValue("");
-    setQuantite("");
-  };
-
   const handleStartReappro = async () => {
     if (!selectedEntreprise) return;
     try {
@@ -381,21 +372,6 @@ const UserReappro = () => {
         <h1>
           <HiRefresh /> Réapprovisionnement
         </h1>
-        <div className="entreprise-selector">
-          <HiOfficeBuilding />
-          <select
-            value={selectedEntreprise}
-            onChange={handleEntrepriseChange}
-            disabled={reappro?.status === "en_cours"}
-          >
-            <option value="">-- Choisir une entreprise --</option>
-            {entreprises?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.trigramme} - {e.nomComplet}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Message */}

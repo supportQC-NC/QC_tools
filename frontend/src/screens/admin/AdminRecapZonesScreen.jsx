@@ -4,10 +4,11 @@
 // à contrôler, ETAT >= 4, via /api/receptions/a-controler) + superposition de
 // la PROGRESSION du contrôle (articles contrôlés, anomalies, photos, statut).
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph, HiDownload, HiX, HiSparkles,
 } from "react-icons/hi";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetCommandesAControlerQuery,
   useGetReceptionProgressQuery,
@@ -17,8 +18,6 @@ import {
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
 import "./AdminReceptionSuiviScreen.css";
-
-const STORAGE_KEY = "receptionSuivi.entreprise";
 
 const ANOMALIE = {
   avarie: { label: "Avarie", cls: "rs-ano-warn" },
@@ -37,9 +36,7 @@ const photoSrc = (recId, sigId) =>
   `${BASE_URL}/api/reception-suivi/${recId}/signalement/${sigId}/photo`;
 
 const AdminReceptionSuiviScreen = () => {
-  const [selectedEnt, setSelectedEnt] = useState(
-    localStorage.getItem(STORAGE_KEY) || "",
-  );
+  const selectedEnt = useSelector(selectGlobalDossier) || "";
   const [selectedNumcde, setSelectedNumcde] = useState(null);
   const [filter, setFilter] = useState("tous"); // tous | encours
   const [zoom, setZoom] = useState(null);
@@ -48,8 +45,6 @@ const AdminReceptionSuiviScreen = () => {
   const [openRec, setOpenRec] = useState(null);
   const [recPhotos, setRecPhotos] = useState({});
   const recUrlsRef = useRef({});
-
-  const { data: entreprises, isLoading: loadingEnt } = useGetEntreprisesQuery();
 
   const { data: cmdData, isFetching: fCmd, refetch: refetchCmd } =
     useGetCommandesAControlerQuery(selectedEnt, { skip: !selectedEnt });
@@ -60,15 +55,8 @@ const AdminReceptionSuiviScreen = () => {
   const { data: recentes = [], refetch: refetchRec } =
     useGetRecentesControleesQuery(selectedEnt, { skip: !selectedEnt });
 
-  // Entreprise par défaut : 1re active.
+  // Réinitialise la commande sélectionnée au changement d'entreprise.
   useEffect(() => {
-    if (!selectedEnt && entreprises && entreprises.length > 0) {
-      const a = entreprises.find((e) => e.isActive) || entreprises[0];
-      if (a) setSelectedEnt(a.nomDossierDBF);
-    }
-  }, [entreprises, selectedEnt]);
-  useEffect(() => {
-    if (selectedEnt) localStorage.setItem(STORAGE_KEY, selectedEnt);
     setSelectedNumcde(null);
   }, [selectedEnt]);
 
@@ -207,19 +195,6 @@ const AdminReceptionSuiviScreen = () => {
           </div>
         </div>
         <div className="rs-head-actions">
-          <select
-            className="rs-select"
-            value={selectedEnt}
-            onChange={(e) => setSelectedEnt(e.target.value)}
-            disabled={loadingEnt}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id || e.nomDossierDBF} value={e.nomDossierDBF}>
-                {e.nom || e.nomComplet || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <button className="rs-refresh" onClick={refresh} disabled={busy}>
             <HiRefresh className={busy ? "spin" : ""} /> Rafraîchir
           </button>
@@ -245,7 +220,7 @@ const AdminReceptionSuiviScreen = () => {
       )}
 
       {!selectedEnt ? (
-        <div className="rs-empty">Choisissez une entreprise.</div>
+        <div className="rs-empty">Choisissez une entreprise dans le sélecteur en haut de page.</div>
       ) : busy && merged.length === 0 ? (
         <Loader />
       ) : (

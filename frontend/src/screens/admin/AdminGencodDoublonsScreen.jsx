@@ -1,19 +1,18 @@
 // src/screens/admin/AdminGencodDoublonsScreen.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
 import { HiRefresh, HiDownload, HiDuplicate, HiSearch } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import {
   useGetGencodDoublonsQuery,
   useRefreshGencodDoublonsMutation,
 } from "../../slices/gencodDoublonsApiSlice";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminGencodDoublonsScreen.css";
-
-const STORAGE_KEY = "gencod_doublons_entreprise";
 
 const r0 = (n) => Math.round(Number(n) || 0);
 const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
@@ -25,30 +24,16 @@ const qtyFmt = (p) =>
 const num = { type: "rightAligned" };
 
 const AdminGencodDoublonsScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [search, setSearch] = useState("");
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
   const { data, isLoading, isFetching, error } = useGetGencodDoublonsQuery(
     selectedEntreprise,
     { skip: !selectedEntreprise },
   );
   const [refreshGencodDoublons, { isLoading: refreshing }] =
     useRefreshGencodDoublonsMutation();
-
-  useEffect(() => {
-    if (!selectedEntreprise && entreprises && entreprises.length > 0) {
-      const active = entreprises.find((e) => e.isActive) || entreprises[0];
-      if (active) setSelectedEntreprise(active.nomDossierDBF);
-    }
-  }, [entreprises, selectedEntreprise]);
-
-  useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY, selectedEntreprise);
-  }, [selectedEntreprise]);
 
   const handleRefresh = async () => {
     if (!selectedEntreprise) return;
@@ -139,20 +124,6 @@ const AdminGencodDoublonsScreen = () => {
           <HiDuplicate /> Doublons GENCODE
         </h1>
         <div className="gd-actions">
-          <select
-            className="gd-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id} value={e.nomDossierDBF}>
-                {e.trigramme ? `${e.trigramme} - ` : ""}
-                {e.nomComplet || e.nom || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <button
             className="gd-btn"
             onClick={handleRefresh}

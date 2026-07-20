@@ -1,5 +1,6 @@
 // src/screens/admin/AdminAnalyseReapproScreen.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   HiTruck, HiRefresh, HiExclamationCircle, HiTrendingDown, HiCube, HiShoppingCart,
   HiPaperAirplane, HiTrash, HiPlus, HiX,
@@ -7,8 +8,8 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { useGetAnalyseReapproQuery } from "../../slices/analyseReapproApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetDemandesQuery,
   useCreateDemandePanierMutation,
@@ -17,8 +18,6 @@ import {
 } from "../../slices/demandeReapproApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminAnalyseReapproScreen.css";
-
-const STORAGE_KEY = "analyseReappro.entreprise";
 
 const STATUT_LABEL = {
   en_attente: "En attente",
@@ -37,9 +36,8 @@ const fmtXpf = (n) => `${Math.round(n ?? 0).toLocaleString("fr-FR")} F`;
 const fmtPct = (n) => `${(n ?? 0).toLocaleString("fr-FR")} %`;
 
 const AdminAnalyseReapproScreen = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    localStorage.getItem(STORAGE_KEY) || "",
-  );
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
   const [tab, setTab] = useState("fourn"); // fourn | magasin
   const [gisFilter, setGisFilter] = useState("");
   const [priorite, setPriorite] = useState("a_faire");
@@ -48,25 +46,10 @@ const AdminAnalyseReapproScreen = () => {
   const [manualNart, setManualNart] = useState("");
   const [manualMsg, setManualMsg] = useState(null);
 
-  const { data: entreprises, isLoading: loadingEntreprises } =
-    useGetEntreprisesQuery();
-
   const { data, isLoading, isFetching, refetch } = useGetAnalyseReapproQuery(
     selectedEntreprise,
     { skip: !selectedEntreprise },
   );
-
-  // Sélection par défaut : 1re entreprise active.
-  useEffect(() => {
-    if (!selectedEntreprise && entreprises && entreprises.length > 0) {
-      const active = entreprises.find((e) => e.isActive) || entreprises[0];
-      if (active) setSelectedEntreprise(active.nomDossierDBF);
-    }
-  }, [entreprises, selectedEntreprise]);
-
-  useEffect(() => {
-    if (selectedEntreprise) localStorage.setItem(STORAGE_KEY, selectedEntreprise);
-  }, [selectedEntreprise]);
 
   const kpis = data?.kpis;
   const rows = data?.rows || [];
@@ -203,19 +186,6 @@ const AdminAnalyseReapproScreen = () => {
           </div>
         </div>
         <div className="ar-head-actions">
-          <select
-            className="ar-select"
-            value={selectedEntreprise}
-            onChange={(e) => setSelectedEntreprise(e.target.value)}
-            disabled={loadingEntreprises}
-          >
-            <option value="">— Entreprise —</option>
-            {(entreprises || []).map((e) => (
-              <option key={e._id || e.nomDossierDBF} value={e.nomDossierDBF}>
-                {e.nom || e.nomComplet || e.nomDossierDBF}
-              </option>
-            ))}
-          </select>
           <button className="ar-refresh" onClick={() => refetch()} disabled={busy}>
             <HiRefresh className={busy ? "spin" : ""} /> Rafraîchir
           </button>

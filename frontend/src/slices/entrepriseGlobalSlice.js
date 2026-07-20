@@ -1,28 +1,58 @@
 // src/slices/entrepriseGlobalSlice.js
 // État global : entreprise sélectionnée dans le Header (persistée en localStorage).
-// Stocke uniquement le nomDossierDBF ; les infos complètes (logo, couleurs, nom)
-// sont relues depuis la liste des entreprises (toujours à jour).
+// Stocke une version allégée de l'entreprise ({ _id, nomDossierDBF, trigramme,
+// nomComplet, nom }) afin que chaque écran puisse lire la clé dont il a besoin :
+// certains écrans filtrent par _id Mongo, d'autres par nomDossierDBF.
 import { createSlice } from "@reduxjs/toolkit";
 
-const STORAGE_KEY = "global_entreprise_dossier";
+const STORAGE_KEY = "global_entreprise";
+// Ancienne clé (ne stockait que le nomDossierDBF) — nettoyée au chargement.
+const LEGACY_KEY = "global_entreprise_dossier";
+
+// Ne conserve que les champs utiles (évite de persister le logo/couleurs, etc.).
+const slim = (e) =>
+  e
+    ? {
+        _id: e._id,
+        nomDossierDBF: e.nomDossierDBF,
+        trigramme: e.trigramme,
+        nomComplet: e.nomComplet,
+        nom: e.nom,
+      }
+    : null;
+
+const loadPersisted = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
 const initialState = {
-  selectedDossier: localStorage.getItem(STORAGE_KEY) || null,
+  selected: loadPersisted(),
 };
 
 const entrepriseGlobalSlice = createSlice({
   name: "entrepriseGlobal",
   initialState,
   reducers: {
+    // Payload : l'objet entreprise complet (ou null pour désélectionner).
     setGlobalEntreprise: (state, action) => {
-      const dossier = action.payload || null;
-      state.selectedDossier = dossier;
-      if (dossier) localStorage.setItem(STORAGE_KEY, dossier);
-      else localStorage.removeItem(STORAGE_KEY);
+      const entreprise = slim(action.payload);
+      state.selected = entreprise;
+      localStorage.removeItem(LEGACY_KEY);
+      if (entreprise) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(entreprise));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
     },
     clearGlobalEntreprise: (state) => {
-      state.selectedDossier = null;
+      state.selected = null;
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_KEY);
     },
   },
 });
@@ -30,8 +60,12 @@ const entrepriseGlobalSlice = createSlice({
 export const { setGlobalEntreprise, clearGlobalEntreprise } =
   entrepriseGlobalSlice.actions;
 
-// Sélecteur pratique : nomDossierDBF sélectionné globalement (ou null).
+// Sélecteurs pratiques.
+export const selectGlobalEntreprise = (state) =>
+  state.entrepriseGlobal.selected;
 export const selectGlobalDossier = (state) =>
-  state.entrepriseGlobal.selectedDossier;
+  state.entrepriseGlobal.selected?.nomDossierDBF || null;
+export const selectGlobalEntrepriseId = (state) =>
+  state.entrepriseGlobal.selected?._id || null;
 
 export default entrepriseGlobalSlice.reducer;

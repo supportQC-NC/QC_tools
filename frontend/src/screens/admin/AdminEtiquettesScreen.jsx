@@ -10,7 +10,9 @@ import {
   HiCollection,
   HiX,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetGism1Query,
   useGetGroupesQuery,
@@ -162,7 +164,9 @@ const AdminEtiquettesScreen = () => {
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetMyEntreprisesQuery();
 
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
+  // Société active : lue depuis la sélection GLOBALE (Header).
+  const globalEntrepriseId = useSelector(selectGlobalEntrepriseId);
+  const selectedEntreprise = globalEntrepriseId || "";
   const [mode, setMode] = useState("proforma"); // proforma | commande | nart | gism1
   const [numfact, setNumfact] = useState("");
   const [numcde, setNumcde] = useState("");
@@ -232,11 +236,6 @@ const AdminEtiquettesScreen = () => {
     // Réinitialise pour permettre de réimporter le même fichier
     e.target.value = "";
   };
-
-  // Auto-sélection si une seule entreprise
-  useEffect(() => {
-    if (entreprises?.length === 1) setSelectedEntreprise(entreprises[0]._id);
-  }, [entreprises]);
 
   const entrepriseData = entreprises?.find((e) => e._id === selectedEntreprise);
   const nomDossierDBF = entrepriseData?.nomDossierDBF;
@@ -396,25 +395,15 @@ const AdminEtiquettesScreen = () => {
         </p>
       </div>
 
-      {/* Entreprise */}
-      <div className="etiq-card">
-        <label className="etiq-label">
-          <HiOfficeBuilding /> Entreprise
-        </label>
-        <select
-          className="etiq-select"
-          value={selectedEntreprise}
-          onChange={(e) => setSelectedEntreprise(e.target.value)}
-        >
-          <option value="">— Sélectionner —</option>
-          {entreprises.map((e) => (
-            <option key={e._id} value={e._id}>
-              {e.trigramme ? `${e.trigramme} · ` : ""}
-              {e.nomComplet || e.nom || e.nomDossierDBF}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Société : choisie globalement dans l'en-tête */}
+      {!selectedEntreprise && (
+        <div className="etiq-card">
+          <p className="etiq-hint">
+            <HiOfficeBuilding /> Sélectionnez une société dans l'en-tête pour
+            générer des étiquettes.
+          </p>
+        </div>
+      )}
 
       {/* Source des articles */}
       <div className="etiq-card">

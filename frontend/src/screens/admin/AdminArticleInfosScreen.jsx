@@ -245,10 +245,9 @@ const AdminArticleInfosScreen = () => {
   const navigate = useNavigate();
 
   // États
-  const [selectedEntreprise, setSelectedEntreprise] = useState(
-    nomDossierDBF || "",
-  );
-  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
+  // Société issue de l'URL (fournie par la liste, elle-même pilotée par le
+  // sélecteur global du header). Écran détail : plus de menu déroulant société.
+  const selectedEntreprise = nomDossierDBF || "";
   const [activeTab, setActiveTab] = useState("general");
 
   // State pour les taux de change
@@ -309,6 +308,8 @@ const AdminArticleInfosScreen = () => {
 
   // Queries
   const { data: entreprises, isLoading: loadingEntreprises } = useGetEntreprisesQuery();
+  const selectedEntrepriseData =
+    entreprises?.find((e) => e.nomDossierDBF === selectedEntreprise) || null;
 
   const { data: articleData, isLoading: loadingArticle, error: articleError, refetch, isFetching } =
     useGetArticleByNartQuery({ nomDossierDBF: selectedEntreprise, nart }, { skip: !selectedEntreprise || !nart });
@@ -328,22 +329,7 @@ const AdminArticleInfosScreen = () => {
       { skip: !selectedEntreprise || !article?.NART },
     );
 
-  useEffect(() => {
-    if (entreprises && nomDossierDBF) {
-      const entreprise = entreprises.find((e) => e.nomDossierDBF === nomDossierDBF);
-      if (entreprise) { setSelectedEntrepriseData(entreprise); setSelectedEntreprise(nomDossierDBF); }
-    }
-  }, [entreprises, nomDossierDBF]);
-
   // Handlers
-  const handleEntrepriseChange = (e) => {
-    const newNomDossier = e.target.value;
-    const entreprise = entreprises?.find((ent) => ent.nomDossierDBF === newNomDossier);
-    setSelectedEntreprise(newNomDossier);
-    setSelectedEntrepriseData(entreprise);
-    navigate(`/admin/articles/${newNomDossier}/${nart}`, { replace: true });
-  };
-
   const handleInvalidateCache = async () => {
     if (selectedEntreprise) { await invalidateCache(selectedEntreprise); refetch(); }
   };
@@ -573,17 +559,6 @@ const AdminArticleInfosScreen = () => {
             {nextArticle && <span className="nav-nart">{nextArticle.NART?.trim()}</span>}
             <span className="nav-label"></span><HiChevronRight />
           </button>
-        </div>
-
-        <div className="header-center">
-          <div className="entreprise-selector">
-            <HiOfficeBuilding className="selector-icon" />
-            <select value={selectedEntreprise} onChange={handleEntrepriseChange}>
-              <option value="">Sélectionner une entreprise</option>
-              {entreprises?.map((e) => (<option key={e._id} value={e.nomDossierDBF}>{e.trigramme} - {e.nomComplet}</option>))}
-            </select>
-            <HiChevronDown className="selector-arrow" />
-          </div>
         </div>
 
         <div className="header-actions">

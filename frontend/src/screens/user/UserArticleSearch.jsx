@@ -17,7 +17,9 @@ import {
   HiCheckCircle,
   HiXCircle,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetArticleByNartQuery,
   useGetArticleByGencodQuery,
@@ -28,8 +30,6 @@ import { BASE_URL } from "../../constants";
 import "./UserArticleSearch.css";
 
 const ArticleSearch = () => {
-  const [selectedEntreprise, setSelectedEntreprise] = useState("");
-  const [selectedEntrepriseData, setSelectedEntrepriseData] = useState(null);
   const [searchValue, setSearchValue] = useState("");
   const [searchType, setSearchType] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -40,6 +40,11 @@ const ArticleSearch = () => {
 
   const { data: entreprises, isLoading: loadingEntreprises } =
     useGetMyEntreprisesQuery();
+
+  // Société active : lue depuis la sélection GLOBALE (Header) — par nomDossierDBF.
+  const selectedEntreprise = useSelector(selectGlobalDossier) || "";
+  const selectedEntrepriseData =
+    entreprises?.find((e) => e.nomDossierDBF === selectedEntreprise) || null;
 
   const {
     data: resultByNart,
@@ -96,14 +101,6 @@ const ArticleSearch = () => {
     if (typeof value === "string") return value.trim();
     return String(value);
   };
-
-  // Auto-select si une seule entreprise
-  useEffect(() => {
-    if (entreprises?.length === 1) {
-      setSelectedEntreprise(entreprises[0].nomDossierDBF);
-      setSelectedEntrepriseData(entreprises[0]);
-    }
-  }, [entreprises]);
 
   // Focus sur l'input quand entreprise sélectionnée
   useEffect(() => {
@@ -190,16 +187,6 @@ const ArticleSearch = () => {
     setSearchType(null);
     setActiveTab("details");
     inputRef.current?.focus();
-  };
-
-  const handleEntrepriseChange = (e) => {
-    const nomDossier = e.target.value;
-    setSelectedEntreprise(nomDossier);
-    const entreprise = entreprises?.find(
-      (ent) => ent.nomDossierDBF === nomDossier,
-    );
-    setSelectedEntrepriseData(entreprise);
-    handleClear();
   };
 
   const isPromoActive = (article) => {
@@ -557,31 +544,6 @@ const ArticleSearch = () => {
             <HiCubeTransparent className="header-icon" />
             <h1>Recherche Article</h1>
           </div>
-
-          {entreprises?.length > 1 ? (
-            <div className="entreprise-select-wrapper">
-              <HiOfficeBuilding className="select-icon" />
-              <select
-                value={selectedEntreprise}
-                onChange={handleEntrepriseChange}
-                className="entreprise-select"
-              >
-                <option value="">Sélectionner une entreprise</option>
-                {entreprises?.map((e) => (
-                  <option key={e._id} value={e.nomDossierDBF}>
-                    {e.trigramme} - {e.nomComplet}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="entreprise-chip">
-              <HiOfficeBuilding />
-              <span>{entreprises[0].trigramme}</span>
-              <span className="chip-separator">•</span>
-              <span>{entreprises[0].nomComplet}</span>
-            </div>
-          )}
         </div>
       </header>
 

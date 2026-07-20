@@ -1,5 +1,5 @@
 // src/screens/admin/AdminInventaireProformaScreen.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   HiClipboardList,
   HiOfficeBuilding,
@@ -15,19 +15,14 @@ import {
   HiDownload,
   HiServer,
 } from "react-icons/hi";
-import { useSelector, useDispatch } from "react-redux";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { useSelector } from "react-redux";
 import { useGetInventaireProformaByTiersQuery } from "../../slices/inventaireProformaApiSlice";
-import { setSelectedEntreprise } from "../../slices/inventaireSelectionSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminInventaireProformaScreen.css";
 
 const AdminInventaireProformaScreen = () => {
-  const dispatch = useDispatch();
-  const persistedEntreprise = useSelector(
-    (s) => s.inventaireSelection.selectedEntreprise,
-  );
-  const [nomDossierDBF, setNomDossierDBF] = useState(persistedEntreprise || "");
+  const nomDossierDBF = useSelector(selectGlobalDossier) || "";
   const [tiersInput, setTiersInput] = useState("");
   const [tiers, setTiers] = useState(""); // tiers validé (déclenche la requête)
   const [dateDebut, setDateDebut] = useState(""); // "à partir du" (DATFACT >= dateDebut)
@@ -44,7 +39,6 @@ const AdminInventaireProformaScreen = () => {
   const [datLoading, setDatLoading] = useState(false);
   const [datMsg, setDatMsg] = useState(null); // { type, text }
 
-  const { data: entreprises } = useGetEntreprisesQuery();
 
   const {
     data: lignesData,
@@ -168,14 +162,13 @@ const AdminInventaireProformaScreen = () => {
     return total;
   }, [groupes, excluded]);
 
-  const onEntrepriseChange = (e) => {
-    setNomDossierDBF(e.target.value);
-    dispatch(setSelectedEntreprise(e.target.value));
+  // Réinitialise la sélection tiers si on change d'entreprise (sélecteur global)
+  useEffect(() => {
     setTiersInput("");
     setTiers("");
     setExpanded(new Set());
     setExcluded(new Set());
-  };
+  }, [nomDossierDBF]);
 
   const onSubmit = (e) => {
     e.preventDefault();
@@ -281,18 +274,6 @@ const AdminInventaireProformaScreen = () => {
           <HiClipboardList /> Inventaire Proforma
         </h1>
         <div className="admin-invproforma-actions">
-          <div className="select-with-icon">
-            <HiOfficeBuilding />
-            <select value={nomDossierDBF} onChange={onEntrepriseChange}>
-              <option value="">Sélectionner une entreprise…</option>
-              {entreprises?.map((e) => (
-                <option key={e._id} value={e.nomDossierDBF}>
-                  {e.trigramme} - {e.nomComplet}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <form className="client-form" onSubmit={onSubmit}>
             <div className="select-with-icon">
               <HiUser />
