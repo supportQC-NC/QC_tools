@@ -280,7 +280,8 @@ const resolveLogoBuffer = (entreprise) => {
 // ÉTIQUETTES STANDARD (grille 5x4 cm) — grille CENTRÉE avec marge de sécurité
 // pour éviter tout rognage en haut / sur les bords par l'imprimante.
 // ----------------------------------------------------------------------------
-const drawStandardCell = (rl, record, x, y, labelW, labelH) => {
+const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
+  const { showPrice = true } = opts;
   rl.setStrokeColorRGB(0, 0, 0);
   rl.setLineWidth(1);
   rl.rect(x, y, labelW, labelH);
@@ -289,27 +290,37 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH) => {
   rl.setFont("Helvetica", 6);
   rl.drawString(x + 2, y + labelH - 8, safe(record.NART));
 
-  rl.setFont("Helvetica-Bold", 7);
+  // Sans prix : on grossit la désignation pour occuper l'espace libéré par le prix.
+  const designFont = showPrice ? 7 : 10;
+  const designWrap = showPrice ? 28 : 20;
+  const designLead = showPrice ? 8 : 12;
+  const designMaxLines = showPrice ? 2 : 3;
+  rl.setFont("Helvetica-Bold", designFont);
   const product = safe(record.DESIGN || "Désignation non spécifié").slice(0, 80);
-  let wrapped = wrapText(product, 28);
-  if (wrapped.length > 2) { wrapped = wrapped.slice(0, 2); wrapped[1] = wrapped[1] + "..."; }
-  let yp = y + labelH - 23;
-  for (const line of wrapped) { rl.drawString(x + 5, yp, line); yp -= 8; }
-
-  rl.setFillColorRGB(0.95, 0.95, 0.95);
-  const pbh = 15;
-  rl.rect(x + 5, yp - pbh, labelW - 10, pbh, { fill: true, stroke: false });
-  rl.setFillColorRGB(0, 0, 0);
-  rl.setFont("Helvetica-Bold", 12);
-  rl.drawCentredString(x + labelW / 2, yp - pbh + 3, `${fmtInt(record.PVTETTC || 0)} XPF`);
-  yp -= pbh;
-
-  let klText = "";
-  if (record.VOL && Number(record.VOL) !== 0) {
-    const ppu = (Number(record.PVTETTC) || 0) / Number(record.VOL);
-    klText = `soit ${fmtRound(ppu)} XPF / ${safe(record.KL) || "N/A"}`;
+  let wrapped = wrapText(product, designWrap);
+  if (wrapped.length > designMaxLines) {
+    wrapped = wrapped.slice(0, designMaxLines);
+    wrapped[designMaxLines - 1] = wrapped[designMaxLines - 1] + "...";
   }
-  if (klText) { rl.setFont("Helvetica-Bold", 8); rl.drawCentredString(x + labelW / 2, yp - 10, klText); }
+  let yp = y + labelH - 23;
+  for (const line of wrapped) { rl.drawString(x + 5, yp, line); yp -= designLead; }
+
+  if (showPrice) {
+    rl.setFillColorRGB(0.95, 0.95, 0.95);
+    const pbh = 15;
+    rl.rect(x + 5, yp - pbh, labelW - 10, pbh, { fill: true, stroke: false });
+    rl.setFillColorRGB(0, 0, 0);
+    rl.setFont("Helvetica-Bold", 12);
+    rl.drawCentredString(x + labelW / 2, yp - pbh + 3, `${fmtInt(record.PVTETTC || 0)} XPF`);
+    yp -= pbh;
+
+    let klText = "";
+    if (record.VOL && Number(record.VOL) !== 0) {
+      const ppu = (Number(record.PVTETTC) || 0) / Number(record.VOL);
+      klText = `soit ${fmtRound(ppu)} XPF / ${safe(record.KL) || "N/A"}`;
+    }
+    if (klText) { rl.setFont("Helvetica-Bold", 8); rl.drawCentredString(x + labelW / 2, yp - 10, klText); }
+  }
 
   const gencod = String(record.GENCOD || "").replace(/\D/g, "");
   if (gencod.length === 13) {
@@ -321,7 +332,7 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH) => {
   }
 };
 
-const drawStandard = (rl, records) => {
+const drawStandard = (rl, records, opts = {}) => {
   const W = rl.W;
   const H = rl.H;
   const labelW = 5 * CM;
@@ -344,7 +355,7 @@ const drawStandard = (rl, records) => {
     const row = Math.floor(idxOnPage / cols);
     const x = startX + col * (labelW + gap);
     const y = H - (startYTop + row * (labelH + gap)) - labelH;
-    drawStandardCell(rl, record, x, y, labelW, labelH);
+    drawStandardCell(rl, record, x, y, labelW, labelH, opts);
   });
 };
 
@@ -609,7 +620,7 @@ const drawDemi = (rl, doc, records, logoBuf, drawOne) => {
 };
 
 export const TYPES_ETIQUETTES = [
-  "standard", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire",
+  "standard", "standard_sans_prix", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire",
 ];
 
 /**
@@ -622,7 +633,7 @@ export const TYPES_ETIQUETTES = [
  * @param {string} p.outPath   - chemin de sortie du PDF
  */
 export const genererEtiquettesPDF = async ({ type, format, articles, entreprise, outPath }) => {
-  const isStandard = type === "standard";
+  const isStandard = type === "standard" || type === "standard_sans_prix";
   if (!isStandard && !ONE_DRAWERS[type]) {
     throw new Error(`Type d'étiquette inconnu: ${type}`);
   }
@@ -641,7 +652,7 @@ export const genererEtiquettesPDF = async ({ type, format, articles, entreprise,
 
   const rl = new RL(doc);
   if (isStandard) {
-    drawStandard(rl, articles);
+    drawStandard(rl, articles, { showPrice: type === "standard" });
   } else if (isDemi) {
     drawDemi(rl, doc, articles, logoBuf, ONE_DRAWERS[type]);
   } else {

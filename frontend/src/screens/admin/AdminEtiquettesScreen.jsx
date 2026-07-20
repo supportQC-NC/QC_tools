@@ -26,6 +26,11 @@ const LABEL_TYPES = [
     desc: "Petite étiquette rayonnage (5 × 4 cm, plusieurs par page).",
   },
   {
+    type: "standard_sans_prix",
+    title: "🏷️ Standard sans prix",
+    desc: "Même format que Standard (5 × 4 cm, plusieurs par page), mais sans le prix.",
+  },
+  {
     type: "promo",
     title: "🔥 Promotion",
     desc: "Pleine page A4 avec prix barré, prix promo et dates.",
@@ -580,7 +585,7 @@ const AdminEtiquettesScreen = () => {
           ))}
         </div>
 
-        {type !== "standard" && (
+        {type !== "standard" && type !== "standard_sans_prix" && (
           <div className="etiq-format">
             <span className="etiq-format-label">Format :</span>
             <button
