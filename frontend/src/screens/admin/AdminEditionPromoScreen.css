@@ -1,0 +1,150 @@
+/* AdminEditionPromoScreen.css */
+.promo-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.promo-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.promo-header-icon {
+  font-size: 34px;
+  color: #b9770e;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.promo-header h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+}
+
+.promo-header p {
+  margin: 0;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.promo-header code,
+.promo-alert code {
+  background: #f1f1f3;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.promo-card {
+  background: #fff;
+  border: 1px solid #e3e3e8;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.promo-entreprise {
+  margin-bottom: 18px;
+  font-size: 0.95rem;
+}
+
+.promo-label {
+  color: #555;
+}
+
+.promo-muted {
+  color: #888;
+}
+
+.promo-field {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.promo-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.promo-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #cfcfd6;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.promo-field input:focus {
+  outline: none;
+  border-color: #b9770e;
+  box-shadow: 0 0 0 2px rgba(185, 119, 14, 0.15);
+}
+
+.promo-dates {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.promo-dates .promo-field {
+  flex: 1 1 200px;
+}
+
+.promo-alert {
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 4px 0 16px;
+  font-size: 0.9rem;
+}
+
+.promo-alert-error {
+  background: #fdecea;
+  color: #b3261e;
+  border: 1px solid #f5c6c2;
+}
+
+.promo-alert-success {
+  background: #eaf6ef;
+  color: #1c6b41;
+  border: 1px solid #b7e0c6;
+}
+
+.promo-alert-success ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.promo-alert-success code {
+  word-break: break-all;
+}
+
+.promo-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #b9770e;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.promo-btn:hover:not(:disabled) {
+  background: #a3680b;
+}
+
+.promo-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

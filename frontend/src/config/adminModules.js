@@ -23,6 +23,7 @@ export const PERMISSION_MODULES = [
   { key: "ctrl_info_produit", label: "Contrôle Infos Produit", group: "gestion" },
   { key: "releve", label: "Relevé de prix", group: "gestion" },
   { key: "etiquettes", label: "Générateur d'étiquettes", group: "gestion" },
+  { key: "edition_promo", label: "Édition Promo", group: "gestion" },
   { key: "client", label: "Clients", group: "donnees" },
   { key: "commandes", label: "Commandes", group: "donnees" },
   { key: "facture", label: "Factures", group: "donnees" },

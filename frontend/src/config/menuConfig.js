@@ -216,6 +216,12 @@ export const moduleMenuStructure = [
         path: "/etiquettes",
         icon: HiTag,
       },
+      {
+        moduleKey: "edition_promo",
+        label: "Édition Promo",
+        path: "/edition-promo",
+        icon: HiCurrencyDollar,
+      },
     ],
   },
 ];

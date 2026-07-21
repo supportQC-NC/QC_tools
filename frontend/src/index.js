@@ -33,6 +33,7 @@ import AdminFichesControleScreen from "./screens/admin/AdminFichesControleScreen
 import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
+import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
@@ -99,6 +100,7 @@ const router = createBrowserRouter(
           element={<UserPreparationCommande />}
         />
         <Route path="/etiquettes" element={<AdminEtiquettesScreen />} />
+        <Route path="/edition-promo" element={<AdminEditionPromoScreen />} />
         <Route path="/mes-taches" element={<MesTachesScreen />} />
       </Route>
 

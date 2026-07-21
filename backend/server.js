@@ -28,6 +28,7 @@ import receptionRoutes from "./routes/receptionRoutes.js";
 // ========== ROUTES PRÉPARATION DE COMMANDE ==========
 import preparationRoutes from "./routes/preparationRoutes.js";
 import etiquetteRoutes from "./routes/etiquetteRoutes.js";
+import editionPromoRoutes from "./routes/editionPromoRoutes.js";
 // ========== ROUTES ZONES (INVENTAIRE) ==========
 import zoneRoutes from "./routes/zoneRoutes.js";
 // ========== ROUTES INVENTAIRE ZONES (PROGRESSION) ==========
@@ -161,6 +162,7 @@ app.use("/api/proformas", proformaRoutes);
 // ========== ROUTES INVENTAIRE PROFORMA (admin, lecture) ==========
 app.use("/api/inventaire-proforma", inventaireProformaRoutes);
 app.use("/api/etiquettes", etiquetteRoutes);
+app.use("/api/edition-promo", editionPromoRoutes);
 // ========== ROUTES FOURNISSEURS ==========
 app.use("/api/fournisseurs", fournissRoutes);
 app.use("/api/clients", clientRoutes);
