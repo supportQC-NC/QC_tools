@@ -2057,9 +2057,15 @@ const createReception = asyncHandler(async (req, res) => {
     const nart = safeTrim(ligne.NART);
     let gencod = "";
     let estNouveau = false;
+    let designationArticle = "";
+    let desifrnArticle = "";
     try {
       const art = await articleCacheService.findByNart(entreprise, nart);
       if (art && art.GENCOD) gencod = art.GENCOD.trim();
+      // Le DESIGN de cmdetail est souvent vide : on retombe sur la base article.
+      designationArticle = art ? safeTrim(art.DESIGN) : "";
+      // DESIFRN complet (base article) ; le rapport n'en garde que 6 car. dans REFER.
+      desifrnArticle = art ? safeTrim(art.DESIFRN) : "";
       estNouveau = estArticleNouveau(art);
     } catch {
       /* ignore */
@@ -2067,8 +2073,9 @@ const createReception = asyncHandler(async (req, res) => {
     lignesCommande.push({
       nl: parseFloat(ligne.NL) || 0,
       nart,
-      designation: safeTrim(ligne.DESIGN),
-      refer: safeTrim(ligne.REFER),
+      designation: safeTrim(ligne.DESIGN) || designationArticle,
+      refer: desifrnArticle.slice(0, 6) || safeTrim(ligne.REFER).slice(0, 6),
+      desifrn: desifrnArticle,
       gencod,
       qteCommandee: parseFloat(ligne.QTE) || 0,
       estNouveau,
@@ -2203,13 +2210,46 @@ const getReceptionById = asyncHandler(async (req, res) => {
  */
 const getArticlesCommande = asyncHandler(async (req, res) => {
   const reception = await loadReceptionOwned(req.params.id, req, res);
+
+  // Repli DESIFRN : les sessions créées avant l'ajout du champ au snapshot ne
+  // l'ont pas stocké. On le complète depuis le cache article, sans réécrire le
+  // document Mongo. Aucun surcoût pour les sessions récentes (champ déjà présent).
+  const desifrnByNart = new Map();
+  if (reception.lignesCommande.some((l) => !safeTrim(l.desifrn))) {
+    try {
+      const entreprise = await Entreprise.findById(reception.entreprise);
+      if (entreprise) {
+        for (const l of reception.lignesCommande) {
+          const nart = safeTrim(l.nart);
+          if (!nart || safeTrim(l.desifrn) || desifrnByNart.has(nart)) continue;
+          const art = await articleCacheService.findByNart(entreprise, nart);
+          if (art) desifrnByNart.set(nart, safeTrim(art.DESIFRN));
+        }
+      }
+    } catch {
+      /* repli silencieux : on renvoie le snapshot tel quel */
+    }
+  }
+
   const articles = reception.lignesCommande
     .slice()
     .sort((a, b) =>
       safeTrim(a.designation).localeCompare(safeTrim(b.designation), "fr", {
         sensitivity: "base",
       }),
-    );
+    )
+    .map((l) => {
+      const obj = typeof l.toObject === "function" ? l.toObject() : { ...l };
+      if (!safeTrim(obj.desifrn)) {
+        const found = desifrnByNart.get(safeTrim(obj.nart));
+        if (found) {
+          obj.desifrn = found;
+          if (!safeTrim(obj.refer)) obj.refer = found.slice(0, 6);
+        }
+      }
+      return obj;
+    });
+
   res.json({ numcde: reception.numcde, articles });
 });
 

@@ -158,7 +158,10 @@ export const construireLignesRapport = (reception) => {
     rows.push({
       n,
       code: l.nart,
-      designation: l.designation,
+      // Repli : si la ligne de commande n'a pas de désignation (DESIGN de
+      // cmdetail vide), on prend celle du comptage correspondant.
+      designation: safeTrim(l.designation) || safeTrim(c?.designation),
+      refer: safeTrim(l.refer) || safeTrim(c?.refer).slice(0, 6),
       gencode: l.gencod,
       qteCmd: l.qteCommandee,
       qteBip: qteComptee,
@@ -189,6 +192,7 @@ export const construireLignesRapport = (reception) => {
       rows.push({
         n,
         code: c.nart || "",
+        refer: safeTrim(c.refer).slice(0, 6),
         designation: c.isInconnu ? "GENCODE INCONNU" : c.designation,
         gencode: c.gencod || "",
         qteCmd: "",
@@ -223,16 +227,17 @@ export const construireLignesRapport = (reception) => {
 // GÉNÉRATION PDF (même gabarit que ficheControleService)
 // ===========================================
 const COLS = [
-  { key: "n", label: "N°", w: 24, align: "center" },
-  { key: "code", label: "CODE", w: 50, align: "left" },
-  { key: "designation", label: "DÉSIGNATION", w: 132, align: "left" },
-  { key: "gencode", label: "GENCODE", w: 72, align: "left" },
-  { key: "qteCmd", label: "CMD", w: 38, align: "center" },
-  { key: "qteBip", label: "BIP", w: 38, align: "center" },
-  { key: "qteVal", label: "CONF", w: 38, align: "center" },
-  { key: "ecart", label: "ÉCART", w: 38, align: "center" },
-  { key: "nouv", label: "R/N", w: 34, align: "center" },
-  { key: "gencodeNouveau", label: "GENCODE NOUV.", w: 71, align: "left" },
+  { key: "n", label: "N°", w: 22, align: "center" },
+  { key: "code", label: "CODE", w: 48, align: "left" },
+  { key: "refer", label: "REFER", w: 46, align: "left" },
+  { key: "designation", label: "DÉSIGNATION", w: 110, align: "left" },
+  { key: "gencode", label: "GENCODE", w: 66, align: "left" },
+  { key: "qteCmd", label: "CMD", w: 36, align: "center" },
+  { key: "qteBip", label: "BIP", w: 36, align: "center" },
+  { key: "qteVal", label: "CONF", w: 36, align: "center" },
+  { key: "ecart", label: "ÉCART", w: 36, align: "center" },
+  { key: "nouv", label: "R/N", w: 32, align: "center" },
+  { key: "gencodeNouveau", label: "GENCODE NOUV.", w: 66, align: "left" },
 ];
 
 /** Tronque un texte avec … pour qu'il tienne dans maxWidth (police courante). */

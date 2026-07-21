@@ -295,7 +295,8 @@ const ligneCommandeSchema = new mongoose.Schema(
     nl: { type: Number, default: 0 }, // NL (ordre de la commande)
     nart: { type: String, default: "" }, // code article
     designation: { type: String, default: "" },
-    refer: { type: String, default: "" }, // référence fournisseur
+    refer: { type: String, default: "" }, // référence fournisseur (6 premiers car. de DESIFRN)
+    desifrn: { type: String, default: "" }, // DESIFRN complet (base article)
     gencod: { type: String, default: "" }, // gencode de référence (base article) si résolu
     qteCommandee: { type: Number, default: 0 }, // QTE de cmdetail
     estNouveau: { type: Boolean, default: false }, // nouveauté (V1..V12 tous = 0)
