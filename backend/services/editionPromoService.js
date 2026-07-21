@@ -7,8 +7,9 @@
 // Fichier : promo_<mois_suivant>.csv   (mois suivant relatif à AUJOURD'HUI ;
 //           ex. en juillet -> promo_aout.csv)
 // Format  : entête + lignes, séparateur ";" :
-//           NART;DESIGN;DPROMOD;DPROMOF
-//           834172;RADIATEUR ...;01/08/2026;31/08/2026
+//           NART;GENCOD;DESIGN;DPROMOD;DPROMOF
+//           834172;3401...;RADIATEUR ...;01/08/2026;31/08/2026
+//   - NART / GENCOD / DESIGN : repris de la BASE ARTICLE (inchangés).
 //   - DPROMOD = date de début saisie par l'utilisateur (JJ/MM/AAAA)
 //   - DPROMOF = date de fin saisie par l'utilisateur (JJ/MM/AAAA)
 
@@ -73,15 +74,16 @@ const cellCsv = (v) => safeTrim(v).replace(/[;\r\n]+/g, " ");
 
 /**
  * Construit le contenu CSV (avec entête, séparateur ";", fins de ligne CRLF).
- * @param {Array<{nart:string, design:string}>} articles
+ * @param {Array<{nart:string, gencod:string, design:string}>} articles
  * @param {string} dpromodFr  date début (JJ/MM/AAAA)
  * @param {string} dpromofFr  date fin (JJ/MM/AAAA)
  * @returns {string}
  */
 export const construireCsvPromo = (articles, dpromodFr, dpromofFr) => {
-  const header = "NART;DESIGN;DPROMOD;DPROMOF";
+  const header = "NART;GENCOD;DESIGN;DPROMOD;DPROMOF";
   const lignes = articles.map(
-    (a) => `${cellCsv(a.nart)};${cellCsv(a.design)};${dpromodFr};${dpromofFr}`,
+    (a) =>
+      `${cellCsv(a.nart)};${cellCsv(a.gencod)};${cellCsv(a.design)};${dpromodFr};${dpromofFr}`,
   );
   return [header, ...lignes].join("\r\n") + "\r\n";
 };

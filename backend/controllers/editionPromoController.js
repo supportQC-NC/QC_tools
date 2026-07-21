@@ -54,7 +54,8 @@ const genererPromo = asyncHandler(async (req, res) => {
   }
   rows.sort((a, b) => toNum(a.NL) - toNum(b.NL));
 
-  // 3) Résolution NART + DESIGN (proforma, repli sur base article)
+  // 3) Résolution NART + GENCOD + DESIGN — TOUJOURS depuis la base article
+  //    (pas la ligne proforma, dont la désignation peut contenir du texte promo).
   const articles = [];
   const introuvables = [];
   const vus = new Set();
@@ -64,17 +65,19 @@ const genererPromo = asyncHandler(async (req, res) => {
     if (!nart || vus.has(nart)) continue;
     vus.add(nart);
 
-    let design = safeTrim(r.DESIGN);
     let art = null;
     try {
       art = await articleCacheService.findByNart(entreprise, nart);
     } catch {
       art = null;
     }
-    if (!design && art) design = safeTrim(art.DESIGN);
     if (!art) introuvables.push(nart);
 
-    articles.push({ nart, design });
+    articles.push({
+      nart,
+      gencod: art ? safeTrim(art.GENCOD) : "",
+      design: art ? safeTrim(art.DESIGN) : "",
+    });
   }
 
   if (articles.length === 0) {
