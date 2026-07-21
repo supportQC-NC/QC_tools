@@ -130,7 +130,7 @@ const SearchableMultiSelect = ({
       {open && (
         <div className="etiq-gism1-menu">
           {loading ? (
-            <div className="etiq-gism1-empty">Chargement…</div>
+            <div className="etiq-gism1-empty">Chargement</div>
           ) : filtered.length === 0 ? (
             <div className="etiq-gism1-empty">
               {search ? "Aucun résultat correspondant" : "Aucune valeur disponible"}
