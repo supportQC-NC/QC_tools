@@ -4,9 +4,11 @@ import proformaCacheService from "../services/proformaCacheService.js";
 import articleCacheService from "../services/articleService.js";
 import {
   construireCsvPromo,
-  ecrireFichierPromo,
+  construireCsvPromoSansPrix,
+  ecrireDansCollectSec,
   formatDateFr,
   nomFichierPromo,
+  nomFichierPromoSansPrix,
 } from "../services/editionPromoService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
@@ -56,7 +58,9 @@ const genererPromo = asyncHandler(async (req, res) => {
 
   // 3) Résolution NART + GENCOD + DESIGN — TOUJOURS depuis la base article
   //    (pas la ligne proforma, dont la désignation peut contenir du texte promo).
+  //    On isole aussi les articles SANS prix promo (PVPROMO vide / 0).
   const articles = [];
+  const sansPvpromo = [];
   const introuvables = [];
   const vus = new Set();
   for (const r of rows) {
@@ -73,11 +77,18 @@ const genererPromo = asyncHandler(async (req, res) => {
     }
     if (!art) introuvables.push(nart);
 
-    articles.push({
+    const item = {
       nart,
       gencod: art ? safeTrim(art.GENCOD) : "",
       design: art ? safeTrim(art.DESIGN) : "",
-    });
+    };
+    articles.push(item);
+
+    // PVPROMO vide ou <= 0 (article trouvé) -> 2e fichier.
+    if (art) {
+      const pv = parseFloat(art.PVPROMO);
+      if (!Number.isFinite(pv) || pv <= 0) sansPvpromo.push(item);
+    }
   }
 
   if (articles.length === 0) {
@@ -85,12 +96,23 @@ const genererPromo = asyncHandler(async (req, res) => {
     throw new Error(`Aucun article exploitable pour la proforma ${numfact}`);
   }
 
-  // 4) Construction + écriture du CSV dans collect_sec
-  const contenu = construireCsvPromo(articles, dpromodFr, dpromofFr);
-
+  // 4) Écriture du (des) CSV dans collect_sec.
   let ecrit;
+  let ecritSansPrix = null;
   try {
-    ecrit = ecrireFichierPromo(entreprise, contenu);
+    ecrit = ecrireDansCollectSec(
+      entreprise,
+      nomFichierPromo(),
+      construireCsvPromo(articles, dpromodFr, dpromofFr),
+    );
+    // 2e fichier UNIQUEMENT s'il y a des articles sans prix promo.
+    if (sansPvpromo.length > 0) {
+      ecritSansPrix = ecrireDansCollectSec(
+        entreprise,
+        nomFichierPromoSansPrix(),
+        construireCsvPromoSansPrix(sansPvpromo, dpromodFr, dpromofFr),
+      );
+    }
   } catch (error) {
     res.status(500);
     throw new Error(
@@ -108,6 +130,12 @@ const genererPromo = asyncHandler(async (req, res) => {
     dateFin: dpromofFr,
     nbArticles: articles.length,
     introuvables,
+    // 2e fichier : articles sans prix promo (PVPROMO vide / 0).
+    sansPvpromo: {
+      count: sansPvpromo.length,
+      fileName: ecritSansPrix ? ecritSansPrix.fileName : null,
+      filePath: ecritSansPrix ? ecritSansPrix.filePath : null,
+    },
   });
 });
 

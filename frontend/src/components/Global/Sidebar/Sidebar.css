@@ -198,7 +198,9 @@
   flex-direction: column;
   gap: 2px;
   overflow: hidden;
-  max-height: 1000px;
+  /* Assez haut pour ne jamais tronquer une section entièrement déployée
+     (Gestion + Données + Analyse). Sert de borne à l'animation d'ouverture. */
+  max-height: 4000px;
   transition:
     max-height 0.3s ease,
     opacity 0.2s ease;
@@ -285,7 +287,9 @@
   margin-left: 8px;
   border-left: 1px solid var(--border);
   overflow: hidden;
-  max-height: 500px;
+  /* Le sous-groupe « Analyse » compte 13 entrées : 500px tronquait les
+     dernières (Performance Dock, Collecteurs, Carte des collecteurs). */
+  max-height: 2000px;
   transition:
     max-height 0.25s ease,
     opacity 0.2s ease,

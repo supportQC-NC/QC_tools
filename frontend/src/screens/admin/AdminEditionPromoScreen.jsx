@@ -166,6 +166,14 @@ const AdminEditionPromoScreen = () => {
               <li>
                 Emplacement : <code>{info.filePath}</code>
               </li>
+              {info.sansPvpromo?.count > 0 && (
+                <li>
+                  ⚠️ {info.sansPvpromo.count} article(s) sans prix promo
+                  (PVPROMO vide/0) → fichier{" "}
+                  <code>{info.sansPvpromo.fileName}</code> généré (colonne
+                  PVPROMO à remplir).
+                </li>
+              )}
               {info.introuvables?.length > 0 && (
                 <li className="promo-muted">
                   {info.introuvables.length} NART absent(s) de la base article

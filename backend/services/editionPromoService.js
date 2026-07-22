@@ -44,6 +44,10 @@ export const nomMoisSuivant = (ref = new Date()) => {
 export const nomFichierPromo = (ref = new Date()) =>
   `promo_${nomMoisSuivant(ref)}.csv`;
 
+// Nom du 2e fichier : articles sans prix promo (PVPROMO vide / 0).
+export const nomFichierPromoSansPrix = (ref = new Date()) =>
+  `promo_${nomMoisSuivant(ref)}_sans_pvpromo.csv`;
+
 // "YYYY-MM-DD" (ou Date) -> "JJ/MM/AAAA". Renvoie "" si invalide.
 export const formatDateFr = (value) => {
   if (!value) return "";
@@ -88,30 +92,49 @@ export const construireCsvPromo = (articles, dpromodFr, dpromofFr) => {
   return [header, ...lignes].join("\r\n") + "\r\n";
 };
 
+/**
+ * Variante pour les articles SANS prix promo (PVPROMO vide / 0) : même format,
+ * plus une colonne PVPROMO laissée vide (à renseigner par les Achats).
+ */
+export const construireCsvPromoSansPrix = (articles, dpromodFr, dpromofFr) => {
+  const header = "NART;GENCOD;DESIGN;DPROMOD;DPROMOF;PVPROMO";
+  const lignes = articles.map(
+    (a) =>
+      `${cellCsv(a.nart)};${cellCsv(a.gencod)};${cellCsv(a.design)};${dpromodFr};${dpromofFr};`,
+  );
+  return [header, ...lignes].join("\r\n") + "\r\n";
+};
+
 // Dossier collect_sec de l'entreprise (getter du modèle déjà traduit dev/prod).
 const resoudreDossierCollectSec = (entreprise) =>
   safeTrim(entreprise?.cheminExportInventaire) ||
   "/mnt/rcommun/STOCK/collect_sec";
 
 /**
- * Écrit le fichier promo dans collect_sec. Crée le dossier au besoin.
+ * Écrit un fichier dans collect_sec (crée le dossier au besoin).
  * @returns {{ fileName:string, filePath:string, dossier:string }}
  */
-export const ecrireFichierPromo = (entreprise, contenu, ref = new Date()) => {
+export const ecrireDansCollectSec = (entreprise, fileName, contenu) => {
   const dossier = resoudreDossierCollectSec(entreprise);
   if (!fs.existsSync(dossier)) {
     fs.mkdirSync(dossier, { recursive: true });
   }
-  const fileName = nomFichierPromo(ref);
   const filePath = path.join(dossier, fileName);
   fs.writeFileSync(filePath, contenu, "utf8");
   return { fileName, filePath, dossier };
 };
 
+// Compat : écrit le fichier promo principal (promo_<mois>.csv).
+export const ecrireFichierPromo = (entreprise, contenu, ref = new Date()) =>
+  ecrireDansCollectSec(entreprise, nomFichierPromo(ref), contenu);
+
 export default {
   nomMoisSuivant,
   nomFichierPromo,
+  nomFichierPromoSansPrix,
   formatDateFr,
   construireCsvPromo,
+  construireCsvPromoSansPrix,
+  ecrireDansCollectSec,
   ecrireFichierPromo,
 };
