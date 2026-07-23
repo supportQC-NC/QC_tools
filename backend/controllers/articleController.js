@@ -533,6 +533,41 @@ const getGism1 = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Obtenir les codes distincts d'un niveau de gisement (GISM1..GISM5)
+ * @route   GET /api/articles/:nomDossierDBF/gism/:niveau
+ * @access  Private
+ */
+const getGismNiveau = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const niveau = parseInt(req.params.niveau, 10);
+
+  if (!(niveau >= 1 && niveau <= 5)) {
+    res.status(400);
+    throw new Error(`Niveau de gisement invalide: ${req.params.niveau} (attendu 1..5).`);
+  }
+
+  const dbfPath = path.join(
+    entreprise.cheminBase,
+    entreprise.nomDossierDBF,
+    "article.dbf",
+  );
+  if (!fs.existsSync(dbfPath)) {
+    res.status(404);
+    throw new Error(
+      `Fichier articles non trouvé pour l'entreprise ${entreprise.nomComplet}`,
+    );
+  }
+
+  const gisements = await articleCacheService.getGismLevel(entreprise, niveau);
+  res.json({
+    niveau,
+    champ: `GISM${niveau}`,
+    total: gisements.length,
+    gisements,
+  });
+});
+
+/**
  * @desc    Obtenir la liste des taux TGC distincts
  * @route   GET /api/articles/:nomDossierDBF/tgc-rates
  * @access  Private
@@ -669,6 +704,7 @@ export {
   searchArticles,
   getGroupes,
   getGism1,
+  getGismNiveau,
   getTgcRates,
   getAdjacentArticles,
   invalidateCache,

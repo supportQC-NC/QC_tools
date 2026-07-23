@@ -174,6 +174,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Export Gisements (outil d'export Excel GISM1..GISM5)
+      export_gisements_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // ══════════ ADMINISTRATION (dashboard, users, entreprises) ══════════
       // Tableau de bord
       dashboard_admin: {

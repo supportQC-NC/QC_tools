@@ -117,6 +117,15 @@ export const articleApiSlice = apiSlice.injectEndpoints({
       keepUnusedDataFor: 300, // Cache 5 min car change rarement
     }),
 
+    // Codes distincts d'un niveau de gisement (GISM1..GISM5)
+    getGismLevel: builder.query({
+      query: ({ nomDossierDBF, niveau }) => ({
+        url: `${ARTICLES_URL}/${nomDossierDBF}/gism/${niveau}`,
+      }),
+      providesTags: ["Article"],
+      keepUnusedDataFor: 300,
+    }),
+
     // Liste des taux TGC distincts
     getTgcRates: builder.query({
       query: (nomDossierDBF) => ({
@@ -198,6 +207,7 @@ export const {
   useSearchArticlesQuery,
   useGetGroupesQuery,
   useGetGism1Query,
+  useGetGismLevelQuery,
   useGetTgcRatesQuery,
   useGetArticlesStructureQuery,
   useGetArticlePhotoQuery,

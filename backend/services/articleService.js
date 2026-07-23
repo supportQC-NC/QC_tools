@@ -660,6 +660,27 @@ class ArticleCacheService {
   }
 
   /**
+   * Obtenir les codes distincts d'un niveau de gisement (GISM1..GISM5) avec
+   * comptage. niveau = 1..5.
+   */
+  async getGismLevel(entreprise, niveau) {
+    const n = parseInt(niveau, 10);
+    if (!(n >= 1 && n <= 5)) {
+      throw new Error(`Niveau de gisement invalide: ${niveau} (attendu 1..5)`);
+    }
+    const champ = `GISM${n}`;
+    const cache = await this.getArticles(entreprise);
+    const compte = new Map();
+    cache.records.forEach((r) => {
+      const code = this.safeTrim(r[champ]);
+      if (code) compte.set(code, (compte.get(code) || 0) + 1);
+    });
+    return [...compte.entries()]
+      .map(([code, count]) => ({ code, count }))
+      .sort((a, b) => a.code.localeCompare(b.code, "fr", { numeric: true }));
+  }
+
+  /**
    * Récupérer les articles d'un ou plusieurs GISM1.
    * Ordre : selon l'ordre des GISM1 fournis, puis ordre du fichier (par NART).
    * Les doublons (article présent via plusieurs GISM1) sont dédupliqués.

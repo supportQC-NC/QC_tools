@@ -1,0 +1,305 @@
+/* src/screens/admin/AdminExportGisementsScreen.css */
+
+.expg-screen {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.expg-placeholder {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted, #64748b);
+}
+
+.expg-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.6rem;
+  margin: 0 0 6px;
+}
+
+.expg-header p {
+  color: var(--text-muted, #64748b);
+  margin: 0 0 20px;
+  font-size: 0.95rem;
+}
+
+.expg-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.expg-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+.expg-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.expg-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.expg-type-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 14px;
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--card-bg, #fff);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.expg-type-card:hover {
+  border-color: #93c5fd;
+}
+
+.expg-type-card.selected {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.06);
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+.expg-type-title {
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+.expg-type-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+  line-height: 1.35;
+}
+
+.expg-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.expg-generate {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.expg-generate:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.expg-generate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.expg-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.expg-info {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+/* Onglets sortie Excel / Étiquettes */
+.expg-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--card-bg, #fff);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.expg-tab.active {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+/* Sélecteur de niveau GISM1..5 */
+.expg-niveaux {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.expg-niveau-btn {
+  padding: 8px 14px;
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--card-bg, #fff);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.expg-niveau-btn.active {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+.expg-hint-inline {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* Multiselect recherchable */
+.expg-ms {
+  position: relative;
+}
+
+.expg-ms-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--card-bg, #fff);
+  cursor: text;
+}
+
+.expg-ms-placeholder {
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.9rem;
+}
+
+.expg-ms-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.expg-ms-chip-x {
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #1d4ed8;
+  padding: 0;
+}
+
+.expg-ms-search {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.9rem;
+  padding: 4px;
+}
+
+.expg-ms-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.expg-ms-empty {
+  padding: 12px;
+  color: var(--text-muted, #64748b);
+  font-size: 0.9rem;
+}
+
+.expg-ms-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.expg-ms-option:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.expg-ms-option.checked {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.expg-ms-check {
+  width: 14px;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.expg-ms-code {
+  flex: 1;
+  font-weight: 600;
+}
+
+.expg-ms-count {
+  color: var(--text-muted, #64748b);
+  font-size: 0.8rem;
+}

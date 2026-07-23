@@ -35,6 +35,7 @@ export const PERMISSION_MODULES = [
   { key: "inventaire_proforma_admin", label: "Inventaire Proforma", group: "donnees" },
   { key: "fiches_controle_admin", label: "Fiches de contrôle", group: "donnees" },
   { key: "reception_suivi_admin", label: "Suivi Réceptions", group: "donnees" },
+  { key: "export_gisements_admin", label: "Export Gisements", group: "donnees" },
   // ── Analyse (écrans admin) ────────────────────────────────────────────────
   { key: "commerciaux_admin", label: "Analyse Commerciaux", group: "analyse" },
   { key: "filiales_admin", label: "Analyse Filiales", group: "analyse" },

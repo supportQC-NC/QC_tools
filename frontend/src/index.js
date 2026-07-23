@@ -73,6 +73,7 @@ import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
 import AdminReceptionSuiviScreen from "./screens/admin/AdminReceptionSuiviScreen";
+import AdminExportGisementsScreen from "./screens/admin/AdminExportGisementsScreen";
 import AdminEquipesScreen from "./screens/admin/AdminEquipesScreen";
 import AdminTachesScreen from "./screens/admin/AdminTachesScreen";
 import MesTachesScreen from "./screens/user/MesTachesScreen";
@@ -347,6 +348,14 @@ const router = createBrowserRouter(
         <Route
           path="/admin/suivi-receptions"
           element={<AdminReceptionSuiviScreen />}
+        />
+      </Route>
+
+      {/* Données · Export Gisements -> module "export_gisements_admin" */}
+      <Route element={<ModuleRoute module="export_gisements_admin" />}>
+        <Route
+          path="/admin/export-gisements"
+          element={<AdminExportGisementsScreen />}
         />
       </Route>
 

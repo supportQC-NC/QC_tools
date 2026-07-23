@@ -20,7 +20,8 @@ import {
   HiTemplate,
   HiTag,
   HiQrcode,
-  HiDeviceMobile
+  HiDeviceMobile,
+  HiDownload
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -65,6 +66,7 @@ export const adminMenuStructure = [
       { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
       { label: "Bipages", path: "/admin/bipages", icon: HiClipboardList },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
+      { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
     ],
   },
   {

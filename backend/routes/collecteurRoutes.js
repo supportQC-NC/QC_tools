@@ -33,6 +33,7 @@ router
   .get(protect, canRead, getCollecteurs)
   .post(protect, canWrite, createCollecteur);
 
+  
 router
   .route("/:id")
   .get(protect, canRead, getCollecteurById)

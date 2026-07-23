@@ -8,11 +8,16 @@ import {
   searchArticles,
   getGroupes,
   getGism1,
+  getGismNiveau,
   getTgcRates,
   invalidateCache,
   getCacheStats,
   getAdjacentArticles,
 } from "../controllers/articleController.js";
+import {
+  exportGisements,
+  genererEtiquettesGisement,
+} from "../controllers/gisementsExportController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import {
   checkEntrepriseAccess,
@@ -23,6 +28,33 @@ const router = express.Router();
 
 // Cache stats (admin) - AVANT les routes avec paramètres
 router.get("/cache-stats", protect, admin, getCacheStats);
+
+// Export Excel des gisements (GISM1..GISM5) — outil admin dédié
+router.get(
+  "/:nomDossierDBF/export-gisements",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("export_gisements_admin", "read"),
+  exportGisements,
+);
+
+// Codes distincts d'un niveau de gisement (GISM1..GISM5) — pour le sélecteur
+router.get(
+  "/:nomDossierDBF/gism/:niveau",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("export_gisements_admin", "read"),
+  getGismNiveau,
+);
+
+// Génération PDF d'étiquettes de gisement (A8, Code128)
+router.post(
+  "/:nomDossierDBF/gisement-etiquettes",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("export_gisements_admin", "read"),
+  genererEtiquettesGisement,
+);
 
 // Liste des articles avec pagination et filtres avancés
 router.get(
