@@ -66,6 +66,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/articles", key: "stock" },
   { path: "/admin/fournisseurs", key: "stock" },
   { path: "/admin/clients", key: "client" },
+  { path: "/admin/reservations", key: "proforma" },
   { path: "/admin/commandes", key: "commandes" },
   { path: "/admin/proformas", key: "proforma" },
   { path: "/admin/factures", key: "facture" },

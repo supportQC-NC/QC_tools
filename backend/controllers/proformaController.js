@@ -78,12 +78,36 @@ const formatEntreprise = (entreprise) => ({
 });
 
 /**
- * Labels des états de proforma
+ * Labels des états de proforma (valeurs par défaut si l'entreprise n'a rien
+ * configuré dans mappingEtatsProforma).
  */
 const ETAT_LABELS = {
   0: "brouillon",
   1: "validée",
   2: "facturée",
+};
+
+/**
+ * Construit la table des libellés d'états pour une entreprise :
+ * on part des valeurs par défaut puis on applique le mapping personnalisé
+ * (mappingEtatsProforma) configuré sur la fiche entreprise.
+ */
+const buildEtatLabels = (entreprise) => {
+  const labels = { ...ETAT_LABELS };
+  const mapping = entreprise?.mappingEtatsProforma;
+  if (mapping) {
+    // mappingEtatsProforma est un Map Mongoose (ou un objet après toJSON).
+    const entries =
+      typeof mapping.entries === "function"
+        ? [...mapping.entries()]
+        : Object.entries(mapping);
+    for (const [code, libelle] of entries) {
+      if (libelle !== undefined && libelle !== null && String(libelle).trim()) {
+        labels[code] = libelle;
+      }
+    }
+  }
+  return labels;
 };
 
 // ===========================================
@@ -125,6 +149,8 @@ const getProformas = asyncHandler(async (req, res) => {
       tiers: req.query.tiers || undefined,
       repres: req.query.repres || undefined,
       etat: req.query.etat !== undefined ? req.query.etat : undefined,
+      maxEtat: req.query.maxEtat !== undefined ? req.query.maxEtat : undefined,
+      interne: req.query.interne || undefined,
       dateDebut: req.query.dateDebut || undefined,
       dateFin: req.query.dateFin || undefined,
     };
@@ -159,7 +185,7 @@ const getProformas = asyncHandler(async (req, res) => {
       filters: {
         active: activeFilters,
       },
-      etatLabels: ETAT_LABELS,
+      etatLabels: buildEtatLabels(entreprise),
       _queryTime: `${queryTime}ms`,
       proformas: result.proformas,
     });
@@ -214,7 +240,7 @@ const getProformaByNumfact = asyncHandler(async (req, res) => {
       entreprise: formatEntreprise(entreprise),
       _queryTime: `${queryTime}ms`,
       proforma,
-      etatLabel: ETAT_LABELS[proforma.ETAT] || "inconnu",
+      etatLabel: buildEtatLabels(entreprise)[proforma.ETAT] || "inconnu",
       detail: {
         totalLignes: lignes.length,
         lignesArticle: lignesArticle.length,

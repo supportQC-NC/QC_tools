@@ -1,0 +1,354 @@
+/* ==========================================================================
+   Admin Réservations — réutilise le design des Proformas (AdminProformasScreen.css)
+   Accent propre : indigo/violet (#6366f1) pour distinguer des proformas (teal).
+
+   NOTE : les variables --admin-* utilisées par tout le CSS admin réutilisé
+   (tables, cartes, barres…) ne sont définies nulle part dans le projet ; elles
+   sont donc redéfinies ici, SCOPÉES à cette page, pour un rendu propre (thème
+   sombre) sans impacter les autres écrans. Les propriétés custom se propagent
+   par héritage DOM, donc toutes les règles var(--admin-*) internes se résolvent.
+   ========================================================================== */
+
+.admin-reservations-page {
+  --admin-bg: #0a0a0f;
+  --admin-bg-secondary: #12121a;
+  --admin-bg-tertiary: #1a1a25;
+  --admin-bg-hover: #22222e;
+  --admin-border: #2a2a3a;
+  --admin-text: #f0f0f5;
+  --admin-text-secondary: #a7a7b8;
+  --admin-text-muted: #6b6b7d;
+  --admin-info: #3b82f6;
+  --admin-info-light: rgba(59, 130, 246, 0.16);
+  --admin-success: #10b981;
+  --admin-success-light: rgba(16, 185, 129, 0.16);
+  --admin-danger: #ef4444;
+  --admin-radius: 12px;
+  --admin-radius-sm: 8px;
+  --admin-radius-xs: 4px;
+  --admin-transition: all 0.18s ease;
+  --admin-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --admin-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* Icône d'en-tête */
+.admin-reservations-page .reservations-icon {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Accent des liens N° proforma et badges dans cette page */
+.admin-reservations-page .proforma-numfact-link {
+  color: #818cf8;
+}
+.admin-reservations-page .proforma-numfact-link:hover {
+  background: #6366f1;
+  color: #fff;
+}
+.admin-reservations-page .proformas-table th {
+  border-bottom-color: #6366f1;
+}
+.admin-reservations-page .btn-detail {
+  border-color: #6366f1 !important;
+  color: #818cf8 !important;
+}
+.admin-reservations-page .btn-detail:hover {
+  background: #6366f1 !important;
+  color: #fff !important;
+}
+
+/* ========== Saisie directe d'un N° de proforma ========== */
+.numfact-jump {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+}
+
+.numfact-jump-icon {
+  color: var(--admin-text-muted);
+  flex-shrink: 0;
+}
+
+.numfact-jump input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  width: 180px;
+  font-family: "Monaco", "Consolas", monospace;
+}
+
+.numfact-jump input::placeholder {
+  color: var(--admin-text-muted);
+  font-family: inherit;
+}
+
+.numfact-jump button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: var(--admin-radius-sm);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.numfact-jump button:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.numfact-jump button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========== Onglets de type (Toutes / À préparer / Réservations) ========== */
+.reservations-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0;
+}
+
+.reservation-tab {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-secondary);
+  border-radius: 50px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+
+.reservation-tab:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+
+.reservation-tab.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+/* Bascule « Afficher internes » (poussée à droite) */
+.internes-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px dashed var(--admin-border);
+  color: var(--admin-text-secondary);
+  border-radius: 50px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+
+.internes-toggle:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+
+.internes-toggle.active {
+  background: rgba(236, 72, 153, 0.18);
+  border: 1px solid #ec4899;
+  color: #f9a8d4;
+}
+
+.internes-toggle svg {
+  flex-shrink: 0;
+}
+
+/* ========== Barre de filtres complémentaires ========== */
+.reservations-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.res-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.4rem 0.75rem;
+}
+
+.res-filter-group.grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.res-filter-group svg {
+  color: var(--admin-text-muted);
+  flex-shrink: 0;
+}
+
+.res-filter-group input,
+.res-filter-group select {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.res-filter-group select option {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+}
+
+.res-filter-group input::placeholder {
+  color: var(--admin-text-muted);
+}
+
+/* ========== Badges d'état (couleurs par catégorie) ========== */
+.admin-reservations-page .etat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-reservations-page .etat-badge svg {
+  flex-shrink: 0;
+}
+.admin-reservations-page .etat-reservation {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}
+.admin-reservations-page .etat-speciale {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+.admin-reservations-page .etat-preparer {
+  background: rgba(20, 184, 166, 0.18);
+  color: #5eead4;
+  border: 1px solid rgba(20, 184, 166, 0.5);
+}
+.admin-reservations-page .etat-muted {
+  background: rgba(120, 120, 140, 0.18);
+  color: var(--admin-text-muted);
+  border: 1px solid var(--admin-border);
+}
+
+/* ========== Couleurs de ligne par catégorie ==========
+   Teintes translucides sur fond sombre : le texte clair (--admin-text) reste
+   parfaitement lisible (bon contraste). Bordure gauche = repère visuel fort. */
+.admin-reservations-page .proformas-table tbody tr.row-cat-reservation {
+  background: rgba(59, 130, 246, 0.13);
+  border-left: 3px solid #3b82f6;
+}
+.admin-reservations-page .proformas-table tbody tr.row-cat-reservation:hover {
+  background: rgba(59, 130, 246, 0.24);
+}
+.admin-reservations-page .proformas-table tbody tr.row-cat-speciale {
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 3px solid #f59e0b;
+}
+.admin-reservations-page .proformas-table tbody tr.row-cat-speciale:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+.admin-reservations-page .proformas-table tbody tr.row-cat-preparer {
+  background: rgba(20, 184, 166, 0.1);
+  border-left: 3px solid #14b8a6;
+}
+.admin-reservations-page .proformas-table tbody tr.row-cat-preparer:hover {
+  background: rgba(20, 184, 166, 0.2);
+}
+.admin-reservations-page .proformas-table tbody tr.row-cat-autre {
+  border-left: 3px solid var(--admin-border);
+}
+
+/* ========== Légende ========== */
+.reservations-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 0 1rem 0.75rem;
+  margin: 1rem 0;
+  align-items: center;
+}
+.reservations-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+  font-weight: 600;
+}
+.reservations-legend .legend-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.reservations-legend .swatch-reservation {
+  background: rgba(59, 130, 246, 0.3);
+  border-left: 3px solid #3b82f6;
+}
+.reservations-legend .swatch-speciale {
+  background: rgba(245, 158, 11, 0.3);
+  border-left: 3px solid #f59e0b;
+}
+.reservations-legend .swatch-preparer {
+  background: rgba(20, 184, 166, 0.3);
+  border-left: 3px solid #14b8a6;
+}
+
+/* Nom du représentant (issu de entreprise.vendeurs) */
+.admin-reservations-page .repres-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  display: inline-block;
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 900px) {
+  .numfact-jump input {
+    width: 130px;
+  }
+  .reservations-filters {
+    flex-direction: column;
+  }
+  .res-filter-group.grow {
+    min-width: 0;
+  }
+}

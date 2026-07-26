@@ -50,6 +50,7 @@ import AdminMeilleursVentesScreen from "./screens/admin/AdminMeilleursVentesScre
 import UserPreparationCommande from "./screens/user/UserPreparationCommande";
 import AdminProformasScreen from "./screens/admin/AdminProformasScreen";
 import AdminProformaDetailScreen from "./screens/admin/AdminProformaDetailsScreen";
+import AdminReservationsScreen from "./screens/admin/AdminReservationsScreen";
 import UserProformasScreen from "./screens/user/UserProformasScreen";
 import AdminFournisseursScreen from "./screens/admin/AdminFournisseursScreen";
 import AdminFournisseurInfosScreen from "./screens/admin/AdminFournisseurInfosScreen";
@@ -191,6 +192,16 @@ const router = createBrowserRouter(
         <Route
           path="/admin/proformas/:nomDossierDBF/:numfact"
           element={<AdminProformaDetailScreen />}
+        />
+      </Route>
+
+      {/* Données · Réservations (proformas état <= 2) -> module "proforma".
+          Le détail réutilise l'écran proforma (/admin/proformas/:dossier/:numfact). */}
+      <Route element={<ModuleRoute module="proforma" />}>
+        <Route path="/admin/reservations" element={<AdminReservationsScreen />} />
+        <Route
+          path="/admin/reservations/:nomDossierDBF"
+          element={<AdminReservationsScreen />}
         />
       </Route>
 

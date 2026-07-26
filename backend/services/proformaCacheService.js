@@ -4,6 +4,9 @@ import path from "path";
 import fs from "fs";
 import articleCacheService from "./articleService.js";
 
+// Seuil du code client (TIERS) à partir duquel un compte est considéré INTERNE.
+const SEUIL_TIERS_INTERNE = 9900;
+
 /**
  * Service de cache pour les proformas DBF (entêtes + détails)
  * Deux fichiers : proforma.dbf (entêtes) et prodet.dbf (lignes détail)
@@ -390,6 +393,8 @@ class ProformaCacheService {
       tiers,
       repres,
       etat,
+      maxEtat,
+      interne,
       dateDebut,
       dateFin,
     } = options;
@@ -439,7 +444,7 @@ class ProformaCacheService {
       });
     }
 
-    // Filtre par ETAT (0=brouillon, 1=validée, 2=facturée)
+    // Filtre par ETAT exact (0=brouillon, 1=validée, 2=facturée)
     if (etat !== undefined && etat !== null && etat !== "") {
       const etatNum = parseInt(etat);
       if (!isNaN(etatNum)) {
@@ -447,6 +452,33 @@ class ProformaCacheService {
           return record.ETAT === etatNum;
         });
       }
+    }
+
+    // Filtre par ETAT maximum (ETAT <= maxEtat) — utilisé par l'écran
+    // « Réservations » qui ne montre que les proformas d'état <= 2.
+    if (maxEtat !== undefined && maxEtat !== null && maxEtat !== "") {
+      const maxNum = parseInt(maxEtat);
+      if (!isNaN(maxNum)) {
+        filteredRecords = filteredRecords.filter((record) => {
+          const e = record.ETAT;
+          return e !== undefined && e !== null && Number(e) <= maxNum;
+        });
+      }
+    }
+
+    // Filtre INTERNES : les clients dont le code (TIERS) est >= 9900 sont des
+    // comptes internes. « exclure » (défaut écran Réservations) les masque,
+    // « seulement » n'affiche qu'eux. Paramètre optionnel : sans valeur, aucun
+    // filtrage (l'écran Proformas général reste inchangé).
+    if (interne === "exclure") {
+      // Garde les non-internes ET les proformas sans code tiers (NaN).
+      filteredRecords = filteredRecords.filter(
+        (record) => !(Number(record.TIERS) >= SEUIL_TIERS_INTERNE),
+      );
+    } else if (interne === "seulement") {
+      filteredRecords = filteredRecords.filter(
+        (record) => Number(record.TIERS) >= SEUIL_TIERS_INTERNE,
+      );
     }
 
     // Filtre par plage de dates (DATFACT)

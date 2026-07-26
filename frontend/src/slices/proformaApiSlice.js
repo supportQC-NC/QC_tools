@@ -15,6 +15,8 @@ export const proformaApiSlice = apiSlice.injectEndpoints({
         tiers,
         repres,
         etat,
+        maxEtat,
+        interne,
         dateDebut,
         dateFin,
       }) => ({
@@ -26,6 +28,8 @@ export const proformaApiSlice = apiSlice.injectEndpoints({
           ...(tiers && { tiers }),
           ...(repres && { repres }),
           ...(etat !== undefined && etat !== "" && etat !== "TOUT" && { etat }),
+          ...(maxEtat !== undefined && maxEtat !== "" && { maxEtat }),
+          ...(interne && { interne }),
           ...(dateDebut && { dateDebut }),
           ...(dateFin && { dateFin }),
         },

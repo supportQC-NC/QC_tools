@@ -61,6 +61,7 @@ export const adminMenuStructure = [
       { label: "Articles", path: "/admin/articles", icon: HiCube },
       { label: "Fournisseurs", path: "/admin/fournisseurs", icon: HiFolder },
       { label: "Clients", path: "/admin/clients", icon: HiUserGroup },
+      { label: "Réservations", path: "/admin/reservations", icon: HiClipboardList },
       { label: "Commandes", path: "/admin/commandes", icon: HiTruck },
       { label: "Proformas", path: "/admin/proformas", icon: HiDocumentReport },
       { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
