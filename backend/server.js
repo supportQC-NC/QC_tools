@@ -1,12 +1,15 @@
 // backend/server.js
 import "./loadEnv.js"; // ⬅️ DOIT rester la toute première ligne (charge dotenv avant tout)
 import path from "path";
+import http from "http";
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import fs from "fs";
+import { Server as SocketServer } from "socket.io";
 
 import connectDB from "./config/db.js";
+import initChat from "./socket/chatSocket.js";
 
 // Import des routes
 import userRoutes from "./routes/userRoutes.js";
@@ -76,6 +79,10 @@ import taskRoutes from "./routes/taskRoutes.js";
 import reportSubscriptionRoutes from "./routes/reportSubscriptionRoutes.js";
 // ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
+// ========== ROUTES EXÉCUTABLES (catalogue téléchargeable, GridFS) ==========
+import executableRoutes from "./routes/executableRoutes.js";
+// ========== ROUTES MESSAGES (chat temps réel) ==========
+import messageRoutes from "./routes/messageRoutes.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -192,6 +199,10 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 // ========== ROUTES ANALYSE CA ==========
 app.use("/api/analyse-ca", analyseCaRoutes);
+// ========== ROUTES EXÉCUTABLES ==========
+app.use("/api/executables", executableRoutes);
+// ========== ROUTES MESSAGES (chat) ==========
+app.use("/api/messages", messageRoutes);
 // =======================================
 
 // ==========================================
@@ -226,8 +237,16 @@ if (process.env.NODE_ENV === "production") {
 app.use(notFound);
 app.use(errorHandler);
 
+// Serveur HTTP + Socket.IO (chat temps réel). Même origine que le REST :
+// le cookie JWT est envoyé au handshake (auth dans socket/chatSocket.js).
+const server = http.createServer(app);
+const io = new SocketServer(server, {
+  cors: { origin: true, credentials: true },
+});
+initChat(io);
+
 // Démarrage du serveur
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   startInventaireWatcher();
 });

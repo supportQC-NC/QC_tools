@@ -1,0 +1,899 @@
+/* ==========================================================================
+   Données > Exécutables — thème sombre professionnel
+   Variables globales (index.css) : --bg-*, --text-*, --accent, --border…
+   ========================================================================== */
+
+.admin-executables {
+  padding: 24px;
+  color: var(--text-primary);
+}
+
+/* ---------- En-tête ---------- */
+.exe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.exe-header-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.exe-header-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: #fff;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  box-shadow: 0 6px 16px rgba(77, 166, 255, 0.35);
+}
+
+.exe-header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.exe-header-sub {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.exe-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Boutons ---------- */
+.exe-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+  box-shadow: 0 6px 16px rgba(77, 166, 255, 0.3);
+}
+
+.exe-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(77, 166, 255, 0.4);
+}
+
+.exe-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.exe-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.exe-btn-ghost.icon {
+  width: 42px;
+  padding: 0;
+  font-size: 1.1rem;
+}
+
+.exe-btn-ghost:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.spinning {
+  animation: exe-spin 0.8s linear infinite;
+}
+
+@keyframes exe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Grille de cartes ---------- */
+.exe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+/* ---------- Cartes compactes (écran liste, cliquables) ---------- */
+.exe-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.exe-card-compact {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 16px 18px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: inherit;
+  transition: transform 0.14s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.exe-card-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+  border-color: rgba(77, 166, 255, 0.5);
+}
+
+.exe-cc-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.12);
+  border: 1px solid rgba(77, 166, 255, 0.28);
+}
+
+.exe-cc-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.exe-cc-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.exe-cc-top h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exe-cc-latest {
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.12);
+  border: 1px solid rgba(77, 166, 255, 0.35);
+  padding: 1px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.exe-cc-desc {
+  margin: 4px 0 0;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exe-cc-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.exe-cc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.exe-cc-date {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.exe-cc-arrow {
+  font-size: 1.3rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.14s ease, color 0.14s ease;
+}
+
+.exe-card-compact:hover .exe-cc-arrow {
+  color: var(--accent);
+  transform: translateX(3px);
+}
+
+/* ---------- Écran détail ---------- */
+.exe-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.exe-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-secondary);
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+
+.exe-back:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.exe-detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.exe-detail-headinfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.exe-detail-headinfo h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.exe-detail-desc {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.exe-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.exe-detail-gh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 166, 255, 0.35);
+  background: rgba(77, 166, 255, 0.08);
+}
+
+.exe-detail-gh:hover {
+  background: rgba(77, 166, 255, 0.18);
+}
+
+.exe-versions-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.exe-versions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exe-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exe-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.exe-card-head h2 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.exe-card-count {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+/* ---------- Version ---------- */
+.exe-version {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+}
+
+.exe-version.latest {
+  border-color: rgba(77, 166, 255, 0.45);
+  background: linear-gradient(180deg, rgba(77, 166, 255, 0.08), var(--bg-secondary));
+}
+
+.exe-version-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.exe-version-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exe-version-badge {
+  font-family: "Monaco", "Consolas", monospace;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.12);
+  border: 1px solid rgba(77, 166, 255, 0.35);
+  padding: 2px 9px;
+  border-radius: 6px;
+}
+
+.exe-latest-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.14);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.exe-version-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.exe-version-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exe-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #05121f;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s ease, transform 0.12s ease;
+}
+
+.exe-download:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  color: #05121f;
+}
+
+.exe-icon-link,
+.exe-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  text-decoration: none;
+  transition: all 0.14s ease;
+}
+
+.exe-icon-link:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.exe-icon-btn.danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.exe-version-desc {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* ---------- Documentation ---------- */
+.exe-docs {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.exe-docs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.exe-docs-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.exe-adddoc {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px dashed rgba(77, 166, 255, 0.5);
+  background: rgba(77, 166, 255, 0.08);
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.exe-adddoc:hover {
+  background: rgba(77, 166, 255, 0.18);
+}
+
+.exe-docs-none {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.exe-docs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exe-doc {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.exe-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.8rem;
+  max-width: 220px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+.exe-doc-link:hover {
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.08);
+}
+
+.exe-doc-dl {
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 6px 9px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+.exe-doc-dl:hover {
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.1);
+}
+
+/* Liste des documents sélectionnés dans la modale de création */
+.exe-doc-picklist {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exe-doc-picklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.exe-doc-pick-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.exe-doc-pick-size {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  flex-shrink: 0;
+}
+
+.exe-doc-pick-del {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+}
+
+.exe-doc-pick-del:hover {
+  color: var(--danger);
+}
+
+.exe-doc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exe-doc-ext {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.exe-doc-del {
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+.exe-doc-del:hover {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+/* ---------- États ---------- */
+.exe-empty {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+}
+
+.exe-empty svg {
+  font-size: 2.6rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.exe-empty h3 {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.exe-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 40vh;
+  color: var(--text-secondary);
+}
+
+.exe-state.error svg {
+  font-size: 2.4rem;
+  color: var(--danger);
+}
+
+.exe-state button {
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.exe-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--accent);
+  animation: exe-spin 0.8s linear infinite;
+}
+
+/* ---------- Modale de création ---------- */
+.exe-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.exe-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.exe-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.exe-modal-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.exe-modal-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.exe-modal-close:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.exe-form {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exe-form-row {
+  display: flex;
+  gap: 14px;
+}
+
+.exe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.exe-field-sm {
+  max-width: 160px;
+}
+
+.exe-field label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.exe-field input[type="text"],
+.exe-field input:not([type]) {
+  width: 100%;
+}
+
+.exe-field input {
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.exe-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.exe-field input[type="file"] {
+  padding: 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.exe-field input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.exe-file-hint {
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.exe-form-error {
+  background: rgba(255, 107, 107, 0.14);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  color: var(--danger);
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+}
+
+.exe-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 620px) {
+  .exe-grid {
+    grid-template-columns: 1fr;
+  }
+  .exe-form-row {
+    flex-direction: column;
+  }
+  .exe-field-sm {
+    max-width: none;
+  }
+}

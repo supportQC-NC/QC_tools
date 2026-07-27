@@ -7,7 +7,6 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
 import { HiClipboardCheck } from "react-icons/hi";
 import { useGetTasksQuery } from "../../slices/taskApiSlice";
 import {
@@ -19,15 +18,12 @@ import {
 import "./MesTachesWidget.css";
 
 const MesTachesWidget = () => {
-  const { userInfo } = useSelector((state) => state.auth);
-  const { data: tasks } = useGetTasksQuery();
+  const { data: tasks } = useGetTasksQuery({ mine: true });
 
-  const myId = userInfo?._id;
+  // La requête (mine:true) ne renvoie déjà que MES tâches : on garde les
+  // actives (non terminées / non archivées).
   const actives = (tasks || [])
-    .filter((t) => {
-      const assigneeId = t.assigneA?._id || t.assigneA;
-      return assigneeId === myId && t.statut !== "termine";
-    })
+    .filter((t) => t.statut !== "termine" && !t.archive)
     .sort((a, b) => {
       if (!a.deadline) return 1;
       if (!b.deadline) return -1;

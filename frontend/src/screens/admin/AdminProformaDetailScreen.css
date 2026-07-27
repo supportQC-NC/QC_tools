@@ -4,6 +4,35 @@
    ========================================================================== */
 
 .proforma-detail-page {
+  /* Les variables --admin-* ne sont définies nulle part dans le projet : on les
+     déclare ici, SCOPÉES à cette page, pour un rendu propre (thème sombre, accent
+     teal) sans impacter les autres écrans. Héritage DOM => toutes les règles
+     var(--admin-*) internes se résolvent. */
+  --admin-bg: #0a0a0f;
+  --admin-bg-secondary: #12121a;
+  --admin-bg-tertiary: #1a1a25;
+  --admin-bg-hover: #22222e;
+  --admin-border: #2a2a3a;
+  --admin-border-light: #3a3a4d;
+  --admin-text: #f0f0f5;
+  --admin-text-secondary: #a7a7b8;
+  --admin-text-muted: #6b6b7d;
+  --admin-primary: #14b8a6;
+  --admin-primary-light: #5eead4;
+  --admin-primary-dark: #0d9488;
+  --admin-info: #3b82f6;
+  --admin-info-light: rgba(59, 130, 246, 0.16);
+  --admin-success: #10b981;
+  --admin-success-light: rgba(16, 185, 129, 0.16);
+  --admin-warning: #f59e0b;
+  --admin-danger: #ef4444;
+  --admin-radius: 12px;
+  --admin-radius-sm: 8px;
+  --admin-radius-xs: 4px;
+  --admin-transition: all 0.18s ease;
+  --admin-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --admin-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
   min-height: 100vh;
   background: var(--admin-bg);
   color: var(--admin-text);
@@ -833,12 +862,19 @@
   background: var(--admin-bg-hover);
 }
 
+/* Ligne de COMMENTAIRE (prodet.NART contient "!" ou est vide) :
+   mise en avant lisible, accent indigo, distincte des lignes article. */
 .proforma-detail-page .lines-table tbody tr.row-comment {
-  background: rgba(100, 100, 120, 0.08);
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid #6366f1;
 }
 
 .proforma-detail-page .lines-table tbody tr.row-comment:hover {
-  background: rgba(100, 100, 120, 0.15);
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.proforma-detail-page .lines-table tbody tr.row-comment td {
+  border-bottom-color: rgba(99, 102, 241, 0.25);
 }
 
 /* Type badge */
@@ -858,20 +894,45 @@
 }
 
 .type-badge.comment {
-  background: var(--admin-bg-tertiary);
-  color: var(--admin-text-muted);
-  border: 1px solid var(--admin-border);
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid #6366f1;
 }
 
 .nart-comment {
-  color: var(--admin-text-muted);
-  font-size: 0.8rem;
+  color: #818cf8;
+  font-weight: 700;
+  font-size: 0.9rem;
 }
 
+/* Texte du commentaire : lisible (pas de gris terne), retour à la ligne,
+   précédé d'un petit libellé « Commentaire ». */
 .comment-text {
-  font-style: italic;
-  color: var(--admin-text-muted) !important;
+  font-style: normal;
+  color: var(--admin-text) !important;
+  font-weight: 500;
+  font-size: 0.9rem;
+  line-height: 1.45;
   max-width: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: inline-block;
+}
+
+.comment-text::before {
+  content: "Commentaire";
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 50px;
+  background: rgba(99, 102, 241, 0.22);
+  color: #c7d2fe;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  vertical-align: middle;
 }
 
 /* Cell styles */

@@ -62,11 +62,12 @@ const DIACRITICS = /[̀-ͯ]/g;
 const normalize = (s) =>
   (s ?? "").toString().toLowerCase().normalize("NFD").replace(DIACRITICS, "");
 
-// Les trois vues métier de la page
+// Vues métier de la page (filtrage par code d'état)
 const TYPES = [
   { key: "TOUTES", label: "Toutes (≤ 2)" },
-  { key: "A_PREPARER", label: "À préparer (= 2)" },
-  { key: "RESERVATIONS", label: "Réservations & spéciales (< 2)" },
+  { key: "RESERVATIONS", label: "Réservations" },
+  { key: "SPECIALES", label: "Commandes spéciales" },
+  { key: "A_PREPARER", label: "À préparer" },
 ];
 
 const AdminReservationsScreen = () => {
@@ -96,13 +97,16 @@ const AdminReservationsScreen = () => {
   // le bouton bascule pour n'afficher QUE les internes.
   const [showInternes, setShowInternes] = useState(false);
 
-  // Traduction du type en paramètres API (invariant : ETAT <= 2)
+  // Traduction du type en paramètres API. Codes d'état :
+  //   0 = commande spéciale · 1 = réservation · 2 = à préparer.
   const etatParams = useMemo(() => {
     switch (typeFilter) {
       case "A_PREPARER":
         return { etat: 2, maxEtat: undefined };
       case "RESERVATIONS":
-        return { etat: undefined, maxEtat: 1 };
+        return { etat: 1, maxEtat: undefined };
+      case "SPECIALES":
+        return { etat: 0, maxEtat: undefined };
       case "TOUTES":
       default:
         return { etat: undefined, maxEtat: 2 };

@@ -1,117 +1,778 @@
+/* ==========================================================================
+   « Mes tâches » — tableau type Trello (thème sombre, grand écran)
+   Variables globales : --bg-*, --text-*, --accent, --border, --danger…
+   ========================================================================== */
+
 .mes-taches {
-  padding: 24px;
-  max-width: 900px;
+  padding: 24px 28px 40px;
+  max-width: 1600px;
   margin: 0 auto;
+  width: 100%;
+  color: var(--text-primary);
 }
 
-.mes-taches-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.mes-taches-header h1 {
-  font-size: 1.5rem;
-  margin: 0;
-}
-
-.mes-taches-empty {
-  padding: 48px;
-  text-align: center;
-  color: #64748b;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 12px;
-}
-
-.mes-taches-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tache-item {
+/* ---------- En-tête ---------- */
+.mt-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: #2c2a2a;
-  border: 1px solid #e2e8f0;
-  border-left: 4px solid #64748b;
-  border-radius: 10px;
-  padding: 14px 18px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 
-.tache-item.done {
-  opacity: 0.6;
+.mt-header-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.tache-item.done .tache-item-title strong {
-  text-decoration: line-through;
+.mt-header-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: #fff;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  box-shadow: 0 6px 16px rgba(77, 166, 255, 0.35);
 }
 
-.tache-item-main {
-  flex: 1;
-  min-width: 0;
+.mt-header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
-.tache-item-title {
+.mt-header-sub {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.mt-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
-.tache-item-desc {
-  margin: 4px 0 0;
-  font-size: 0.85rem;
-  color: #c8d3e2;
-}
-
-.tache-item-meta {
+.mt-refresh {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   display: flex;
-  gap: 10px;
-  margin-top: 6px;
-  font-size: 0.8rem;
-  color: #94a3b8;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.tache-badge {
-  display: inline-block;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-size: 0.72rem;
+.mt-refresh:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mt-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mt-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #fff;
   font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(77, 166, 255, 0.3);
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
 }
 
-.tache-overdue {
-  color: #ef4444 !important;
-  font-weight: 700;
+.mt-new:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(77, 166, 255, 0.42);
 }
 
-.tache-item-statut {
+.spinning {
+  animation: mt-spin 0.8s linear infinite;
+}
+
+@keyframes mt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mt-hint {
+  margin: 0 0 18px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.mt-hint-perso {
+  color: #a5b4fc;
+  font-weight: 600;
+}
+
+/* ---------- Board ---------- */
+.mt-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.mt-col {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 12px;
+  min-height: 200px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.mt-col.over {
+  border-color: var(--accent);
+  background: rgba(77, 166, 255, 0.06);
+}
+
+.mt-col-head {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  margin-bottom: 12px;
+}
+
+.mt-col-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.tache-item-statut label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #94a3b8;
+.mt-col-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.mt-col-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
-.tache-item-statut select {
-  padding: 6px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+.mt-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60px;
+}
+
+.mt-col-empty {
+  padding: 22px 10px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+/* ---------- Carte tâche ---------- */
+.mt-task {
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.mt-task:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+
+.mt-task.dragging {
+  opacity: 0.5;
+}
+
+/* Tâche PERSONNELLE : fond violet distinct + curseur pointer (éditable). */
+.mt-task.perso {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.16), rgba(99, 102, 241, 0.07));
+  border-left-color: #6366f1;
+  cursor: pointer;
+}
+
+.mt-task.perso:hover {
+  border-color: rgba(99, 102, 241, 0.55);
+}
+
+.mt-task-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mt-prio {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.mt-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
   font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 6px;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mt-tag.perso {
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.mt-task-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.mt-task-desc {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mt-task-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.mt-task-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.mt-task-deadline.overdue {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.14);
+  font-weight: 700;
+}
+
+.mt-task-docs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.mt-task.archived {
+  opacity: 0.75;
+}
+
+.mt-task.archived .mt-task-title {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+/* ---------- Bande archive / Terminées ---------- */
+.mt-archive {
+  margin-top: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 6px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.mt-archive.over {
+  border-color: var(--success);
+  background: rgba(74, 222, 128, 0.06);
+}
+
+.mt-archive-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.mt-archive-hint {
+  margin-left: auto;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.mt-archive-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  padding: 8px 8px 10px;
+}
+
+/* ---------- Chargement / erreur ---------- */
+.mt-loading,
+.mt-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 50vh;
+  color: var(--text-secondary);
+}
+
+.mt-error svg {
+  font-size: 2.4rem;
+  color: var(--danger);
+}
+
+.mt-error button {
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mt-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--accent);
+  animation: mt-spin 0.8s linear infinite;
+}
+
+/* ---------- Responsive : board scrollable puis empilé ---------- */
+@media (max-width: 1100px) {
+  .mt-board {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .mt-board {
+    grid-template-columns: 1fr;
+  }
+  .mes-taches {
+    padding: 16px;
+  }
+}
+
+/* ==========================================================================
+   Modale de tâche personnelle (PersoTaskModal)
+   ========================================================================== */
+.ptm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.ptm-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.ptm-chat {
+  padding: 0 20px 20px;
+}
+
+.ptm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ptm-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.ptm-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.ptm-close:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.ptm-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ptm-row {
+  display: flex;
+  gap: 14px;
+}
+
+.ptm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.ptm-field label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ptm-field input,
+.ptm-field textarea,
+.ptm-field select {
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ptm-field textarea {
+  resize: vertical;
+}
+
+.ptm-field input:focus,
+.ptm-field textarea:focus,
+.ptm-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ptm-field select option {
+  background: var(--bg-secondary);
+}
+
+.ptm-error {
+  background: rgba(255, 107, 107, 0.14);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  color: var(--danger);
+  padding: 10px 12px;
+  border-radius: 9px;
   font-size: 0.85rem;
-  background: #fff;
+}
+
+.ptm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.ptm-actions-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.ptm-btn-primary {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ptm-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ptm-btn-ghost {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ptm-btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ptm-btn-delete:hover {
+  background: rgba(255, 107, 107, 0.2);
+}
+
+/* Contexte tâche d'équipe (lecture seule) */
+.ptm-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+
+.ptm-context-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.18);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ptm-readonly {
+  margin: 0;
+  padding: 9px 12px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+
+/* Documents dans la modale */
+.ptm-docs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ptm-docs-head label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ptm-adddoc {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px dashed rgba(77, 166, 255, 0.5);
+  background: rgba(77, 166, 255, 0.08);
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ptm-adddoc:hover {
+  background: rgba(77, 166, 255, 0.18);
+}
+
+.ptm-docs-none {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ptm-doclist {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ptm-doclist li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ptm-doc-open {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ptm-doc-open:hover {
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.08);
+}
+
+.ptm-doc-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nom de fichier « en attente » (création) posé directement dans le li */
+.ptm-doclist li > .ptm-doc-name {
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.ptm-doc-ext {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.ptm-doc-dl,
+.ptm-doc-x {
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 8px 9px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+}
+
+.ptm-doc-dl:hover {
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.1);
+}
+
+.ptm-doc-x:hover {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
 }

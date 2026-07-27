@@ -21,7 +21,8 @@ import {
   HiTag,
   HiQrcode,
   HiDeviceMobile,
-  HiDownload
+  HiDownload,
+  HiChatAlt2
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -68,6 +69,7 @@ export const adminMenuStructure = [
       { label: "Bipages", path: "/admin/bipages", icon: HiClipboardList },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
       { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
+      { label: "Exécutables", path: "/admin/executables", icon: HiDownload },
     ],
   },
   {
@@ -346,6 +348,7 @@ export const getUserMenus = (userInfo) => {
     collapsible: true,
     items: [
       { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
+      { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
     ],
   });
 

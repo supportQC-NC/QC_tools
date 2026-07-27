@@ -75,9 +75,13 @@ import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
 import AdminReceptionSuiviScreen from "./screens/admin/AdminReceptionSuiviScreen";
 import AdminExportGisementsScreen from "./screens/admin/AdminExportGisementsScreen";
+import AdminExecutablesScreen from "./screens/admin/AdminExecutablesScreen";
+import AdminExecutableDetailScreen from "./screens/admin/AdminExecutableDetailScreen";
 import AdminEquipesScreen from "./screens/admin/AdminEquipesScreen";
+import AdminEquipeDetailScreen from "./screens/admin/AdminEquipeDetailScreen";
 import AdminTachesScreen from "./screens/admin/AdminTachesScreen";
 import MesTachesScreen from "./screens/user/MesTachesScreen";
+import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -104,6 +108,7 @@ const router = createBrowserRouter(
         <Route path="/etiquettes" element={<AdminEtiquettesScreen />} />
         <Route path="/edition-promo" element={<AdminEditionPromoScreen />} />
         <Route path="/mes-taches" element={<MesTachesScreen />} />
+        <Route path="/espace-equipe" element={<EspaceEquipeScreen />} />
       </Route>
 
       {/* ======= Écrans admin : garde par module (admin OU utilisateur
@@ -123,6 +128,7 @@ const router = createBrowserRouter(
       {/* Administration · Équipes & Tâches -> admins + responsables */}
       <Route element={<TeamRoute />}>
         <Route path="/admin/equipes" element={<AdminEquipesScreen />} />
+        <Route path="/admin/equipes/:id" element={<AdminEquipeDetailScreen />} />
         <Route path="/admin/taches" element={<AdminTachesScreen />} />
       </Route>
 
@@ -367,6 +373,15 @@ const router = createBrowserRouter(
         <Route
           path="/admin/export-gisements"
           element={<AdminExportGisementsScreen />}
+        />
+      </Route>
+
+      {/* Données · Exécutables -> module "executables_admin" */}
+      <Route element={<ModuleRoute module="executables_admin" />}>
+        <Route path="/admin/executables" element={<AdminExecutablesScreen />} />
+        <Route
+          path="/admin/executables/:name"
+          element={<AdminExecutableDetailScreen />}
         />
       </Route>
 

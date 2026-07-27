@@ -43,6 +43,8 @@ export const apiSlice = createApi({
     "Team",
     // ========== TAGS TÂCHES ==========
     "Task",
+    // ========== TAGS EXÉCUTABLES ==========
+    "Executable",
   ],
   endpoints: (builder) => ({}),
 });

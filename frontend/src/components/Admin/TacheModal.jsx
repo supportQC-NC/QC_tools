@@ -27,7 +27,7 @@ const TacheModal = ({ task, onClose }) => {
     titre: "",
     description: "",
     equipe: "",
-    assigneA: "",
+    assignes: [],
     deadline: "",
     priorite: "normale",
     statut: "a_faire",
@@ -40,7 +40,7 @@ const TacheModal = ({ task, onClose }) => {
         titre: task.titre || "",
         description: task.description || "",
         equipe: task.equipe?._id || task.equipe || "",
-        assigneA: task.assigneA?._id || task.assigneA || "",
+        assignes: (task.assignes || []).map((a) => a._id || a),
         deadline: toDateInput(task.deadline),
         priorite: task.priorite || "normale",
         statut: task.statut || "a_faire",
@@ -60,24 +60,33 @@ const TacheModal = ({ task, onClose }) => {
     const { name, value } = e.target;
     setForm((prev) => {
       const next = { ...prev, [name]: value };
-      // Changer d'équipe réinitialise l'assigné (il doit en être membre).
-      if (name === "equipe") next.assigneA = "";
+      // Changer d'équipe réinitialise les assignés (ils doivent en être membres).
+      if (name === "equipe") next.assignes = [];
       return next;
     });
   };
 
+  // Coche/décoche un membre assigné.
+  const toggleAssigne = (userId) =>
+    setForm((prev) => ({
+      ...prev,
+      assignes: prev.assignes.includes(userId)
+        ? prev.assignes.filter((id) => id !== userId)
+        : [...prev.assignes, userId],
+    }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.titre || !form.equipe || !form.assigneA) {
-      setError("Titre, équipe et assigné sont requis");
+    if (!form.titre || !form.equipe || form.assignes.length === 0) {
+      setError("Titre, équipe et au moins un assigné sont requis");
       return;
     }
     const payload = {
       titre: form.titre,
       description: form.description,
       equipe: form.equipe,
-      assigneA: form.assigneA,
+      assignes: form.assignes,
       deadline: form.deadline || null,
       priorite: form.priorite,
     };
@@ -129,41 +138,56 @@ const TacheModal = ({ task, onClose }) => {
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Équipe</label>
-              <select
-                name="equipe"
-                value={form.equipe}
-                onChange={handleChange}
-                disabled={isEdit}
-                required
-              >
-                <option value="">Sélectionner...</option>
-                {(teams || []).map((t) => (
-                  <option key={t._id} value={t._id}>
-                    {t.nom} ({t.entreprise?.trigramme || "—"})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Assigné à</label>
-              <select
-                name="assigneA"
-                value={form.assigneA}
-                onChange={handleChange}
-                required
-                disabled={!form.equipe}
-              >
-                <option value="">Sélectionner un membre...</option>
-                {membresDispo.map((m) => (
-                  <option key={m._id || m} value={m._id || m}>
-                    {m.prenom} {m.nom}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="form-group">
+            <label>Équipe</label>
+            <select
+              name="equipe"
+              value={form.equipe}
+              onChange={handleChange}
+              disabled={isEdit}
+              required
+            >
+              <option value="">Sélectionner...</option>
+              {(teams || []).map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.nom} ({t.entreprise?.trigramme || "—"})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>
+              Assigné(s) à{" "}
+              {form.assignes.length > 0 && `(${form.assignes.length})`}
+            </label>
+            {!form.equipe ? (
+              <span className="label-hint">
+                Sélectionnez d'abord une équipe.
+              </span>
+            ) : membresDispo.length === 0 ? (
+              <span className="label-hint">Cette équipe n'a aucun membre.</span>
+            ) : (
+              <div className="tache-assignes">
+                {membresDispo.map((m) => {
+                  const id = m._id || m;
+                  const checked = form.assignes.includes(id);
+                  return (
+                    <button
+                      type="button"
+                      key={id}
+                      className={`tache-assigne ${checked ? "on" : ""}`}
+                      onClick={() => toggleAssigne(id)}
+                    >
+                      <span className="tache-assigne-check">
+                        {checked ? "✓" : ""}
+                      </span>
+                      {m.prenom} {m.nom}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="form-row">

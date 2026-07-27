@@ -754,3 +754,40 @@
   color: #1f4e79;
   font-size: 0.88rem;
 }
+/* Sélection multiple d'assignés (TacheModal) */
+.tache-assignes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tache-assigne {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.tache-assigne:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.tache-assigne.on {
+  background: rgba(77, 166, 255, 0.16);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tache-assigne-check {
+  width: 13px;
+  font-weight: 800;
+}

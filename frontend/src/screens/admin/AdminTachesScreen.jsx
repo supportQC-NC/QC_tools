@@ -1,6 +1,14 @@
 // src/screens/admin/AdminTachesScreen.jsx
 import React, { useMemo, useState } from "react";
-import { HiPlus, HiPencil, HiTrash, HiRefresh } from "react-icons/hi";
+import {
+  HiPlus,
+  HiPencil,
+  HiTrash,
+  HiRefresh,
+  HiClipboardList,
+  HiExclamationCircle,
+  HiFilter,
+} from "react-icons/hi";
 import {
   useGetTasksQuery,
   useDeleteTaskMutation,
@@ -29,6 +37,7 @@ const AdminTachesScreen = () => {
     isLoading,
     error,
     refetch,
+    isFetching,
   } = useGetTasksQuery({
     equipe: filters.equipe || undefined,
     statut: filters.statut || undefined,
@@ -41,6 +50,19 @@ const AdminTachesScreen = () => {
     const t = (teams || []).find((x) => x._id === filters.equipe);
     return t?.membres || [];
   }, [teams, filters.equipe]);
+
+  // Compteurs (sur le résultat filtré courant).
+  const stats = useMemo(() => {
+    const list = tasks || [];
+    return {
+      total: list.length,
+      a_faire: list.filter((t) => t.statut === "a_faire").length,
+      en_cours: list.filter((t) => t.statut === "en_cours").length,
+      termine: list.filter((t) => t.statut === "termine").length,
+      bloque: list.filter((t) => t.statut === "bloque").length,
+      retard: list.filter((t) => isOverdue(t)).length,
+    };
+  }, [tasks]);
 
   const handleFilter = (e) => {
     const { name, value } = e.target;
@@ -69,26 +91,75 @@ const AdminTachesScreen = () => {
     }
   };
 
-  if (isLoading) return <div className="admin-loading">Chargement...</div>;
-  if (error)
-    return <div className="admin-error">Erreur: {error?.data?.message}</div>;
-
   return (
     <div className="admin-taches">
-      <div className="admin-taches-header">
-        <h1>Gestion des tâches</h1>
-        <div className="admin-taches-actions">
-          <button className="btn-icon" onClick={refetch} title="Rafraîchir">
-            <HiRefresh />
+      {/* En-tête */}
+      <header className="at-header">
+        <div className="at-header-title">
+          <div className="at-header-icon">
+            <HiClipboardList />
+          </div>
+          <div>
+            <h1>Gestion des tâches</h1>
+            <p className="at-header-sub">
+              Créer, assigner et suivre les tâches des équipes
+            </p>
+          </div>
+        </div>
+        <div className="at-header-actions">
+          <button
+            className="at-btn-ghost"
+            onClick={refetch}
+            disabled={isFetching}
+            title="Rafraîchir"
+          >
+            <HiRefresh className={isFetching ? "spinning" : ""} />
           </button>
-          <button className="btn-primary" onClick={handleCreate}>
+          <button className="at-btn-primary" onClick={handleCreate}>
             <HiPlus />
             <span>Nouvelle tâche</span>
           </button>
         </div>
+      </header>
+
+      {/* Cartes statistiques */}
+      <div className="at-stats">
+        <div className="at-stat">
+          <span className="at-stat-value">{stats.total}</span>
+          <span className="at-stat-label">Total</span>
+        </div>
+        <div className="at-stat">
+          <span className="at-stat-dot" style={{ background: STATUT_COLORS.a_faire }} />
+          <span className="at-stat-value">{stats.a_faire}</span>
+          <span className="at-stat-label">À faire</span>
+        </div>
+        <div className="at-stat">
+          <span className="at-stat-dot" style={{ background: STATUT_COLORS.en_cours }} />
+          <span className="at-stat-value">{stats.en_cours}</span>
+          <span className="at-stat-label">En cours</span>
+        </div>
+        <div className="at-stat">
+          <span className="at-stat-dot" style={{ background: STATUT_COLORS.termine }} />
+          <span className="at-stat-value">{stats.termine}</span>
+          <span className="at-stat-label">Terminées</span>
+        </div>
+        <div className="at-stat">
+          <span className="at-stat-dot" style={{ background: STATUT_COLORS.bloque }} />
+          <span className="at-stat-value">{stats.bloque}</span>
+          <span className="at-stat-label">Bloquées</span>
+        </div>
+        <div className={`at-stat ${stats.retard ? "danger" : ""}`}>
+          <span className="at-stat-value">{stats.retard}</span>
+          <span className="at-stat-label">En retard</span>
+        </div>
       </div>
 
-      <div className="taches-filters">
+      {/* Filtres */}
+      <div className="at-filters">
+        <div className="at-filters-icon">
+          <HiFilter />
+          <span>Filtres</span>
+        </div>
         <select name="equipe" value={filters.equipe} onChange={handleFilter}>
           <option value="">Toutes les équipes</option>
           {(teams || []).map((t) => (
@@ -120,89 +191,112 @@ const AdminTachesScreen = () => {
         </select>
       </div>
 
-      <div className="admin-users-table-container">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Tâche</th>
-              <th>Équipe</th>
-              <th>Assigné à</th>
-              <th>Échéance</th>
-              <th>Priorité</th>
-              <th>Statut</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks?.length === 0 ? (
+      {/* Table */}
+      <div className="at-table-container">
+        {isLoading ? (
+          <div className="at-state">
+            <div className="at-spinner" />
+            <p>Chargement des tâches…</p>
+          </div>
+        ) : error ? (
+          <div className="at-state error">
+            <HiExclamationCircle />
+            <p>Erreur : {error?.data?.message || "chargement impossible"}</p>
+            <button onClick={refetch}>Réessayer</button>
+          </div>
+        ) : (
+          <table className="at-table">
+            <thead>
               <tr>
-                <td colSpan="7" className="no-data">
-                  Aucune tâche
-                </td>
+                <th>Tâche</th>
+                <th>Équipe</th>
+                <th>Assigné à</th>
+                <th>Échéance</th>
+                <th>Priorité</th>
+                <th>Statut</th>
+                <th className="th-actions">Actions</th>
               </tr>
-            ) : (
-              tasks?.map((task) => (
-                <tr key={task._id}>
-                  <td>
-                    <strong>{task.titre}</strong>
-                    {task.description && (
-                      <div className="tache-desc">{task.description}</div>
-                    )}
-                  </td>
-                  <td>{task.equipe?.nom || "—"}</td>
-                  <td>
-                    {task.assigneA
-                      ? `${task.assigneA.prenom} ${task.assigneA.nom}`
-                      : "—"}
-                  </td>
-                  <td className={isOverdue(task) ? "tache-overdue" : ""}>
-                    {formatDeadline(task.deadline)}
-                  </td>
-                  <td>
-                    <span
-                      className="tache-badge"
-                      style={{
-                        color: PRIORITE_COLORS[task.priorite],
-                        background: `${PRIORITE_COLORS[task.priorite]}1a`,
-                      }}
-                    >
-                      {PRIORITE_LABELS[task.priorite]}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className="tache-badge"
-                      style={{
-                        color: STATUT_COLORS[task.statut],
-                        background: `${STATUT_COLORS[task.statut]}1a`,
-                      }}
-                    >
-                      {STATUT_LABELS[task.statut]}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="table-actions">
-                      <button
-                        className="btn-action btn-edit"
-                        onClick={() => handleEdit(task)}
-                        title="Modifier"
-                      >
-                        <HiPencil />
-                      </button>
-                      <button
-                        className="btn-action btn-delete"
-                        onClick={() => handleDelete(task)}
-                        title="Supprimer"
-                      >
-                        <HiTrash />
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {tasks?.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="at-nodata">
+                    <HiClipboardList />
+                    <span>Aucune tâche</span>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                tasks?.map((task) => (
+                  <tr key={task._id}>
+                    <td>
+                      <strong className="at-titre">{task.titre}</strong>
+                      {task.description && (
+                        <div className="at-desc">{task.description}</div>
+                      )}
+                    </td>
+                    <td className="at-cell-muted">{task.equipe?.nom || "—"}</td>
+                    <td>
+                      {task.assignes?.length ? (
+                        <span className="at-assignee">
+                          {task.assignes
+                            .map((a) => `${a.prenom} ${a.nom}`)
+                            .join(", ")}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className={isOverdue(task) ? "at-overdue" : "at-cell-muted"}>
+                      {formatDeadline(task.deadline)}
+                    </td>
+                    <td>
+                      <span
+                        className="at-badge"
+                        style={{
+                          color: PRIORITE_COLORS[task.priorite],
+                          background: `${PRIORITE_COLORS[task.priorite]}22`,
+                          border: `1px solid ${PRIORITE_COLORS[task.priorite]}55`,
+                        }}
+                      >
+                        {PRIORITE_LABELS[task.priorite]}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className="at-badge"
+                        style={{
+                          color: STATUT_COLORS[task.statut],
+                          background: `${STATUT_COLORS[task.statut]}22`,
+                          border: `1px solid ${STATUT_COLORS[task.statut]}55`,
+                        }}
+                      >
+                        {STATUT_LABELS[task.statut]}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="at-actions">
+                        <button
+                          className="at-action edit"
+                          onClick={() => handleEdit(task)}
+                          title="Modifier"
+                        >
+                          <HiPencil />
+                        </button>
+                        <button
+                          className="at-action delete"
+                          onClick={() => handleDelete(task)}
+                          title="Supprimer"
+                        >
+                          <HiTrash />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {modalOpen && (

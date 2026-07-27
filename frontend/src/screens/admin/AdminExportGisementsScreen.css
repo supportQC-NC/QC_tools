@@ -1,15 +1,18 @@
-/* src/screens/admin/AdminExportGisementsScreen.css */
+/* src/screens/admin/AdminExportGisementsScreen.css
+   Thème sombre (charte globale : --bg-*, --text-*, --accent, --border…).
+   Mêmes classes que le JSX — aucun changement de structure. */
 
 .expg-screen {
-  max-width: 900px;
+  max-width: 920px;
   margin: 0 auto;
   padding: 24px 16px 48px;
+  color: var(--text-primary);
 }
 
 .expg-placeholder {
-  padding: 40px;
+  padding: 48px;
   text-align: center;
-  color: var(--text-muted, #64748b);
+  color: var(--text-secondary);
 }
 
 .expg-header h1 {
@@ -17,37 +20,50 @@
   align-items: center;
   gap: 10px;
   font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.expg-header h1 svg {
+  color: var(--accent);
 }
 
 .expg-header p {
-  color: var(--text-muted, #64748b);
+  color: var(--text-secondary);
   margin: 0 0 20px;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .expg-card {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
   padding: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .expg-hint {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .expg-label {
   display: block;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 12px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
+/* Cartes de format d'export */
 .expg-types {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -60,78 +76,82 @@
   gap: 6px;
   text-align: left;
   padding: 14px;
-  border: 2px solid var(--border, #e2e8f0);
-  border-radius: 10px;
-  background: var(--card-bg, #fff);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .expg-type-card:hover {
-  border-color: #93c5fd;
+  border-color: rgba(77, 166, 255, 0.5);
 }
 
 .expg-type-card.selected {
-  border-color: #2563eb;
-  background: rgba(37, 99, 235, 0.06);
-  box-shadow: 0 0 0 1px #2563eb inset;
+  border-color: var(--accent);
+  background: rgba(77, 166, 255, 0.1);
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
 .expg-type-title {
   font-weight: 700;
-  font-size: 0.98rem;
+  font-size: 0.96rem;
+  color: var(--text-primary);
 }
 
 .expg-type-desc {
-  font-size: 0.85rem;
-  color: var(--text-muted, #64748b);
-  line-height: 1.35;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
+/* Actions / bouton principal */
 .expg-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .expg-generate {
-  background: #2563eb;
-  color: #fff;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #05121f;
   border: none;
   border-radius: 10px;
   padding: 12px 22px;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease;
+  box-shadow: 0 6px 16px rgba(77, 166, 255, 0.3);
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
 }
 
 .expg-generate:hover:not(:disabled) {
-  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(77, 166, 255, 0.4);
 }
 
 .expg-generate:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
+/* Alertes */
 .expg-error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
+  background: rgba(255, 107, 107, 0.14);
+  color: var(--danger);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: 9px;
   padding: 12px 14px;
   margin-bottom: 14px;
 }
 
 .expg-info {
-  background: #ecfdf5;
-  color: #047857;
-  border: 1px solid #a7f3d0;
-  border-radius: 8px;
+  background: rgba(74, 222, 128, 0.14);
+  color: var(--success);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  border-radius: 9px;
   padding: 12px 14px;
   margin-bottom: 14px;
 }
@@ -148,49 +168,61 @@
   align-items: center;
   gap: 6px;
   padding: 10px 16px;
-  border: 2px solid var(--border, #e2e8f0);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  background: var(--card-bg, #fff);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   cursor: pointer;
   font-weight: 600;
   transition: all 0.15s ease;
 }
 
-.expg-tab.active {
-  border-color: #2563eb;
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
+.expg-tab:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
-/* Sélecteur de niveau GISM1..5 */
+.expg-tab.active {
+  border-color: var(--accent);
+  background: rgba(77, 166, 255, 0.14);
+  color: var(--accent);
+}
+
+/* Boutons niveau / dimension / type de code */
 .expg-niveaux {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .expg-niveau-btn {
   padding: 8px 14px;
-  border: 2px solid var(--border, #e2e8f0);
-  border-radius: 8px;
-  background: var(--card-bg, #fff);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   cursor: pointer;
   font-weight: 600;
   transition: all 0.15s ease;
 }
 
+.expg-niveau-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
 .expg-niveau-btn.active {
-  border-color: #2563eb;
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
+  border-color: var(--accent);
+  background: rgba(77, 166, 255, 0.14);
+  color: var(--accent);
 }
 
 .expg-hint-inline {
   display: block;
   margin-top: 8px;
-  font-size: 0.85rem;
-  color: var(--text-muted, #64748b);
+  font-size: 0.83rem;
+  color: var(--text-muted);
 }
 
 /* Multiselect recherchable */
@@ -203,16 +235,20 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  min-height: 42px;
+  min-height: 44px;
   padding: 6px 8px;
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 8px;
-  background: var(--card-bg, #fff);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: var(--bg-primary);
   cursor: text;
 }
 
+.expg-ms-control:focus-within {
+  border-color: var(--accent);
+}
+
 .expg-ms-placeholder {
-  color: var(--text-muted, #94a3b8);
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -220,11 +256,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(37, 99, 235, 0.1);
-  color: #1d4ed8;
+  background: rgba(77, 166, 255, 0.16);
+  color: #93c5fd;
+  border: 1px solid rgba(77, 166, 255, 0.4);
   border-radius: 6px;
   padding: 2px 6px;
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   font-weight: 600;
 }
 
@@ -233,8 +270,12 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  color: #1d4ed8;
+  color: #93c5fd;
   padding: 0;
+}
+
+.expg-ms-chip-x:hover {
+  color: var(--danger);
 }
 
 .expg-ms-search {
@@ -243,6 +284,7 @@
   border: none;
   outline: none;
   background: transparent;
+  color: var(--text-primary);
   font-size: 0.9rem;
   padding: 4px;
 }
@@ -255,15 +297,15 @@
   right: 0;
   max-height: 280px;
   overflow-y: auto;
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 .expg-ms-empty {
   padding: 12px;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -272,25 +314,26 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: none;
   background: transparent;
+  color: var(--text-primary);
   cursor: pointer;
   text-align: left;
   font-size: 0.9rem;
 }
 
 .expg-ms-option:hover {
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(77, 166, 255, 0.08);
 }
 
 .expg-ms-option.checked {
-  background: rgba(37, 99, 235, 0.1);
+  background: rgba(77, 166, 255, 0.14);
 }
 
 .expg-ms-check {
   width: 14px;
-  color: #2563eb;
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -300,6 +343,6 @@
 }
 
 .expg-ms-count {
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted);
   font-size: 0.8rem;
 }

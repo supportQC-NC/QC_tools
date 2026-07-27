@@ -12,6 +12,24 @@ import mongoose from "mongoose";
 export const TASK_STATUTS = ["a_faire", "en_cours", "termine", "bloque"];
 export const TASK_PRIORITES = ["basse", "normale", "haute", "urgente"];
 
+// Pièce jointe d'une tâche (PDF / Excel / image…), stockée dans GridFS.
+const taskDocumentSchema = new mongoose.Schema(
+  {
+    fileId: { type: mongoose.Schema.Types.ObjectId, required: true }, // ref GridFS
+    fileName: { type: String, required: true },
+    mimeType: { type: String, default: "application/octet-stream" },
+    size: { type: Number, default: 0 },
+    kind: {
+      type: String,
+      enum: ["pdf", "image", "tableur", "autre"],
+      default: "autre",
+    },
+    // Qui a déposé le document (créateur OU assigné).
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  },
+  { timestamps: true },
+);
+
 const taskSchema = new mongoose.Schema(
   {
     titre: {
@@ -23,28 +41,36 @@ const taskSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Type de tâche :
+    //   - "equipe" : assignée par un responsable/admin à un membre d'une équipe.
+    //   - "perso"  : créée par un utilisateur pour lui-même (sans équipe).
+    type: {
+      type: String,
+      enum: ["equipe", "perso"],
+      default: "equipe",
+    },
+    // Équipe (requise pour les tâches d'équipe ; null pour les tâches perso).
     equipe: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
-      required: [true, "Équipe requise"],
+      default: null,
     },
-    // Membre à qui la tâche est assignée.
-    assigneA: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Assigné requis"],
+    // Membres à qui la tâche est assignée (1..n ; pour une tâche perso = l'auteur).
+    assignes: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
     },
-    // Auteur (responsable ou admin).
+    // Auteur (responsable/admin pour une tâche d'équipe, ou l'utilisateur lui-même).
     creePar: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    // Société de rattachement (dénormalisée depuis l'équipe).
+    // Société de rattachement (dénormalisée depuis l'équipe ; null si perso).
     entreprise: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Entreprise",
-      required: true,
+      default: null,
     },
     deadline: {
       type: Date,
@@ -65,13 +91,28 @@ const taskSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Documents joints (PDF/Excel/images), déposés par le créateur ou l'assigné.
+    documents: {
+      type: [taskDocumentSchema],
+      default: [],
+    },
+    // Archivage : une tâche passée en "termine" est archivée pour ne pas
+    // encombrer le tableau de travail.
+    archive: {
+      type: Boolean,
+      default: false,
+    },
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
   },
 );
 
-taskSchema.index({ assigneA: 1, statut: 1 });
+taskSchema.index({ assignes: 1, statut: 1 });
 taskSchema.index({ equipe: 1 });
 taskSchema.index({ entreprise: 1 });
 
