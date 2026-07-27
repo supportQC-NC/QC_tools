@@ -56,6 +56,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Photo de profil (optionnelle) : id GridFS (bucket "avatars"). Le binaire
+    // n'est jamais renvoyé dans le JSON ; on sert l'image via GET /api/users/:id/photo.
+    photo: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    photoUpdatedAt: {
+      type: Date,
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

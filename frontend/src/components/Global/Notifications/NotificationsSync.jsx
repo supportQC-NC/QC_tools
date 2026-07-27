@@ -10,7 +10,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { getSocket } from "../../../socketClient";
+import { getSocket, resetSocket } from "../../../socketClient";
 import { apiSlice } from "../../../slices/apiSlice";
 import {
   useGetNotificationCountsQuery,
@@ -39,9 +39,13 @@ const NotificationsSync = () => {
     skip: !userInfo,
   });
 
-  // Rafraîchissement immédiat sur événement socket.
+  // Connexion socket + écoute, PILOTÉES PAR L'IDENTITÉ de l'utilisateur.
+  // Le socket est (re)créé quand l'utilisateur change et FERMÉ au changement de
+  // compte / démontage (resetSocket) — sinon la connexion garderait l'identité
+  // du compte précédent (cookie du handshake), d'où messages attribués au mauvais
+  // auteur et auto-notifications. C'est le point d'entrée unique du socket applicatif.
   useEffect(() => {
-    if (!userInfo) return undefined;
+    if (!userInfo?._id) return undefined;
     const socket = getSocket();
 
     const onMessage = () => {
@@ -58,8 +62,9 @@ const NotificationsSync = () => {
     return () => {
       socket.off("notif:message", onMessage);
       socket.off("notif:task", onTask);
+      resetSocket();
     };
-  }, [userInfo, dispatch, markChatSeen, markTasksSeen]);
+  }, [userInfo?._id, dispatch, markChatSeen, markTasksSeen]);
 
   return null;
 };

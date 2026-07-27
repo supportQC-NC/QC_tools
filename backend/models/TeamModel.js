@@ -47,6 +47,11 @@ const teamSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Clé d'icône de la discussion d'équipe (voir config/chatIcons.js).
+    icone: {
+      type: String,
+      default: "users",
+    },
     isActive: {
       type: Boolean,
       default: true,

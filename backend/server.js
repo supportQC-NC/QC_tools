@@ -85,6 +85,8 @@ import executableRoutes from "./routes/executableRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 // ========== ROUTES NOTIFICATIONS (badges sidebar) ==========
 import notificationRoutes from "./routes/notificationRoutes.js";
+// ========== ROUTES CONVERSATIONS (discussions Espace équipe) ==========
+import conversationRoutes from "./routes/conversationRoutes.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -206,6 +208,7 @@ app.use("/api/executables", executableRoutes);
 // ========== ROUTES MESSAGES (chat) ==========
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/conversations", conversationRoutes);
 // =======================================
 
 // ==========================================

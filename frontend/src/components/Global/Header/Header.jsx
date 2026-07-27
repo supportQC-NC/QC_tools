@@ -2,7 +2,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { useLogoutMutation } from "../../../slices/userApiSlice";
+import { useLogoutMutation, userPhotoUrl } from "../../../slices/userApiSlice";
 import { logout } from "../../../slices/authSlice";
 import { HiLogout, HiMenu, HiMenuAlt2 } from "react-icons/hi";
 import { useSidebar } from "../../../contexte/SidebarContext";
@@ -74,8 +74,17 @@ const Header = () => {
         <EntrepriseSelector />
         <Link to="/profile" className="header-profile">
           <span className="header-avatar">
-            {userInfo?.prenom?.charAt(0)}
-            {userInfo?.nom?.charAt(0)}
+            {userInfo?.photo ? (
+              <img
+                src={userPhotoUrl(userInfo._id, userInfo.photoUpdatedAt)}
+                alt=""
+              />
+            ) : (
+              <>
+                {userInfo?.prenom?.charAt(0)}
+                {userInfo?.nom?.charAt(0)}
+              </>
+            )}
           </span>
           <div className="header-user-info">
             <span className="header-username">

@@ -1,5 +1,6 @@
 // backend/routes/userRoutes.js
 import express from "express";
+import multer from "multer";
 import {
   authUser,
   logoutUser,
@@ -10,6 +11,9 @@ import {
   createUser,
   getUsers,
   getAssignableUsers,
+  uploadProfilePhoto,
+  deleteProfilePhoto,
+  getUserPhoto,
   getUserById,
   updateUser,
   deleteUser,
@@ -20,6 +24,12 @@ import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
 import { allowUserManagement } from "../middleware/accessControl.js";
 
 const router = express.Router();
+
+// Upload photo de profil : image unique en mémoire → GridFS, 5 Mo max.
+const uploadPhoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("photo");
 
 // Lecture / création / mise à jour / (dés)activation : admins, détenteurs du
 // module users_admin, ET responsables (le périmètre fin est appliqué dans le
@@ -38,12 +48,17 @@ router.put("/reset-password/:token", resetPassword);
 router.post("/logout", protect, logoutUser);
 router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, updateUserProfile);
+// Photo de profil (self) — AVANT /:id pour ne pas être capté par :id.
+router.post("/profile/photo", protect, uploadPhoto, uploadProfilePhoto);
+router.delete("/profile/photo", protect, deleteProfilePhoto);
 
 // Administration des utilisateurs (module "users_admin")
 router.post("/", protect, canWrite, createUser);
 router.get("/", protect, canRead, getUsers);
 // Liste allégée pour le choix des membres d'équipe — AVANT /:id.
 router.get("/assignable", protect, canRead, getAssignableUsers);
+// Photo d'un user (image) — accessible à tout utilisateur connecté.
+router.get("/:id/photo", protect, getUserPhoto);
 router.get("/:id", protect, canRead, getUserById);
 router.put("/:id", protect, canWrite, updateUser);
 router.delete("/:id", protect, canDelete, deleteUser);

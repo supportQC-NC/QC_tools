@@ -1,6 +1,10 @@
 import { apiSlice } from "./apiSlice";
 import { USERS_URL } from "../constants";
 
+// URL de la photo de profil d'un user (cache-bustée par photoUpdatedAt).
+export const userPhotoUrl = (id, v) =>
+  `${USERS_URL}/${id}/photo${v ? `?v=${encodeURIComponent(v)}` : ""}`;
+
 export const userApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Auth
@@ -47,6 +51,18 @@ export const userApiSlice = apiSlice.injectEndpoints({
         method: "PUT",
         body: data,
       }),
+      invalidatesTags: ["User"],
+    }),
+    uploadProfilePhoto: builder.mutation({
+      query: (file) => {
+        const fd = new FormData();
+        fd.append("photo", file);
+        return { url: `${USERS_URL}/profile/photo`, method: "POST", body: fd };
+      },
+      invalidatesTags: ["User"],
+    }),
+    deleteProfilePhoto: builder.mutation({
+      query: () => ({ url: `${USERS_URL}/profile/photo`, method: "DELETE" }),
       invalidatesTags: ["User"],
     }),
 
@@ -113,6 +129,8 @@ export const {
   useResetPasswordMutation,
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useUploadProfilePhotoMutation,
+  useDeleteProfilePhotoMutation,
   useGetUsersQuery,
   useGetAssignableUsersQuery,
   useGetUserByIdQuery,

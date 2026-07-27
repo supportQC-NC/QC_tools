@@ -47,6 +47,8 @@ export const apiSlice = createApi({
     "Executable",
     // ========== TAGS NOTIFICATIONS (badges sidebar) ==========
     "Notif",
+    // ========== TAGS CONVERSATIONS (Espace équipe) ==========
+    "Conversation",
   ],
   endpoints: (builder) => ({}),
 });

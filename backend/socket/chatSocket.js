@@ -6,40 +6,8 @@
 import jwt from "jsonwebtoken";
 import User from "../models/UserModel.js";
 import Message from "../models/MessageModel.js";
-import Team from "../models/TeamModel.js";
-import Task from "../models/TaskModel.js";
-import { canAccessRoom } from "../utils/chatAccess.js";
-
-// Destinataires d'un message : ids des users concernés par le salon (pour
-// pousser une notification « message non lu » sur leur salon personnel).
-//   - global    -> tous les utilisateurs actifs
-//   - team:<id> -> membres + responsable de l'équipe
-//   - task:<id> -> assignés + auteur de la tâche
-const roomRecipients = async (room) => {
-  if (room === "global") {
-    const users = await User.find({ isActive: true }).select("_id");
-    return users.map((u) => u._id.toString());
-  }
-  const sep = room.indexOf(":");
-  if (sep === -1) return [];
-  const kind = room.slice(0, sep);
-  const id = room.slice(sep + 1);
-  if (kind === "team") {
-    const team = await Team.findById(id).select("membres responsable");
-    if (!team) return [];
-    return [...(team.membres || []), team.responsable]
-      .filter(Boolean)
-      .map((x) => x.toString());
-  }
-  if (kind === "task") {
-    const task = await Task.findById(id).select("assignes creePar");
-    if (!task) return [];
-    return [...(task.assignes || []), task.creePar]
-      .filter(Boolean)
-      .map((x) => x.toString());
-  }
-  return [];
-};
+import RoomRead from "../models/RoomReadModel.js";
+import { canAccessRoom, roomRecipients } from "../utils/chatAccess.js";
 
 // Extrait un cookie nommé depuis l'entête brut "a=1; b=2".
 const readCookie = (raw = "", name) => {
@@ -116,7 +84,7 @@ export const initChat = (io) => {
           texte: contenu.slice(0, 4000),
         });
         const populated = await Message.findById(created._id)
-          .populate("auteur", "nom prenom")
+          .populate("auteur", "nom prenom photo photoUpdatedAt")
           .lean();
         io.to(room).emit("message:new", populated);
 
@@ -131,6 +99,48 @@ export const initChat = (io) => {
         if (typeof ack === "function") ack({ ok: true });
       } catch {
         if (typeof ack === "function") ack({ ok: false, error: "Envoi échoué" });
+      }
+    });
+
+    // Indicateur « en train d'écrire » : rediffusé aux AUTRES membres du salon.
+    socket.on("typing", async ({ room, actif } = {}) => {
+      try {
+        if (!room || !(await canAccessRoom(user, room))) return;
+        socket.to(room).emit("typing", {
+          room,
+          actif: actif !== false,
+          user: { _id: user._id, prenom: user.prenom, nom: user.nom },
+        });
+      } catch {
+        /* silencieux */
+      }
+    });
+
+    // Accusé de lecture : l'utilisateur a lu le salon jusqu'à maintenant.
+    // Pas d'accusés sur « global » (concerne tout le monde -> inutile).
+    socket.on("room:read", async (room) => {
+      try {
+        if (!room || room === "global") return;
+        if (!(await canAccessRoom(user, room))) return;
+        const now = new Date();
+        await RoomRead.findOneAndUpdate(
+          { user: user._id, room },
+          { lastReadAt: now },
+          { upsert: true },
+        );
+        socket.to(room).emit("room:read", {
+          room,
+          lastReadAt: now,
+          user: {
+            _id: user._id,
+            prenom: user.prenom,
+            nom: user.nom,
+            photo: user.photo || null,
+            photoUpdatedAt: user.photoUpdatedAt || null,
+          },
+        });
+      } catch {
+        /* silencieux */
       }
     });
   });

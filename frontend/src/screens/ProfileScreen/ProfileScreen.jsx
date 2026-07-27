@@ -1,9 +1,12 @@
 // src/screens/ProfileScreen/ProfileScreen.jsx
-import React, { useMemo, useState } from "react";
-import { useDispatch } from "react-redux";
+import React, { useMemo, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useUploadProfilePhotoMutation,
+  useDeleteProfilePhotoMutation,
+  userPhotoUrl,
 } from "../../slices/userApiSlice";
 import {
   useGetReportOptionsQuery,
@@ -107,10 +110,52 @@ const statutClass = (st) =>
 const ProfileScreen = () => {
   const dispatch = useDispatch();
 
+  const { userInfo } = useSelector((state) => state.auth);
+
   // ─────────────────────────── Profil ───────────────────────────
   const { data: profile } = useGetProfileQuery();
   const [updateProfile, { isLoading: savingProfile }] =
     useUpdateProfileMutation();
+
+  // ── Photo de profil ──
+  const [uploadPhoto, { isLoading: uploadingPhoto }] =
+    useUploadProfilePhotoMutation();
+  const [removePhoto] = useDeleteProfilePhotoMutation();
+  const photoRef = useRef(null);
+
+  const handlePhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Veuillez choisir une image.");
+      return;
+    }
+    try {
+      const res = await uploadPhoto(file).unwrap();
+      dispatch(
+        setCredentials({
+          ...userInfo,
+          photo: res.photo,
+          photoUpdatedAt: res.photoUpdatedAt,
+        }),
+      );
+    } catch (err) {
+      alert(err?.data?.message || "Envoi de la photo impossible (max 5 Mo).");
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!window.confirm("Supprimer votre photo de profil ?")) return;
+    try {
+      await removePhoto().unwrap();
+      dispatch(
+        setCredentials({ ...userInfo, photo: null, photoUpdatedAt: Date.now() }),
+      );
+    } catch {
+      alert("Suppression impossible");
+    }
+  };
 
   const [form, setForm] = useState({
     nom: "",
@@ -300,11 +345,38 @@ const ProfileScreen = () => {
     <div className="profile-page">
       {/* ─── Bandeau de profil ─── */}
       <div className="profile-hero">
-        <div className="profile-avatar">{initials}</div>
+        <button
+          type="button"
+          className="profile-avatar"
+          onClick={() => photoRef.current?.click()}
+          title="Changer la photo de profil"
+          disabled={uploadingPhoto}
+        >
+          {profile?.photo ? (
+            <img src={userPhotoUrl(profile._id, profile.photoUpdatedAt)} alt="" />
+          ) : (
+            initials
+          )}
+          <span className="profile-avatar-edit">
+            {uploadingPhoto ? "…" : "📷"}
+          </span>
+        </button>
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handlePhoto}
+        />
         <div className="profile-hero-info">
           <h1 className="profile-hero-name">{fullName || "Mon profil"}</h1>
           {profile?.email && (
             <div className="profile-hero-email">{profile.email}</div>
+          )}
+          {profile?.photo && (
+            <button className="profile-photo-remove" onClick={handleRemovePhoto}>
+              Retirer la photo
+            </button>
           )}
         </div>
         <span className="profile-role">{roleLabel}</span>

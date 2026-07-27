@@ -6,6 +6,12 @@ import generateToken from "../utils/generateToken.js";
 import sendEmail from "../utils/sendEmail.js";
 import crypto from "crypto";
 import {
+  uploadBufferToGridFS,
+  deleteFromGridFS,
+  findGridFSFile,
+  openDownloadStream,
+} from "../utils/gridfsBucket.js";
+import {
   getManageableUserScope,
   canManageUser,
   assertGrantWithinScope,
@@ -71,6 +77,8 @@ const authUser = asyncHandler(async (req, res) => {
     nom: user.nom,
     prenom: user.prenom,
     role: user.role,
+    photo: user.photo || null,
+    photoUpdatedAt: user.photoUpdatedAt || null,
     permissions: permissions || null,
   });
 });
@@ -110,8 +118,82 @@ const getUserProfile = asyncHandler(async (req, res) => {
     role: user.role,
     isActive: user.isActive,
     lastLogin: user.lastLogin,
+    photo: user.photo || null,
+    photoUpdatedAt: user.photoUpdatedAt || null,
     permissions: permissions || null,
   });
+});
+
+// ---------------------------------------------------------------------------
+// PHOTO DE PROFIL (bucket GridFS "avatars")
+// ---------------------------------------------------------------------------
+const AVATARS_BUCKET = "avatars";
+
+// @desc    Uploader/remplacer sa photo de profil
+// @route   POST /api/users/profile/photo   (multipart, champ "photo")
+// @access  Privé
+const uploadProfilePhoto = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400);
+    throw new Error("Aucune image fournie");
+  }
+  if (!(req.file.mimetype || "").startsWith("image/")) {
+    res.status(400);
+    throw new Error("Le fichier doit être une image");
+  }
+  const user = await User.findById(req.user._id);
+  if (user.photo) await deleteFromGridFS(user.photo, AVATARS_BUCKET);
+
+  const fileId = await uploadBufferToGridFS(
+    req.file.buffer,
+    `avatar-${user._id}`,
+    req.file.mimetype,
+    AVATARS_BUCKET,
+  );
+  user.photo = fileId;
+  user.photoUpdatedAt = new Date();
+  await user.save();
+
+  res.json({ photo: user.photo, photoUpdatedAt: user.photoUpdatedAt });
+});
+
+// @desc    Supprimer sa photo de profil
+// @route   DELETE /api/users/profile/photo
+// @access  Privé
+const deleteProfilePhoto = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (user.photo) {
+    await deleteFromGridFS(user.photo, AVATARS_BUCKET);
+    user.photo = null;
+    user.photoUpdatedAt = new Date();
+    await user.save();
+  }
+  res.json({ ok: true });
+});
+
+// @desc    Servir la photo de profil d'un user (image)
+// @route   GET /api/users/:id/photo
+// @access  Privé
+const getUserPhoto = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id).select("photo");
+  if (!user || !user.photo) {
+    res.status(404);
+    throw new Error("Pas de photo");
+  }
+  const gf = await findGridFSFile(user.photo, AVATARS_BUCKET);
+  if (!gf) {
+    res.status(404);
+    throw new Error("Photo absente du stockage");
+  }
+  res.setHeader("Content-Type", gf.contentType || "image/jpeg");
+  if (gf.length) res.setHeader("Content-Length", gf.length);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  const stream = openDownloadStream(user.photo, AVATARS_BUCKET);
+  stream.on("error", () => {
+    if (!res.headersSent) res.status(500);
+    res.end();
+  });
+  stream.pipe(res);
 });
 
 // @desc    Update user profile (self)
@@ -141,6 +223,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     nom: updatedUser.nom,
     prenom: updatedUser.prenom,
     role: updatedUser.role,
+    photo: updatedUser.photo || null,
+    photoUpdatedAt: updatedUser.photoUpdatedAt || null,
   });
 });
 
@@ -374,7 +458,7 @@ const getAssignableUsers = asyncHandler(async (req, res) => {
   const filter = scope.all ? {} : { _id: { $in: scope.userIds } };
 
   const users = await User.find(filter)
-    .select("nom prenom email role isActive")
+    .select("nom prenom email role isActive photo photoUpdatedAt")
     .sort({ nom: 1, prenom: 1 });
 
   // Trigrammes des sociétés de chaque user (aide au choix en multi-sociétés).
@@ -809,6 +893,9 @@ export {
   createUser,
   getUsers,
   getAssignableUsers,
+  uploadProfilePhoto,
+  deleteProfilePhoto,
+  getUserPhoto,
   getUserById,
   updateUser,
   deleteUser,

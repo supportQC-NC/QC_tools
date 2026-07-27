@@ -13,6 +13,7 @@ import Message from "../models/MessageModel.js";
 import Task from "../models/TaskModel.js";
 import Team from "../models/TeamModel.js";
 import User from "../models/UserModel.js";
+import Conversation from "../models/ConversationModel.js";
 import {
   isSuperAdmin,
   getAccessibleEntreprises,
@@ -32,8 +33,15 @@ const accessibleChatRooms = async (user) => {
     teamFilter = { $or: [{ responsable: user._id }, { membres: user._id }] };
   }
 
-  const teams = await Team.find(teamFilter).select("_id");
-  return ["global", ...teams.map((t) => `team:${t._id}`)];
+  const [teams, convs] = await Promise.all([
+    Team.find(teamFilter).select("_id"),
+    Conversation.find({ participants: user._id }).select("_id"),
+  ]);
+  return [
+    "global",
+    ...teams.map((t) => `team:${t._id}`),
+    ...convs.map((c) => `conv:${c._id}`),
+  ];
 };
 
 // @desc    Compteurs de notifications (messages non lus + tâches non vues)

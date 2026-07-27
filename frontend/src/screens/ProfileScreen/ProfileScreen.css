@@ -581,3 +581,49 @@
   background: rgba(255, 107, 107, 0.15);
   color: var(--danger);
 }
+/* Avatar cliquable + photo de profil */
+.profile-avatar {
+  position: relative;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.profile-avatar:disabled {
+  cursor: default;
+}
+
+.profile-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.profile-avatar-edit {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  font-size: 0.72rem;
+}
+
+.profile-photo-remove {
+  background: none;
+  border: none;
+  color: #f87171;
+  cursor: pointer;
+  font-size: 0.76rem;
+  padding: 0;
+  margin-top: 6px;
+  text-decoration: underline;
+}
