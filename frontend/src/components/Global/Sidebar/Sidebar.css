@@ -350,6 +350,7 @@
 }
 
 .sidebar-icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -357,6 +358,45 @@
   height: 22px;
   flex-shrink: 0;
   font-size: 18px;
+}
+
+/* =============================================
+   BADGES DE NOTIFICATION
+   ============================================= */
+/* Pastille sur l'icône : visible même quand la sidebar est repliée. */
+.sidebar-badge-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid var(--bg-secondary, #1e1e2a);
+  box-sizing: content-box;
+}
+
+/* Compteur chiffré aligné à droite du label (sidebar dépliée). */
+.sidebar-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: #ef4444;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+
+/* Sidebar repliée : on ne garde que la pastille, pas le compteur chiffré. */
+.sidebar.collapsed .sidebar-badge {
+  display: none;
 }
 
 .sidebar-label {

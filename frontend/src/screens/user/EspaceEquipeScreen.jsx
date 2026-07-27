@@ -2,15 +2,22 @@
 //
 // Espace d'équipe : chat GLOBAL (tous les utilisateurs) + un chat par équipe
 // accessible à l'utilisateur. Sélection du salon par onglets.
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { HiChatAlt2, HiGlobeAlt, HiUserGroup } from "react-icons/hi";
 import { useGetTeamsQuery } from "../../slices/teamApiSlice";
+import { useMarkChatSeenMutation } from "../../slices/notificationApiSlice";
 import ChatPanel from "../../components/chat/ChatPanel";
 import "./EspaceEquipeScreen.css";
 
 const EspaceEquipeScreen = () => {
   const { data: teams } = useGetTeamsQuery();
   const [active, setActive] = useState("global");
+
+  // Ouvrir l'espace équipe = marquer les messages comme lus (efface le badge).
+  const [markChatSeen] = useMarkChatSeenMutation();
+  useEffect(() => {
+    markChatSeen();
+  }, [markChatSeen]);
 
   const salons = useMemo(() => {
     const list = [{ key: "global", room: "global", label: "Général", icon: "globe" }];

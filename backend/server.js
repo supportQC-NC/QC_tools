@@ -83,6 +83,8 @@ import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 import executableRoutes from "./routes/executableRoutes.js";
 // ========== ROUTES MESSAGES (chat temps réel) ==========
 import messageRoutes from "./routes/messageRoutes.js";
+// ========== ROUTES NOTIFICATIONS (badges sidebar) ==========
+import notificationRoutes from "./routes/notificationRoutes.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -203,6 +205,7 @@ app.use("/api/analyse-ca", analyseCaRoutes);
 app.use("/api/executables", executableRoutes);
 // ========== ROUTES MESSAGES (chat) ==========
 app.use("/api/messages", messageRoutes);
+app.use("/api/notifications", notificationRoutes);
 // =======================================
 
 // ==========================================
@@ -243,6 +246,9 @@ const server = http.createServer(app);
 const io = new SocketServer(server, {
   cors: { origin: true, credentials: true },
 });
+// Rendre `io` accessible aux contrôleurs REST (ex. notif de nouvelle tâche) via
+// req.app.get("io").
+app.set("io", io);
 initChat(io);
 
 // Démarrage du serveur

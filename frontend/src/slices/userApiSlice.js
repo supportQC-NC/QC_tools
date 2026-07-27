@@ -58,6 +58,14 @@ export const userApiSlice = apiSlice.injectEndpoints({
       providesTags: ["User"],
       keepUnusedDataFor: 5,
     }),
+    // Liste allégée des utilisateurs assignables à une équipe (périmètre société).
+    getAssignableUsers: builder.query({
+      query: () => ({
+        url: `${USERS_URL}/assignable`,
+      }),
+      providesTags: ["User"],
+      keepUnusedDataFor: 5,
+    }),
     getUserById: builder.query({
       query: (id) => ({
         url: `${USERS_URL}/${id}`,
@@ -106,6 +114,7 @@ export const {
   useGetProfileQuery,
   useUpdateProfileMutation,
   useGetUsersQuery,
+  useGetAssignableUsersQuery,
   useGetUserByIdQuery,
   useCreateUserMutation,
   useUpdateUserMutation,

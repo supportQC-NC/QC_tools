@@ -791,3 +791,36 @@
   width: 13px;
   font-weight: 800;
 }
+
+/* Sélecteur de membres à la création d'une équipe */
+.eq-members-picker {
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eq-member-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.eq-member-check:hover {
+  background: rgba(77, 166, 255, 0.1);
+}
+
+.eq-member-check input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}

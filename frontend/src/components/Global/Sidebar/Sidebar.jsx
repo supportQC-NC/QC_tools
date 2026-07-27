@@ -5,11 +5,21 @@ import { useSelector } from "react-redux";
 import { getUserMenus } from "../../../config/menuConfig";
 import { HiHome, HiX, HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { useSidebar } from "../../../contexte/SidebarContext";
+import { useGetNotificationCountsQuery } from "../../../slices/notificationApiSlice";
 import "./Sidebar.css";
 
 const Sidebar = () => {
   const { userInfo } = useSelector((state) => state.auth);
   const menus = getUserMenus(userInfo);
+
+  // Compteurs de notifications -> badges. Map par path des items de la sidebar.
+  const { data: notifCounts } = useGetNotificationCountsQuery(undefined, {
+    skip: !userInfo,
+  });
+  const badges = {
+    "/espace-equipe": notifCounts?.messages || 0,
+    "/mes-taches": notifCounts?.taches || 0,
+  };
 
   // Context sidebar (pour mobile ET collapsed)
   const { isOpen, isMobile, isCollapsed, closeSidebar } = useSidebar();
@@ -36,6 +46,7 @@ const Sidebar = () => {
   // Render un item de menu (lien)
   const renderMenuItem = (item, key) => {
     const IconComponent = item.icon || HiHome;
+    const count = badges[item.path] || 0;
     return (
       <NavLink
         key={key}
@@ -47,8 +58,12 @@ const Sidebar = () => {
       >
         <span className="sidebar-icon">
           <IconComponent />
+          {count > 0 && <span className="sidebar-badge-dot" />}
         </span>
         <span className="sidebar-label">{item.label}</span>
+        {count > 0 && (
+          <span className="sidebar-badge">{count > 99 ? "99+" : count}</span>
+        )}
       </NavLink>
     );
   };

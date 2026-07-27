@@ -8,3 +8,4 @@ export const COMMANDES_URL = "/api/commandes";
 export const REPORT_SUBSCRIPTIONS_URL = "/api/report-subscriptions";
 export const TEAMS_URL = "/api/teams";
 export const TASKS_URL = "/api/tasks";
+export const NOTIFICATIONS_URL = "/api/notifications";

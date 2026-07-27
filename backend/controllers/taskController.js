@@ -218,6 +218,16 @@ const createTask = asyncHandler(async (req, res) => {
     statut: "a_faire",
   });
 
+  // Notification « nouvelle tâche » : poussée à chaque assigné (hors créateur)
+  // sur son salon personnel, pour rafraîchir le badge « Mes tâches ».
+  const io = req.app.get("io");
+  if (io) {
+    for (const a of assignes) {
+      if (String(a) === String(req.user._id)) continue;
+      io.to(`user:${a}`).emit("notif:task", { taskId: task._id });
+    }
+  }
+
   res.status(201).json(await populateTask(Task.findById(task._id)));
 });
 

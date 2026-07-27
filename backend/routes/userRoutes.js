@@ -9,6 +9,7 @@ import {
   resetPassword,
   createUser,
   getUsers,
+  getAssignableUsers,
   getUserById,
   updateUser,
   deleteUser,
@@ -41,6 +42,8 @@ router.put("/profile", protect, updateUserProfile);
 // Administration des utilisateurs (module "users_admin")
 router.post("/", protect, canWrite, createUser);
 router.get("/", protect, canRead, getUsers);
+// Liste allégée pour le choix des membres d'équipe — AVANT /:id.
+router.get("/assignable", protect, canRead, getAssignableUsers);
 router.get("/:id", protect, canRead, getUserById);
 router.put("/:id", protect, canWrite, updateUser);
 router.delete("/:id", protect, canDelete, deleteUser);

@@ -16,7 +16,6 @@
 import asyncHandler from "./asyncHandler.js";
 import Permission from "../models/PermissionModel.js";
 import Team from "../models/TeamModel.js";
-import User from "../models/UserModel.js";
 
 /**
  * Renvoie le périmètre d'entreprises accessible à un utilisateur.
@@ -193,30 +192,19 @@ export const getManageableUserScope = async (actor) => {
 
   const selfId = actor._id.toString();
 
-  // Admin scopé : tous les utilisateurs dont le périmètre société recoupe le sien.
-  if (actor.role === "admin") {
-    const { ids } = await getAccessibleEntreprises(actor);
+  // Admin scopé ET Responsable : tous les utilisateurs dont le périmètre société
+  // recoupe le leur (+ eux-mêmes). Décision client : un responsable gère TOUS les
+  // utilisateurs de ses sociétés — pour les modifier comme pour les rattacher à
+  // une équipe — pas seulement ceux qu'il a créés. Le périmètre est donc basé sur
+  // les SOCIÉTÉS accessibles, ce qui autorise aussi le multi-sociétés.
+  if (actor.role === "admin" || actor.role === "responsable") {
+    const { all, ids } = await getAccessibleEntreprises(actor);
+    if (all) return { all: true, userIds: null };
     const perms = await Permission.find({
       entreprises: { $in: ids },
     }).select("user");
     const userIds = new Set(perms.map((p) => p.user.toString()));
     userIds.add(selfId);
-    return { all: false, userIds: [...userIds] };
-  }
-
-  // Responsable : les membres de ses équipes ET les users qu'il a créés
-  // (+ lui-même). Le `createdBy` garantit qu'un membre fraîchement créé reste
-  // visible même avant d'être rattaché à une équipe.
-  if (actor.role === "responsable") {
-    const [teams, created] = await Promise.all([
-      Team.find({ responsable: actor._id }).select("membres"),
-      User.find({ createdBy: actor._id }).select("_id"),
-    ]);
-    const userIds = new Set([selfId]);
-    for (const t of teams) {
-      for (const m of t.membres || []) userIds.add(m.toString());
-    }
-    for (const u of created) userIds.add(u._id.toString());
     return { all: false, userIds: [...userIds] };
   }
 

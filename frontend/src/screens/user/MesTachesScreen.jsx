@@ -4,7 +4,7 @@
 // Bloqué) + bande « Terminées » (archive) repliable. Glisser-déposer pour
 // changer de statut. Tout utilisateur crée des tâches PERSO (fond distinct,
 // éditables). Cartes cliquables -> détail + documents.
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   HiRefresh,
   HiClipboardCheck,
@@ -22,6 +22,7 @@ import {
   useGetTasksQuery,
   useUpdateTaskStatutMutation,
 } from "../../slices/taskApiSlice";
+import { useMarkTasksSeenMutation } from "../../slices/notificationApiSlice";
 import PersoTaskModal from "../../components/user/PersoTaskModal";
 import {
   STATUT_LABELS,
@@ -41,6 +42,12 @@ const MesTachesScreen = () => {
   const { data: tasks, isLoading, error, refetch, isFetching } =
     useGetTasksQuery({ mine: true });
   const [updateStatut] = useUpdateTaskStatutMutation();
+
+  // Ouvrir « Mes tâches » = marquer les tâches comme vues (efface le badge).
+  const [markTasksSeen] = useMarkTasksSeenMutation();
+  useEffect(() => {
+    markTasksSeen();
+  }, [markTasksSeen]);
 
   const [modal, setModal] = useState(null); // null | "create" | task
   const [dragId, setDragId] = useState(null);

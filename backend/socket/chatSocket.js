@@ -6,7 +6,40 @@
 import jwt from "jsonwebtoken";
 import User from "../models/UserModel.js";
 import Message from "../models/MessageModel.js";
+import Team from "../models/TeamModel.js";
+import Task from "../models/TaskModel.js";
 import { canAccessRoom } from "../utils/chatAccess.js";
+
+// Destinataires d'un message : ids des users concernés par le salon (pour
+// pousser une notification « message non lu » sur leur salon personnel).
+//   - global    -> tous les utilisateurs actifs
+//   - team:<id> -> membres + responsable de l'équipe
+//   - task:<id> -> assignés + auteur de la tâche
+const roomRecipients = async (room) => {
+  if (room === "global") {
+    const users = await User.find({ isActive: true }).select("_id");
+    return users.map((u) => u._id.toString());
+  }
+  const sep = room.indexOf(":");
+  if (sep === -1) return [];
+  const kind = room.slice(0, sep);
+  const id = room.slice(sep + 1);
+  if (kind === "team") {
+    const team = await Team.findById(id).select("membres responsable");
+    if (!team) return [];
+    return [...(team.membres || []), team.responsable]
+      .filter(Boolean)
+      .map((x) => x.toString());
+  }
+  if (kind === "task") {
+    const task = await Task.findById(id).select("assignes creePar");
+    if (!task) return [];
+    return [...(task.assignes || []), task.creePar]
+      .filter(Boolean)
+      .map((x) => x.toString());
+  }
+  return [];
+};
 
 // Extrait un cookie nommé depuis l'entête brut "a=1; b=2".
 const readCookie = (raw = "", name) => {
@@ -41,6 +74,11 @@ export const initChat = (io) => {
 
   io.on("connection", (socket) => {
     const user = socket.user;
+
+    // Salon PERSONNEL (stable, jamais quitté) : reçoit les notifications ciblées
+    // (message non lu, nouvelle tâche) pour rafraîchir les badges de la sidebar
+    // même quand l'utilisateur n'est pas sur l'écran de chat.
+    socket.join(`user:${user._id}`);
 
     // Rejoindre un salon (après contrôle d'accès).
     socket.on("room:join", async (room, ack) => {
@@ -81,6 +119,15 @@ export const initChat = (io) => {
           .populate("auteur", "nom prenom")
           .lean();
         io.to(room).emit("message:new", populated);
+
+        // Notification « message non lu » : poussée sur le salon personnel de
+        // chaque destinataire (hors auteur) pour mettre à jour le badge sidebar.
+        const recipients = await roomRecipients(room);
+        for (const uid of recipients) {
+          if (uid === user._id.toString()) continue;
+          io.to(`user:${uid}`).emit("notif:message", { room });
+        }
+
         if (typeof ack === "function") ack({ ok: true });
       } catch {
         if (typeof ack === "function") ack({ ok: false, error: "Envoi échoué" });

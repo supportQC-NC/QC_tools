@@ -7,7 +7,10 @@ import {
   useUpdateTeamMutation,
 } from "../../slices/teamApiSlice";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
-import { useGetUsersQuery } from "../../slices/userApiSlice";
+import {
+  useGetUsersQuery,
+  useGetAssignableUsersQuery,
+} from "../../slices/userApiSlice";
 import { actorGrantableEntrepriseIds } from "../../config/adminModules";
 import "./UserModal.css";
 
@@ -22,10 +25,16 @@ const EquipeModal = ({ team, onClose }) => {
     responsable: "",
     description: "",
   });
+  // Membres pré-sélectionnés à la création (l'édition des membres se fait dans
+  // l'écran détail). Tableau d'ids User.
+  const [membres, setMembres] = useState([]);
   const [error, setError] = useState("");
 
   const { data: entreprises } = useGetEntreprisesQuery();
   const { data: users } = useGetUsersQuery();
+  // Périmètre société : tous les users que l'acteur peut rattacher à une équipe
+  // (y compris multi-sociétés). Sert au choix des membres à la création.
+  const { data: assignables } = useGetAssignableUsersQuery();
   const [createTeam, { isLoading: isCreating }] = useCreateTeamMutation();
   const [updateTeam, { isLoading: isUpdating }] = useUpdateTeamMutation();
 
@@ -42,6 +51,19 @@ const EquipeModal = ({ team, onClose }) => {
     () => (users || []).filter((u) => u.role === "responsable"),
     [users],
   );
+
+  // Membres sélectionnables : tout le périmètre société, sauf le responsable de
+  // l'équipe (lui-même pour un responsable, le responsable choisi pour un admin).
+  const leadId = isResponsable ? actor?._id : form.responsable;
+  const membresDispo = useMemo(
+    () => (assignables || []).filter((u) => u._id !== leadId),
+    [assignables, leadId],
+  );
+
+  const toggleMembre = (id) =>
+    setMembres((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id],
+    );
 
   useEffect(() => {
     if (team) {
@@ -86,7 +108,8 @@ const EquipeModal = ({ team, onClose }) => {
       if (isEdit) {
         await updateTeam({ id: team._id, ...payload }).unwrap();
       } else {
-        await createTeam(payload).unwrap();
+        // Membres pré-sélectionnés uniquement à la création.
+        await createTeam({ ...payload, membres }).unwrap();
       }
       onClose();
     } catch (err) {
@@ -158,6 +181,42 @@ const EquipeModal = ({ team, onClose }) => {
                 <span className="label-hint">
                   Aucun utilisateur « responsable » disponible — créez-en un
                   d'abord.
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Membres : sélection à la création. En édition, on gère les membres
+              depuis l'écran détail de l'équipe. */}
+          {!isEdit && (
+            <div className="form-group">
+              <label>Membres (optionnel)</label>
+              {membresDispo.length === 0 ? (
+                <span className="label-hint">
+                  Aucun utilisateur disponible dans vos sociétés.
+                </span>
+              ) : (
+                <div className="eq-members-picker">
+                  {membresDispo.map((u) => (
+                    <label key={u._id} className="eq-member-check">
+                      <input
+                        type="checkbox"
+                        checked={membres.includes(u._id)}
+                        onChange={() => toggleMembre(u._id)}
+                      />
+                      <span>
+                        {u.prenom} {u.nom} ({u.email})
+                        {u.entreprises?.length
+                          ? ` — ${u.entreprises.join(", ")}`
+                          : ""}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {membres.length > 0 && (
+                <span className="label-hint">
+                  {membres.length} membre(s) sélectionné(s).
                 </span>
               )}
             </div>

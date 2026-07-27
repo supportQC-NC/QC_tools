@@ -22,7 +22,7 @@ import {
   useAddTeamMembersMutation,
   useRemoveTeamMemberMutation,
 } from "../../slices/teamApiSlice";
-import { useGetUsersQuery } from "../../slices/userApiSlice";
+import { useGetAssignableUsersQuery } from "../../slices/userApiSlice";
 import EquipeModal from "../../components/Admin/EquipeModal";
 import "./AdminEquipesScreen.css";
 
@@ -34,7 +34,7 @@ const AdminEquipeDetailScreen = () => {
   const navigate = useNavigate();
 
   const { data: team, isLoading, error } = useGetTeamByIdQuery(id);
-  const { data: users } = useGetUsersQuery();
+  const { data: users } = useGetAssignableUsersQuery();
   const [deleteTeam] = useDeleteTeamMutation();
   const [addMembers] = useAddTeamMembersMutation();
   const [removeMember] = useRemoveTeamMemberMutation();
@@ -184,6 +184,7 @@ const AdminEquipeDetailScreen = () => {
             {candidates.map((u) => (
               <option key={u._id} value={u._id}>
                 {u.prenom} {u.nom} ({u.email})
+                {u.entreprises?.length ? ` — ${u.entreprises.join(", ")}` : ""}
               </option>
             ))}
           </select>

@@ -6,6 +6,7 @@ import Sidebar from "./components/Global/Sidebar/Sidebar";
 import Login from "./screens/LoginScreen/LoginScreen";
 import "./index.css";
 import { SidebarProvider } from "./contexte/SidebarContext";
+import NotificationsSync from "./components/Global/Notifications/NotificationsSync";
 
 const PUBLIC_ROUTES = ["/login", "/forgot-password"];
 
@@ -29,6 +30,7 @@ const App = () => {
     <>
     
     <SidebarProvider>
+      <NotificationsSync />
       <div className="app">
         <Header />
         <div className="app-body">

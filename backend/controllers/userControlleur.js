@@ -363,6 +363,43 @@ const getUsers = asyncHandler(async (req, res) => {
   res.json(usersWithPermissions);
 });
 
+// @desc    Liste ALLÉGÉE des utilisateurs du périmètre de l'acteur, pour le choix
+//          des membres d'une équipe. Même périmètre que getUsers (société) mais
+//          projection minimale (nom/prenom/email/role + trigrammes) — pas de
+//          populate lourd des permissions.
+// @route   GET /api/users/assignable
+// @access  Admin / Responsable
+const getAssignableUsers = asyncHandler(async (req, res) => {
+  const scope = await getManageableUserScope(req.user);
+  const filter = scope.all ? {} : { _id: { $in: scope.userIds } };
+
+  const users = await User.find(filter)
+    .select("nom prenom email role isActive")
+    .sort({ nom: 1, prenom: 1 });
+
+  // Trigrammes des sociétés de chaque user (aide au choix en multi-sociétés).
+  const perms = await Permission.find({
+    user: { $in: users.map((u) => u._id) },
+  })
+    .select("user entreprises")
+    .populate("entreprises", "trigramme");
+
+  const entMap = new Map();
+  for (const p of perms) {
+    entMap.set(
+      p.user.toString(),
+      (p.entreprises || []).map((e) => e.trigramme).filter(Boolean),
+    );
+  }
+
+  res.json(
+    users.map((u) => ({
+      ...u.toObject(),
+      entreprises: entMap.get(u._id.toString()) || [],
+    })),
+  );
+});
+
 // @desc    Get user by ID
 // @route   GET /api/users/:id
 // @access  Private/Admin
@@ -771,6 +808,7 @@ export {
   resetPassword,
   createUser,
   getUsers,
+  getAssignableUsers,
   getUserById,
   updateUser,
   deleteUser,

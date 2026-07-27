@@ -46,6 +46,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Notifications sidebar : horodatage de la DERNIÈRE consultation par surface.
+    // « Non lu » = éléments créés après ce marqueur (voir notificationController).
+    chatSeenAt: {
+      type: Date,
+      default: null,
+    },
+    tasksSeenAt: {
+      type: Date,
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

@@ -102,7 +102,7 @@ const createTeam = asyncHandler(async (req, res) => {
     leadId = lead._id;
   }
 
-  // Membres : chacun doit être dans le périmètre de l'acteur.
+  // Membres : chacun doit être dans le périmètre société de l'acteur (cross-société OK).
   const membreIds = [...new Set((membres || []).map(String))];
   for (const m of membreIds) {
     if (!(await canManageUser(req.user, m))) {
@@ -177,7 +177,7 @@ const addMembers = asyncHandler(async (req, res) => {
   }
 
   for (const id of ids) {
-    // Chaque membre ajouté doit être dans le périmètre de l'acteur.
+    // Chaque membre ajouté doit être dans le périmètre société de l'acteur.
     if (!(await canManageUser(req.user, id))) {
       res.status(403);
       throw new Error("Un des utilisateurs est hors de votre périmètre");
