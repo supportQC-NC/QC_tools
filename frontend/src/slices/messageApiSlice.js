@@ -15,10 +15,13 @@ export const messageApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Envoi avec fichiers : le FormData laisse le navigateur poser le boundary.
     sendMessageWithFiles: builder.mutation({
-      query: ({ room, texte, files }) => {
+      query: ({ room, texte, files, replyTo, mentions }) => {
         const fd = new FormData();
         fd.append("room", room);
         if (texte) fd.append("texte", texte);
+        if (replyTo) fd.append("replyTo", replyTo);
+        if (mentions && mentions.length)
+          fd.append("mentions", JSON.stringify(mentions));
         (files || []).forEach((f) => fd.append("files", f));
         return { url: MESSAGES_URL, method: "POST", body: fd };
       },
@@ -33,6 +36,21 @@ export const messageApiSlice = apiSlice.injectEndpoints({
         body: { type },
       }),
     }),
+    // Fichiers & médias partagés d'un salon (galerie du panneau latéral).
+    getRoomMedia: builder.query({
+      query: (room) => ({ url: `${MESSAGES_URL}/media`, params: { room } }),
+      keepUnusedDataFor: 30,
+    }),
+    editMessage: builder.mutation({
+      query: ({ id, texte }) => ({
+        url: `${MESSAGES_URL}/${id}`,
+        method: "PUT",
+        body: { texte },
+      }),
+    }),
+    pinMessage: builder.mutation({
+      query: (id) => ({ url: `${MESSAGES_URL}/${id}/pin`, method: "POST" }),
+    }),
   }),
 });
 
@@ -40,4 +58,7 @@ export const {
   useSendMessageWithFilesMutation,
   useDeleteMessageMutation,
   useReactToMessageMutation,
+  useGetRoomMediaQuery,
+  useEditMessageMutation,
+  usePinMessageMutation,
 } = messageApiSlice;

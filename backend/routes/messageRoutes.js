@@ -3,8 +3,13 @@ import express from "express";
 import multer from "multer";
 import {
   getMessages,
+  getRoomMedia,
   sendMessage,
   downloadMessageFile,
+  editMessage,
+  pinMessage,
+  getPinned,
+  searchMessages,
   deleteMessage,
   reactToMessage,
   getReads,
@@ -22,10 +27,15 @@ const uploadFiles = multer({
 router.use(protect);
 
 router.route("/").get(getMessages).post(uploadFiles, sendMessage);
-// Accusés de lecture — AVANT /:id/*.
+// Accusés de lecture + médias + épingles + recherche — AVANT /:id/*.
 router.get("/reads", getReads);
+router.get("/media", getRoomMedia);
+router.get("/pinned", getPinned);
+router.get("/search", searchMessages);
 router.get("/:id/files/:fileId", downloadMessageFile);
 router.post("/:id/react", reactToMessage);
+router.post("/:id/pin", pinMessage);
+router.put("/:id", editMessage);
 router.delete("/:id", deleteMessage);
 
 export default router;

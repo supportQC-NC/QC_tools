@@ -37,6 +37,195 @@
   flex-shrink: 0;
 }
 
+/* Barre d'outils (recherche) */
+.chat-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+.chat-toolbtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+.chat-toolbtn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.chat-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--text-muted);
+}
+.chat-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+  font-size: 0.86rem;
+}
+.chat-search button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+}
+
+/* Résultats de recherche */
+.chat-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-sr {
+  display: flex;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 10px;
+}
+.chat-sr:hover {
+  background: var(--bg-tertiary);
+}
+.chat-sr-body {
+  min-width: 0;
+  flex: 1;
+}
+.chat-sr-top {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+.chat-sr-top span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.chat-sr-text {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* Bandeau des messages épinglés */
+.chat-pinned {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(245, 158, 11, 0.1);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.25);
+  flex-shrink: 0;
+}
+.chat-pinned-icon {
+  flex-shrink: 0;
+  color: #f59e0b;
+  font-size: 1.05rem;
+}
+.chat-pinned-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.chat-pinned-label {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+.chat-pinned-text {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-pinned-x {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.chat-pinned-x:hover {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-primary);
+}
+
+/* Édition en place */
+.chat-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+.chat-edit input {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+}
+.chat-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+.chat-edit-actions button {
+  border: none;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-edit-actions button:first-child {
+  background: var(--accent, #4da6ff);
+  color: #fff;
+}
+.chat-edit-actions button:last-child {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+/* Indicateur « modifié » */
+.chat-edited {
+  font-size: 0.68rem;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* Bouton épingle actif */
+.chat-reply-btn.on {
+  color: #f59e0b;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -118,10 +307,16 @@
   border: 2px solid var(--bg-secondary);
   box-sizing: border-box;
 }
-.chat-av-dot.on {
+.chat-av-dot.s-actif {
   background: #22c55e;
 }
-.chat-av-dot.off {
+.chat-av-dot.s-absent {
+  background: #f59e0b;
+}
+.chat-av-dot.s-occupe {
+  background: #ef4444;
+}
+.chat-av-dot.s-offline {
   background: #6b7280;
 }
 
@@ -413,6 +608,193 @@
 
 .chat-msg-row:hover .chat-react {
   opacity: 1;
+}
+
+/* Bouton « Répondre » (survol de la ligne). */
+.chat-reply-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0;
+  transition: opacity 0.14s ease, color 0.14s ease, background 0.14s ease;
+}
+.chat-msg-row:hover .chat-reply-btn {
+  opacity: 1;
+}
+.chat-reply-btn:hover {
+  color: #fff;
+  background: var(--accent, #4da6ff);
+}
+
+/* Citation affichée dans une bulle (message auquel on répond). */
+.chat-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 5px;
+  padding: 5px 9px;
+  border-left: 3px solid rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  max-width: 100%;
+}
+.chat-group.mine .chat-quote {
+  border-left-color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.18);
+}
+.chat-quote-author {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.95;
+}
+.chat-quote-text {
+  font-size: 0.78rem;
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+/* Mention @ surlignée dans le texte. */
+.chat-mention {
+  color: #cfe3ff;
+  background: rgba(77, 166, 255, 0.22);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 600;
+}
+.chat-group.mine .chat-mention {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}
+.chat-mention.me {
+  background: rgba(245, 158, 11, 0.28);
+  color: #fde68a;
+}
+
+/* Bulle où JE suis mentionné : léger liseré ambre. */
+.chat-bubble.mentioned {
+  box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.55);
+}
+
+/* ── Zone de saisie (composer) : citation + menu de mentions ── */
+.chat-composer {
+  position: relative;
+}
+
+.chat-replybar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px 10px 0 0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.chat-replybar-icon {
+  flex-shrink: 0;
+  color: var(--accent, #4da6ff);
+  font-size: 1.1rem;
+}
+.chat-replybar-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.chat-replybar-author {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent, #4da6ff);
+}
+.chat-replybar-text {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-replybar-x {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.chat-replybar-x:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.chat-mention-menu {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 100%;
+  margin-bottom: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  z-index: 6;
+}
+.chat-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 11px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-mention-item:hover,
+.chat-mention-item.on {
+  background: rgba(77, 166, 255, 0.16);
+}
+.chat-mention-av {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  overflow: hidden;
+}
+.chat-mention-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chat-mention-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-react-btn {

@@ -56,6 +56,12 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Présence : horodatage de la dernière déconnexion socket (« vu il y a X »).
+    // Le statut en ligne/absent/occupé est géré EN MÉMOIRE côté socket (transitoire).
+    lastSeenAt: {
+      type: Date,
+      default: null,
+    },
     // Photo de profil (optionnelle) : id GridFS (bucket "avatars"). Le binaire
     // n'est jamais renvoyé dans le JSON ; on sert l'image via GET /api/users/:id/photo.
     photo: {

@@ -8,6 +8,11 @@ import User from "../models/UserModel.js";
 import Message from "../models/MessageModel.js";
 import RoomRead from "../models/RoomReadModel.js";
 import { canAccessRoom, roomRecipients } from "../utils/chatAccess.js";
+import {
+  buildReplySnapshot,
+  sanitizeMentions,
+  mentionUserIds,
+} from "../utils/chatMessageHelpers.js";
 
 // Extrait un cookie nommé depuis l'entête brut "a=1; b=2".
 const readCookie = (raw = "", name) => {
@@ -24,9 +29,19 @@ const readCookie = (raw = "", name) => {
 // ── PRÉSENCE ──────────────────────────────────────────────────────────────
 // Qui est connecté à l'application ? On compte les sockets par utilisateur
 // (multi-onglets = plusieurs sockets pour un même user). En ligne = compteur > 0.
+// Le STATUT (actif / absent / occupe) est transitoire, gardé en mémoire.
 const onlineCounts = new Map(); // userId -> nb de sockets ouverts
+const userStatus = new Map(); // userId -> "actif" | "absent" | "occupe"
+const STATUSES = ["actif", "absent", "occupe"];
 
 export const getOnlineUserIds = () => [...onlineCounts.keys()];
+
+// Snapshot des utilisateurs en ligne avec leur statut.
+const presenceSnapshot = () =>
+  [...onlineCounts.keys()].map((id) => ({
+    userId: id,
+    status: userStatus.get(id) || "actif",
+  }));
 
 // Authentifie une connexion socket à partir du cookie JWT du handshake.
 const authenticateSocket = async (socket, next) => {
@@ -57,29 +72,47 @@ export const initChat = (io) => {
     socket.join(`user:${uid}`);
 
     // Présence : incrémente le compteur ; si c'était la 1re socket de ce user,
-    // on l'annonce à tout le monde (dernier vu = maintenant). Puis on envoie au
-    // nouvel arrivant le SNAPSHOT complet des utilisateurs déjà en ligne.
+    // on l'annonce à tout le monde (statut par défaut « actif »). Puis on envoie
+    // au nouvel arrivant le SNAPSHOT complet (users en ligne + statut).
     const prevCount = onlineCounts.get(uid) || 0;
     onlineCounts.set(uid, prevCount + 1);
     if (prevCount === 0) {
-      io.emit("presence:update", { userId: uid, online: true });
+      if (!userStatus.has(uid)) userStatus.set(uid, "actif");
+      io.emit("presence:update", {
+        userId: uid,
+        online: true,
+        status: userStatus.get(uid) || "actif",
+      });
     }
-    socket.emit("presence:state", getOnlineUserIds());
+    socket.emit("presence:state", presenceSnapshot());
 
     // Le client peut redemander le snapshot (ex. reconnexion).
     socket.on("presence:get", (ack) => {
-      const ids = getOnlineUserIds();
-      if (typeof ack === "function") ack(ids);
-      else socket.emit("presence:state", ids);
+      const snap = presenceSnapshot();
+      if (typeof ack === "function") ack(snap);
+      else socket.emit("presence:state", snap);
+    });
+
+    // Changement de statut (manuel ou auto-absent) → rediffusé à tous.
+    socket.on("presence:status", (status) => {
+      const s = STATUSES.includes(status) ? status : "actif";
+      userStatus.set(uid, s);
+      io.emit("presence:update", { userId: uid, online: true, status: s });
     });
 
     // Déconnexion : décrémente ; si plus aucune socket, l'utilisateur passe
-    // hors ligne pour tout le monde.
-    socket.on("disconnect", () => {
+    // hors ligne pour tout le monde et on mémorise « vu à » (lastSeenAt).
+    socket.on("disconnect", async () => {
       const c = (onlineCounts.get(uid) || 1) - 1;
       if (c <= 0) {
         onlineCounts.delete(uid);
+        userStatus.delete(uid);
         io.emit("presence:update", { userId: uid, online: false });
+        try {
+          await User.updateOne({ _id: uid }, { lastSeenAt: new Date() });
+        } catch {
+          /* non bloquant */
+        }
       } else {
         onlineCounts.set(uid, c);
       }
@@ -104,7 +137,8 @@ export const initChat = (io) => {
     });
 
     // Envoi d'un message : contrôle d'accès -> persistance -> diffusion au salon.
-    socket.on("message:send", async ({ room, texte } = {}, ack) => {
+    // Accepte une CITATION (replyTo = id du message cité) et des MENTIONS @.
+    socket.on("message:send", async ({ room, texte, replyTo, mentions } = {}, ack) => {
       try {
         const contenu = (texte || "").trim();
         if (!room || !contenu) {
@@ -115,10 +149,14 @@ export const initChat = (io) => {
           if (typeof ack === "function") ack({ ok: false, error: "Accès refusé" });
           return;
         }
+        const reply = await buildReplySnapshot(replyTo, room);
+        const cleanMentions = await sanitizeMentions(mentions, room);
         const created = await Message.create({
           room,
           auteur: user._id,
           texte: contenu.slice(0, 4000),
+          replyTo: reply || undefined,
+          mentions: cleanMentions,
         });
         const populated = await Message.findById(created._id)
           .populate("auteur", "nom prenom photo photoUpdatedAt")
@@ -126,11 +164,16 @@ export const initChat = (io) => {
         io.to(room).emit("message:new", populated);
 
         // Notification « message non lu » : poussée sur le salon personnel de
-        // chaque destinataire (hors auteur) pour mettre à jour le badge sidebar.
+        // chaque destinataire (hors auteur) pour le badge sidebar. Les personnes
+        // MENTIONNÉES reçoivent en plus `notif:mention` (signal plus fort).
         const recipients = await roomRecipients(room);
+        const mentioned = new Set(mentionUserIds(cleanMentions));
         for (const uid of recipients) {
           if (uid === user._id.toString()) continue;
           io.to(`user:${uid}`).emit("notif:message", { room });
+          if (mentioned.has(uid)) {
+            io.to(`user:${uid}`).emit("notif:mention", { room });
+          }
         }
 
         if (typeof ack === "function") ack({ ok: true });
@@ -154,10 +197,13 @@ export const initChat = (io) => {
     });
 
     // Accusé de lecture : l'utilisateur a lu le salon jusqu'à maintenant.
-    // Pas d'accusés sur « global » (concerne tout le monde -> inutile).
+    // On enregistre la position de lecture pour TOUS les salons (y compris
+    // « global ») afin de calculer les non-lus PAR conversation dans le rail.
+    // En revanche, on ne DIFFUSE l'accusé « vu par » que hors « global »
+    // (sinon bruit inutile : global concerne tout le monde).
     socket.on("room:read", async (room) => {
       try {
-        if (!room || room === "global") return;
+        if (!room) return;
         if (!(await canAccessRoom(user, room))) return;
         const now = new Date();
         await RoomRead.findOneAndUpdate(
@@ -165,17 +211,19 @@ export const initChat = (io) => {
           { lastReadAt: now },
           { upsert: true },
         );
-        socket.to(room).emit("room:read", {
-          room,
-          lastReadAt: now,
-          user: {
-            _id: user._id,
-            prenom: user.prenom,
-            nom: user.nom,
-            photo: user.photo || null,
-            photoUpdatedAt: user.photoUpdatedAt || null,
-          },
-        });
+        if (room !== "global") {
+          socket.to(room).emit("room:read", {
+            room,
+            lastReadAt: now,
+            user: {
+              _id: user._id,
+              prenom: user.prenom,
+              nom: user.nom,
+              photo: user.photo || null,
+              photoUpdatedAt: user.photoUpdatedAt || null,
+            },
+          });
+        }
       } catch {
         /* silencieux */
       }

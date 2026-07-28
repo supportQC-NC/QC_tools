@@ -15,6 +15,7 @@ import {
   applyPresenceState,
   applyPresenceUpdate,
   resetPresence,
+  getMyManualStatus,
 } from "../../../presenceClient";
 import { apiSlice } from "../../../slices/apiSlice";
 import {
@@ -62,10 +63,9 @@ const NotificationsSync = () => {
       else dispatch(apiSlice.util.invalidateTags(["Notif"]));
     };
 
-    // Présence : snapshot initial + deltas (qui est connecté à l'app).
-    const onPresenceState = (ids) => applyPresenceState(ids);
-    const onPresenceUpdate = ({ userId, online }) =>
-      applyPresenceUpdate(userId, online);
+    // Présence : snapshot initial + deltas (qui est connecté + statut).
+    const onPresenceState = (list) => applyPresenceState(list);
+    const onPresenceUpdate = (payload) => applyPresenceUpdate(payload);
 
     socket.on("notif:message", onMessage);
     socket.on("notif:task", onTask);
@@ -86,6 +86,42 @@ const NotificationsSync = () => {
       resetSocket();
     };
   }, [userInfo?._id, dispatch, markChatSeen, markTasksSeen]);
+
+  // Auto-absent : après 5 min sans activité, le statut passe « absent » ; il
+  // repasse « actif » à la première interaction. Respecte un statut MANUEL
+  // (occupe / absent choisi par l'utilisateur → on ne le touche pas).
+  useEffect(() => {
+    if (!userInfo?._id) return undefined;
+    const socket = getSocket();
+    const IDLE_MS = 5 * 60 * 1000;
+    let idleTimer = null;
+    let away = false;
+
+    const goAway = () => {
+      if (getMyManualStatus()) return;
+      away = true;
+      socket.emit("presence:status", "absent");
+    };
+    const onActivity = () => {
+      if (!getMyManualStatus() && away) {
+        away = false;
+        socket.emit("presence:status", "actif");
+      }
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(goAway, IDLE_MS);
+    };
+
+    window.addEventListener("mousemove", onActivity, { passive: true });
+    window.addEventListener("keydown", onActivity);
+    window.addEventListener("click", onActivity);
+    idleTimer = setTimeout(goAway, IDLE_MS);
+    return () => {
+      clearTimeout(idleTimer);
+      window.removeEventListener("mousemove", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("click", onActivity);
+    };
+  }, [userInfo?._id]);
 
   return null;
 };

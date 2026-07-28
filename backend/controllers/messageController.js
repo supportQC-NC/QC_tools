@@ -9,6 +9,11 @@ import {
   roomRecipients,
 } from "../utils/chatAccess.js";
 import {
+  buildReplySnapshot,
+  sanitizeMentions,
+  mentionUserIds,
+} from "../utils/chatMessageHelpers.js";
+import {
   uploadBufferToGridFS,
   deleteFromGridFS,
   findGridFSFile,
@@ -36,14 +41,19 @@ const kindFromMime = (mime = "") => {
 
 const AUTEUR_FIELDS = "nom prenom photo photoUpdatedAt";
 
-// Diffuse un message au salon + pousse la notif « non lu » aux destinataires.
+// Diffuse un message au salon + pousse la notif « non lu » aux destinataires
+// (et `notif:mention` aux personnes mentionnées).
 const broadcastMessage = async (io, populated, authorId) => {
   if (!io) return;
   io.to(populated.room).emit("message:new", populated);
   const recipients = await roomRecipients(populated.room);
+  const mentioned = new Set(mentionUserIds(populated.mentions));
   for (const uid of recipients) {
     if (uid !== String(authorId)) {
       io.to(`user:${uid}`).emit("notif:message", { room: populated.room });
+      if (mentioned.has(uid)) {
+        io.to(`user:${uid}`).emit("notif:mention", { room: populated.room });
+      }
     }
   }
 };
@@ -72,6 +82,45 @@ const getMessages = asyncHandler(async (req, res) => {
     .lean();
 
   res.json(messages.reverse());
+});
+
+// @desc    Fichiers & médias partagés d'un salon (galerie du panneau latéral)
+// @route   GET /api/messages/media?room=...
+// @access  Privé (accès au salon vérifié)
+const getRoomMedia = asyncHandler(async (req, res) => {
+  const { room } = req.query;
+  if (!room) {
+    res.status(400);
+    throw new Error("Salon (room) requis");
+  }
+  if (!(await canAccessRoom(req.user, room))) {
+    res.status(403);
+    throw new Error("Accès à ce salon refusé");
+  }
+  // Messages porteurs d'au moins une pièce jointe, du plus récent au plus ancien.
+  const msgs = await Message.find({ room, "attachments.0": { $exists: true } })
+    .select("attachments auteur createdAt")
+    .populate("auteur", "prenom nom")
+    .sort({ createdAt: -1 })
+    .limit(400)
+    .lean();
+
+  // Aplatit en une liste de fichiers (l'ordre = messages récents d'abord).
+  const items = [];
+  for (const m of msgs) {
+    for (const a of m.attachments || []) {
+      items.push({
+        messageId: String(m._id),
+        fileId: String(a._id),
+        fileName: a.fileName,
+        kind: a.kind,
+        size: a.size,
+        at: m.createdAt,
+        auteurPrenom: m.auteur?.prenom || "",
+      });
+    }
+  }
+  res.json(items);
 });
 
 // @desc    Envoyer un message AVEC fichiers (le texte pur passe par le socket)
@@ -114,11 +163,23 @@ const sendMessage = asyncHandler(async (req, res) => {
     });
   }
 
+  // Citation + mentions (mentions transmises en JSON dans le multipart).
+  const reply = await buildReplySnapshot(req.body.replyTo, room);
+  let rawMentions = [];
+  try {
+    rawMentions = req.body.mentions ? JSON.parse(req.body.mentions) : [];
+  } catch {
+    rawMentions = [];
+  }
+  const cleanMentions = await sanitizeMentions(rawMentions, room);
+
   const created = await Message.create({
     room,
     auteur: req.user._id,
     texte: texte.slice(0, 4000),
     attachments,
+    replyTo: reply || undefined,
+    mentions: cleanMentions,
   });
   const populated = await Message.findById(created._id)
     .populate("auteur", AUTEUR_FIELDS)
@@ -170,6 +231,118 @@ const downloadMessageFile = asyncHandler(async (req, res) => {
     res.end();
   });
   stream.pipe(res);
+});
+
+// @desc    Éditer le texte d'un message (auteur uniquement)
+// @route   PUT /api/messages/:id   { texte }
+// @access  Auteur
+const editMessage = asyncHandler(async (req, res) => {
+  const message = await Message.findById(req.params.id);
+  if (!message) {
+    res.status(404);
+    throw new Error("Message introuvable");
+  }
+  if (String(message.auteur) !== String(req.user._id)) {
+    res.status(403);
+    throw new Error("Seul l'auteur peut modifier ce message");
+  }
+  const texte = (req.body.texte || "").trim();
+  if (!texte) {
+    res.status(400);
+    throw new Error("Le message ne peut pas être vide");
+  }
+  message.texte = texte.slice(0, 4000);
+  message.editedAt = new Date();
+  await message.save();
+
+  const io = req.app.get("io");
+  if (io) {
+    io.to(message.room).emit("message:edited", {
+      id: String(message._id),
+      room: message.room,
+      texte: message.texte,
+      editedAt: message.editedAt,
+    });
+  }
+  res.json({ id: String(message._id), texte: message.texte, editedAt: message.editedAt });
+});
+
+// @desc    Épingler / désépingler un message (auteur ou modérateur du salon)
+// @route   POST /api/messages/:id/pin
+// @access  Auteur / modérateur
+const pinMessage = asyncHandler(async (req, res) => {
+  const message = await Message.findById(req.params.id);
+  if (!message) {
+    res.status(404);
+    throw new Error("Message introuvable");
+  }
+  const isAuthor = String(message.auteur) === String(req.user._id);
+  if (!isAuthor && !(await canModerateRoom(req.user, message.room))) {
+    res.status(403);
+    throw new Error("Vous ne pouvez pas épingler ce message");
+  }
+  message.pinned = !message.pinned;
+  message.pinnedAt = message.pinned ? new Date() : null;
+  message.pinnedBy = message.pinned ? req.user._id : null;
+  await message.save();
+
+  const io = req.app.get("io");
+  if (io) {
+    io.to(message.room).emit("message:pinned", {
+      id: String(message._id),
+      room: message.room,
+      pinned: message.pinned,
+    });
+  }
+  res.json({ id: String(message._id), pinned: message.pinned });
+});
+
+// @desc    Messages épinglés d'un salon (bandeau)
+// @route   GET /api/messages/pinned?room=...
+// @access  Privé (accès au salon vérifié)
+const getPinned = asyncHandler(async (req, res) => {
+  const { room } = req.query;
+  if (!room) {
+    res.status(400);
+    throw new Error("Salon (room) requis");
+  }
+  if (!(await canAccessRoom(req.user, room))) {
+    res.status(403);
+    throw new Error("Accès à ce salon refusé");
+  }
+  const pinned = await Message.find({ room, pinned: true })
+    .sort({ pinnedAt: -1 })
+    .limit(10)
+    .populate("auteur", AUTEUR_FIELDS)
+    .lean();
+  res.json(pinned);
+});
+
+// @desc    Rechercher dans les messages d'un salon
+// @route   GET /api/messages/search?room=...&q=...
+// @access  Privé (accès au salon vérifié)
+const searchMessages = asyncHandler(async (req, res) => {
+  const { room } = req.query;
+  const q = (req.query.q || "").trim();
+  if (!room) {
+    res.status(400);
+    throw new Error("Salon (room) requis");
+  }
+  if (!(await canAccessRoom(req.user, room))) {
+    res.status(403);
+    throw new Error("Accès à ce salon refusé");
+  }
+  if (q.length < 2) return res.json([]);
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const results = await Message.find({
+    room,
+    texte: { $regex: escaped, $options: "i" },
+  })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .populate("auteur", AUTEUR_FIELDS)
+    .lean();
+  res.json(results);
 });
 
 // @desc    Supprimer un message (auteur, ou modérateur du salon)
@@ -278,8 +451,13 @@ const getReads = asyncHandler(async (req, res) => {
 
 export {
   getMessages,
+  getRoomMedia,
   sendMessage,
   downloadMessageFile,
+  editMessage,
+  pinMessage,
+  getPinned,
+  searchMessages,
   deleteMessage,
   reactToMessage,
   getReads,

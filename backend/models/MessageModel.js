@@ -39,6 +39,30 @@ const messageSchema = new mongoose.Schema(
     // La règle « texte OU attachment » est appliquée dans le contrôleur/socket.
     texte: { type: String, trim: true, maxlength: 4000, default: "" },
     attachments: { type: [attachmentSchema], default: [] },
+    // Réponse / citation : SNAPSHOT du message cité (résiste à sa suppression).
+    replyTo: {
+      message: { type: mongoose.Schema.Types.ObjectId, ref: "Message", default: null },
+      texte: { type: String, default: "" },
+      auteurPrenom: { type: String, default: "" },
+      auteurNom: { type: String, default: "" },
+    },
+    // Mentions @ : utilisateurs cités (pour surlignage + notification ciblée).
+    mentions: {
+      type: [
+        {
+          user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          display: { type: String, default: "" },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+    // Édition : horodatage de la dernière modification (affiche « modifié »).
+    editedAt: { type: Date, default: null },
+    // Épingle : message mis en avant (bandeau en haut du salon).
+    pinned: { type: Boolean, default: false },
+    pinnedAt: { type: Date, default: null },
+    pinnedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     // Réactions : une par utilisateur (toggle). `type` = clé (voir chatReactions).
     reactions: {
       type: [

@@ -13,6 +13,7 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import Conversation from "../models/ConversationModel.js";
 import Team from "../models/TeamModel.js";
 import Message from "../models/MessageModel.js";
+import RoomRead from "../models/RoomReadModel.js";
 import User from "../models/UserModel.js";
 import {
   isSuperAdmin,
@@ -133,6 +134,64 @@ const getConversations = asyncHandler(async (req, res) => {
     });
   }
 
+  // ── Enrichissement « rail façon messagerie » : dernier message + non-lus ──
+  const rooms = out.map((o) => o.room);
+
+  // Dernier message par salon (une seule agrégation).
+  const lastAgg = await Message.aggregate([
+    { $match: { room: { $in: rooms } } },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: "$room",
+        texte: { $first: "$texte" },
+        createdAt: { $first: "$createdAt" },
+        auteur: { $first: "$auteur" },
+        nbAtt: { $first: { $size: { $ifNull: ["$attachments", []] } } },
+      },
+    },
+  ]);
+  const lastByRoom = new Map(lastAgg.map((l) => [l._id, l]));
+
+  // Prénoms des auteurs des derniers messages.
+  const authorIds = [
+    ...new Set(lastAgg.map((l) => String(l.auteur)).filter(Boolean)),
+  ];
+  const authors = await User.find({ _id: { $in: authorIds } })
+    .select("prenom nom")
+    .lean();
+  const authorById = new Map(authors.map((a) => [String(a._id), a]));
+
+  // Position de lecture par salon (RoomRead ; repli chatSeenAt pour « global »).
+  const reads = await RoomRead.find({ user: user._id, room: { $in: rooms } })
+    .select("room lastReadAt")
+    .lean();
+  const readByRoom = new Map(reads.map((r) => [r.room, r.lastReadAt]));
+  const EPOCH = new Date(0);
+
+  for (const o of out) {
+    const lm = lastByRoom.get(o.room);
+    if (lm) {
+      const a = authorById.get(String(lm.auteur));
+      o.lastMessage = {
+        texte: lm.texte || (lm.nbAtt > 0 ? "📎 Pièce jointe" : ""),
+        at: lm.createdAt,
+        auteurPrenom: a?.prenom || "",
+        mine: String(lm.auteur) === String(user._id),
+      };
+    }
+    // Non-lus = messages arrivés après ma position de lecture, hors les miens.
+    let threshold = readByRoom.get(o.room);
+    if (!threshold) {
+      threshold = o.room === "global" ? user.chatSeenAt || EPOCH : EPOCH;
+    }
+    o.unread = await Message.countDocuments({
+      room: o.room,
+      auteur: { $ne: user._id },
+      createdAt: { $gt: threshold },
+    });
+  }
+
   res.json(out);
 });
 
@@ -154,7 +213,7 @@ const getRoomMembers = asyncHandler(async (req, res) => {
   // membres+responsable (team), participants (conv), assignés+auteur (task).
   const ids = await roomRecipients(room);
   const users = await User.find({ _id: { $in: ids } })
-    .select("nom prenom email photo photoUpdatedAt role")
+    .select("nom prenom email photo photoUpdatedAt role lastSeenAt")
     .sort({ prenom: 1, nom: 1 })
     .lean();
   res.json(users);
