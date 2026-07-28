@@ -11,8 +11,14 @@
 import cron from "node-cron";
 import MailCampaign from "../models/MailCampaignModel.js";
 import { sendToRecipients } from "./mailingSender.js";
+import {
+  detectAndEnroll,
+  processDueEnrollments,
+} from "./automationService.js";
 
 let running = false;
+let runningAuto = false;
+let runningDetect = false;
 
 const sendNextBatch = async (campaign) => {
   const recipients = campaign.recipients || [];
@@ -27,7 +33,10 @@ const sendNextBatch = async (campaign) => {
     return;
   }
 
-  const { sent, failed, errors } = await sendToRecipients(campaign, batch);
+  const { sent, failed, errors } = await sendToRecipients(campaign, batch, {
+    track: true,
+    startIndex: start,
+  });
   campaign.sentCount = (campaign.sentCount || 0) + sent;
   campaign.failedCount = (campaign.failedCount || 0) + failed;
   campaign.cursor = start + batch.length;
@@ -80,9 +89,37 @@ const processDue = async () => {
   }
 };
 
+// Traitement des automatisations (chaque minute) : envoie les étapes dues.
+const processAutomationTick = async () => {
+  if (runningAuto) return;
+  runningAuto = true;
+  try {
+    await processDueEnrollments();
+  } catch (e) {
+    console.error("[automation:process]", e.message);
+  } finally {
+    runningAuto = false;
+  }
+};
+
+// Détection des nouveaux clients (toutes les 30 min) → enrôlement.
+const detectionTick = async () => {
+  if (runningDetect) return;
+  runningDetect = true;
+  try {
+    await detectAndEnroll();
+  } catch (e) {
+    console.error("[automation:detect]", e.message);
+  } finally {
+    runningDetect = false;
+  }
+};
+
 export const startMailingScheduler = () => {
   cron.schedule("* * * * *", processDue, { timezone: "Pacific/Noumea" });
-  console.log("[mailingScheduler] démarré (envoi par lots)");
+  cron.schedule("* * * * *", processAutomationTick, { timezone: "Pacific/Noumea" });
+  cron.schedule("*/30 * * * *", detectionTick, { timezone: "Pacific/Noumea" });
+  console.log("[mailingScheduler] démarré (envoi par lots + automatisations)");
 };
 
 export default { startMailingScheduler };

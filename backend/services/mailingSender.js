@@ -7,6 +7,12 @@
 
 import nodemailer from "nodemailer";
 import { renderCampaign } from "./mailRenderService.js";
+import {
+  recipientToken,
+  unsubToken,
+  unsubUrl,
+  injectTracking,
+} from "./mailTracking.js";
 
 let _transport = null;
 const getTransport = () => {
@@ -41,10 +47,16 @@ const applyMerge = (str, r) =>
   });
 
 // Envoie le rendu de la campagne à une liste de destinataires (1 mail chacun).
-export const sendToRecipients = async (campaign, recipients) => {
-  const { html, text } = renderCampaign(campaign.design || {}, {
-    baseUrl: baseUrl(),
-  });
+// opts.track = suivi ouvertures/clics + lien de désinscription réel (envoi RÉEL) ;
+// opts.startIndex = index global du 1er destinataire du lot (pour le rid unique).
+// En mode test (track=false), aucun suivi et {{unsubscribe_url}} → "#".
+export const sendToRecipients = async (campaign, recipients, opts = {}) => {
+  const { track = false, startIndex = 0 } = opts;
+  // Lien de désinscription RÉEL dès qu'on suit la campagne OU si demandé
+  // explicitement (automatisations : pas de tracking mais désinscription active).
+  const realUnsub = track || opts.unsub === true;
+  const base = baseUrl();
+  const { html, text } = renderCampaign(campaign.design || {}, { baseUrl: base });
   const transporter = getTransport();
   const subject = campaign.subject || "(sans objet)";
   const replyTo = campaign.replyTo || undefined;
@@ -52,18 +64,36 @@ export const sendToRecipients = async (campaign, recipients) => {
   let sent = 0;
   let failed = 0;
   const errors = [];
-  for (const r of recipients) {
+  for (let i = 0; i < recipients.length; i++) {
+    const r = recipients[i];
     const rec = typeof r === "string" ? { email: r, nom: "" } : r || {};
     const to = rec.email;
     if (!to) continue;
+
+    const uUrl = realUnsub ? unsubUrl(base, unsubToken(campaign.entreprise, to)) : "#";
+    let htmlOut = applyMerge(html, rec);
+    if (track) {
+      htmlOut = injectTracking(htmlOut, base, recipientToken(campaign._id, startIndex + i));
+    }
+    htmlOut = htmlOut.split("{{unsubscribe_url}}").join(uUrl);
+    const textOut = applyMerge(text, rec).split("{{unsubscribe_url}}").join(uUrl);
+
+    const headers = track
+      ? {
+          "List-Unsubscribe": `<${uUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
+      : undefined;
+
     try {
       await transporter.sendMail({
         from: fromHeader(),
         to,
         replyTo,
         subject: applyMerge(subject, rec),
-        html: applyMerge(html, rec),
-        text: applyMerge(text, rec),
+        html: htmlOut,
+        text: textOut,
+        headers,
       });
       sent++;
     } catch (e) {
@@ -74,8 +104,8 @@ export const sendToRecipients = async (campaign, recipients) => {
   return { sent, failed, errors };
 };
 
-// Envoi de TEST immédiat vers une liste d'emails.
+// Envoi de TEST immédiat vers une liste d'emails (aucun suivi, aucune blacklist).
 export const sendTest = async (campaign, emails) =>
-  sendToRecipients(campaign, (emails || []).filter(Boolean));
+  sendToRecipients(campaign, (emails || []).filter(Boolean), { track: false });
 
 export default { sendToRecipients, sendTest };

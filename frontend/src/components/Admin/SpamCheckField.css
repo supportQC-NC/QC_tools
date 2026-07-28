@@ -1,0 +1,96 @@
+/* SpamCheckField — champ avec surlignage des mots à risque (spam). */
+
+.scf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scf-lbl {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.scf-box {
+  position: relative;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.scf-warn .scf-box {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+}
+
+.scf-danger .scf-box {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4);
+}
+
+/* Le calque et le champ DOIVENT avoir des métriques identiques. */
+.scf-input,
+.scf-backdrop {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 9px 11px;
+  border: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  letter-spacing: normal;
+}
+
+.scf-backdrop {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.scf-box--multi .scf-backdrop {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.scf-input {
+  position: relative;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+  display: block;
+}
+
+.scf-box--multi .scf-input {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.scf-mark {
+  background: rgba(239, 68, 68, 0.4);
+  color: transparent;
+  border-radius: 3px;
+}
+
+.scf-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 7px;
+  padding: 6px 10px;
+}
+
+.scf-warn .scf-banner {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+}

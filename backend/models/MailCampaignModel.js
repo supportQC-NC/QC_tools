@@ -29,12 +29,13 @@ const mailCampaignSchema = new mongoose.Schema(
     scope: {
       type: {
         type: String,
-        enum: ["tous", "categorie", "profes", "csv"],
+        enum: ["tous", "categorie", "profes", "csv", "segment"],
         default: "tous",
       },
       categories: { type: [String], default: [] },
       profes: { type: [String], default: [] },
       csvEmails: { type: [String], default: [] },
+      segmentId: { type: mongoose.Schema.Types.ObjectId, ref: "MailSegment" },
     },
     testEmails: { type: [String], default: [] },
     // Snapshot figé au lancement.

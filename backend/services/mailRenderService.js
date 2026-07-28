@@ -279,6 +279,10 @@ export const renderCampaign = (design = {}, { baseUrl = "" } = {}) => {
     .map((b) => `<tr><td style="${cellStyle(b)}">${renderBlock(b, baseUrl)}</td></tr>`)
     .join("");
 
+  // Pied de page DÉSINSCRIPTION (obligatoire, bon pour la délivrabilité).
+  // {{unsubscribe_url}} est remplacé PAR destinataire dans le sender.
+  const footer = `<tr><td style="padding:18px 28px;border-top:1px solid #eee;text-align:center;font-family:${font};font-size:11px;color:#9aa0a6;line-height:1.5;">Vous recevez cet email en tant que client.<br/><a href="{{unsubscribe_url}}" style="color:#9aa0a6;text-decoration:underline;">Se désinscrire</a> de nos communications.</td></tr>`;
+
   const html = `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -289,6 +293,7 @@ export const renderCampaign = (design = {}, { baseUrl = "" } = {}) => {
   <tr><td align="center" style="padding:24px 12px;">
     <table role="presentation" width="${width}" cellpadding="0" cellspacing="0" style="width:${width}px;max-width:100%;background:${cardBg};border-radius:10px;overflow:hidden;font-family:${font};color:#333;">
       ${rows}
+      ${footer}
     </table>
   </td></tr>
 </table>
@@ -324,7 +329,9 @@ export const renderCampaign = (design = {}, { baseUrl = "" } = {}) => {
     .filter((s) => s.trim())
     .join("\n\n");
 
-  return { html, text };
+  const textWithFooter = `${text}\n\n—\nSe désinscrire : {{unsubscribe_url}}`;
+
+  return { html, text: textWithFooter };
 };
 
 export default { renderCampaign };

@@ -51,6 +51,8 @@ export const apiSlice = createApi({
     "Conversation",
     // ========== TAGS MAILING ==========
     "MailCampaign",
+    "MailSegment",
+    "MailAutomation",
   ],
   endpoints: (builder) => ({}),
 });

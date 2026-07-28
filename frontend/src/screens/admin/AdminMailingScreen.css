@@ -7,8 +7,9 @@
   color: var(--text-primary);
 }
 
+/* Espace de travail marketing : destiné aux écrans d'ordinateur → très large. */
 .ml-screen--wide {
-  max-width: min(1500px, calc(100vw - 40px));
+  max-width: min(2200px, calc(100vw - 48px));
 }
 
 .ml-head {
@@ -95,6 +96,177 @@
 .ml-msg--err {
   background: rgba(239, 68, 68, 0.14);
   color: #fca5a5;
+}
+
+/* Onglets Campagnes / Segments */
+.ml-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ml-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.ml-tab.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.ml-select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+/* Segments */
+.seg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.seg-sub {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.seg-count {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #7cc0ff;
+  background: rgba(77, 166, 255, 0.14);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+.seg-tags {
+  color: var(--text-muted);
+}
+
+/* Automatisations */
+.auto-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  margin-bottom: 14px;
+}
+
+.auto-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.auto-step {
+  position: relative;
+  min-width: 180px;
+  max-width: 240px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.auto-step.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.auto-step-delay {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #7cc0ff;
+  background: rgba(77, 166, 255, 0.14);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.auto-step-name {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.auto-step-subj {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-step-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auto-step-del:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+.auto-step-add {
+  min-width: 160px;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.auto-step-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Liste des campagnes */

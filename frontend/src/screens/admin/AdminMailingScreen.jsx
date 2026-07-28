@@ -14,6 +14,9 @@ import {
   HiPause,
   HiArrowLeft,
   HiSearch,
+  HiUserGroup,
+  HiChartBar,
+  HiLightningBolt,
 } from "react-icons/hi";
 import {
   selectGlobalDossier,
@@ -30,8 +33,14 @@ import {
   useLaunchCampaignMutation,
   usePauseCampaignMutation,
   useResumeCampaignMutation,
+  useGetSegmentsQuery,
+  useGetSegmentCountQuery,
 } from "../../slices/mailingApiSlice";
 import MailBlockDesigner from "../../components/Admin/MailBlockDesigner";
+import MailSegments from "../../components/Admin/MailSegments";
+import MailStats from "../../components/Admin/MailStats";
+import MailAutomations from "../../components/Admin/MailAutomations";
+import SpamCheckField from "../../components/Admin/SpamCheckField";
 import "./AdminMailingScreen.css";
 
 const parseEmails = (t) => [
@@ -78,6 +87,9 @@ const CheckList = ({ items, selected, onToggle, color }) => {
   );
 };
 
+// ⚠️ Adresses de test SÛRES — ne JAMAIS tester l'envoi avec la base clients.
+const TEST_EMAILS = "communication@quincaillerie.nc\nsupport@quincaillerie.nc\nkrysto.contact@gmail.com";
+
 const emptyForm = () => ({
   nom: "",
   subject: "",
@@ -87,7 +99,8 @@ const emptyForm = () => ({
   categories: [],
   profes: [],
   csvText: "",
-  testText: "",
+  segmentId: "",
+  testText: TEST_EMAILS,
 });
 
 const AdminMailingScreen = () => {
@@ -105,25 +118,45 @@ const AdminMailingScreen = () => {
   const [pauseCampaign] = usePauseCampaignMutation();
   const [resumeCampaign] = useResumeCampaignMutation();
 
+  const [tab, setTab] = useState("campagnes"); // campagnes | segments
+  const [statsFor, setStatsFor] = useState(null); // campagne dont on voit les stats
   const [editing, setEditing] = useState(null); // null = liste ; sinon campagne
   const [form, setForm] = useState(emptyForm());
   const [msg, setMsg] = useState(null);
 
   const { data: filters } = useGetMailFiltersQuery(nomDossierDBF, {
-    skip: !nomDossierDBF || !editing,
+    skip: !nomDossierDBF,
   });
 
-  // Comptage des destinataires (hors CSV, où on compte localement).
+  // Segments de la société (pour cibler une campagne).
+  const { data: segments = [] } = useGetSegmentsQuery(entrepriseId, {
+    skip: !entrepriseId || !editing,
+  });
+
+  // Comptage des destinataires (hors CSV/segment, comptés autrement).
   const { data: countData } = useGetRecipientsCountQuery(
     {
       nomDossierDBF,
       categories: form.scopeType === "categorie" ? form.categories : [],
       profes: form.scopeType === "profes" ? form.profes : [],
     },
-    { skip: !nomDossierDBF || !editing || form.scopeType === "csv" },
+    {
+      skip:
+        !nomDossierDBF ||
+        !editing ||
+        form.scopeType === "csv" ||
+        form.scopeType === "segment",
+    },
   );
+  const { data: segCount } = useGetSegmentCountQuery(form.segmentId, {
+    skip: form.scopeType !== "segment" || !form.segmentId,
+  });
   const recipientCount =
-    form.scopeType === "csv" ? parseEmails(form.csvText).length : countData?.count ?? "…";
+    form.scopeType === "csv"
+      ? parseEmails(form.csvText).length
+      : form.scopeType === "segment"
+        ? segCount?.count ?? "…"
+        : countData?.count ?? "…";
 
   const openNew = () => {
     setMsg(null);
@@ -141,7 +174,8 @@ const AdminMailingScreen = () => {
       categories: c.scope?.categories || [],
       profes: c.scope?.profes || [],
       csvText: (c.scope?.csvEmails || []).join("\n"),
-      testText: (c.testEmails || []).join("\n"),
+      segmentId: c.scope?.segmentId || "",
+      testText: (c.testEmails || []).length ? c.testEmails.join("\n") : TEST_EMAILS,
     });
     setEditing(c);
   };
@@ -151,6 +185,7 @@ const AdminMailingScreen = () => {
     categories: form.categories,
     profes: form.profes,
     csvEmails: parseEmails(form.csvText),
+    segmentId: form.segmentId || undefined,
   });
 
   const ensureSaved = async () => {
@@ -239,18 +274,43 @@ const AdminMailingScreen = () => {
         : [...f[key], code],
     }));
 
+  // ─────────────────────────── Vue STATISTIQUES ───────────────────────────
+  if (statsFor) {
+    return (
+      <div className="ml-screen ml-screen--wide">
+        <MailStats campaign={statsFor} onClose={() => setStatsFor(null)} />
+      </div>
+    );
+  }
+
   // ─────────────────────────── Vue LISTE ───────────────────────────
   if (!editing) {
+    const launched = (c) =>
+      c.status === "en_cours" || c.status === "pause" || c.status === "termine";
     return (
       <div className="ml-screen">
         <div className="ml-head">
           <h1><HiMail /> Mailing clients</h1>
-          <button className="ml-primary" onClick={openNew}><HiPlus /> Nouvelle campagne</button>
+          {tab === "campagnes" && (
+            <button className="ml-primary" onClick={openNew}><HiPlus /> Nouvelle campagne</button>
+          )}
         </div>
+
+        <div className="ml-tabs">
+          <button className={`ml-tab ${tab === "campagnes" ? "on" : ""}`} onClick={() => setTab("campagnes")}><HiMail /> Campagnes</button>
+          <button className={`ml-tab ${tab === "segments" ? "on" : ""}`} onClick={() => setTab("segments")}><HiUserGroup /> Segments</button>
+          <button className={`ml-tab ${tab === "automatisations" ? "on" : ""}`} onClick={() => setTab("automatisations")}><HiLightningBolt /> Automatisations</button>
+        </div>
+
         {!nomDossierDBF && (
           <div className="ml-hint">Sélectionnez une société dans l'en-tête.</div>
         )}
-        {campaigns.length === 0 ? (
+
+        {tab === "segments" ? (
+          <MailSegments entrepriseId={entrepriseId} filters={filters} />
+        ) : tab === "automatisations" ? (
+          <MailAutomations entrepriseId={entrepriseId} brand={filters?.brand} />
+        ) : campaigns.length === 0 ? (
           <div className="ml-empty">Aucune campagne pour l'instant.</div>
         ) : (
           <div className="ml-list">
@@ -268,7 +328,7 @@ const AdminMailingScreen = () => {
                       {c.entreprise?.trigramme ? `${c.entreprise.trigramme} · ` : ""}
                       {c.subject || "(sans objet)"}
                     </div>
-                    {(c.status === "en_cours" || c.status === "pause" || c.status === "termine") && (
+                    {launched(c) && (
                       <div className="ml-progress">
                         <div className="ml-progress-bar"><span style={{ width: `${pct}%` }} /></div>
                         <span className="ml-progress-txt">{c.sentCount}/{total} envoyés{c.failedCount ? ` · ${c.failedCount} échec` : ""}</span>
@@ -276,6 +336,9 @@ const AdminMailingScreen = () => {
                     )}
                   </div>
                   <div className="ml-card-actions">
+                    {launched(c) && (
+                      <button title="Statistiques" onClick={() => setStatsFor(c)}><HiChartBar /></button>
+                    )}
                     {c.status === "en_cours" && (
                       <button title="Pause" onClick={() => pauseCampaign(c._id)}><HiPause /></button>
                     )}
@@ -310,8 +373,8 @@ const AdminMailingScreen = () => {
 
       <div className="ml-card ml-block">
         <div className="ml-fields">
-          <label>Nom (interne)<input value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} placeholder="Ex : Promo rentrée" /></label>
-          <label>Objet de l'email<input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="Ex : -20% cette semaine !" /></label>
+          <SpamCheckField label="Nom (interne)" value={form.nom} onChange={(v) => setForm((f) => ({ ...f, nom: v }))} placeholder="Ex : Promo rentrée" />
+          <SpamCheckField label="Objet de l'email" value={form.subject} onChange={(v) => setForm((f) => ({ ...f, subject: v }))} placeholder="Ex : Nos nouveautés cette semaine" />
           <label>Répondre à (Reply-To)<input value={form.replyTo} onChange={(e) => setForm((f) => ({ ...f, replyTo: e.target.value }))} placeholder="contact@…" /></label>
         </div>
       </div>
@@ -328,6 +391,7 @@ const AdminMailingScreen = () => {
         <div className="ml-scopes">
           {[
             ["tous", "Tous les clients"],
+            ["segment", "Segment"],
             ["categorie", "Par catégorie"],
             ["profes", "Par profession"],
             ["csv", "Liste CSV / emails"],
@@ -335,6 +399,18 @@ const AdminMailingScreen = () => {
             <button key={v} type="button" className={`ml-scope ${form.scopeType === v ? "on" : ""}`} onClick={() => setForm((f) => ({ ...f, scopeType: v }))}>{l}</button>
           ))}
         </div>
+        {form.scopeType === "segment" && (
+          segments.length === 0 ? (
+            <div className="ml-muted">Aucun segment pour cette société. Créez-en un dans l'onglet « Segments ».</div>
+          ) : (
+            <select className="ml-select" value={form.segmentId} onChange={(e) => setForm((f) => ({ ...f, segmentId: e.target.value }))}>
+              <option value="">— Choisir un segment —</option>
+              {segments.map((s) => (
+                <option key={s._id} value={s._id}>{s.nom}{s.description ? ` — ${s.description}` : ""}</option>
+              ))}
+            </select>
+          )
+        )}
         {form.scopeType === "categorie" && (
           <CheckList items={filters?.categories} selected={form.categories} onToggle={(c) => toggle("categories", c)} color="#34d399" />
         )}

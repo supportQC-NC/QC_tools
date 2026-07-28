@@ -32,19 +32,19 @@
 
 .mbd-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
   align-items: start;
 }
 
 .mbd-preview {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  padding: 20px;
+  padding: 24px;
   display: flex;
   justify-content: center;
-  min-height: 360px;
-  max-height: 620px;
+  min-height: 440px;
+  max-height: calc(100vh - 240px);
   overflow-y: auto;
 }
 

@@ -68,6 +68,73 @@ export const mailingApiSlice = apiSlice.injectEndpoints({
         return { url: `${MAIL_URL}/img`, method: "POST", body: fd };
       },
     }),
+
+    // Statistiques d'une campagne (ouvertures / clics).
+    getCampaignStats: builder.query({
+      query: (id) => ({ url: `${MAIL_URL}/campaigns/${id}/stats` }),
+    }),
+
+    // Segments de clients.
+    getSegments: builder.query({
+      query: (entrepriseId) => ({ url: `${MAIL_URL}/segments`, params: { entrepriseId } }),
+      providesTags: ["MailSegment"],
+    }),
+    getSegmentCount: builder.query({
+      query: (id) => ({ url: `${MAIL_URL}/segments/${id}/count` }),
+    }),
+    createSegment: builder.mutation({
+      query: (data) => ({ url: `${MAIL_URL}/segments`, method: "POST", body: data }),
+      invalidatesTags: ["MailSegment"],
+    }),
+    updateSegment: builder.mutation({
+      query: ({ id, ...data }) => ({ url: `${MAIL_URL}/segments/${id}`, method: "PUT", body: data }),
+      invalidatesTags: ["MailSegment"],
+    }),
+    deleteSegment: builder.mutation({
+      query: (id) => ({ url: `${MAIL_URL}/segments/${id}`, method: "DELETE" }),
+      invalidatesTags: ["MailSegment"],
+    }),
+
+    // Automatisations.
+    getAutomations: builder.query({
+      query: (entrepriseId) => ({ url: `${MAIL_URL}/automations`, params: { entrepriseId } }),
+      providesTags: ["MailAutomation"],
+    }),
+    createAutomation: builder.mutation({
+      query: (data) => ({ url: `${MAIL_URL}/automations`, method: "POST", body: data }),
+      invalidatesTags: ["MailAutomation"],
+    }),
+    updateAutomation: builder.mutation({
+      query: ({ id, ...data }) => ({ url: `${MAIL_URL}/automations/${id}`, method: "PUT", body: data }),
+      invalidatesTags: ["MailAutomation"],
+    }),
+    deleteAutomation: builder.mutation({
+      query: (id) => ({ url: `${MAIL_URL}/automations/${id}`, method: "DELETE" }),
+      invalidatesTags: ["MailAutomation"],
+    }),
+    activateAutomation: builder.mutation({
+      query: (id) => ({ url: `${MAIL_URL}/automations/${id}/activate`, method: "POST" }),
+      invalidatesTags: ["MailAutomation"],
+    }),
+    deactivateAutomation: builder.mutation({
+      query: (id) => ({ url: `${MAIL_URL}/automations/${id}/deactivate`, method: "POST" }),
+      invalidatesTags: ["MailAutomation"],
+    }),
+    testAutomation: builder.mutation({
+      query: ({ id, emails }) => ({ url: `${MAIL_URL}/automations/${id}/test`, method: "POST", body: { emails } }),
+    }),
+    addAutomationContacts: builder.mutation({
+      query: ({ id, contacts }) => ({ url: `${MAIL_URL}/automations/${id}/contacts`, method: "POST", body: { contacts } }),
+      invalidatesTags: ["MailAutomation"],
+    }),
+    importAutomationContacts: builder.mutation({
+      query: ({ id, file }) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        return { url: `${MAIL_URL}/automations/${id}/import`, method: "POST", body: fd };
+      },
+      invalidatesTags: ["MailAutomation"],
+    }),
   }),
 });
 
@@ -84,4 +151,19 @@ export const {
   useResumeCampaignMutation,
   usePreviewCampaignMutation,
   useUploadMailImageMutation,
+  useGetCampaignStatsQuery,
+  useGetSegmentsQuery,
+  useGetSegmentCountQuery,
+  useCreateSegmentMutation,
+  useUpdateSegmentMutation,
+  useDeleteSegmentMutation,
+  useGetAutomationsQuery,
+  useCreateAutomationMutation,
+  useUpdateAutomationMutation,
+  useDeleteAutomationMutation,
+  useActivateAutomationMutation,
+  useDeactivateAutomationMutation,
+  useTestAutomationMutation,
+  useAddAutomationContactsMutation,
+  useImportAutomationContactsMutation,
 } = mailingApiSlice;
