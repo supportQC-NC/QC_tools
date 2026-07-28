@@ -292,7 +292,7 @@ const resumeCampaign = asyncHandler(async (req, res) => {
 // @route POST /api/mailing/preview   { design }
 const previewCampaign = asyncHandler(async (req, res) => {
   const { html } = renderCampaign(req.body.design || {}, {
-    baseUrl: process.env.FRONTEND_URL || process.env.CLIENT_URL || "",
+    baseUrl: process.env.FRONTEND_URL || "https://robot-nc.com",
   });
   res.json({ html: html.split("{{unsubscribe_url}}").join("#") });
 });

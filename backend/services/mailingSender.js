@@ -33,8 +33,11 @@ const getTransport = () => {
 const fromHeader = () =>
   `"${process.env.SMTP_FROM_NAME || "Quincaillerie"}" <${process.env.SMTP_USER}>`;
 
-const baseUrl = () =>
-  process.env.FRONTEND_URL || process.env.CLIENT_URL || "https://robot-nc.com";
+// Domaine PUBLIC des emails (pixel d'ouverture, liens traçés, désinscription).
+// On N'UTILISE PLUS CLIENT_URL (souvent = http://localhost en dev) : des liens
+// localhost dans un vrai email sont injoignables ET un fort signal SPAM. On force
+// le domaine de PROD par défaut. Override possible via FRONTEND_URL.
+const baseUrl = () => process.env.FRONTEND_URL || "https://robot-nc.com";
 
 // Variables de personnalisation : {{nom}}, {{email}} avec repli {{nom|Cher client}}.
 const TAG_RE = /\{\{\s*([a-zA-Z]+)\s*(?:\|([^}]*))?\}\}/g;
