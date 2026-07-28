@@ -55,6 +55,14 @@
   cursor: pointer;
 }
 
+/* Le menu déroulant natif hérite d'un fond blanc : on force un fond sombre et un
+   texte clair pour que les options restent lisibles (sinon texte blanc invisible). */
+.ced-fieldadd select option,
+.ced-pselect option {
+  background: var(--bg-secondary, #1e2230);
+  color: var(--text-primary, #f4f4f5);
+}
+
 .ced-datahint {
   font-size: 0.8rem;
   color: #34d399;
@@ -251,6 +259,14 @@
 
 .ced-ptext {
   resize: vertical;
+}
+
+.ced-phint {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: -4px 0 10px;
 }
 
 .ced-prow {

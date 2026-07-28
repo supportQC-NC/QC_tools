@@ -165,7 +165,21 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
     let articles = null;
     let introuvables = [];
     let nartList = [];
-    if (mode && mode !== "aucun") {
+    if (mode === "import") {
+      // Données libres importées (Excel/CSV sans en-tête) : 1 étiquette par ligne.
+      // Chaque ligne = tableau de colonnes lisibles via le champ `imp<N>`.
+      const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+      const clean = rows
+        .map((r) => (Array.isArray(r) ? r : [r]).map((c) => (c == null ? "" : String(c))))
+        .filter((r) => r.some((c) => c.trim() !== ""))
+        .slice(0, 20000); // garde-fou anti-PDF géant
+      if (clean.length === 0) {
+        res.status(400);
+        throw new Error("Aucune ligne exploitable dans le fichier importé.");
+      }
+      articles = clean.map((cols) => ({ __cols: cols }));
+      nartList = articles;
+    } else if (mode && mode !== "aucun") {
       const r = await resolveArticles(req, res, entreprise, mode);
       articles = r.articles;
       introuvables = r.introuvables;

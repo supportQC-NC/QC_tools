@@ -25,20 +25,70 @@ const GAP = 8;
 
 // Champs article disponibles (mêmes données que les autres étiquettes).
 const FIELDS = [
-  { key: "ref", label: "Référence (NART)" },
-  { key: "design", label: "Désignation" },
+  { key: "ref", label: "Référence (NART)", maxLen: 6 },
+  { key: "design", label: "Désignation", maxLen: 50 },
   { key: "prix", label: "Prix TTC" },
   { key: "prixPromo", label: "Prix promo" },
   { key: "contenance", label: "Prix / unité" },
   { key: "gencod", label: "Code GENCOD" },
   { key: "datesPromo", label: "Dates promo" },
 ];
-const fieldLabel = (key) => FIELDS.find((f) => f.key === key)?.label || key;
+
+// Longueurs MAX réelles des champs → l'aperçu affiche un texte d'exemple de cette
+// longueur pour aider à dimensionner/positionner l'élément (le PDF final utilise
+// toujours la vraie valeur de l'article). NART = 6 car., désignation = 50 car.
+const SAMPLE_TEXT = "Désignation article exemple de longueur maximale possible ici";
+
+// Coupe un texte en lignes de `width` caractères max (mots préservés, mots trop
+// longs coupés) — MÊME logique que `wrapText` du backend, pour un aperçu fidèle.
+const wrapPreview = (text, width) => {
+  const w = Number(width) || 0;
+  if (w <= 0) return String(text);
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = "";
+  for (const wd of words) {
+    if (!cur) cur = wd;
+    else if ((cur + " " + wd).length <= w) cur += " " + wd;
+    else { lines.push(cur); cur = wd; }
+    while (cur.length > w) { lines.push(cur.slice(0, w)); cur = cur.slice(w); }
+  }
+  if (cur) lines.push(cur);
+  return lines.join("\n");
+};
 
 let _seq = 0;
 const nextId = () => `el-${Date.now()}-${_seq++}`;
 
-const CustomEtiquetteDesigner = ({ dataMode = false, onChange, initial }) => {
+// `fields` : liste des champs plaçables. Par défaut les champs article ci-dessus ;
+// en mode « import Excel » le parent fournit les colonnes détectées (Colonne 1…N).
+const CustomEtiquetteDesigner = ({
+  dataMode = false,
+  fields = FIELDS,
+  onChange,
+  initial,
+}) => {
+  const fieldOf = (key) => fields.find((f) => f.key === key);
+  const fieldLabel = (key) => fieldOf(key)?.label || key;
+  const fieldMax = (key) => fieldOf(key)?.maxLen || 0;
+  // Libellé d'option : les champs à longueur connue (NART/désignation) sont mis
+  // entre {} avec leur nombre de caractères max → plus lisible pour l'utilisateur.
+  const optionLabel = (f) =>
+    f.maxLen ? `{${f.label}} — ${f.maxLen} car.` : f.label;
+  // Texte d'aperçu d'un champ : échantillon à la longueur MAX si connue, sinon
+  // le libellé entre accolades (colonnes importées, prix, code, dates…).
+  // Si `wrap` est défini sur l'élément, l'échantillon est coupé en plusieurs lignes.
+  const fieldSample = (el) => {
+    const key = el.field;
+    const len = fieldMax(key);
+    const wrap = Number(el.wrap) || 0;
+    if (!len) return wrap ? wrapPreview(`{${fieldLabel(key)}}`, wrap) : `{${fieldLabel(key)}}`;
+    const base = key === "ref" ? "123456789012" : SAMPLE_TEXT;
+    const sample = base.slice(0, len);
+    // Avec retour à la ligne : on montre le texte coupé ; sinon padding à la
+    // largeur max (trailing spaces) pour visualiser l'encombrement maximal.
+    return wrap ? wrapPreview(sample, wrap) : sample.padEnd(len, key === "ref" ? "0" : " ");
+  };
   // `initial` (optionnel) amorce l'état depuis un template chargé. Comme il n'est
   // lu qu'au montage, le parent REMONTE le designer (via key) au chargement.
   const [unit, setUnit] = useState(initial?.unit || "cm");
@@ -173,7 +223,7 @@ const CustomEtiquetteDesigner = ({ dataMode = false, onChange, initial }) => {
     let extra = {};
     if (el.kind === "text" || el.kind === "field") {
       extra = { fontSize: (el.fontSize || 16) * scale, fontWeight: el.bold ? 700 : 400, color: el.color };
-      inner = el.kind === "text" ? el.text || " " : `{${fieldLabel(el.field)}}`;
+      inner = el.kind === "text" ? el.text || " " : fieldSample(el);
     } else if (el.kind === "line") {
       const w = (el.orientation === "v" ? el.thickness : el.length) * scale;
       const h = (el.orientation === "v" ? el.length : el.thickness) * scale;
@@ -258,9 +308,9 @@ const CustomEtiquetteDesigner = ({ dataMode = false, onChange, initial }) => {
                 e.target.value = "";
               }}
             >
-              <option value="">Champ article…</option>
-              {FIELDS.map((f) => (
-                <option key={f.key} value={f.key}>{f.label}</option>
+              <option value="">Champ à insérer…</option>
+              {fields.map((f) => (
+                <option key={f.key} value={f.key}>{optionLabel(f)}</option>
               ))}
             </select>
           </div>
@@ -320,12 +370,25 @@ const CustomEtiquetteDesigner = ({ dataMode = false, onChange, initial }) => {
               )}
               {selected.kind === "field" && (
                 <>
-                  <label className="ced-plabel">Champ article</label>
+                  <label className="ced-plabel">Champ à afficher</label>
                   <select className="ced-pselect" value={selected.field} onChange={(e) => updateSel({ field: e.target.value })}>
-                    {FIELDS.map((f) => (
-                      <option key={f.key} value={f.key}>{f.label}</option>
+                    {fields.map((f) => (
+                      <option key={f.key} value={f.key}>{optionLabel(f)}</option>
                     ))}
                   </select>
+                  <label className="ced-plabel">Retour à la ligne tous les (caractères)</label>
+                  <input
+                    type="number"
+                    className="ced-pselect"
+                    min="0"
+                    value={selected.wrap || 0}
+                    onChange={(e) => updateSel({ wrap: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                    placeholder="0 = une seule ligne"
+                  />
+                  <span className="ced-phint">
+                    0 = pas de retour (une seule ligne). Sinon le texte passe à la
+                    ligne après ce nombre de caractères (une ou plusieurs lignes).
+                  </span>
                 </>
               )}
 
@@ -400,6 +463,22 @@ const CustomEtiquetteDesigner = ({ dataMode = false, onChange, initial }) => {
                       </div>
                     )}
                   </div>
+                </>
+              )}
+
+              {selected.kind === "barcode" && (
+                <>
+                  <label className="ced-plabel">Source du code (EAN-13)</label>
+                  <select
+                    className="ced-pselect"
+                    value={selected.field || ""}
+                    onChange={(e) => updateSel({ field: e.target.value })}
+                  >
+                    <option value="">Code GENCOD de l'article</option>
+                    {fields.map((f) => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
                 </>
               )}
 

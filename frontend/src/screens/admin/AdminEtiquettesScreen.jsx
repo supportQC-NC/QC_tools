@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   HiTag,
   HiOfficeBuilding,
@@ -8,6 +9,7 @@ import {
   HiTruck,
   HiLocationMarker,
   HiCollection,
+  HiTable,
   HiX,
   HiBookmark,
   HiSave,
@@ -196,6 +198,20 @@ const AdminEtiquettesScreen = () => {
   const [csvCount, setCsvCount] = useState(0);
   const fileInputRef = useRef(null);
 
+  // Import « en masse » (type custom) : fichier Excel/CSV SANS en-tête. Chaque
+  // ligne = une étiquette ; les colonnes deviennent des champs plaçables (imp0…N).
+  const [importRows, setImportRows] = useState([]); // tableau de lignes (tableaux de cellules)
+  const [importFileName, setImportFileName] = useState("");
+  const [importError, setImportError] = useState("");
+  const importFileRef = useRef(null);
+
+  // Nombre de colonnes détecté = ligne la plus large.
+  const importCols = importRows.reduce((m, r) => Math.max(m, r.length), 0);
+  const importFields = Array.from({ length: importCols }, (_, i) => ({
+    key: `imp${i}`,
+    label: `Colonne ${i + 1}`,
+  }));
+
   // Templates d'étiquettes personnalisées (partagés par société).
   const [designerKey, setDesignerKey] = useState(0); // remonte le designer au chargement
   const [templateInitial, setTemplateInitial] = useState(null);
@@ -258,6 +274,53 @@ const AdminEtiquettesScreen = () => {
     e.target.value = "";
   };
 
+  // Import « en masse » : lit un fichier Excel/CSV SANS en-tête en tableau de
+  // lignes (chaque ligne = tableau de cellules texte). Colonnes vides finales
+  // ignorées ; détecte le nombre de colonnes = ligne la plus large.
+  const handleImportFile = (e) => {
+    setImportError("");
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // header:1 → tableau de tableaux ; blankrows:false → ignore lignes vides.
+        const aoa = XLSX.utils.sheet_to_json(ws, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        const rows = aoa
+          .map((r) => (Array.isArray(r) ? r.map((c) => (c == null ? "" : String(c).trim())) : []))
+          .filter((r) => r.some((c) => c !== ""));
+        if (rows.length === 0) {
+          setImportRows([]);
+          setImportFileName("");
+          setImportError("Aucune donnée trouvée dans le fichier.");
+          return;
+        }
+        setImportRows(rows);
+        setImportFileName(file.name);
+      } catch {
+        setImportRows([]);
+        setImportFileName("");
+        setImportError("Fichier illisible (formats acceptés : .xlsx, .xls, .csv).");
+      }
+    };
+    reader.onerror = () =>
+      setImportError("Impossible de lire le fichier.");
+    reader.readAsArrayBuffer(file);
+    e.target.value = ""; // permet de réimporter le même fichier
+  };
+
+  const clearImport = () => {
+    setImportRows([]);
+    setImportFileName("");
+    setImportError("");
+  };
+
   const entrepriseData = entreprises?.find((e) => e._id === selectedEntreprise);
   const nomDossierDBF = entrepriseData?.nomDossierDBF;
 
@@ -307,7 +370,13 @@ const AdminEtiquettesScreen = () => {
   const loadTemplate = (tpl) => {
     const cfg = tpl.config || {};
     setType("custom");
-    setMode(tpl.dataMode ? (mode === "aucun" ? "nart" : mode) : "aucun");
+    // Template « import » (colonnes libres imp0…N) : rebascule en mode import ;
+    // l'utilisateur (re)fournit le fichier de données.
+    const isImportTpl = (cfg.elements || []).some((el) =>
+      /^imp\d+$/.test(el?.field || ""),
+    );
+    if (isImportTpl) setMode("import");
+    else setMode(tpl.dataMode ? (mode === "aucun" || mode === "import" ? "nart" : mode) : "aucun");
     setTemplateInitial({
       unit: "px",
       width: cfg.widthPx,
@@ -376,6 +445,11 @@ const AdminEtiquettesScreen = () => {
       if (selectedGroupe.length === 0)
         return { ok: false, error: "Sélectionnez au moins un groupe (GROUPE)." };
       return { ok: true, fields: { groupe: selectedGroupe } };
+    }
+    if (mode === "import") {
+      if (importRows.length === 0)
+        return { ok: false, error: "Importez un fichier Excel/CSV (une ligne = une étiquette)." };
+      return { ok: true, fields: { rows: importRows } };
     }
     return { ok: false, error: "Choisissez une source d'articles." };
   };
@@ -466,10 +540,13 @@ const AdminEtiquettesScreen = () => {
 
       let note;
       if (type === "custom") {
-        note =
-          trouves && Number(trouves) > 0
-            ? `PDF généré (${trouves} étiquette(s) depuis les articles).`
-            : `PDF généré (${body.copies || "?"} étiquette(s) personnalisée(s)).`;
+        if (mode === "import") {
+          note = `PDF généré (${trouves || importRows.length} étiquette(s) depuis le fichier importé).`;
+        } else if (trouves && Number(trouves) > 0) {
+          note = `PDF généré (${trouves} étiquette(s) depuis les articles).`;
+        } else {
+          note = `PDF généré (${body.copies || "?"} étiquette(s) personnalisée(s)).`;
+        }
       } else {
         note = `${trouves || "?"} étiquette(s) générée(s).`;
         if (introuvables && Number(introuvables) > 0) {
@@ -535,6 +612,15 @@ const AdminEtiquettesScreen = () => {
               onClick={() => setMode("aucun")}
             >
               <HiPencilAlt /> Texte seul
+            </button>
+          )}
+          {type === "custom" && (
+            <button
+              type="button"
+              className={`etiq-mode-btn ${mode === "import" ? "active" : ""}`}
+              onClick={() => setMode("import")}
+            >
+              <HiTable /> Importer un fichier (masse)
             </button>
           )}
           <button
@@ -685,6 +771,89 @@ const AdminEtiquettesScreen = () => {
           </div>
         )}
 
+        {type === "custom" && mode === "import" && (
+          <div className="etiq-field">
+            <label className="etiq-label">Fichier de données (Excel / CSV)</label>
+            <div className="etiq-csv-row">
+              <button
+                type="button"
+                className="etiq-csv-btn"
+                onClick={() => importFileRef.current && importFileRef.current.click()}
+              >
+                <HiUpload /> Importer un fichier
+              </button>
+              {importRows.length > 0 && (
+                <>
+                  <span className="etiq-csv-count">
+                    {importRows.length} ligne{importRows.length > 1 ? "s" : ""} · {importCols} colonne{importCols > 1 ? "s" : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="etiq-mode-btn"
+                    onClick={clearImport}
+                    title="Retirer le fichier"
+                  >
+                    <HiX /> Retirer
+                  </button>
+                </>
+              )}
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                onChange={handleImportFile}
+                style={{ display: "none" }}
+              />
+            </div>
+
+            {importError && <div className="etiq-error">{importError}</div>}
+
+            {importRows.length > 0 && (
+              <>
+                <span className="etiq-hint">
+                  Le fichier ne doit <b>pas</b> avoir de ligne d'en-tête. Chaque
+                  ligne produira une étiquette. Placez les colonnes détectées
+                  (« Colonne 1 … {importCols} ») sur l'étiquette ci-dessous, comme
+                  des champs article.
+                </span>
+                <div className="etiq-import-preview">
+                  <table>
+                    <thead>
+                      <tr>
+                        {importFields.map((f) => (
+                          <th key={f.key}>{f.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importRows.slice(0, 5).map((r, ri) => (
+                        <tr key={ri}>
+                          {importFields.map((f, ci) => (
+                            <td key={f.key}>{r[ci] ?? ""}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {importRows.length > 5 && (
+                    <div className="etiq-import-more">
+                      … et {importRows.length - 5} ligne(s) de plus
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {importRows.length === 0 && !importError && (
+              <span className="etiq-hint">
+                Importez un fichier <b>sans en-tête</b> (une ou plusieurs colonnes).
+                Le module détecte le nombre de colonnes ; chaque ligne devient une
+                étiquette générée en masse.
+              </span>
+            )}
+          </div>
+        )}
+
         {type === "custom" && mode === "aucun" && (
           <span className="etiq-hint">
             Mode « texte seul » : l'étiquette ne dépend d'aucun article. Choisissez
@@ -704,9 +873,10 @@ const AdminEtiquettesScreen = () => {
               className={`etiq-type-card ${type === lt.type ? "selected" : ""}`}
               onClick={() => {
                 setType(lt.type);
-                // Custom démarre en « texte seul » ; sortir de custom rétablit une source.
+                // Custom démarre en « texte seul » ; sortir de custom rétablit une
+                // source article (les modes « aucun »/« import » n'existent qu'en custom).
                 if (lt.type === "custom") setMode("aucun");
-                else if (mode === "aucun") setMode("nart");
+                else if (mode === "aucun" || mode === "import") setMode("nart");
               }}
             >
               <span className="etiq-type-title">{lt.title}</span>
@@ -746,6 +916,7 @@ const AdminEtiquettesScreen = () => {
             key={designerKey}
             initial={templateInitial}
             dataMode={mode !== "aucun"}
+            fields={mode === "import" ? importFields : undefined}
             onChange={setCustomLayout}
           />
         </div>

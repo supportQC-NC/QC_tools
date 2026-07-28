@@ -515,3 +515,55 @@
   border-color: rgba(239, 68, 68, 0.4);
   background: rgba(239, 68, 68, 0.12);
 }
+
+/* Aperçu du fichier importé (mode « masse » du type personnalisé) */
+.etiq-import-preview {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+  background: var(--bg-primary);
+}
+
+.etiq-import-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.etiq-import-preview th,
+.etiq-import-preview td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: left;
+  color: var(--text-primary);
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.etiq-import-preview th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+}
+
+.etiq-import-preview tr:last-child td {
+  border-bottom: none;
+}
+
+.etiq-import-preview th:last-child,
+.etiq-import-preview td:last-child {
+  border-right: none;
+}
+
+.etiq-import-more {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}

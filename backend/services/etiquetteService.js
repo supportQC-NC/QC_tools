@@ -635,8 +635,15 @@ const hexToRgb01 = (hex) => {
 };
 
 // Valeur d'un CHAMP article (mêmes données que les autres étiquettes).
+// Cas particulier « import Excel » : un champ `imp<N>` lit la N-ième colonne de la
+// ligne importée (record.__cols), permettant de placer des données libres.
 const getFieldValue = (record, field) => {
   if (!record) return "";
+  const imp = /^imp(\d+)$/.exec(String(field || ""));
+  if (imp) {
+    const arr = record.__cols;
+    return Array.isArray(arr) ? safe(arr[Number(imp[1])]) : "";
+  }
   switch (field) {
     case "ref":
       return safe(record.NART);
@@ -668,8 +675,17 @@ const getFieldValue = (record, field) => {
 
 // Dessine un bloc de texte (multi-ligne) ancré en haut-gauche (px depuis le haut).
 const drawTextEl = (rl, cellX, cellBottomY, hpt, el, text) => {
-  const raw = text == null ? "" : String(text);
+  let raw = text == null ? "" : String(text);
   if (!raw) return;
+  // `wrap` (nb de caractères/ligne, défini sur les champs) : coupe le texte en
+  // plusieurs lignes. Les retours manuels (\n) existants sont préservés.
+  const wrap = Number(el.wrap) || 0;
+  if (wrap > 0) {
+    raw = raw
+      .split("\n")
+      .map((line) => wrapText(line, wrap).join("\n"))
+      .join("\n");
+  }
   const sizePt = Math.max(1, (Number(el.fontSize) || 12) * PX);
   rl.setFont(el.bold ? "Helvetica-Bold" : "Helvetica", sizePt);
   const [r, g, b] = hexToRgb01(el.color || "#000000");
@@ -737,7 +753,12 @@ const drawCustomLabel = (rl, layout, cellX, cellBottomY, wpt, hpt, ctx = {}) => 
         }
       }
     } else if (kind === "barcode") {
-      const code = getFieldValue(record, "gencod");
+      // `el.field` (facultatif) : colonne importée / champ article source du code ;
+      // sinon on retombe sur le GENCOD de l'article.
+      const raw = el.field
+        ? getFieldValue(record, el.field)
+        : getFieldValue(record, "gencod");
+      const code = String(raw || "").replace(/\D/g, "");
       if (code && code.length === 13) {
         const wPt = Math.max(30, (Number(el.w) || 100) * PX);
         const hPt = Math.max(20, (Number(el.h) || 40) * PX);
