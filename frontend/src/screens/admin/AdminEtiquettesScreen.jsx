@@ -9,6 +9,9 @@ import {
   HiLocationMarker,
   HiCollection,
   HiX,
+  HiBookmark,
+  HiSave,
+  HiTrash,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
@@ -17,6 +20,11 @@ import {
   useGetGism1Query,
   useGetGroupesQuery,
 } from "../../slices/articleApiSlice";
+import {
+  useGetEtiquetteTemplatesQuery,
+  useCreateEtiquetteTemplateMutation,
+  useDeleteEtiquetteTemplateMutation,
+} from "../../slices/etiquetteTemplateApiSlice";
 import { BASE_URL } from "../../constants";
 import CustomEtiquetteDesigner from "../../components/Admin/CustomEtiquetteDesigner";
 import "./AdminEtiquettesScreen.css";
@@ -188,6 +196,12 @@ const AdminEtiquettesScreen = () => {
   const [csvCount, setCsvCount] = useState(0);
   const fileInputRef = useRef(null);
 
+  // Templates d'étiquettes personnalisées (partagés par société).
+  const [designerKey, setDesignerKey] = useState(0); // remonte le designer au chargement
+  const [templateInitial, setTemplateInitial] = useState(null);
+  const [templateName, setTemplateName] = useState("");
+  const [tplMsg, setTplMsg] = useState(null);
+
   // Détecte le séparateur le plus fréquent et extrait la 1re colonne de chaque ligne.
   const parseCsvNarts = (text) => {
     const content = String(text).replace(/^\uFEFF/, ""); // BOM éventuel
@@ -256,6 +270,63 @@ const AdminEtiquettesScreen = () => {
     nomDossierDBF,
     { skip: !nomDossierDBF || mode !== "groupe" },
   );
+
+  // Templates de la société (visibles/utilisables par tous les users y ayant accès).
+  const { data: templates = [] } = useGetEtiquetteTemplatesQuery(nomDossierDBF, {
+    skip: !nomDossierDBF,
+  });
+  const [createTemplate, { isLoading: savingTpl }] =
+    useCreateEtiquetteTemplateMutation();
+  const [deleteTemplate] = useDeleteEtiquetteTemplateMutation();
+
+  const saveTemplate = async () => {
+    setTplMsg(null);
+    if (!nomDossierDBF) return setTplMsg({ type: "err", text: "Sélectionnez une société." });
+    if (!templateName.trim()) return setTplMsg({ type: "err", text: "Donnez un nom au template." });
+    if (!customLayout || !(customLayout.elements || []).length)
+      return setTplMsg({ type: "err", text: "Ajoutez au moins un élément avant d'enregistrer." });
+    try {
+      await createTemplate({
+        nomDossierDBF,
+        nom: templateName.trim(),
+        dataMode: mode !== "aucun",
+        config: {
+          widthPx: customLayout.widthPx,
+          heightPx: customLayout.heightPx,
+          copies: customLayout.copies,
+          elements: customLayout.elements,
+        },
+      }).unwrap();
+      setTemplateName("");
+      setTplMsg({ type: "ok", text: "Template enregistré (visible par toute la société)." });
+    } catch (e) {
+      setTplMsg({ type: "err", text: e?.data?.message || e.message });
+    }
+  };
+
+  const loadTemplate = (tpl) => {
+    const cfg = tpl.config || {};
+    setType("custom");
+    setMode(tpl.dataMode ? (mode === "aucun" ? "nart" : mode) : "aucun");
+    setTemplateInitial({
+      unit: "px",
+      width: cfg.widthPx,
+      height: cfg.heightPx,
+      copies: cfg.copies || 1,
+      elements: cfg.elements || [],
+    });
+    setDesignerKey((k) => k + 1); // force le remontage du designer avec `initial`
+    setTplMsg({ type: "ok", text: `Template « ${tpl.nom} » chargé.` });
+  };
+
+  const removeTemplate = async (tpl) => {
+    if (!window.confirm(`Supprimer le template « ${tpl.nom} » ?`)) return;
+    try {
+      await deleteTemplate({ nomDossierDBF, id: tpl._id }).unwrap();
+    } catch (e) {
+      alert(e?.data?.message || "Suppression impossible");
+    }
+  };
 
   // Réinitialise les sélections si on change d'entreprise
   useEffect(() => {
@@ -672,9 +743,76 @@ const AdminEtiquettesScreen = () => {
         <div className="etiq-card">
           <label className="etiq-label">Conception de l'étiquette</label>
           <CustomEtiquetteDesigner
+            key={designerKey}
+            initial={templateInitial}
             dataMode={mode !== "aucun"}
             onChange={setCustomLayout}
           />
+        </div>
+      )}
+
+      {/* Templates de la société (enregistrer / réutiliser) */}
+      {type === "custom" && (
+        <div className="etiq-card">
+          <label className="etiq-label">
+            <HiBookmark /> Mes templates de la société
+          </label>
+          <span className="etiq-hint">
+            Enregistrez ce design pour le réutiliser plus tard. Tous les utilisateurs
+            ayant accès à cette société et au module étiquettes le retrouveront ici.
+          </span>
+
+          {tplMsg && (
+            <div className={tplMsg.type === "ok" ? "etiq-info" : "etiq-error"}>
+              {tplMsg.text}
+            </div>
+          )}
+
+          <div className="etiq-tpl-save">
+            <input
+              type="text"
+              className="etiq-input"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Nom du template (ex. Étiquette rayon promo)"
+            />
+            <button
+              type="button"
+              className="etiq-tpl-savebtn"
+              onClick={saveTemplate}
+              disabled={savingTpl}
+            >
+              <HiSave /> {savingTpl ? "Enregistrement…" : "Enregistrer ce design"}
+            </button>
+          </div>
+
+          {templates.length === 0 ? (
+            <div className="etiq-hint">Aucun template pour cette société pour l'instant.</div>
+          ) : (
+            <div className="etiq-tpl-list">
+              {templates.map((tpl) => (
+                <div key={tpl._id} className="etiq-tpl-item">
+                  <div className="etiq-tpl-info">
+                    <span className="etiq-tpl-name">{tpl.nom}</span>
+                    <span className="etiq-tpl-meta">
+                      {tpl.dataMode ? "Avec données article" : "Texte seul"}
+                      {tpl.user?.prenom || tpl.user?.nom
+                        ? ` · par ${[tpl.user.prenom, tpl.user.nom].filter(Boolean).join(" ")}`
+                        : ""}
+                    </span>
+                  </div>
+                  <div className="etiq-tpl-actions">
+                    <button type="button" className="etiq-tpl-use" onClick={() => loadTemplate(tpl)}>
+                      Utiliser
+                    </button>
+                    <button type="button" className="etiq-tpl-del" onClick={() => removeTemplate(tpl)} title="Supprimer">
+                      <HiTrash />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

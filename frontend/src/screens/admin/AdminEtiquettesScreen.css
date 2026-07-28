@@ -408,3 +408,110 @@
   font-size: 13px;
   font-weight: 600;
 }
+
+/* Templates d'étiquettes */
+.etiq-tpl-save {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.etiq-tpl-save .etiq-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.etiq-tpl-savebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.etiq-tpl-savebtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.etiq-tpl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.etiq-tpl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.etiq-tpl-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.etiq-tpl-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.etiq-tpl-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.etiq-tpl-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.etiq-tpl-use {
+  padding: 7px 14px;
+  border: 1px solid var(--accent, #4da6ff);
+  border-radius: 8px;
+  background: rgba(77, 166, 255, 0.14);
+  color: var(--accent, #4da6ff);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.etiq-tpl-use:hover {
+  background: rgba(77, 166, 255, 0.25);
+}
+
+.etiq-tpl-del {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.etiq-tpl-del:hover {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.12);
+}

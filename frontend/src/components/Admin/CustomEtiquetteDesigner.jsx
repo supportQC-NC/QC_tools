@@ -38,14 +38,20 @@ const fieldLabel = (key) => FIELDS.find((f) => f.key === key)?.label || key;
 let _seq = 0;
 const nextId = () => `el-${Date.now()}-${_seq++}`;
 
-const CustomEtiquetteDesigner = ({ dataMode = false, onChange }) => {
-  const [unit, setUnit] = useState("cm");
-  const [width, setWidth] = useState(9);
-  const [height, setHeight] = useState(5);
-  const [copies, setCopies] = useState(1);
-  const [elements, setElements] = useState([
-    { id: nextId(), kind: "text", text: "Mon étiquette", x: 12, y: 12, fontSize: 22, bold: true, color: "#000000" },
-  ]);
+const CustomEtiquetteDesigner = ({ dataMode = false, onChange, initial }) => {
+  // `initial` (optionnel) amorce l'état depuis un template chargé. Comme il n'est
+  // lu qu'au montage, le parent REMONTE le designer (via key) au chargement.
+  const [unit, setUnit] = useState(initial?.unit || "cm");
+  const [width, setWidth] = useState(initial?.width ?? 9);
+  const [height, setHeight] = useState(initial?.height ?? 5);
+  const [copies, setCopies] = useState(initial?.copies ?? 1);
+  const [elements, setElements] = useState(
+    initial?.elements?.length
+      ? initial.elements.map((el) => ({ id: el.id || nextId(), ...el }))
+      : [
+          { id: nextId(), kind: "text", text: "Mon étiquette", x: 12, y: 12, fontSize: 22, bold: true, color: "#000000" },
+        ],
+  );
   const [selectedId, setSelectedId] = useState(null);
   const labelRef = useRef(null);
   const stageRef = useRef(null);
