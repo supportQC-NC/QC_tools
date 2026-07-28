@@ -11,6 +11,11 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getSocket, resetSocket } from "../../../socketClient";
+import {
+  applyPresenceState,
+  applyPresenceUpdate,
+  resetPresence,
+} from "../../../presenceClient";
 import { apiSlice } from "../../../slices/apiSlice";
 import {
   useGetNotificationCountsQuery,
@@ -57,11 +62,27 @@ const NotificationsSync = () => {
       else dispatch(apiSlice.util.invalidateTags(["Notif"]));
     };
 
+    // Présence : snapshot initial + deltas (qui est connecté à l'app).
+    const onPresenceState = (ids) => applyPresenceState(ids);
+    const onPresenceUpdate = ({ userId, online }) =>
+      applyPresenceUpdate(userId, online);
+
     socket.on("notif:message", onMessage);
     socket.on("notif:task", onTask);
+    socket.on("presence:state", onPresenceState);
+    socket.on("presence:update", onPresenceUpdate);
+    // Redemande le snapshot à chaque (re)connexion du socket.
+    const onConnect = () => socket.emit("presence:get");
+    socket.on("connect", onConnect);
+    if (socket.connected) socket.emit("presence:get");
+
     return () => {
       socket.off("notif:message", onMessage);
       socket.off("notif:task", onTask);
+      socket.off("presence:state", onPresenceState);
+      socket.off("presence:update", onPresenceUpdate);
+      socket.off("connect", onConnect);
+      resetPresence();
       resetSocket();
     };
   }, [userInfo?._id, dispatch, markChatSeen, markTasksSeen]);

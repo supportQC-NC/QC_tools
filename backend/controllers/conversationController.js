@@ -20,6 +20,7 @@ import {
   canChatWith,
   canAccessTeam,
 } from "../middleware/accessControl.js";
+import { canAccessRoom, roomRecipients } from "../utils/chatAccess.js";
 import { isValidChatIcon } from "../config/chatIcons.js";
 import {
   uploadBufferToGridFS,
@@ -133,6 +134,30 @@ const getConversations = asyncHandler(async (req, res) => {
   }
 
   res.json(out);
+});
+
+// @desc    Membres d'un salon (avec accès contrôlé) — pour le panneau
+//          « Participants » et l'affichage en ligne / hors ligne.
+// @route   GET /api/conversations/members?room=global|team:<id>|conv:<id>|task:<id>
+// @access  Membre du salon
+const getRoomMembers = asyncHandler(async (req, res) => {
+  const room = String(req.query.room || "").trim();
+  if (!room) {
+    res.status(400);
+    throw new Error("Paramètre room requis");
+  }
+  if (!(await canAccessRoom(req.user, room))) {
+    res.status(403);
+    throw new Error("Accès refusé à ce salon");
+  }
+  // roomRecipients renvoie les ids concernés : tous les users actifs (global),
+  // membres+responsable (team), participants (conv), assignés+auteur (task).
+  const ids = await roomRecipients(room);
+  const users = await User.find({ _id: { $in: ids } })
+    .select("nom prenom email photo photoUpdatedAt role")
+    .sort({ prenom: 1, nom: 1 })
+    .lean();
+  res.json(users);
 });
 
 // @desc    Créer une discussion (1:1 ou groupe)
@@ -355,6 +380,7 @@ const deleteConversationPhoto = asyncHandler(async (req, res) => {
 
 export {
   getConversations,
+  getRoomMembers,
   createConversation,
   deleteConversation,
   leaveConversation,

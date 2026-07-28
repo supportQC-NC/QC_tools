@@ -93,6 +93,7 @@
 
 /* Avatar (initiales) — affiché pour les autres, aligné bas de groupe. */
 .chat-avatar {
+  position: relative;
   width: 28px;
   height: 28px;
   flex-shrink: 0;
@@ -104,6 +105,24 @@
   font-weight: 700;
   color: #fff;
   user-select: none;
+}
+
+/* Pastille de présence (en ligne / hors ligne) sur l'avatar d'auteur. */
+.chat-av-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+  box-sizing: border-box;
+}
+.chat-av-dot.on {
+  background: #22c55e;
+}
+.chat-av-dot.off {
+  background: #6b7280;
 }
 
 .chat-group-bubbles {

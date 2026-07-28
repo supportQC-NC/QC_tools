@@ -6,6 +6,7 @@ import MailUnsubscribe from "../models/MailUnsubscribeModel.js";
 import MailEvent from "../models/MailEventModel.js";
 import MailAutomation from "../models/MailAutomationModel.js";
 import MailAutomationEnrollment from "../models/MailAutomationEnrollmentModel.js";
+import MailTemplate from "../models/MailTemplateModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import clientCacheService from "../services/clientCacheService.js";
 import { renderCampaign } from "../services/mailRenderService.js";
@@ -389,6 +390,77 @@ const getSegmentCount = asyncHandler(async (req, res) => {
   const unsub = await getUnsubSet(seg.entreprise);
   recipients = recipients.filter((r) => !unsub.has(r.email));
   res.json({ count: recipients.length });
+});
+
+// ── Modèles d'email (société-scopés, PARTAGÉS entre tous les users de la société) ──
+
+const populateTplUser = (q) => q.populate("user", "nom prenom email");
+
+// @route GET /api/mailing/templates?entrepriseId=...
+const getMailTemplates = asyncHandler(async (req, res) => {
+  const { entrepriseId } = req.query;
+  if (!entrepriseId || !(await canUseEntreprise(req.user, entrepriseId))) {
+    res.status(403);
+    throw new Error("Société hors de votre périmètre");
+  }
+  const list = await populateTplUser(
+    MailTemplate.find({ entreprise: entrepriseId }).sort({ updatedAt: -1 }),
+  );
+  res.json(list);
+});
+
+// @route POST /api/mailing/templates
+const createMailTemplate = asyncHandler(async (req, res) => {
+  const { entrepriseId, nom, description, subject, design } = req.body;
+  if (!entrepriseId || !nom || !String(nom).trim()) {
+    res.status(400);
+    throw new Error("Société et nom du modèle requis");
+  }
+  if (!(await canUseEntreprise(req.user, entrepriseId))) {
+    res.status(403);
+    throw new Error("Société hors de votre périmètre");
+  }
+  const tpl = await MailTemplate.create({
+    user: req.user._id,
+    entreprise: entrepriseId,
+    nom: String(nom).trim(),
+    description: description || "",
+    subject: subject || "",
+    design: design || { blocks: [] },
+  });
+  res.status(201).json(await populateTplUser(MailTemplate.findById(tpl._id)));
+});
+
+const loadTemplateWithAccess = async (req, res) => {
+  const tpl = await MailTemplate.findById(req.params.id);
+  if (!tpl) {
+    res.status(404);
+    throw new Error("Modèle introuvable");
+  }
+  if (!(await canUseEntreprise(req.user, tpl.entreprise))) {
+    res.status(403);
+    throw new Error("Modèle hors de votre périmètre");
+  }
+  return tpl;
+};
+
+// @route PUT /api/mailing/templates/:id
+const updateMailTemplate = asyncHandler(async (req, res) => {
+  const tpl = await loadTemplateWithAccess(req, res);
+  const { nom, description, subject, design } = req.body;
+  if (nom !== undefined) tpl.nom = String(nom).trim();
+  if (description !== undefined) tpl.description = description;
+  if (subject !== undefined) tpl.subject = subject;
+  if (design !== undefined) tpl.design = design;
+  await tpl.save();
+  res.json(await populateTplUser(MailTemplate.findById(tpl._id)));
+});
+
+// @route DELETE /api/mailing/templates/:id
+const deleteMailTemplate = asyncHandler(async (req, res) => {
+  const tpl = await loadTemplateWithAccess(req, res);
+  await MailTemplate.deleteOne({ _id: tpl._id });
+  res.json({ message: "Modèle supprimé" });
 });
 
 // ── Automatisations (société-scopées, façon Brevo) ──
@@ -863,6 +935,10 @@ export {
   updateSegment,
   deleteSegment,
   getSegmentCount,
+  getMailTemplates,
+  createMailTemplate,
+  updateMailTemplate,
+  deleteMailTemplate,
   getAutomations,
   createAutomation,
   updateAutomation,

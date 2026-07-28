@@ -21,6 +21,13 @@ const readCookie = (raw = "", name) => {
   return null;
 };
 
+// ── PRÉSENCE ──────────────────────────────────────────────────────────────
+// Qui est connecté à l'application ? On compte les sockets par utilisateur
+// (multi-onglets = plusieurs sockets pour un même user). En ligne = compteur > 0.
+const onlineCounts = new Map(); // userId -> nb de sockets ouverts
+
+export const getOnlineUserIds = () => [...onlineCounts.keys()];
+
 // Authentifie une connexion socket à partir du cookie JWT du handshake.
 const authenticateSocket = async (socket, next) => {
   try {
@@ -42,11 +49,41 @@ export const initChat = (io) => {
 
   io.on("connection", (socket) => {
     const user = socket.user;
+    const uid = user._id.toString();
 
     // Salon PERSONNEL (stable, jamais quitté) : reçoit les notifications ciblées
     // (message non lu, nouvelle tâche) pour rafraîchir les badges de la sidebar
     // même quand l'utilisateur n'est pas sur l'écran de chat.
-    socket.join(`user:${user._id}`);
+    socket.join(`user:${uid}`);
+
+    // Présence : incrémente le compteur ; si c'était la 1re socket de ce user,
+    // on l'annonce à tout le monde (dernier vu = maintenant). Puis on envoie au
+    // nouvel arrivant le SNAPSHOT complet des utilisateurs déjà en ligne.
+    const prevCount = onlineCounts.get(uid) || 0;
+    onlineCounts.set(uid, prevCount + 1);
+    if (prevCount === 0) {
+      io.emit("presence:update", { userId: uid, online: true });
+    }
+    socket.emit("presence:state", getOnlineUserIds());
+
+    // Le client peut redemander le snapshot (ex. reconnexion).
+    socket.on("presence:get", (ack) => {
+      const ids = getOnlineUserIds();
+      if (typeof ack === "function") ack(ids);
+      else socket.emit("presence:state", ids);
+    });
+
+    // Déconnexion : décrémente ; si plus aucune socket, l'utilisateur passe
+    // hors ligne pour tout le monde.
+    socket.on("disconnect", () => {
+      const c = (onlineCounts.get(uid) || 1) - 1;
+      if (c <= 0) {
+        onlineCounts.delete(uid);
+        io.emit("presence:update", { userId: uid, online: false });
+      } else {
+        onlineCounts.set(uid, c);
+      }
+    });
 
     // Rejoindre un salon (après contrôle d'accès).
     socket.on("room:join", async (room, ack) => {

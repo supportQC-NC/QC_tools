@@ -20,6 +20,10 @@ import {
   updateSegment,
   deleteSegment,
   getSegmentCount,
+  getMailTemplates,
+  createMailTemplate,
+  updateMailTemplate,
+  deleteMailTemplate,
   getAutomations,
   createAutomation,
   updateAutomation,
@@ -88,6 +92,12 @@ router.post("/segments", canWrite, createSegment);
 router.put("/segments/:id", canWrite, updateSegment);
 router.delete("/segments/:id", canWrite, deleteSegment);
 router.get("/segments/:id/count", canRead, getSegmentCount);
+
+// Modèles d'email (société-scopés, partagés)
+router.get("/templates", canRead, getMailTemplates);
+router.post("/templates", canWrite, createMailTemplate);
+router.put("/templates/:id", canWrite, updateMailTemplate);
+router.delete("/templates/:id", canWrite, deleteMailTemplate);
 
 // Automatisations (société-scopées)
 router.get("/automations", canRead, getAutomations);

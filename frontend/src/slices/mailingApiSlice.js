@@ -98,6 +98,24 @@ export const mailingApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["MailSegment"],
     }),
 
+    // Modèles d'email (société-scopés, partagés).
+    getMailTemplates: builder.query({
+      query: (entrepriseId) => ({ url: `${MAIL_URL}/templates`, params: { entrepriseId } }),
+      providesTags: ["MailTemplate"],
+    }),
+    createMailTemplate: builder.mutation({
+      query: (data) => ({ url: `${MAIL_URL}/templates`, method: "POST", body: data }),
+      invalidatesTags: ["MailTemplate"],
+    }),
+    updateMailTemplate: builder.mutation({
+      query: ({ id, ...data }) => ({ url: `${MAIL_URL}/templates/${id}`, method: "PUT", body: data }),
+      invalidatesTags: ["MailTemplate"],
+    }),
+    deleteMailTemplate: builder.mutation({
+      query: (id) => ({ url: `${MAIL_URL}/templates/${id}`, method: "DELETE" }),
+      invalidatesTags: ["MailTemplate"],
+    }),
+
     // Automatisations.
     getAutomations: builder.query({
       query: (entrepriseId) => ({ url: `${MAIL_URL}/automations`, params: { entrepriseId } }),
@@ -160,6 +178,10 @@ export const {
   useCreateSegmentMutation,
   useUpdateSegmentMutation,
   useDeleteSegmentMutation,
+  useGetMailTemplatesQuery,
+  useCreateMailTemplateMutation,
+  useUpdateMailTemplateMutation,
+  useDeleteMailTemplateMutation,
   useGetAutomationsQuery,
   useCreateAutomationMutation,
   useUpdateAutomationMutation,

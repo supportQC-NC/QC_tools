@@ -53,6 +53,7 @@ export const apiSlice = createApi({
     "MailCampaign",
     "MailSegment",
     "MailAutomation",
+    "MailTemplate",
     // ========== TAGS ÉTIQUETTES ==========
     "EtiquetteTemplate",
   ],

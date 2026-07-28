@@ -17,6 +17,7 @@ import {
   HiEmojiHappy,
 } from "react-icons/hi";
 import { getSocket } from "../../socketClient";
+import { usePresence } from "../../presenceClient";
 import {
   useSendMessageWithFilesMutation,
   useDeleteMessageMutation,
@@ -131,6 +132,7 @@ const ChatPanel = ({
   const { userInfo } = useSelector((state) => state.auth);
   const myId = userInfo?._id;
   const isGlobal = room === "global";
+  const { isOnline } = usePresence();
 
   const [messages, setMessages] = useState([]);
   const [texte, setTexte] = useState("");
@@ -472,6 +474,9 @@ const ChatPanel = ({
                     ) : (
                       initiales(auteur)
                     )}
+                    <i
+                      className={`chat-av-dot ${isOnline(auteur?._id) ? "on" : "off"}`}
+                    />
                   </div>
                 )}
                 <div className="chat-group-bubbles">

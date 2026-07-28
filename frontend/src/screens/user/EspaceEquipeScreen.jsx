@@ -5,20 +5,26 @@
 //   • Général          -> bleu
 //   • Équipes           -> vert
 //   • Discussions users -> violet (1:1 / groupe)
-// Rail de conversations à gauche, conversation active (en-tête + chat) à droite.
+// Rail de conversations à gauche, conversation active (en-tête + chat) à droite,
+// panneau « Participants » (présence en ligne / hors ligne) optionnel à droite.
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   HiChatAlt2,
   HiUserGroup,
+  HiUsers,
   HiSearch,
   HiPlus,
   HiTrash,
   HiLogout,
   HiCamera,
+  HiX,
 } from "react-icons/hi";
 import { getSocket } from "../../socketClient";
+import { usePresence } from "../../presenceClient";
 import {
   useGetConversationsQuery,
+  useGetRoomMembersQuery,
   useDeleteConversationMutation,
   useLeaveConversationMutation,
   useUploadConversationPhotoMutation,
@@ -37,7 +43,19 @@ const couleurType = (type) => {
   return "global"; // bleu
 };
 
-const Avatar = ({ conv, size = "md" }) => {
+const initiales = (u) =>
+  `${(u?.prenom || "").charAt(0)}${(u?.nom || "").charAt(0)}`.toUpperCase() || "?";
+
+const avatarColor = (u) => {
+  const key = String(u?._id || u?.email || `${u?.prenom}${u?.nom}` || "?");
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 360;
+  return `hsl(${h}, 55%, 45%)`;
+};
+
+// Avatar d'une conversation (icône/photo colorée). `dot` = présence (true/false)
+// ou undefined pour ne pas afficher de pastille.
+const Avatar = ({ conv, size = "md", dot }) => {
   const Icon = conv.type === "global" ? HiChatAlt2 : chatIcon(conv.icone);
   return (
     <span className={`ee-avatar ee-av--${couleurType(conv.type)} ee-av--${size}`}>
@@ -46,15 +64,38 @@ const Avatar = ({ conv, size = "md" }) => {
       ) : (
         <Icon />
       )}
+      {dot !== undefined && (
+        <i className={`ee-presence ${dot ? "on" : "off"}`} />
+      )}
     </span>
   );
 };
 
+// Avatar d'un utilisateur (photo si dispo, sinon initiales colorées) + pastille.
+const UserAvatar = ({ user, online }) => (
+  <span className="ee-uavatar" style={{ background: avatarColor(user) }}>
+    {user?.photo ? (
+      <img
+        src={`/api/users/${user._id}/photo?v=${user.photoUpdatedAt || ""}`}
+        alt=""
+      />
+    ) : (
+      <span>{initiales(user)}</span>
+    )}
+    <i className={`ee-presence ${online ? "on" : "off"}`} />
+  </span>
+);
+
 const EspaceEquipeScreen = () => {
   const { data: conversations = [], refetch } = useGetConversationsQuery();
+  const { userInfo } = useSelector((s) => s.auth);
+  const myId = userInfo?._id;
+  const { isOnline } = usePresence();
+
   const [activeRoom, setActiveRoom] = useState("global");
   const [q, setQ] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
 
   const [deleteConversation] = useDeleteConversationMutation();
   const [leaveConversation] = useLeaveConversationMutation();
@@ -92,6 +133,40 @@ const EspaceEquipeScreen = () => {
     conversations.find((c) => c.type === "global");
 
   const isUserConv = current && (current.type === "direct" || current.type === "group");
+  const isDirect = current?.type === "direct";
+
+  // Pour une discussion 1:1, l'AUTRE participant (présence affichée en en-tête).
+  const otherUser = useMemo(() => {
+    if (!isDirect) return null;
+    return (current.participants || []).find((p) => String(p._id) !== String(myId)) || null;
+  }, [isDirect, current, myId]);
+
+  // Membres du salon actif (panneau participants) — chargés à la demande.
+  const { data: members = [], isFetching: loadingMembers } = useGetRoomMembersQuery(
+    current?.room,
+    { skip: !current?.room || !showMembers },
+  );
+
+  const sortedMembers = useMemo(() => {
+    const arr = [...members];
+    arr.sort((a, b) => {
+      const oa = isOnline(a._id) ? 0 : 1;
+      const ob = isOnline(b._id) ? 0 : 1;
+      if (oa !== ob) return oa - ob; // en ligne d'abord
+      return `${a.prenom} ${a.nom}`.localeCompare(`${b.prenom} ${b.nom}`);
+    });
+    return arr;
+  }, [members, isOnline]);
+
+  const membersOnlineCount = useMemo(
+    () => members.reduce((n, u) => n + (isOnline(u._id) ? 1 : 0), 0),
+    [members, isOnline],
+  );
+
+  // Fermer le panneau participants au changement de salon.
+  useEffect(() => {
+    setShowMembers(false);
+  }, [activeRoom]);
 
   const handleDelete = async (conv) => {
     if (
@@ -133,19 +208,29 @@ const EspaceEquipeScreen = () => {
     }
   };
 
-  const renderRoom = (c) => (
-    <button
-      key={c.room}
-      className={`ee-room ${activeRoom === c.room ? "active" : ""} ee-room--${couleurType(c.type)}`}
-      onClick={() => setActiveRoom(c.room)}
-    >
-      <Avatar conv={c} />
-      <span className="ee-room-texts">
-        <span className="ee-room-name">{c.nom}</span>
-        <span className="ee-room-sub">{c.sub}</span>
-      </span>
-    </button>
-  );
+  const renderRoom = (c) => {
+    // Pastille de présence sur le rail : uniquement pour les discussions 1:1.
+    let dot;
+    if (c.type === "direct") {
+      const other = (c.participants || []).find(
+        (p) => String(p._id) !== String(myId),
+      );
+      dot = other ? isOnline(other._id) : false;
+    }
+    return (
+      <button
+        key={c.room}
+        className={`ee-room ${activeRoom === c.room ? "active" : ""} ee-room--${couleurType(c.type)}`}
+        onClick={() => setActiveRoom(c.room)}
+      >
+        <Avatar conv={c} dot={dot} />
+        <span className="ee-room-texts">
+          <span className="ee-room-name">{c.nom}</span>
+          <span className="ee-room-sub">{c.sub}</span>
+        </span>
+      </button>
+    );
+  };
 
   return (
     <div className="espace-equipe">
@@ -161,7 +246,7 @@ const EspaceEquipeScreen = () => {
         </div>
       </header>
 
-      <div className="ee-layout">
+      <div className={`ee-layout ${showMembers ? "with-members" : ""}`}>
         {/* Rail des conversations */}
         <aside className="ee-rooms">
           <div className="ee-search">
@@ -205,35 +290,65 @@ const EspaceEquipeScreen = () => {
           {current && (
             <>
               <header className="ee-conv-head">
-                <Avatar conv={current} size="lg" />
+                <Avatar
+                  conv={current}
+                  size="lg"
+                  dot={isDirect ? (otherUser ? isOnline(otherUser._id) : false) : undefined}
+                />
                 <div className="ee-conv-headtexts">
                   <h2>{current.nom}</h2>
                   <span className="ee-conv-sub">
-                    <HiUserGroup /> {current.sub}
+                    {isDirect ? (
+                      <>
+                        <i
+                          className={`ee-presence-inline ${otherUser && isOnline(otherUser._id) ? "on" : "off"}`}
+                        />
+                        {otherUser && isOnline(otherUser._id)
+                          ? "En ligne"
+                          : "Hors ligne"}
+                      </>
+                    ) : (
+                      <>
+                        <HiUserGroup /> {current.sub}
+                      </>
+                    )}
                   </span>
                 </div>
 
-                {isUserConv && (
-                  <div className="ee-conv-actions">
-                    {current.type === "group" && (
-                      <>
-                        <input
-                          ref={groupPhotoRef}
-                          type="file"
-                          accept="image/*"
-                          hidden
-                          onChange={handleGroupPhoto}
-                        />
-                        <button
-                          onClick={() => groupPhotoRef.current?.click()}
-                          title="Changer la photo du groupe"
-                        >
-                          <HiCamera />
-                        </button>
-                      </>
-                    )}
-                    {current.isOwner ? (
+                <div className="ee-conv-actions">
+                  {/* Participants + présence (hors 1:1, dont la présence est en en-tête). */}
+                  {!isDirect && (
+                    <button
+                      className={`ee-act ${showMembers ? "on" : ""}`}
+                      onClick={() => setShowMembers((v) => !v)}
+                      title="Voir les participants"
+                    >
+                      <HiUsers />
+                    </button>
+                  )}
+
+                  {isUserConv && current.type === "group" && (
+                    <>
+                      <input
+                        ref={groupPhotoRef}
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={handleGroupPhoto}
+                      />
                       <button
+                        className="ee-act"
+                        onClick={() => groupPhotoRef.current?.click()}
+                        title="Changer la photo du groupe"
+                      >
+                        <HiCamera />
+                      </button>
+                    </>
+                  )}
+                  {isUserConv &&
+                    (current.isOwner ? (
+                      <button
+                        className="ee-act ee-act--danger"
                         onClick={() => handleDelete(current)}
                         title="Supprimer la discussion"
                       >
@@ -241,22 +356,72 @@ const EspaceEquipeScreen = () => {
                       </button>
                     ) : (
                       <button
+                        className="ee-act ee-act--danger"
                         onClick={() => handleLeave(current)}
                         title="Quitter la discussion"
                       >
                         <HiLogout />
                       </button>
-                    )}
-                  </div>
-                )}
+                    ))}
+                </div>
               </header>
 
-              <ChatPanel
-                key={current.room}
-                room={current.room}
-                embedded
-                canModerate={!!current.isModerator}
-              />
+              <div className="ee-conv-body">
+                <ChatPanel
+                  key={current.room}
+                  room={current.room}
+                  embedded
+                  canModerate={!!current.isModerator}
+                />
+
+                {showMembers && (
+                  <aside className="ee-members">
+                    <div className="ee-members-head">
+                      <span className="ee-members-title">
+                        Participants
+                        <span className="ee-members-count">{members.length}</span>
+                      </span>
+                      <button
+                        className="ee-members-close"
+                        onClick={() => setShowMembers(false)}
+                        title="Fermer"
+                      >
+                        <HiX />
+                      </button>
+                    </div>
+                    <div className="ee-members-online">
+                      <i className="ee-presence on" />
+                      {membersOnlineCount} en ligne
+                    </div>
+                    <div className="ee-members-list">
+                      {loadingMembers && members.length === 0 ? (
+                        <div className="ee-members-hint">Chargement…</div>
+                      ) : members.length === 0 ? (
+                        <div className="ee-members-hint">Aucun participant.</div>
+                      ) : (
+                        sortedMembers.map((u) => {
+                          const online = isOnline(u._id);
+                          const me = String(u._id) === String(myId);
+                          return (
+                            <div key={u._id} className="ee-member">
+                              <UserAvatar user={u} online={online} />
+                              <span className="ee-member-texts">
+                                <span className="ee-member-name">
+                                  {u.prenom} {u.nom}
+                                  {me && <span className="ee-member-you"> (vous)</span>}
+                                </span>
+                                <span className={`ee-member-status ${online ? "on" : "off"}`}>
+                                  {online ? "En ligne" : "Hors ligne"}
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </aside>
+                )}
+              </div>
             </>
           )}
         </section>

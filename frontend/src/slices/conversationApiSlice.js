@@ -16,6 +16,12 @@ export const conversationApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Conversation"],
       keepUnusedDataFor: 30,
     }),
+    // Membres d'un salon (pour le panneau « Participants »). room = "global" |
+    // "team:<id>" | "conv:<id>" | "task:<id>".
+    getRoomMembers: builder.query({
+      query: (room) => ({ url: `${CONV_URL}/members`, params: { room } }),
+      keepUnusedDataFor: 60,
+    }),
     createConversation: builder.mutation({
       query: (data) => ({ url: CONV_URL, method: "POST", body: data }),
       invalidatesTags: ["Conversation"],
@@ -45,6 +51,7 @@ export const conversationApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetConversationsQuery,
+  useGetRoomMembersQuery,
   useCreateConversationMutation,
   useDeleteConversationMutation,
   useLeaveConversationMutation,

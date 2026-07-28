@@ -17,6 +17,8 @@ import {
   HiUserGroup,
   HiChartBar,
   HiLightningBolt,
+  HiTemplate,
+  HiBookmark,
 } from "react-icons/hi";
 import {
   selectGlobalDossier,
@@ -35,9 +37,11 @@ import {
   useResumeCampaignMutation,
   useGetSegmentsQuery,
   useGetSegmentCountQuery,
+  useCreateMailTemplateMutation,
 } from "../../slices/mailingApiSlice";
 import MailBlockDesigner from "../../components/Admin/MailBlockDesigner";
 import MailSegments from "../../components/Admin/MailSegments";
+import MailTemplates from "../../components/Admin/MailTemplates";
 import MailStats from "../../components/Admin/MailStats";
 import MailAutomations from "../../components/Admin/MailAutomations";
 import MailAutomationStats from "../../components/Admin/MailAutomationStats";
@@ -120,6 +124,8 @@ const AdminMailingScreen = () => {
   const [launchCampaign, { isLoading: launching }] = useLaunchCampaignMutation();
   const [pauseCampaign] = usePauseCampaignMutation();
   const [resumeCampaign] = useResumeCampaignMutation();
+  const [createMailTemplate, { isLoading: savingTpl }] =
+    useCreateMailTemplateMutation();
 
   const [tab, setTab] = useState("campagnes"); // campagnes | segments
   const [statsFor, setStatsFor] = useState(null); // campagne dont on voit les stats
@@ -184,6 +190,49 @@ const AdminMailingScreen = () => {
       testText: (c.testEmails || []).length ? c.testEmails.join("\n") : TEST_EMAILS,
     });
     setEditing(c);
+  };
+
+  // Applique un MODÈLE : ouvre une NOUVELLE campagne pré-remplie (design + objet).
+  const useTemplate = (tpl) => {
+    setMsg(null);
+    setForm({
+      ...emptyForm(),
+      nom: tpl.nom || "",
+      subject: tpl.subject || "",
+      design: tpl.design || { blocks: [], settings: { bg: "#f2f4f7", contentWidth: 600 } },
+    });
+    setTab("campagnes");
+    setEditing({}); // nouvelle campagne (non enregistrée)
+  };
+
+  // Enregistre le design courant comme MODÈLE partagé (société).
+  const saveAsTemplate = async () => {
+    setMsg(null);
+    if (!entrepriseId) {
+      setMsg({ type: "err", text: "Sélectionnez une société dans l'en-tête." });
+      return;
+    }
+    const nom = window.prompt(
+      "Nom du modèle (visible par toute la société) :",
+      form.nom || "",
+    );
+    if (nom === null) return; // annulé
+    if (!nom.trim()) {
+      setMsg({ type: "err", text: "Donnez un nom au modèle." });
+      return;
+    }
+    try {
+      await createMailTemplate({
+        entrepriseId,
+        nom: nom.trim(),
+        description: "",
+        subject: form.subject,
+        design: form.design,
+      }).unwrap();
+      setMsg({ type: "ok", text: "Modèle enregistré (partagé avec la société)." });
+    } catch (e) {
+      setMsg({ type: "err", text: e?.data?.message || e.message });
+    }
   };
 
   const buildScope = () => ({
@@ -312,6 +361,7 @@ const AdminMailingScreen = () => {
 
         <div className="ml-tabs">
           <button className={`ml-tab ${tab === "campagnes" ? "on" : ""}`} onClick={() => setTab("campagnes")}><HiMail /> Campagnes</button>
+          <button className={`ml-tab ${tab === "modeles" ? "on" : ""}`} onClick={() => setTab("modeles")}><HiTemplate /> Modèles</button>
           <button className={`ml-tab ${tab === "segments" ? "on" : ""}`} onClick={() => setTab("segments")}><HiUserGroup /> Segments</button>
           <button className={`ml-tab ${tab === "automatisations" ? "on" : ""}`} onClick={() => setTab("automatisations")}><HiLightningBolt /> Automatisations</button>
         </div>
@@ -320,7 +370,9 @@ const AdminMailingScreen = () => {
           <div className="ml-hint">Sélectionnez une société dans l'en-tête.</div>
         )}
 
-        {tab === "segments" ? (
+        {tab === "modeles" ? (
+          <MailTemplates entrepriseId={entrepriseId} onUse={useTemplate} />
+        ) : tab === "segments" ? (
           <MailSegments entrepriseId={entrepriseId} filters={filters} />
         ) : tab === "automatisations" ? (
           <MailAutomations entrepriseId={entrepriseId} brand={filters?.brand} onOpenStats={setAutoStatsFor} />
@@ -377,6 +429,9 @@ const AdminMailingScreen = () => {
       <div className="ml-head">
         <button className="ml-back" onClick={() => setEditing(null)}><HiArrowLeft /> Campagnes</button>
         <div className="ml-editor-actions">
+          <button className="ml-ghost" onClick={saveAsTemplate} disabled={savingTpl}>
+            <HiBookmark /> {savingTpl ? "Enregistrement…" : "Enregistrer comme modèle"}
+          </button>
           <button className="ml-ghost" onClick={onSave}>Enregistrer</button>
           <button className="ml-primary" onClick={onLaunch} disabled={launching}>
             {launching ? "Lancement…" : "🚀 Lancer la campagne"}

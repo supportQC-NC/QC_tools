@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import {
   getConversations,
+  getRoomMembers,
   createConversation,
   deleteConversation,
   leaveConversation,
@@ -23,6 +24,7 @@ const uploadPhoto = multer({
 router.use(protect);
 
 router.route("/").get(getConversations).post(createConversation);
+router.get("/members", getRoomMembers); // AVANT /:id
 router.delete("/:id", deleteConversation);
 router.post("/:id/leave", leaveConversation);
 router
