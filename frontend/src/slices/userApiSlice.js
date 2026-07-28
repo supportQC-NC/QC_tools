@@ -82,6 +82,14 @@ export const userApiSlice = apiSlice.injectEndpoints({
       providesTags: ["User"],
       keepUnusedDataFor: 5,
     }),
+    // Annuaire société pour créer une discussion (tout utilisateur connecté).
+    getDirectoryUsers: builder.query({
+      query: () => ({
+        url: `${USERS_URL}/directory`,
+      }),
+      providesTags: ["User"],
+      keepUnusedDataFor: 30,
+    }),
     getUserById: builder.query({
       query: (id) => ({
         url: `${USERS_URL}/${id}`,
@@ -133,6 +141,7 @@ export const {
   useDeleteProfilePhotoMutation,
   useGetUsersQuery,
   useGetAssignableUsersQuery,
+  useGetDirectoryUsersQuery,
   useGetUserByIdQuery,
   useCreateUserMutation,
   useUpdateUserMutation,

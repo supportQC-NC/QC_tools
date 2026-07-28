@@ -5,13 +5,14 @@
 // liste prédéfinie.
 import React, { useMemo, useState } from "react";
 import { HiX, HiSearch } from "react-icons/hi";
-import { useGetAssignableUsersQuery } from "../../slices/userApiSlice";
+import { useGetDirectoryUsersQuery } from "../../slices/userApiSlice";
 import { useCreateConversationMutation } from "../../slices/conversationApiSlice";
 import { CHAT_ICON_KEYS, chatIcon } from "../../config/chatIcons";
 import "./NouvelleDiscussionModal.css";
 
 const NouvelleDiscussionModal = ({ onClose, onCreated }) => {
-  const { data: users = [] } = useGetAssignableUsersQuery();
+  // Annuaire société : tout utilisateur peut discuter avec ses collègues.
+  const { data: users = [] } = useGetDirectoryUsersQuery();
   const [createConversation, { isLoading }] = useCreateConversationMutation();
 
   const [selected, setSelected] = useState([]); // ids

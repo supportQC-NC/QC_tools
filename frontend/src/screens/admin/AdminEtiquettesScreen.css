@@ -6,6 +6,11 @@
   margin: 0 auto;
 }
 
+/* Type « personnalisé » : on prend toute la largeur pour voir un A4 en entier. */
+.etiq-screen--wide {
+  max-width: min(1680px, calc(100vw - 40px));
+}
+
 /* En-tête */
 .etiq-header {
   margin-bottom: 18px;

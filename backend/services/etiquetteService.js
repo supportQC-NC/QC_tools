@@ -178,7 +178,8 @@ class RL {
   }
   drawImage(buf, x, y, w, h) {
     const top = this.H - (y + h);
-    this.doc.image(buf, x, top, { width: w, height: h });
+    // `fit` : préserve le RATIO (jamais d'étirement), centré dans la zone w×h.
+    this.doc.image(buf, x, top, { fit: [w, h], align: "center", valign: "center" });
   }
   showPage(opts = { size: "A4", layout: "landscape", margin: 0 }) {
     this.doc.addPage(opts);
@@ -616,8 +617,202 @@ const drawDemi = (rl, doc, records, logoBuf, drawOne) => {
 };
 
 export const TYPES_ETIQUETTES = [
-  "standard", "standard_sans_prix", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire",
+  "standard", "standard_sans_prix", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire", "custom",
 ];
+
+// ----------------------------------------------------------------------------
+// ÉTIQUETTE PERSONNALISÉE (« custom ») — l'utilisateur choisit la taille et place
+// librement des éléments texte. On tuile autant d'exemplaires que possible sur
+// une feuille A4 (même logique que la grille standard).
+// ----------------------------------------------------------------------------
+const PX = 72 / 96; // 1 px @96dpi -> 0.75 pt (préserve les cm : cm->px@96 puis px->pt)
+
+const hexToRgb01 = (hex) => {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex == null ? "" : hex).trim());
+  if (!m) return [0, 0, 0];
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+};
+
+// Valeur d'un CHAMP article (mêmes données que les autres étiquettes).
+const getFieldValue = (record, field) => {
+  if (!record) return "";
+  switch (field) {
+    case "ref":
+      return safe(record.NART);
+    case "design":
+      return safe(record.DESIGN).replace(/\*/g, "").replace(/\s+/g, " ").trim();
+    case "prix":
+      return record.PVTETTC ? `${fmtInt(record.PVTETTC)} XPF` : "";
+    case "prixPromo": {
+      const pvpromo = Number(record.PVPROMO) || 0;
+      const atva = Number(record.ATVA) || 0;
+      if (!pvpromo) return "";
+      return `${fmtInt(Math.trunc(pvpromo * (1 + atva / 100)))} XPF`;
+    }
+    case "contenance": {
+      if (record.VOL && Number(record.VOL) !== 0) {
+        const ppu = (Number(record.PVTETTC) || 0) / Number(record.VOL);
+        return `soit ${fmtRound(ppu)} XPF / ${safe(record.KL) || "N/A"}`;
+      }
+      return "";
+    }
+    case "gencod":
+      return String(record.GENCOD || "").replace(/\D/g, "");
+    case "datesPromo":
+      return `du ${fmtPromoDate(record.DPROMOD)} au ${fmtPromoDate(record.DPROMOF)}`;
+    default:
+      return "";
+  }
+};
+
+// Dessine un bloc de texte (multi-ligne) ancré en haut-gauche (px depuis le haut).
+const drawTextEl = (rl, cellX, cellBottomY, hpt, el, text) => {
+  const raw = text == null ? "" : String(text);
+  if (!raw) return;
+  const sizePt = Math.max(1, (Number(el.fontSize) || 12) * PX);
+  rl.setFont(el.bold ? "Helvetica-Bold" : "Helvetica", sizePt);
+  const [r, g, b] = hexToRgb01(el.color || "#000000");
+  rl.setFillColorRGB(r, g, b);
+  const exPt = (Number(el.x) || 0) * PX;
+  const eyPt = (Number(el.y) || 0) * PX;
+  const lineH = sizePt * 1.2;
+  raw.split("\n").forEach((line, li) => {
+    const topY = cellBottomY + hpt - eyPt - li * lineH; // Y-up du haut de ligne
+    rl.drawString(cellX + exPt, topY - ASCENT * sizePt, line);
+  });
+};
+
+// Dessine UNE étiquette custom dans la cellule. Éléments positionnés en px depuis
+// le HAUT-GAUCHE. Kinds : text | field | line | rect | logo | barcode.
+const drawCustomLabel = (rl, layout, cellX, cellBottomY, wpt, hpt, ctx = {}) => {
+  const { record = null, logoBuf = null } = ctx;
+  if (layout.border !== false) {
+    rl.setStrokeColorRGB(0, 0, 0);
+    rl.setLineWidth(0.7);
+    rl.rect(cellX, cellBottomY, wpt, hpt);
+  }
+  const elements = Array.isArray(layout.elements) ? layout.elements : [];
+  for (const el of elements) {
+    const kind = el.kind || "text";
+    const exPt = (Number(el.x) || 0) * PX;
+    const eyPt = (Number(el.y) || 0) * PX;
+
+    if (kind === "text") {
+      drawTextEl(rl, cellX, cellBottomY, hpt, el, el.text);
+    } else if (kind === "field") {
+      drawTextEl(rl, cellX, cellBottomY, hpt, el, getFieldValue(record, el.field));
+    } else if (kind === "line") {
+      const [r, g, b] = hexToRgb01(el.color || "#000000");
+      rl.setStrokeColorRGB(r, g, b);
+      rl.setLineWidth(Math.max(0.3, (Number(el.thickness) || 1) * PX));
+      const lenPt = (Number(el.length) || 0) * PX;
+      const yTop = cellBottomY + hpt - eyPt;
+      const x1 = cellX + exPt;
+      if (el.orientation === "v") rl.line(x1, yTop, x1, yTop - lenPt);
+      else rl.line(x1, yTop, x1 + lenPt, yTop);
+    } else if (kind === "rect") {
+      const wPt = (Number(el.w) || 0) * PX;
+      const hPt = (Number(el.h) || 0) * PX;
+      const yBottom = cellBottomY + hpt - eyPt - hPt;
+      const [sr, sg, sb] = hexToRgb01(el.color || "#000000");
+      rl.setStrokeColorRGB(sr, sg, sb);
+      rl.setLineWidth(Math.max(0.3, (Number(el.lineWidth) || 1) * PX));
+      if (el.fill) {
+        const [fr, fg, fb] = hexToRgb01(el.fillColor || el.color || "#000000");
+        rl.setFillColorRGB(fr, fg, fb);
+        rl.rect(cellX + exPt, yBottom, wPt, hPt, { fill: true, stroke: true });
+      } else {
+        rl.rect(cellX + exPt, yBottom, wPt, hPt, { fill: false, stroke: true });
+      }
+    } else if (kind === "logo") {
+      if (logoBuf) {
+        const wPt = (Number(el.w) || 0) * PX;
+        const hPt = (Number(el.h) || 0) * PX;
+        const yBottom = cellBottomY + hpt - eyPt - hPt;
+        try {
+          rl.drawImage(logoBuf, cellX + exPt, yBottom, wPt, hPt);
+        } catch {
+          /* pdfkit : PNG/JPEG uniquement */
+        }
+      }
+    } else if (kind === "barcode") {
+      const code = getFieldValue(record, "gencod");
+      if (code && code.length === 13) {
+        const wPt = Math.max(30, (Number(el.w) || 100) * PX);
+        const hPt = Math.max(20, (Number(el.h) || 40) * PX);
+        const yBottom = cellBottomY + hpt - eyPt - hPt;
+        drawEAN13(rl, code, cellX + exPt, yBottom, wPt, hPt);
+      }
+    }
+  }
+};
+
+/**
+ * Génère un PDF d'étiquettes PERSONNALISÉES tuilées sur A4.
+ *  - Sans `articles` : `copies` exemplaires du même visuel (texte/formes/logo).
+ *  - Avec `articles`  : UNE étiquette par article, les éléments `field`/`barcode`
+ *                       étant remplis depuis chaque enregistrement article.
+ * @param {Object} p
+ * @param {Object} p.layout      - { widthPx, heightPx, border?, elements: [...] }
+ * @param {number} [p.copies]    - exemplaires (mode texte seul)
+ * @param {Array}  [p.articles]  - enregistrements article.dbf (mode données)
+ * @param {Object} [p.entreprise]- doc entreprise (logo)
+ * @param {string} p.outPath     - chemin de sortie du PDF
+ */
+export const genererEtiquettesCustomPDF = async ({
+  layout,
+  copies,
+  articles,
+  entreprise,
+  outPath,
+}) => {
+  const wpt = Math.max(4, (Number(layout.widthPx) || 0) * PX);
+  const hpt = Math.max(4, (Number(layout.heightPx) || 0) * PX);
+  const hasArticles = Array.isArray(articles) && articles.length > 0;
+  const n = hasArticles
+    ? articles.length
+    : Math.max(1, Math.min(5000, Math.floor(Number(copies) || 1)));
+  const logoBuf = resolveLogoBuffer(entreprise);
+
+  const PDFDocument = (await import("pdfkit")).default;
+  const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+  const stream = fs.createWriteStream(outPath);
+  doc.pipe(stream);
+
+  const rl = new RL(doc);
+  const W = rl.W;
+  const H = rl.H;
+  const gap = 8;
+  const margin = 14;
+
+  const cols = Math.max(1, Math.floor((W - 2 * margin + gap) / (wpt + gap)));
+  const rows = Math.max(1, Math.floor((H - 2 * margin + gap) / (hpt + gap)));
+  const perPage = cols * rows;
+  const gridW = cols * wpt + (cols - 1) * gap;
+  const gridH = rows * hpt + (rows - 1) * gap;
+  const startX = (W - gridW) / 2;
+  const startTop = (H - gridH) / 2;
+
+  for (let i = 0; i < n; i++) {
+    const idx = i % perPage;
+    if (idx === 0 && i > 0) rl.showPage({ size: "A4", layout: "portrait", margin: 0 });
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const cellLeft = startX + col * (wpt + gap);
+    const cellTopFromTop = startTop + row * (hpt + gap);
+    const cellBottomY = H - cellTopFromTop - hpt;
+    const record = hasArticles ? articles[i] : null;
+    drawCustomLabel(rl, layout, cellLeft, cellBottomY, wpt, hpt, { record, logoBuf });
+  }
+  rl.save();
+
+  await new Promise((resolve, reject) => {
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+  });
+  return outPath;
+};
 
 /**
  * Génère le PDF d'étiquettes dans outPath.
@@ -663,4 +858,4 @@ export const genererEtiquettesPDF = async ({ type, format, articles, entreprise,
   return outPath;
 };
 
-export default { genererEtiquettesPDF, TYPES_ETIQUETTES };
+export default { genererEtiquettesPDF, genererEtiquettesCustomPDF, TYPES_ETIQUETTES };

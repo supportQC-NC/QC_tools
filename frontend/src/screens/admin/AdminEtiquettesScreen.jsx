@@ -18,6 +18,7 @@ import {
   useGetGroupesQuery,
 } from "../../slices/articleApiSlice";
 import { BASE_URL } from "../../constants";
+import CustomEtiquetteDesigner from "../../components/Admin/CustomEtiquetteDesigner";
 import "./AdminEtiquettesScreen.css";
 
 // Types d'étiquettes (clés alignées avec le backend etiquetteService.js)
@@ -61,6 +62,11 @@ const LABEL_TYPES = [
     type: "inventaire",
     title: "🔢 Inventaire",
     desc: "NART et désignation en gros + grande case « Quantité » à remplir au stylo (A4 / demi A4).",
+  },
+  {
+    type: "custom",
+    title: "🎨 Personnalisée",
+    desc: "Vous choisissez la taille (cm/px), écrivez et placez votre texte. Plusieurs par feuille A4 si ça rentre.",
   },
 ];
 
@@ -175,6 +181,7 @@ const AdminEtiquettesScreen = () => {
   const [selectedGroupe, setSelectedGroupe] = useState([]); // liste de codes GROUPE
   const [type, setType] = useState("standard");
   const [format, setFormat] = useState("a4"); // a4 | demi (types pleine page)
+  const [customLayout, setCustomLayout] = useState(null); // layout du designer custom
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState(null);
   const [error, setError] = useState("");
@@ -268,6 +275,40 @@ const AdminEtiquettesScreen = () => {
     );
   };
 
+  // Valide le mode « source article » courant et renvoie les champs à envoyer.
+  const buildArticleSource = () => {
+    if (mode === "proforma") {
+      if (!numfact.trim())
+        return { ok: false, error: "Saisissez un numéro de proforma." };
+      return { ok: true, fields: { numfact: numfact.trim() } };
+    }
+    if (mode === "commande") {
+      if (!numcde.trim())
+        return { ok: false, error: "Saisissez un numéro de commande." };
+      return { ok: true, fields: { numcde: numcde.trim() } };
+    }
+    if (mode === "nart") {
+      const narts = nartText
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (narts.length === 0)
+        return { ok: false, error: "Saisissez au moins un NART." };
+      return { ok: true, fields: { narts } };
+    }
+    if (mode === "gism1") {
+      if (selectedGism1.length === 0)
+        return { ok: false, error: "Sélectionnez au moins un gisement (GISM1)." };
+      return { ok: true, fields: { gism1: selectedGism1 } };
+    }
+    if (mode === "groupe") {
+      if (selectedGroupe.length === 0)
+        return { ok: false, error: "Sélectionnez au moins un groupe (GROUPE)." };
+      return { ok: true, fields: { groupe: selectedGroupe } };
+    }
+    return { ok: false, error: "Choisissez une source d'articles." };
+  };
+
   const genererEtiquettes = async () => {
     setError("");
     setInfo(null);
@@ -276,47 +317,47 @@ const AdminEtiquettesScreen = () => {
       setError("Sélectionnez une entreprise.");
       return;
     }
-    if (mode === "proforma" && !numfact.trim()) {
-      setError("Saisissez un numéro de proforma.");
-      return;
-    }
-    if (mode === "commande" && !numcde.trim()) {
-      setError("Saisissez un numéro de commande.");
-      return;
-    }
-    const narts =
-      mode === "nart"
-        ? nartText.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean)
-        : [];
-    if (mode === "nart" && narts.length === 0) {
-      setError("Saisissez au moins un NART.");
-      return;
-    }
-    if (mode === "gism1" && selectedGism1.length === 0) {
-      setError("Sélectionnez au moins un gisement (GISM1).");
-      return;
-    }
-    if (mode === "groupe" && selectedGroupe.length === 0) {
-      setError("Sélectionnez au moins un groupe/famille (GROUPE).");
-      return;
+
+    const customBody =
+      type === "custom"
+        ? {
+            type: "custom",
+            layout: {
+              widthPx: customLayout?.widthPx,
+              heightPx: customLayout?.heightPx,
+              border: true,
+              elements: customLayout?.elements || [],
+            },
+          }
+        : null;
+
+    let body;
+    if (type === "custom" && mode === "aucun") {
+      if (!customLayout || !(customLayout.elements || []).length) {
+        setError("Ajoutez au moins un élément à l'étiquette personnalisée.");
+        return;
+      }
+      body = { ...customBody, copies: Math.max(1, Number(customLayout.copies) || 1) };
+    } else {
+      // Source article (proforma / commande / nart / gism1 / groupe).
+      const src = buildArticleSource();
+      if (!src.ok) {
+        setError(src.error);
+        return;
+      }
+      if (type === "custom") {
+        if (!customLayout || !(customLayout.elements || []).length) {
+          setError("Ajoutez au moins un élément à l'étiquette personnalisée.");
+          return;
+        }
+        body = { ...customBody, mode, ...src.fields };
+      } else {
+        body = { type, mode, ...src.fields, format };
+      }
     }
 
     setLoading(true);
     try {
-      let body;
-      if (mode === "proforma") {
-        body = { type, mode: "proforma", numfact: numfact.trim() };
-      } else if (mode === "commande") {
-        body = { type, mode: "commande", numcde: numcde.trim() };
-      } else if (mode === "gism1") {
-        body = { type, mode: "gism1", gism1: selectedGism1 };
-      } else if (mode === "groupe") {
-        body = { type, mode: "groupe", groupe: selectedGroupe };
-      } else {
-        body = { type, mode: "nart", narts };
-      }
-      body.format = format;
-
       const res = await fetch(
         `${BASE_URL}/api/etiquettes/${nomDossierDBF}/generer`,
         {
@@ -352,9 +393,17 @@ const AdminEtiquettesScreen = () => {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(href), 60000);
 
-      let note = `${trouves || "?"} étiquette(s) générée(s).`;
-      if (introuvables && Number(introuvables) > 0) {
-        note += ` ${introuvables} NART introuvable(s) sur ${total} ignoré(s).`;
+      let note;
+      if (type === "custom") {
+        note =
+          trouves && Number(trouves) > 0
+            ? `PDF généré (${trouves} étiquette(s) depuis les articles).`
+            : `PDF généré (${body.copies || "?"} étiquette(s) personnalisée(s)).`;
+      } else {
+        note = `${trouves || "?"} étiquette(s) générée(s).`;
+        if (introuvables && Number(introuvables) > 0) {
+          note += ` ${introuvables} NART introuvable(s) sur ${total} ignoré(s).`;
+        }
       }
       setInfo(note);
     } catch (e) {
@@ -383,7 +432,7 @@ const AdminEtiquettesScreen = () => {
   }
 
   return (
-    <div className="etiq-screen">
+    <div className={`etiq-screen ${type === "custom" ? "etiq-screen--wide" : ""}`}>
       <div className="etiq-header">
         <h1>
           <HiTag /> Générateur d'étiquettes
@@ -405,9 +454,18 @@ const AdminEtiquettesScreen = () => {
         </div>
       )}
 
-      {/* Source des articles */}
+      {/* Source des articles (le type « custom » ajoute « Texte seul »). */}
       <div className="etiq-card">
         <div className="etiq-mode-tabs">
+          {type === "custom" && (
+            <button
+              type="button"
+              className={`etiq-mode-btn ${mode === "aucun" ? "active" : ""}`}
+              onClick={() => setMode("aucun")}
+            >
+              <HiPencilAlt /> Texte seul
+            </button>
+          )}
           <button
             type="button"
             className={`etiq-mode-btn ${mode === "proforma" ? "active" : ""}`}
@@ -555,6 +613,13 @@ const AdminEtiquettesScreen = () => {
             </span>
           </div>
         )}
+
+        {type === "custom" && mode === "aucun" && (
+          <span className="etiq-hint">
+            Mode « texte seul » : l'étiquette ne dépend d'aucun article. Choisissez
+            une source ci-dessus pour insérer des champs article + code-barres.
+          </span>
+        )}
       </div>
 
       {/* Type d'étiquette */}
@@ -566,7 +631,12 @@ const AdminEtiquettesScreen = () => {
               type="button"
               key={lt.type}
               className={`etiq-type-card ${type === lt.type ? "selected" : ""}`}
-              onClick={() => setType(lt.type)}
+              onClick={() => {
+                setType(lt.type);
+                // Custom démarre en « texte seul » ; sortir de custom rétablit une source.
+                if (lt.type === "custom") setMode("aucun");
+                else if (mode === "aucun") setMode("nart");
+              }}
             >
               <span className="etiq-type-title">{lt.title}</span>
               <span className="etiq-type-desc">{lt.desc}</span>
@@ -574,7 +644,9 @@ const AdminEtiquettesScreen = () => {
           ))}
         </div>
 
-        {type !== "standard" && type !== "standard_sans_prix" && (
+        {type !== "standard" &&
+          type !== "standard_sans_prix" &&
+          type !== "custom" && (
           <div className="etiq-format">
             <span className="etiq-format-label">Format :</span>
             <button
@@ -594,6 +666,17 @@ const AdminEtiquettesScreen = () => {
           </div>
         )}
       </div>
+
+      {/* Designer d'étiquette personnalisée */}
+      {type === "custom" && (
+        <div className="etiq-card">
+          <label className="etiq-label">Conception de l'étiquette</label>
+          <CustomEtiquetteDesigner
+            dataMode={mode !== "aucun"}
+            onChange={setCustomLayout}
+          />
+        </div>
+      )}
 
       {error && <div className="etiq-error">{error}</div>}
       {info && <div className="etiq-info">{info}</div>}

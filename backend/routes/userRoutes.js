@@ -11,6 +11,7 @@ import {
   createUser,
   getUsers,
   getAssignableUsers,
+  getDirectoryUsers,
   uploadProfilePhoto,
   deleteProfilePhoto,
   getUserPhoto,
@@ -57,6 +58,8 @@ router.post("/", protect, canWrite, createUser);
 router.get("/", protect, canRead, getUsers);
 // Liste allégée pour le choix des membres d'équipe — AVANT /:id.
 router.get("/assignable", protect, canRead, getAssignableUsers);
+// Annuaire société pour créer une discussion — tout user connecté. AVANT /:id.
+router.get("/directory", protect, getDirectoryUsers);
 // Photo d'un user (image) — accessible à tout utilisateur connecté.
 router.get("/:id/photo", protect, getUserPhoto);
 router.get("/:id", protect, canRead, getUserById);

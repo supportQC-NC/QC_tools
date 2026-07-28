@@ -17,7 +17,7 @@ import User from "../models/UserModel.js";
 import {
   isSuperAdmin,
   getAccessibleEntreprises,
-  canManageUser,
+  canChatWith,
   canAccessTeam,
 } from "../middleware/accessControl.js";
 import { isValidChatIcon } from "../config/chatIcons.js";
@@ -150,9 +150,11 @@ const createConversation = asyncHandler(async (req, res) => {
     throw new Error("Sélectionnez au moins un participant");
   }
   for (const id of ids) {
-    if (!(await canManageUser(req.user, id))) {
+    // Périmètre CHAT (annuaire société), pas la gestion : tout user peut discuter
+    // avec ses collègues de société.
+    if (!(await canChatWith(req.user, id))) {
       res.status(403);
-      throw new Error("Un des participants est hors de votre périmètre");
+      throw new Error("Un des participants est hors de votre société");
     }
     const u = await User.findById(id).select("_id");
     if (!u) {

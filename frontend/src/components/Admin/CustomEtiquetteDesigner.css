@@ -1,0 +1,319 @@
+/* CustomEtiquetteDesigner — thème sombre, aperçu « papier » blanc. Desktop. */
+
+.ced {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ced-toolbar,
+.ced-palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.ced-palette {
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ced-palette > button,
+.ced-fieldadd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.84rem;
+}
+
+.ced-palette > button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ced-fieldadd {
+  padding: 0 8px 0 10px;
+  color: var(--text-muted);
+}
+
+.ced-fieldadd select {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  padding: 7px 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ced-datahint {
+  font-size: 0.8rem;
+  color: #34d399;
+  font-weight: 600;
+}
+
+.ced-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ced-field label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ced-field input[type="number"] {
+  width: 78px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+}
+
+.ced-unit {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ced-unit button {
+  padding: 7px 11px;
+  border: none;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  min-width: 34px;
+}
+
+.ced-unit button.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ced-fill {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+/* Zone principale : aperçu + panneau élargi (desktop). */
+.ced-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.ced-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: repeating-conic-gradient(#20232e 0% 25%, #262a36 0% 50%) 50% / 22px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 24px;
+  min-height: 320px;
+  justify-content: center;
+  overflow: auto;
+}
+
+.ced-label {
+  position: relative;
+  background: #ffffff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.ced-el {
+  position: absolute;
+  cursor: move;
+  outline: 1px dashed transparent;
+}
+
+.ced-el--text,
+.ced-el--field {
+  white-space: pre;
+  line-height: 1.2;
+}
+
+.ced-el--field {
+  color: #1e56c8 !important;
+  font-style: italic;
+}
+
+.ced-el--logo,
+.ced-el--barcode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px dashed rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+}
+
+.ced-ph {
+  font-size: 0.6rem;
+  color: #333;
+  white-space: nowrap;
+}
+
+.ced-el:hover {
+  outline-color: rgba(77, 166, 255, 0.7);
+}
+
+.ced-el.sel {
+  outline: 1px solid #4da6ff;
+  outline-offset: 1px;
+}
+
+.ced-stage-info {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+/* Panneau élément */
+.ced-panel {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 220px;
+}
+
+.ced-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  font-size: 0.92rem;
+}
+
+.ced-del {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ced-plabel {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.ced-ptext,
+.ced-pselect {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  margin-bottom: 10px;
+}
+
+.ced-ptext {
+  resize: vertical;
+}
+
+.ced-prow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.ced-prow .ced-field input[type="number"] {
+  width: 68px;
+}
+
+.ced-prow input[type="color"] {
+  width: 40px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+.ced-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding-bottom: 7px;
+}
+
+.ced-center {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ced-center button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.ced-center button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ced-panel-empty {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .ced-main {
+    grid-template-columns: 1fr;
+  }
+}

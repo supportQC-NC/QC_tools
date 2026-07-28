@@ -14,6 +14,7 @@ import {
 import {
   getManageableUserScope,
   canManageUser,
+  getCompanyDirectoryScope,
   assertGrantWithinScope,
   canAssignRole,
   isSuperAdmin,
@@ -484,6 +485,43 @@ const getAssignableUsers = asyncHandler(async (req, res) => {
   );
 });
 
+// @desc    ANNUAIRE : collègues des sociétés de l'acteur (pour créer une
+//          discussion). Accessible à TOUT utilisateur connecté (découplé de la
+//          gestion). Exclut soi-même et les comptes désactivés.
+// @route   GET /api/users/directory
+// @access  Privé
+const getDirectoryUsers = asyncHandler(async (req, res) => {
+  const scope = await getCompanyDirectoryScope(req.user);
+  const filter = scope.all
+    ? { isActive: true, _id: { $ne: req.user._id } }
+    : { isActive: true, _id: { $in: scope.userIds, $ne: req.user._id } };
+
+  const users = await User.find(filter)
+    .select("nom prenom email role photo photoUpdatedAt")
+    .sort({ nom: 1, prenom: 1 });
+
+  const perms = await Permission.find({
+    user: { $in: users.map((u) => u._id) },
+  })
+    .select("user entreprises")
+    .populate("entreprises", "trigramme");
+
+  const entMap = new Map();
+  for (const p of perms) {
+    entMap.set(
+      p.user.toString(),
+      (p.entreprises || []).map((e) => e.trigramme).filter(Boolean),
+    );
+  }
+
+  res.json(
+    users.map((u) => ({
+      ...u.toObject(),
+      entreprises: entMap.get(u._id.toString()) || [],
+    })),
+  );
+});
+
 // @desc    Get user by ID
 // @route   GET /api/users/:id
 // @access  Private/Admin
@@ -777,7 +815,7 @@ const generateWelcomeEmail = ({ nom, prenom, email, password, role }) => `
       </div>
       <div class="btn-wrap">
         <div class="btn-outer">
-          <a href="http://192.168.0.86:3000" class="btn">Accéder à la plateforme →</a>
+          <a href="${process.env.FRONTEND_URL || "https://robot-nc.com"}" class="btn">Accéder à la plateforme →</a>
         
         </div>
       </div>
@@ -893,6 +931,7 @@ export {
   createUser,
   getUsers,
   getAssignableUsers,
+  getDirectoryUsers,
   uploadProfilePhoto,
   deleteProfilePhoto,
   getUserPhoto,

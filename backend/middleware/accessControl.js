@@ -192,12 +192,23 @@ export const getManageableUserScope = async (actor) => {
 
   const selfId = actor._id.toString();
 
-  // Admin scopé ET Responsable : tous les utilisateurs dont le périmètre société
-  // recoupe le leur (+ eux-mêmes). Décision client : un responsable gère TOUS les
-  // utilisateurs de ses sociétés — pour les modifier comme pour les rattacher à
-  // une équipe — pas seulement ceux qu'il a créés. Le périmètre est donc basé sur
-  // les SOCIÉTÉS accessibles, ce qui autorise aussi le multi-sociétés.
-  if (actor.role === "admin" || actor.role === "responsable") {
+  // Détenteur du module users_admin (ou allModules) sans être admin/responsable :
+  // il gère aussi les utilisateurs de ses sociétés (il a explicitement ce droit).
+  const permission = await Permission.findOne({ user: actor._id });
+  const hasUsersAdmin = !!(
+    permission?.allModules || permission?.modules?.users_admin?.read
+  );
+
+  // Admin scopé, Responsable OU détenteur users_admin : tous les utilisateurs dont
+  // le périmètre société recoupe le leur (+ eux-mêmes). Décision client : un
+  // responsable gère TOUS les utilisateurs de ses sociétés — pour les modifier
+  // comme pour les rattacher à une équipe. Périmètre basé sur les SOCIÉTÉS
+  // accessibles (multi-sociétés inclus).
+  if (
+    actor.role === "admin" ||
+    actor.role === "responsable" ||
+    hasUsersAdmin
+  ) {
     const { all, ids } = await getAccessibleEntreprises(actor);
     if (all) return { all: true, userIds: null };
     const perms = await Permission.find({
@@ -215,6 +226,36 @@ export const getManageableUserScope = async (actor) => {
 /** L'acteur peut-il gérer l'utilisateur cible (par son id) ? */
 export const canManageUser = async (actor, targetUserId) => {
   const scope = await getManageableUserScope(actor);
+  if (scope.all) return true;
+  return scope.userIds.includes(String(targetUserId));
+};
+
+/**
+ * ANNUAIRE société : tous les utilisateurs des sociétés accessibles à l'acteur
+ * (+ lui-même). DÉCOUPLÉ de la gestion : n'importe quel utilisateur peut ainsi
+ * DISCUTER avec ses collègues (créer une discussion), sans droit de gestion.
+ * @returns {Promise<{ all: boolean, userIds: string[] | null }>}
+ */
+export const getCompanyDirectoryScope = async (actor) => {
+  if (!actor) return { all: false, userIds: [] };
+  if (await isSuperAdmin(actor)) return { all: true, userIds: null };
+
+  const selfId = actor._id.toString();
+  const { all, ids } = await getAccessibleEntreprises(actor);
+  if (all) return { all: true, userIds: null };
+  if (!ids.length) return { all: false, userIds: [selfId] };
+
+  const perms = await Permission.find({
+    entreprises: { $in: ids },
+  }).select("user");
+  const userIds = new Set(perms.map((p) => p.user.toString()));
+  userIds.add(selfId);
+  return { all: false, userIds: [...userIds] };
+};
+
+/** L'acteur peut-il DISCUTER avec la cible (même société) ? */
+export const canChatWith = async (actor, targetUserId) => {
+  const scope = await getCompanyDirectoryScope(actor);
   if (scope.all) return true;
   return scope.userIds.includes(String(targetUserId));
 };
@@ -369,6 +410,8 @@ export default {
   attachAccessScope,
   getManageableUserScope,
   canManageUser,
+  getCompanyDirectoryScope,
+  canChatWith,
   assertGrantWithinScope,
   canAssignRole,
   allowUserManagement,
