@@ -99,15 +99,21 @@ const getRecipientsCount = asyncHandler(async (req, res) => {
   res.json({ count: recipients.length });
 });
 
-// ── Campagnes (user-scopées) ──
+// ── Campagnes (SOCIÉTÉ-scopées : visibles/gérables par tout user ayant le
+//    module mailing + accès à la société, quel que soit le créateur) ──
 
 const populateCampaign = (q) =>
-  q.populate("entreprise", "nomComplet trigramme nomDossierDBF");
+  q
+    .populate("entreprise", "nomComplet trigramme nomDossierDBF")
+    .populate("user", "nom prenom email");
 
 // @route GET /api/mailing/campaigns
+// Renvoie les campagnes de TOUTES les sociétés accessibles à l'utilisateur.
 const getMyCampaigns = asyncHandler(async (req, res) => {
+  const scope = await getAccessibleEntreprises(req.user);
+  const filter = scope.all ? {} : { entreprise: { $in: scope.ids } };
   const list = await populateCampaign(
-    MailCampaign.find({ user: req.user._id })
+    MailCampaign.find(filter)
       .select("-recipients") // tableau potentiellement énorme
       .sort({ updatedAt: -1 }),
   );
@@ -140,11 +146,17 @@ const createCampaign = asyncHandler(async (req, res) => {
   res.status(201).json(await populateCampaign(MailCampaign.findById(campaign._id)));
 });
 
+// Charge une campagne accessible : n'importe quel user ayant accès à SA société
+// peut la voir/gérer (collaboration), pas seulement le créateur.
 const loadOwnedCampaign = async (req, res) => {
   const campaign = await MailCampaign.findById(req.params.id);
-  if (!campaign || String(campaign.user) !== String(req.user._id)) {
+  if (!campaign) {
     res.status(404);
     throw new Error("Campagne introuvable");
+  }
+  if (!(await canUseEntreprise(req.user, campaign.entreprise))) {
+    res.status(403);
+    throw new Error("Campagne hors de votre périmètre");
   }
   return campaign;
 };

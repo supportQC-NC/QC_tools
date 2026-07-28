@@ -70,6 +70,17 @@
   font-size: 1.05rem;
 }
 
+.mst-note {
+  background: rgba(77, 166, 255, 0.08);
+  border: 1px solid rgba(77, 166, 255, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 /* A/B testing */
 .mst-ab {
   display: grid;

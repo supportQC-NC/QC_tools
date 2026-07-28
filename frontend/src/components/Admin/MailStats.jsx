@@ -96,6 +96,10 @@ const MailStats = ({ campaign, onClose }) => {
               sub={"parmi ceux qui ont ouvert"} />
           </div>
 
+          <div className="mst-note">
+            ℹ️ Chaque destinataire est compté <b>individuellement</b>. Le <b>taux d'ouverture</b> reste toutefois <b>approximatif</b> (norme du secteur) : il ne détecte que les ouvertures dont la messagerie charge une image invisible. Beaucoup de messageries d'entreprise (dont des serveurs <b>.nc</b>) et Apple Mail <b>bloquent ces images</b> → les ouvertures réelles sont sous-estimées. Le <b>taux de clic</b>, lui, est fiable.
+          </div>
+
           {data.ab && (
             <div className="mst-card">
               <div className="mst-card-title">A/B testing de l'objet</div>

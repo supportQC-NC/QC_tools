@@ -11,6 +11,13 @@
 // liens http(s) vers une redirection traçée, et l'URL de désinscription.
 import crypto from "crypto";
 
+// ⚠️ CE SECRET DOIT ÊTRE IDENTIQUE SUR TOUS LES ENVIRONNEMENTS qui signent et
+// vérifient les tokens de tracking. Si un mailing est ENVOYÉ depuis un backend
+// (ex: dev localhost) mais que le pixel/lien pointe vers un AUTRE backend
+// (ex: prod robot-nc.com via FRONTEND_URL), les deux doivent partager la même
+// valeur, sinon la vérification échoue et les ouvertures/clics ne sont PAS
+// enregistrés (stats à 0). On utilise MAIL_TRACK_SECRET dédié (≠ JWT_SECRET qui
+// diffère souvent entre dev et prod) → définir la MÊME valeur dans chaque .env.
 const SECRET =
   process.env.MAIL_TRACK_SECRET ||
   process.env.JWT_SECRET ||

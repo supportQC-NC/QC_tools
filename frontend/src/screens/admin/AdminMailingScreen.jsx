@@ -341,6 +341,7 @@ const AdminMailingScreen = () => {
                     <div className="ml-card-sub">
                       {c.entreprise?.trigramme ? `${c.entreprise.trigramme} · ` : ""}
                       {c.subject || "(sans objet)"}
+                      {c.user?.prenom || c.user?.nom ? ` · par ${[c.user.prenom, c.user.nom].filter(Boolean).join(" ")}` : ""}
                     </div>
                     {launched(c) && (
                       <div className="ml-progress">
