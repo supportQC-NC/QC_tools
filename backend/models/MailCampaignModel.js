@@ -8,7 +8,8 @@
 import mongoose from "mongoose";
 
 const recipientSchema = new mongoose.Schema(
-  { email: String, nom: String },
+  // variant = "" (pas d'A/B) | "A" | "B" (assigné au lancement si A/B activé).
+  { email: String, nom: String, variant: { type: String, default: "" } },
   { _id: false },
 );
 
@@ -38,6 +39,11 @@ const mailCampaignSchema = new mongoose.Schema(
       segmentId: { type: mongoose.Schema.Types.ObjectId, ref: "MailSegment" },
     },
     testEmails: { type: [String], default: [] },
+    // A/B TESTING de l'objet : 50% reçoivent subject, 50% subjectB.
+    abTest: {
+      enabled: { type: Boolean, default: false },
+      subjectB: { type: String, default: "" },
+    },
     // Snapshot figé au lancement.
     recipients: { type: [recipientSchema], default: [] },
     recipientsTotal: { type: Number, default: 0 }, // = recipients.length (pour la liste, sans charger le tableau)

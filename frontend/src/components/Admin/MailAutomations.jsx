@@ -17,6 +17,7 @@ import {
   HiExclamation,
   HiUpload,
   HiUserAdd,
+  HiChartBar,
 } from "react-icons/hi";
 import {
   useGetAutomationsQuery,
@@ -84,7 +85,7 @@ const emptyForm = (brand) => ({
   steps: [newStep(brand, true)],
 });
 
-const MailAutomations = ({ entrepriseId, brand }) => {
+const MailAutomations = ({ entrepriseId, brand, onOpenStats }) => {
   const { data: automations = [] } = useGetAutomationsQuery(entrepriseId, { skip: !entrepriseId });
   const [createAutomation] = useCreateAutomationMutation();
   const [updateAutomation] = useUpdateAutomationMutation();
@@ -317,6 +318,7 @@ const MailAutomations = ({ entrepriseId, brand }) => {
                 </div>
               </div>
               <div className="ml-card-actions">
+                <button title="Statistiques" onClick={() => onOpenStats?.(a)}><HiChartBar /></button>
                 {a.active ? (
                   <button title="Désactiver" onClick={() => onDeactivate(a)}><HiPause /></button>
                 ) : (

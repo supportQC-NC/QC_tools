@@ -96,11 +96,33 @@ const MailStats = ({ campaign, onClose }) => {
               sub={"parmi ceux qui ont ouvert"} />
           </div>
 
+          {data.ab && (
+            <div className="mst-card">
+              <div className="mst-card-title">A/B testing de l'objet</div>
+              <div className="mst-ab">
+                {[
+                  { k: "A", subject: data.ab.subjectA, total: data.ab.aTotal, opens: data.ab.aOpens, rate: data.ab.aRate },
+                  { k: "B", subject: data.ab.subjectB, total: data.ab.bTotal, opens: data.ab.bOpens, rate: data.ab.bRate },
+                ].map((v) => (
+                  <div key={v.k} className={`mst-ab-variant ${data.ab.winner === v.k ? "win" : ""}`}>
+                    <div className="mst-ab-head">
+                      <span className="mst-ab-badge">Objet {v.k}</span>
+                      {data.ab.winner === v.k && <span className="mst-ab-win">🏆 Gagnant</span>}
+                    </div>
+                    <div className="mst-ab-subject">« {v.subject || "(vide)"} »</div>
+                    <div className="mst-ab-rate">{pct(v.rate)}</div>
+                    <div className="mst-ab-sub">{v.opens} ouverture(s) / {v.total} envoyé(s)</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mst-card">
             <div className="mst-card-title">Ouvertures & clics dans le temps</div>
             {timeline.length ? (
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={timeline} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={400}>
+                <AreaChart data={timeline} margin={{ top: 10, right: 20, left: -6, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gOpen" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
@@ -127,13 +149,13 @@ const MailStats = ({ campaign, onClose }) => {
           <div className="mst-card">
             <div className="mst-card-title">Liens les plus cliqués</div>
             {topLinks.length ? (
-              <ResponsiveContainer width="100%" height={Math.max(120, topLinks.length * 42)}>
-                <BarChart data={topLinks} layout="vertical" margin={{ top: 0, right: 16, left: 10, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={Math.max(200, topLinks.length * 54)}>
+                <BarChart data={topLinks} layout="vertical" margin={{ top: 0, right: 24, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fill: "#9aa0a6", fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={220} tick={{ fill: "#cbd2e0", fontSize: 11 }} />
+                  <XAxis type="number" allowDecimals={false} tick={{ fill: "#9aa0a6", fontSize: 12 }} />
+                  <YAxis type="category" dataKey="name" width={300} tick={{ fill: "#cbd2e0", fontSize: 12 }} />
                   <Tooltip contentStyle={{ background: "#1e212c", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "#fff" }} />
-                  <Bar dataKey="Clics" fill="#4da6ff" radius={[0, 6, 6, 0]} barSize={18} />
+                  <Bar dataKey="Clics" fill="#4da6ff" radius={[0, 6, 6, 0]} barSize={22} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

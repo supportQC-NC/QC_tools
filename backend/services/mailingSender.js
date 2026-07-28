@@ -59,6 +59,7 @@ export const sendToRecipients = async (campaign, recipients, opts = {}) => {
   const { html, text } = renderCampaign(campaign.design || {}, { baseUrl: base });
   const transporter = getTransport();
   const subject = campaign.subject || "(sans objet)";
+  const subjectB = campaign.abTest?.subjectB || subject;
   const replyTo = campaign.replyTo || undefined;
 
   let sent = 0;
@@ -86,11 +87,12 @@ export const sendToRecipients = async (campaign, recipients, opts = {}) => {
       : undefined;
 
     try {
+      const subj = rec.variant === "B" ? subjectB : subject;
       await transporter.sendMail({
         from: fromHeader(),
         to,
         replyTo,
-        subject: applyMerge(subject, rec),
+        subject: applyMerge(subj, rec),
         html: htmlOut,
         text: textOut,
         headers,

@@ -116,7 +116,7 @@ const getMyCampaigns = asyncHandler(async (req, res) => {
 
 // @route POST /api/mailing/campaigns
 const createCampaign = asyncHandler(async (req, res) => {
-  const { entrepriseId, nom, subject, replyTo, design, scope, batchSize, pauseMinutes } = req.body;
+  const { entrepriseId, nom, subject, replyTo, design, scope, batchSize, pauseMinutes, abTest } = req.body;
   if (!entrepriseId || !nom) {
     res.status(400);
     throw new Error("Société et nom de campagne requis");
@@ -135,6 +135,7 @@ const createCampaign = asyncHandler(async (req, res) => {
     scope: scope || { type: "tous" },
     batchSize: batchSize || 25,
     pauseMinutes: pauseMinutes == null ? 60 : pauseMinutes,
+    abTest: abTest || { enabled: false, subjectB: "" },
   });
   res.status(201).json(await populateCampaign(MailCampaign.findById(campaign._id)));
 });
@@ -155,7 +156,7 @@ const updateCampaign = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("Impossible de modifier une campagne en cours d'envoi.");
   }
-  const { nom, subject, replyTo, design, scope, batchSize, pauseMinutes } = req.body;
+  const { nom, subject, replyTo, design, scope, batchSize, pauseMinutes, abTest } = req.body;
   if (nom !== undefined) campaign.nom = nom;
   if (subject !== undefined) campaign.subject = subject;
   if (replyTo !== undefined) campaign.replyTo = replyTo;
@@ -163,6 +164,7 @@ const updateCampaign = asyncHandler(async (req, res) => {
   if (scope !== undefined) campaign.scope = scope;
   if (batchSize !== undefined) campaign.batchSize = batchSize;
   if (pauseMinutes !== undefined) campaign.pauseMinutes = pauseMinutes;
+  if (abTest !== undefined) campaign.abTest = abTest;
   await campaign.save();
   res.json(await populateCampaign(MailCampaign.findById(campaign._id)));
 });
@@ -233,6 +235,11 @@ const launchCampaign = asyncHandler(async (req, res) => {
   if (recipients.length === 0) {
     res.status(400);
     throw new Error("Aucun destinataire avec un email valide pour cette cible.");
+  }
+
+  // A/B testing : assigne alternativement le variant A / B (≈ 50/50).
+  if (campaign.abTest?.enabled && (campaign.abTest.subjectB || "").trim()) {
+    recipients = recipients.map((r, i) => ({ ...r, variant: i % 2 === 0 ? "A" : "B" }));
   }
 
   campaign.recipients = recipients;
@@ -588,16 +595,33 @@ const testAutomationCtrl = asyncHandler(async (req, res) => {
 // @route GET /api/mailing/automations/:id/stats
 const getAutomationStats = asyncHandler(async (req, res) => {
   const auto = await loadAutomationWithAccess(req, res);
-  const [active, done] = await Promise.all([
+  const [active, done, stopped, timelineAgg] = await Promise.all([
     MailAutomationEnrollment.countDocuments({ automation: auto._id, status: "active" }),
     MailAutomationEnrollment.countDocuments({ automation: auto._id, status: "done" }),
+    MailAutomationEnrollment.countDocuments({ automation: auto._id, status: "stopped" }),
+    MailAutomationEnrollment.aggregate([
+      { $match: { automation: auto._id } },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: "Pacific/Noumea" },
+          },
+          n: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
   ]);
   res.json({
     active: auto.active,
+    trigger: auto.trigger?.type,
+    steps: auto.steps?.length || 0,
     enrolledCount: auto.enrolledCount || 0,
     sentCount: auto.sentCount || 0,
     inProgress: active,
     completed: done,
+    stopped,
+    timeline: timelineAgg.map((t) => ({ day: t._id, inscrits: t.n })),
   });
 });
 
@@ -607,12 +631,33 @@ const getAutomationStats = asyncHandler(async (req, res) => {
 const getCampaignStats = asyncHandler(async (req, res) => {
   const campaign = await loadOwnedCampaign(req, res);
   const cid = campaign._id;
-  const [uniqueOpens, totalOpens, uniqueClicks, totalClicks] = await Promise.all([
-    MailEvent.distinct("rid", { campaign: cid, kind: "open" }).then((a) => a.length),
+  const [openedRids, totalOpens, uniqueClicks, totalClicks] = await Promise.all([
+    MailEvent.distinct("rid", { campaign: cid, kind: "open" }),
     MailEvent.countDocuments({ campaign: cid, kind: "open" }),
     MailEvent.distinct("rid", { campaign: cid, kind: "click" }).then((a) => a.length),
     MailEvent.countDocuments({ campaign: cid, kind: "click" }),
   ]);
+  const uniqueOpens = openedRids.length;
+
+  // A/B testing : taux d'ouverture par variant d'objet.
+  let ab = null;
+  if (campaign.abTest?.enabled && (campaign.abTest.subjectB || "").trim()) {
+    const recs = campaign.recipients || [];
+    const openedSet = new Set(openedRids);
+    let aTotal = 0, bTotal = 0, aOpens = 0, bOpens = 0;
+    recs.forEach((r, i) => {
+      if (r.variant === "A") { aTotal++; if (openedSet.has(i)) aOpens++; }
+      else if (r.variant === "B") { bTotal++; if (openedSet.has(i)) bOpens++; }
+    });
+    const aRate = aTotal ? aOpens / aTotal : 0;
+    const bRate = bTotal ? bOpens / bTotal : 0;
+    ab = {
+      subjectA: campaign.subject,
+      subjectB: campaign.abTest.subjectB,
+      aTotal, bTotal, aOpens, bOpens, aRate, bRate,
+      winner: aTotal && bTotal ? (aRate >= bRate ? "A" : "B") : null,
+    };
+  }
   const timelineAgg = await MailEvent.aggregate([
     { $match: { campaign: cid } },
     {
@@ -659,6 +704,7 @@ const getCampaignStats = asyncHandler(async (req, res) => {
     ctr: uniqueOpens ? uniqueClicks / uniqueOpens : 0,
     timeline: Object.values(buckets),
     topLinks: topLinksAgg.map((t) => ({ url: t._id, n: t.n })),
+    ab,
   });
 });
 

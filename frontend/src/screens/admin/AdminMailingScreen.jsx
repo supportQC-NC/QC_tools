@@ -40,6 +40,7 @@ import MailBlockDesigner from "../../components/Admin/MailBlockDesigner";
 import MailSegments from "../../components/Admin/MailSegments";
 import MailStats from "../../components/Admin/MailStats";
 import MailAutomations from "../../components/Admin/MailAutomations";
+import MailAutomationStats from "../../components/Admin/MailAutomationStats";
 import SpamCheckField from "../../components/Admin/SpamCheckField";
 import "./AdminMailingScreen.css";
 
@@ -100,6 +101,8 @@ const emptyForm = () => ({
   profes: [],
   csvText: "",
   segmentId: "",
+  abEnabled: false,
+  abSubjectB: "",
   testText: TEST_EMAILS,
 });
 
@@ -120,6 +123,7 @@ const AdminMailingScreen = () => {
 
   const [tab, setTab] = useState("campagnes"); // campagnes | segments
   const [statsFor, setStatsFor] = useState(null); // campagne dont on voit les stats
+  const [autoStatsFor, setAutoStatsFor] = useState(null); // automatisation dont on voit les stats
   const [editing, setEditing] = useState(null); // null = liste ; sinon campagne
   const [form, setForm] = useState(emptyForm());
   const [msg, setMsg] = useState(null);
@@ -175,6 +179,8 @@ const AdminMailingScreen = () => {
       profes: c.scope?.profes || [],
       csvText: (c.scope?.csvEmails || []).join("\n"),
       segmentId: c.scope?.segmentId || "",
+      abEnabled: c.abTest?.enabled || false,
+      abSubjectB: c.abTest?.subjectB || "",
       testText: (c.testEmails || []).length ? c.testEmails.join("\n") : TEST_EMAILS,
     });
     setEditing(c);
@@ -199,6 +205,7 @@ const AdminMailingScreen = () => {
       scope: buildScope(),
       batchSize: 25,
       pauseMinutes: 60,
+      abTest: { enabled: form.abEnabled, subjectB: form.abSubjectB },
     };
     if (editing?._id) {
       const up = await updateCampaign({ id: editing._id, ...payload }).unwrap();
@@ -282,6 +289,13 @@ const AdminMailingScreen = () => {
       </div>
     );
   }
+  if (autoStatsFor) {
+    return (
+      <div className="ml-screen ml-screen--wide">
+        <MailAutomationStats automation={autoStatsFor} onClose={() => setAutoStatsFor(null)} />
+      </div>
+    );
+  }
 
   // ─────────────────────────── Vue LISTE ───────────────────────────
   if (!editing) {
@@ -309,7 +323,7 @@ const AdminMailingScreen = () => {
         {tab === "segments" ? (
           <MailSegments entrepriseId={entrepriseId} filters={filters} />
         ) : tab === "automatisations" ? (
-          <MailAutomations entrepriseId={entrepriseId} brand={filters?.brand} />
+          <MailAutomations entrepriseId={entrepriseId} brand={filters?.brand} onOpenStats={setAutoStatsFor} />
         ) : campaigns.length === 0 ? (
           <div className="ml-empty">Aucune campagne pour l'instant.</div>
         ) : (
@@ -374,9 +388,18 @@ const AdminMailingScreen = () => {
       <div className="ml-card ml-block">
         <div className="ml-fields">
           <SpamCheckField label="Nom (interne)" value={form.nom} onChange={(v) => setForm((f) => ({ ...f, nom: v }))} placeholder="Ex : Promo rentrée" />
-          <SpamCheckField label="Objet de l'email" value={form.subject} onChange={(v) => setForm((f) => ({ ...f, subject: v }))} placeholder="Ex : Nos nouveautés cette semaine" />
+          <SpamCheckField label={form.abEnabled ? "Objet A" : "Objet de l'email"} value={form.subject} onChange={(v) => setForm((f) => ({ ...f, subject: v }))} placeholder="Ex : Nos nouveautés cette semaine" />
           <label>Répondre à (Reply-To)<input value={form.replyTo} onChange={(e) => setForm((f) => ({ ...f, replyTo: e.target.value }))} placeholder="contact@…" /></label>
         </div>
+        <label className="ml-abtoggle">
+          <input type="checkbox" checked={form.abEnabled} onChange={(e) => setForm((f) => ({ ...f, abEnabled: e.target.checked }))} />
+          A/B testing de l'objet — 50% des destinataires reçoivent l'objet A, 50% l'objet B (le meilleur taux d'ouverture ressort dans les statistiques).
+        </label>
+        {form.abEnabled && (
+          <div style={{ marginTop: 10 }}>
+            <SpamCheckField label="Objet B (variante à tester)" value={form.abSubjectB} onChange={(v) => setForm((f) => ({ ...f, abSubjectB: v }))} placeholder="Ex : Une autre formulation d'objet" />
+          </div>
+        )}
       </div>
 
       {/* Designer d'email */}

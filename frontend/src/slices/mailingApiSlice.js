@@ -73,6 +73,9 @@ export const mailingApiSlice = apiSlice.injectEndpoints({
     getCampaignStats: builder.query({
       query: (id) => ({ url: `${MAIL_URL}/campaigns/${id}/stats` }),
     }),
+    getAutomationStats: builder.query({
+      query: (id) => ({ url: `${MAIL_URL}/automations/${id}/stats` }),
+    }),
 
     // Segments de clients.
     getSegments: builder.query({
@@ -166,4 +169,5 @@ export const {
   useTestAutomationMutation,
   useAddAutomationContactsMutation,
   useImportAutomationContactsMutation,
+  useGetAutomationStatsQuery,
 } = mailingApiSlice;

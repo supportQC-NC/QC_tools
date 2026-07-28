@@ -2,9 +2,13 @@
 
 .ml-screen {
   padding: 24px;
+  /* .main-content est un flex → sans width:100%, l'écran se réduit à la largeur
+     de son contenu au lieu de remplir l'espace (max-width plafonne, n'étire pas). */
+  width: 100%;
   max-width: 980px;
   margin: 0 auto;
   color: var(--text-primary);
+  box-sizing: border-box;
 }
 
 /* Espace de travail marketing : destiné aux écrans d'ordinateur → très large. */
@@ -96,6 +100,21 @@
 .ml-msg--err {
   background: rgba(239, 68, 68, 0.14);
   color: #fca5a5;
+}
+
+/* A/B testing toggle */
+.ml-abtoggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.ml-abtoggle input {
+  margin-top: 2px;
 }
 
 /* Onglets Campagnes / Segments */

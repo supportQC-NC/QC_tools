@@ -249,9 +249,18 @@ const MailBlockDesigner = ({ value, onChange, brand }) => {
 
   const selected = blocks.find((b) => b.id === selectedId) || null;
 
+  // Callback stable : on garde la DERNIÈRE référence de onChange dans un ref, et
+  // on n'émet QUE lorsque blocks/settings changent. Sans ça, un onChange recréé à
+  // chaque rendu par le parent (cas courant) déclencherait une BOUCLE de rendu
+  // infinie (onChange → setForm parent → nouveau onChange → effet → …) qui sature
+  // le thread et bloque la navigation. NE PAS remettre onChange dans les deps.
+  const onChangeRef = useRef(onChange);
   useEffect(() => {
-    onChange?.({ blocks: blocks.map(({ id, ...b }) => b), settings });
-  }, [blocks, settings, onChange]);
+    onChangeRef.current = onChange;
+  }, [onChange]);
+  useEffect(() => {
+    onChangeRef.current?.({ blocks: blocks.map(({ id, ...b }) => b), settings });
+  }, [blocks, settings]);
 
   const add = (kind) => {
     const b = { id: nid(), kind, ...COMMON, ...structuredCloneSafe(DEFAULTS[kind]) };
