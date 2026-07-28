@@ -135,6 +135,7 @@ class ClientCacheService {
     const indexByCatcli = new Map();
     const indexByType = new Map();
     const indexByCategorie = new Map();
+    const indexByProfes = new Map();
     const indexByGroupe = new Map();
     const indexByBanque = new Map();
     const indexByCodtarif = new Map();
@@ -184,6 +185,7 @@ class ClientCacheService {
       this._addToIndex(indexByCatcli, this.safeTrim(record.CATCLI), idx);
       this._addToIndex(indexByType, this.safeTrim(record.TYPE), idx);
       this._addToIndex(indexByCategorie, this.safeTrim(record.CATEGORIE), idx);
+      this._addToIndex(indexByProfes, this.safeTrim(record.PROFES), idx);
       this._addToIndex(indexByGroupe, this.safeTrim(record.GROUPE), idx);
       this._addToIndex(indexByBanque, this.safeTrim(record.BANQUE), idx);
       this._addToIndex(indexByCodtarif, this.safeTrim(record.CODTARIF), idx);
@@ -219,7 +221,7 @@ class ClientCacheService {
     return {
       records: enrichedRecords, dbfInfo, tiersData,
       indexByTiers, indexByRidet, indexByNom, indexByRepres,
-      indexByCatcli, indexByType, indexByCategorie, indexByGroupe,
+      indexByCatcli, indexByType, indexByCategorie, indexByProfes, indexByGroupe,
       indexByBanque, indexByCodtarif, indexByCltva, indexByEcotaxe,
       indexBySav, indexByFdm, indexByCompte, searchIndex,
       loadedAt: Date.now(), lastModified: dbfInfo.lastModified,
@@ -427,6 +429,7 @@ class ClientCacheService {
   async getCategories(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByCatcli); }
   async getTypes(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByType); }
   async getCategoriesDetaillees(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByCategorie); }
+  async getProfessions(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByProfes); }
   async getGroupes(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByGroupe); }
   async getBanques(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByBanque); }
   async getCodtarifs(entreprise) { return this._getDistinctFromIndex((await this.getClients(entreprise)).indexByCodtarif); }
@@ -450,6 +453,7 @@ class ClientCacheService {
       catclis: this._getDistinctFromIndex(cache.indexByCatcli),
       types: this._getDistinctFromIndex(cache.indexByType),
       categories: this._getDistinctFromIndex(cache.indexByCategorie),
+      professions: this._getDistinctFromIndex(cache.indexByProfes),
       groupes: this._getDistinctFromIndex(cache.indexByGroupe),
       banques: this._getDistinctFromIndex(cache.indexByBanque),
       codtarifs: this._getDistinctFromIndex(cache.indexByCodtarif),
@@ -459,6 +463,31 @@ class ClientCacheService {
       fdms: this._getDistinctFromIndex(cache.indexByFdm),
       comptes: this._getDistinctFromIndex(cache.indexByCompte),
     };
+  }
+
+  // Destinataires d'un mailing : clients avec ADMAIL VALIDE, filtrés par
+  // CATEGORIE et/ou PROFES (listes de valeurs), dédoublonnés par email.
+  async getMailRecipients(entreprise, { categories = [], profes = [] } = {}) {
+    const cache = await this.getClients(entreprise);
+    const cats = new Set((categories || []).map((c) => this.safeTrim(c)).filter(Boolean));
+    const profs = new Set((profes || []).map((p) => this.safeTrim(p)).filter(Boolean));
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const seen = new Set();
+    const out = [];
+    for (const r of cache.records) {
+      if (cats.size && !cats.has(this.safeTrim(r.CATEGORIE))) continue;
+      if (profs.size && !profs.has(this.safeTrim(r.PROFES))) continue;
+      const email = this.safeTrim(r.ADMAIL).toLowerCase();
+      if (!email || !emailRe.test(email)) continue;
+      if (seen.has(email)) continue;
+      seen.add(email);
+      out.push({
+        tiers: r.TIERS != null ? r.TIERS.toString().trim() : "",
+        nom: this.safeTrim(r.NOM),
+        email,
+      });
+    }
+    return out;
   }
 
   async getStructure(entreprise) {

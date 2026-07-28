@@ -34,6 +34,7 @@ import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
+import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
@@ -117,6 +118,11 @@ const router = createBrowserRouter(
       {/* Administration · Tableau de bord -> module "dashboard_admin" */}
       <Route element={<ModuleRoute module="dashboard_admin" />}>
         <Route path="/admin" element={<AdminDashboard />} />
+      </Route>
+
+      {/* Communication · Mailing -> module "mailing" (strictement gaté) */}
+      <Route element={<ModuleRoute module="mailing" />}>
+        <Route path="/mailing" element={<AdminMailingScreen />} />
       </Route>
 
       {/* Administration · Utilisateurs -> module "users_admin" (ou responsable,

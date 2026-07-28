@@ -135,7 +135,7 @@
   padding: 24px;
   min-height: 320px;
   justify-content: center;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .ced-label {

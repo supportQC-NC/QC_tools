@@ -87,6 +87,9 @@ import messageRoutes from "./routes/messageRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 // ========== ROUTES CONVERSATIONS (discussions Espace équipe) ==========
 import conversationRoutes from "./routes/conversationRoutes.js";
+// ========== ROUTES MAILING (campagnes email clients) ==========
+import mailingRoutes from "./routes/mailingRoutes.js";
+import { startMailingScheduler } from "./services/mailingScheduler.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -209,6 +212,7 @@ app.use("/api/executables", executableRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/mailing", mailingRoutes);
 // =======================================
 
 // ==========================================
@@ -258,4 +262,5 @@ initChat(io);
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   startInventaireWatcher();
+  startMailingScheduler();
 });

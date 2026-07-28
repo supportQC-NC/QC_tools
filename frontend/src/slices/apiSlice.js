@@ -49,6 +49,8 @@ export const apiSlice = createApi({
     "Notif",
     // ========== TAGS CONVERSATIONS (Espace équipe) ==========
     "Conversation",
+    // ========== TAGS MAILING ==========
+    "MailCampaign",
   ],
   endpoints: (builder) => ({}),
 });

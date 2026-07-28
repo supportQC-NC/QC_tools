@@ -22,7 +22,8 @@ import {
   HiQrcode,
   HiDeviceMobile,
   HiDownload,
-  HiChatAlt2
+  HiChatAlt2,
+  HiMail
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -226,6 +227,20 @@ export const moduleMenuStructure = [
         label: "Édition Promo",
         path: "/edition-promo",
         icon: HiCurrencyDollar,
+      },
+    ],
+  },
+  {
+    type: "subgroup",
+    label: "Communication",
+    icon: HiMail,
+    collapsible: true,
+    items: [
+      {
+        moduleKey: "mailing",
+        label: "Mailing clients",
+        path: "/mailing",
+        icon: HiMail,
       },
     ],
   },
