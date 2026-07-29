@@ -27,6 +27,7 @@ export const PERMISSION_MODULES = [
   { key: "etiquettes", label: "Générateur d'étiquettes", group: "gestion" },
   { key: "edition_promo", label: "Édition Promo", group: "gestion" },
   { key: "mailing", label: "Mailing clients", group: "gestion" },
+  { key: "assistant_ia", label: "Assistant IA", group: "gestion" },
   // ── Données (écrans admin) ────────────────────────────────────────────────
   { key: "client", label: "Clients", group: "donnees" },
   { key: "commandes", label: "Commandes", group: "donnees" },

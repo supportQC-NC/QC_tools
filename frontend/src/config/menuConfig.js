@@ -23,7 +23,8 @@ import {
   HiDeviceMobile,
   HiDownload,
   HiChatAlt2,
-  HiMail
+  HiMail,
+  HiSparkles
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -241,6 +242,12 @@ export const moduleMenuStructure = [
         label: "Mailing clients",
         path: "/mailing",
         icon: HiMail,
+      },
+      {
+        moduleKey: "assistant_ia",
+        label: "Assistant IA",
+        path: "/assistant-ia",
+        icon: HiSparkles,
       },
     ],
   },

@@ -89,6 +89,8 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 // ========== ROUTES MAILING (campagnes email clients) ==========
 import mailingRoutes from "./routes/mailingRoutes.js";
+// ========== ROUTES ASSISTANT IA (chat métier branché sur les données) ==========
+import aiRoutes from "./routes/aiRoutes.js";
 import { startMailingScheduler } from "./services/mailingScheduler.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
@@ -213,6 +215,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/mailing", mailingRoutes);
+app.use("/api/ai", aiRoutes);
 // =======================================
 
 // ==========================================

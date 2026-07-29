@@ -35,6 +35,7 @@ import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProfor
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
+import AssistantIAScreen from "./screens/user/AssistantIAScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
@@ -123,6 +124,11 @@ const router = createBrowserRouter(
       {/* Communication · Mailing -> module "mailing" (strictement gaté) */}
       <Route element={<ModuleRoute module="mailing" />}>
         <Route path="/mailing" element={<AdminMailingScreen />} />
+      </Route>
+
+      {/* Communication · Assistant IA -> module "assistant_ia" (strictement gaté) */}
+      <Route element={<ModuleRoute module="assistant_ia" />}>
+        <Route path="/assistant-ia" element={<AssistantIAScreen />} />
       </Route>
 
       {/* Administration · Utilisateurs -> module "users_admin" (ou responsable,
