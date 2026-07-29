@@ -1,42 +1,36 @@
 // src/slices/aiApiSlice.js
 //
-// Assistant IA : gestion des conversations (liste, détail, création, suppression).
-// Le CHAT est streamé (SSE) directement via fetch dans l'écran, pas via RTK Query.
+// Assistant IA : sociétés accessibles (sélecteur) + conversations (par user).
+// Le CHAT est streamé (SSE) via fetch dans l'écran, avec le périmètre (scope).
 import { apiSlice } from "./apiSlice";
 
 const AI_URL = "/api/ai";
 
 export const aiApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
+    getAiCompanies: builder.query({
+      query: () => ({ url: `${AI_URL}/companies` }),
+    }),
     getAiConversations: builder.query({
-      query: (nomDossierDBF) => ({
-        url: `${AI_URL}/${nomDossierDBF}/conversations`,
-      }),
+      query: () => ({ url: `${AI_URL}/conversations` }),
       providesTags: ["AiConversation"],
     }),
     getAiConversation: builder.query({
-      query: ({ nomDossierDBF, id }) => ({
-        url: `${AI_URL}/${nomDossierDBF}/conversations/${id}`,
-      }),
+      query: (id) => ({ url: `${AI_URL}/conversations/${id}` }),
     }),
     createAiConversation: builder.mutation({
-      query: (nomDossierDBF) => ({
-        url: `${AI_URL}/${nomDossierDBF}/conversations`,
-        method: "POST",
-      }),
+      query: () => ({ url: `${AI_URL}/conversations`, method: "POST" }),
       invalidatesTags: ["AiConversation"],
     }),
     deleteAiConversation: builder.mutation({
-      query: ({ nomDossierDBF, id }) => ({
-        url: `${AI_URL}/${nomDossierDBF}/conversations/${id}`,
-        method: "DELETE",
-      }),
+      query: (id) => ({ url: `${AI_URL}/conversations/${id}`, method: "DELETE" }),
       invalidatesTags: ["AiConversation"],
     }),
   }),
 });
 
 export const {
+  useGetAiCompaniesQuery,
   useGetAiConversationsQuery,
   useGetAiConversationQuery,
   useCreateAiConversationMutation,

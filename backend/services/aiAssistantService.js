@@ -15,6 +15,13 @@ import commandeCacheService from "./commandeService.js";
 import proformaCacheService from "./proformaCacheService.js";
 import factureCacheService from "./factureCacheService.js";
 import topArticlesService from "./topArticlesService.js";
+import { buildAnalyseReappro } from "./analyseReapproService.js";
+import { getFreshSnapshot } from "./aiSnapshotService.js";
+// Données MongoDB (app) — annuaire/équipes, tâches, inventaires, mailing.
+import Team from "../models/TeamModel.js";
+import Task, { TASK_STATUTS } from "../models/TaskModel.js";
+import Inventaire from "../models/InventaireModel.js";
+import MailCampaign from "../models/MailCampaignModel.js";
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const MAX_ROUNDS = 6; // garde-fou anti-boucle d'appels d'outils
@@ -256,9 +263,55 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "marge_article",
+      description:
+        "Marge / rentabilité d'UN article (par référence NART ou GENCOD) : prix de vente HT, coût (prix de revient), marge unitaire et TAUX de marge %.",
+      parameters: {
+        type: "object",
+        properties: {
+          ref: { type: "string", description: "Référence article (NART)" },
+          gencod: { type: "string", description: "Code-barres EAN-13" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rentabilite_top_ventes",
+      description:
+        "Croise les MEILLEURES VENTES avec la MARGE de chaque article : taux de marge % et marge totale générée (XPF). Pour repérer les best-sellers les plus/moins rentables. Défaut : 12 derniers mois.",
+      parameters: {
+        type: "object",
+        properties: {
+          date_debut: { type: "string", description: "Début AAAA-MM-JJ" },
+          date_fin: { type: "string", description: "Fin AAAA-MM-JJ" },
+          limit: { type: "integer", description: "Nb d'articles (déf. 10, max 20)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "articles_a_reapprovisionner",
+      description:
+        "Articles à RÉAPPROVISIONNER / en RUPTURE (réassort), priorisés par CA perdu : stock, ventes moyennes/mois, quantité à commander, CA perdu, fournisseur. Idéal pour préparer les commandes.",
+      parameters: {
+        type: "object",
+        properties: {
+          seulement_ruptures: { type: "boolean", description: "Ne garder que les articles en rupture (stock <= 0)" },
+          limit: { type: "integer", description: "Nb d'articles (déf. 15, max 40)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "recherche_web",
       description:
-        "Recherche sur le WEB (produits, références, nouveautés, fournisseurs, tendances). À utiliser pour SUGGÉRER des nouveautés à commander ou comparer des références externes. Les résultats sont des sources externes : cite-les, ne les présente jamais comme des données internes.",
+        "Recherche sur le WEB (produits, références, NOUVEAUTÉS et tendances qui font le buzz, fournisseurs). À utiliser pour SUGGÉRER des nouveautés à vendre en quincaillerie / bricolage. Les résultats sont des sources externes : cite-les avec leur lien, ne les présente jamais comme des données internes.",
       parameters: {
         type: "object",
         properties: {
@@ -269,7 +322,122 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "lister_societes",
+      description:
+        "Liste les sociétés du périmètre courant (celles auxquelles l'utilisateur a accès). Utile pour savoir sur quelles sociétés tu peux répondre et récupérer leurs trigrammes.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  // ── Données MongoDB (app) — scope-aware : société précise (societe) OU toutes
+  //    les sociétés du périmètre si `societe` non fourni. ──
+  {
+    type: "function",
+    function: {
+      name: "equipes",
+      description:
+        "Équipes internes : nom, responsable, nombre de membres, société. Annuaire « qui gère quelle équipe ».",
+      parameters: {
+        type: "object",
+        properties: {
+          societe: { type: "string", description: "Trigramme (facultatif : sinon toutes les sociétés du périmètre)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "taches",
+      description:
+        "Tâches internes (avancement) : titre, statut, priorité, assignés, échéance, société. Filtrable par statut.",
+      parameters: {
+        type: "object",
+        properties: {
+          statut: { type: "string", enum: TASK_STATUTS, description: "Filtrer par statut" },
+          societe: { type: "string", description: "Trigramme (facultatif)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "inventaires",
+      description:
+        "Sessions d'inventaire : nom, statut (en_cours/termine/exporte), articles comptés, quantité, responsable, société. Par défaut les inventaires en cours.",
+      parameters: {
+        type: "object",
+        properties: {
+          statut: { type: "string", enum: ["en_cours", "termine", "exporte"], description: "Filtrer par statut" },
+          societe: { type: "string", description: "Trigramme (facultatif)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "mailing_stats",
+      description:
+        "Campagnes email : nom, statut, nb destinataires, envoyés, échecs, société.",
+      parameters: {
+        type: "object",
+        properties: {
+          societe: { type: "string", description: "Trigramme (facultatif)" },
+        },
+      },
+    },
+  },
 ];
+
+// En multi-sociétés, chaque outil DE DONNÉES accepte un paramètre `societe`
+// (trigramme) pour cibler une société précise. On l'injecte automatiquement.
+for (const t of TOOLS) {
+  const skip = ["recherche_web", "lister_societes"];
+  if (skip.includes(t.function.name)) continue;
+  const p = t.function.parameters;
+  if (p && p.type === "object") {
+    p.properties.societe = {
+      type: "string",
+      description:
+        "Trigramme de la société ciblée. OBLIGATOIRE quand le périmètre contient plusieurs sociétés.",
+    };
+  }
+}
+
+// Résout l'entreprise concernée par un appel d'outil selon le périmètre.
+const norm = (s) => String(s || "").trim().toLowerCase();
+const resolveEntreprise = (args, ctx) => {
+  const list = ctx.entreprises || [];
+  if (list.length === 1) return list[0];
+  if (list.length === 0) throw new Error("Aucune société accessible.");
+  const key = norm(args.societe);
+  if (!key) {
+    throw new Error(
+      "Plusieurs sociétés dans le périmètre : précise le trigramme via le paramètre `societe`. Disponibles : " +
+        list.map((x) => x.trigramme).join(", ") + ".",
+    );
+  }
+  const found = list.find(
+    (x) => norm(x.trigramme) === key || norm(x.nomDossierDBF) === key || norm(x.nom) === key,
+  );
+  if (!found)
+    throw new Error(
+      `Société « ${args.societe} » hors du périmètre. Disponibles : ${list.map((x) => x.trigramme).join(", ")}.`,
+    );
+  return found;
+};
+
+// Ids d'entreprises ciblées pour les requêtes Mongo (société précise via `societe`,
+// sinon TOUTES les sociétés du périmètre — les requêtes Mongo restent légères).
+const scopeIds = (args, ctx) => {
+  if (args.societe) return [resolveEntreprise(args, ctx)._id];
+  return (ctx.entreprises || []).map((e) => e._id);
+};
+const fullName = (u) => (u ? `${u.prenom || ""} ${u.nom || ""}`.trim() : "");
 
 // Recherche web via Tavily (clé optionnelle TAVILY_API_KEY). Résultats = sources
 // EXTERNES : à citer, jamais présentées comme des données internes.
@@ -326,9 +494,144 @@ const analyserVentes = (entreprise, debut, fin) => {
   return promise;
 };
 
+// Ventes pour un outil : si aucune date explicite → snapshot pré-calculé (INSTANTANÉ)
+// s'il est frais, sinon calcul live (12 derniers mois). Dates explicites → live.
+const getVentesForTool = async (entreprise, args) => {
+  const explicit = args.date_debut || args.date_fin;
+  if (!explicit) {
+    const snap = await getFreshSnapshot(entreprise);
+    if (snap)
+      return {
+        debut: snap.debut,
+        fin: snap.fin,
+        totaux: snap.totaux || {},
+        topCa: snap.topCa || [],
+        topQte: snap.topQte || [],
+        source: "snapshot",
+      };
+  }
+  const p = defaultPeriod();
+  const debut = args.date_debut || p.date_debut;
+  const fin = args.date_fin || p.date_fin;
+  const res = await analyserVentes(entreprise, debut, fin);
+  return { debut, fin, totaux: res.totaux, topCa: res.topCa, topQte: res.topQte, source: "live" };
+};
+
+// Marge d'un article (à partir de PREV = prix de revient, PVTE = vente HT).
+const computeMargin = (r) => {
+  const cout = num(r.PREV);
+  const pvHt = num(r.PVTE) || (r.PVTETTC ? num(r.PVTETTC) / (1 + num(r.ATVA) / 100) : 0);
+  if (!pvHt) return null;
+  const marge = pvHt - cout;
+  return compact({
+    prix_vente_ht: round(pvHt),
+    cout_ht: round(cout),
+    marge_ht: round(marge),
+    taux_marge_pct: pvHt ? Math.round((marge / pvHt) * 1000) / 10 : undefined,
+  });
+};
+
 // ── Exécution d'un outil (LECTURE SEULE) ────────────────────────────────────
-const runTool = async (name, args, entreprise) => {
+const runTool = async (name, args, ctx) => {
   const lim = Math.min(Math.max(parseInt(args.limit, 10) || 15, 1), 30);
+
+  // Outils sans société : périmètre + web.
+  if (name === "lister_societes") {
+    return {
+      societes: (ctx.entreprises || []).map((e) => ({
+        trigramme: e.trigramme,
+        nom: e.nom,
+        dossier: e.nomDossierDBF,
+      })),
+    };
+  }
+  if (name === "recherche_web") {
+    return webSearch(args.query || "", parseInt(args.limit, 10) || 5);
+  }
+
+  // ── Outils MongoDB (app) : scope-aware (société précise ou tout le périmètre) ──
+  if (name === "equipes") {
+    const teams = await Team.find({ entreprise: { $in: scopeIds(args, ctx) } })
+      .populate("responsable", "prenom nom")
+      .populate("entreprise", "trigramme")
+      .select("nom responsable membres entreprise")
+      .limit(100)
+      .lean();
+    return {
+      equipes: teams.map((t) => ({
+        nom: t.nom,
+        societe: t.entreprise?.trigramme || "",
+        responsable: fullName(t.responsable),
+        nb_membres: (t.membres || []).length,
+      })),
+    };
+  }
+  if (name === "taches") {
+    const q = { entreprise: { $in: scopeIds(args, ctx) }, archive: { $ne: true } };
+    if (args.statut && TASK_STATUTS.includes(args.statut)) q.statut = args.statut;
+    const tasks = await Task.find(q)
+      .populate("assignes", "prenom nom")
+      .populate("entreprise", "trigramme")
+      .select("titre statut priorite deadline assignes entreprise")
+      .sort({ updatedAt: -1 })
+      .limit(80)
+      .lean();
+    return {
+      taches: tasks.map((t) => ({
+        titre: t.titre,
+        statut: t.statut,
+        priorite: t.priorite,
+        societe: t.entreprise?.trigramme || "",
+        assignes: (t.assignes || []).map(fullName),
+        echeance: t.deadline ? new Date(t.deadline).toISOString().slice(0, 10) : null,
+      })),
+    };
+  }
+  if (name === "inventaires") {
+    const q = { entreprise: { $in: scopeIds(args, ctx) } };
+    q.status = ["en_cours", "termine", "exporte"].includes(args.statut)
+      ? args.statut
+      : "en_cours";
+    const invs = await Inventaire.find(q)
+      .populate("user", "prenom nom")
+      .populate("entreprise", "trigramme")
+      .select("nom status totalArticles totalQuantite user entreprise updatedAt")
+      .sort({ updatedAt: -1 })
+      .limit(50)
+      .lean();
+    return {
+      inventaires: invs.map((i) => ({
+        nom: i.nom,
+        statut: i.status,
+        societe: i.entreprise?.trigramme || "",
+        par: fullName(i.user),
+        articles_comptes: i.totalArticles,
+        quantite_totale: i.totalQuantite,
+        maj: i.updatedAt ? new Date(i.updatedAt).toISOString().slice(0, 10) : null,
+      })),
+    };
+  }
+  if (name === "mailing_stats") {
+    const camps = await MailCampaign.find({ entreprise: { $in: scopeIds(args, ctx) } })
+      .populate("entreprise", "trigramme")
+      .select("nom status recipientsTotal sentCount failedCount entreprise updatedAt")
+      .sort({ updatedAt: -1 })
+      .limit(50)
+      .lean();
+    return {
+      campagnes: camps.map((c) => ({
+        nom: c.nom,
+        statut: c.status,
+        societe: c.entreprise?.trigramme || "",
+        destinataires: c.recipientsTotal,
+        envoyes: c.sentCount,
+        echecs: c.failedCount,
+      })),
+    };
+  }
+
+  // Outils DE DONNÉES DBF : on résout la société ciblée (mono = auto, multi = `societe`).
+  const entreprise = resolveEntreprise(args, ctx);
   switch (name) {
     case "rechercher_articles": {
       const r = await articleCacheService.search(entreprise, args.query || "", {
@@ -346,7 +649,12 @@ const runTool = async (name, args, entreprise) => {
       if (!rec && args.gencod)
         rec = await articleCacheService.findByGencod(entreprise, args.gencod);
       if (!rec) return { trouve: false };
-      return { trouve: true, article: mapArticle(rec), brut: slim(rec, 20) };
+      return {
+        trouve: true,
+        article: mapArticle(rec),
+        marge: computeMargin(rec) || undefined,
+        brut: slim(rec, 20),
+      };
     }
     case "rechercher_clients": {
       const r = await clientCacheService.search(entreprise, args.query || "", {
@@ -401,18 +709,15 @@ const runTool = async (name, args, entreprise) => {
       };
     }
     case "top_articles": {
-      const p = defaultPeriod();
-      const debut = args.date_debut || p.date_debut;
-      const fin = args.date_fin || p.date_fin;
-      const res = await analyserVentes(entreprise, debut, fin);
+      const v = await getVentesForTool(entreprise, args);
       const parQte = args.critere === "quantite";
       const topLim = Math.min(Math.max(parseInt(args.limit, 10) || 10, 1), 25);
-      const liste = (parQte ? res.topQte : res.topCa).slice(0, topLim);
+      const liste = (parQte ? v.topQte : v.topCa).slice(0, topLim);
       return {
-        periode: { debut, fin },
+        periode: { debut: v.debut, fin: v.fin },
         critere: parQte ? "quantite" : "chiffre_affaires",
-        ca_total_xpf: round(res.totaux.caTotal),
-        nb_factures: res.totaux.nbFacturesAnalysees,
+        ca_total_xpf: round(v.totaux.caTotal),
+        nb_factures: v.totaux.nbFacturesAnalysees,
         top: liste.map((a) => ({
           rang: a.rang,
           ref: a.nart,
@@ -424,16 +729,70 @@ const runTool = async (name, args, entreprise) => {
       };
     }
     case "chiffre_affaires": {
-      const p = defaultPeriod();
-      const debut = args.date_debut || p.date_debut;
-      const fin = args.date_fin || p.date_fin;
-      const res = await analyserVentes(entreprise, debut, fin);
+      const v = await getVentesForTool(entreprise, args);
       return {
-        periode: { debut, fin },
-        ca_total_xpf: round(res.totaux.caTotal),
-        quantite_totale: round(res.totaux.qteTotale),
-        nb_factures: res.totaux.nbFacturesAnalysees,
-        nb_references_vendues: res.totaux.nbArticlesDistincts,
+        periode: { debut: v.debut, fin: v.fin },
+        ca_total_xpf: round(v.totaux.caTotal),
+        quantite_totale: round(v.totaux.qteTotale),
+        nb_factures: v.totaux.nbFacturesAnalysees,
+        nb_references_vendues: v.totaux.nbArticlesDistincts,
+      };
+    }
+    case "marge_article": {
+      let rec = null;
+      if (args.ref) rec = await articleCacheService.findByNart(entreprise, args.ref);
+      if (!rec && args.gencod)
+        rec = await articleCacheService.findByGencod(entreprise, args.gencod);
+      if (!rec) return { trouve: false };
+      const marge = computeMargin(rec);
+      if (!marge) return { trouve: true, marge_disponible: false, article: mapArticle(rec) };
+      return { trouve: true, article: mapArticle(rec), marge };
+    }
+    case "rentabilite_top_ventes": {
+      const v = await getVentesForTool(entreprise, args);
+      const topLim = Math.min(Math.max(parseInt(args.limit, 10) || 10, 1), 20);
+      const liste = v.topCa.slice(0, topLim);
+      const out = [];
+      for (const a of liste) {
+        let rec = null;
+        try {
+          rec = await articleCacheService.findByNart(entreprise, a.nart);
+        } catch { /* ignore */ }
+        const marge = rec ? computeMargin(rec) : null;
+        out.push(
+          compact({
+            rang: a.rang,
+            ref: a.nart,
+            designation: a.design,
+            quantite: round(a.qte),
+            ca_xpf: round(a.ca),
+            taux_marge_pct: marge?.taux_marge_pct,
+            marge_generee_xpf: marge ? round(marge.marge_ht * a.qte) : undefined,
+          }),
+        );
+      }
+      return { periode: { debut: v.debut, fin: v.fin }, articles: out };
+    }
+    case "articles_a_reapprovisionner": {
+      const rea = await buildAnalyseReappro(entreprise, { maxRows: 400 });
+      let rows = rea.rows || [];
+      if (args.seulement_ruptures) rows = rows.filter((r) => r.enRupture);
+      const n = Math.min(Math.max(parseInt(args.limit, 10) || 15, 1), 40);
+      return {
+        kpis: rea.kpis,
+        articles: rows.slice(0, n).map((r) =>
+          compact({
+            ref: r.nart,
+            designation: r.design,
+            fournisseur: r.fournNom || undefined,
+            gisement: r.gisement || undefined,
+            stock: r.stock,
+            en_rupture: r.enRupture || undefined,
+            vente_moy_mois: round(r.vteMoyMois),
+            a_commander: r.reappro,
+            ca_perdu_mois_xpf: round(r.caPerdu),
+          }),
+        ),
       };
     }
     case "articles_par_categorie": {
@@ -448,27 +807,39 @@ const runTool = async (name, args, entreprise) => {
         articles: (arts || []).slice(0, lim).map(mapArticle),
       };
     }
-    case "recherche_web":
-      return webSearch(args.query || "", parseInt(args.limit, 10) || 5);
     default:
       return { erreur: `Outil inconnu : ${name}` };
   }
 };
 
-// System prompt : cadre strict (quincaillerie + société courante + lecture seule).
-const buildSystemPrompt = (entreprise) => {
-  const nom = entreprise?.nom || entreprise?.trigramme || "la société";
+// System prompt : cadre strict (quincaillerie + périmètre société + lecture seule).
+const buildSystemPrompt = (entreprises, mode) => {
   const today = new Date().toISOString().slice(0, 10);
-  return [
-    "Tu es l'assistant interne d'un groupe de quincailleries en Nouvelle-Calédonie.",
-    `Nous sommes le ${today} (utilise TOUJOURS cette date pour interpréter « cette année », « ce mois-ci », « les 12 derniers mois », etc. — n'utilise jamais une autre année par défaut).`,
-    `Tu travailles sur les données de la société « ${nom} » (société actuellement sélectionnée).`,
-    "Pour les données INTERNES (articles, stock, prix, clients, fournisseurs, commandes, proformas, factures, chiffre d'affaires, meilleures ventes), tu passes EXCLUSIVEMENT par les outils fournis. N'invente JAMAIS de données internes : si un outil ne renvoie rien, dis-le clairement.",
-    "Tu peux aussi faire des RECHERCHES WEB (outil recherche_web) pour proposer des nouveautés à commander, comparer des références externes ou repérer des tendances. Les résultats web sont des sources EXTERNES : cite-les (titre + lien) et ne les présente jamais comme des données internes.",
-    "Analyse pertinente attendue : croise les ventes (meilleures ventes / CA) avec des idées de nouveautés (web) pour faire des SUGGESTIONS d'achat argumentées. Tu ne fais que SUGGÉRER : tu ne commandes rien et ne modifies rien (lecture seule). N'affirme jamais avoir passé une commande.",
-    "Les montants sont en francs pacifique (XPF), sans décimales. Sois concis, factuel et professionnel. Réponds en français.",
-    "Pour toute question hors du domaine (quincaillerie, ces données, ou recherches produits utiles au métier), décline poliment.",
-  ].join(" ");
+  const lignes = [
+    "Tu es l'assistant interne expert d'un groupe de quincailleries en Nouvelle-Calédonie. Tu connais bien le marché du bricolage, de l'outillage, du jardin, de la maison et du bâtiment.",
+    `Nous sommes le ${today} (utilise TOUJOURS cette date pour interpréter « cette année », « ce mois-ci », « les 12 derniers mois », etc. — jamais une autre année par défaut).`,
+  ];
+
+  if (mode === "societe" && entreprises.length === 1) {
+    const e = entreprises[0];
+    lignes.push(
+      `PÉRIMÈTRE : tu réponds UNIQUEMENT sur la société « ${e.nom || e.trigramme} » (trigramme ${e.trigramme}). N'utilise le paramètre \`societe\` d'aucun outil pour sortir de cette société.`,
+    );
+  } else {
+    const liste = entreprises.map((e) => `${e.trigramme} (${e.nom})`).join(", ");
+    lignes.push(
+      `PÉRIMÈTRE : l'utilisateur a accès à PLUSIEURS sociétés : ${liste}. Pour interroger une société, passe son TRIGRAMME dans le paramètre \`societe\` des outils. Pour une question transverse (comparaison / agrégat), appelle l'outil pour CHAQUE société concernée puis synthétise. Tu ne dois JAMAIS répondre sur une société hors de cette liste.`,
+    );
+  }
+
+  lignes.push(
+    "Pour les données INTERNES — ERP/DBF (articles, stock, prix, MARGE/rentabilité, clients, fournisseurs, commandes, proformas, factures, chiffre d'affaires, meilleures ventes, RÉASSORT/ruptures) ET application/Mongo (équipes, tâches & avancement, sessions d'inventaire, campagnes mailing) — tu passes EXCLUSIVEMENT par les outils. N'invente JAMAIS de données internes ; si un outil ne renvoie rien, dis-le.",
+    "RECHERCHE WEB (outil recherche_web) : sers-t'en pour trouver des NOUVEAUTÉS et tendances qui font le buzz, pertinentes pour une quincaillerie (outillage, énergie/solaire, jardin, maison connectée, sécurité, DIY…), et croise-les avec les MEILLEURES VENTES pour proposer un assortiment argumenté. Cite toujours tes sources web avec leur lien (format markdown [titre](url)). Les résultats web sont EXTERNES : ne les présente jamais comme des données internes.",
+    "Tu ne fais que SUGGÉRER : tu es en LECTURE SEULE, tu ne commandes/modifies rien et n'affirmes jamais avoir passé une commande.",
+    "Format : réponds en français, en MARKDOWN clair (titres, listes à puces, gras, liens cliquables). Montants en XPF sans décimales. Sois concis et actionnable.",
+    "Pour toute demande hors domaine (quincaillerie, ces données, ou recherches produits utiles au métier), décline poliment.",
+  );
+  return lignes.join(" ");
 };
 
 /**
@@ -476,14 +847,22 @@ const buildSystemPrompt = (entreprise) => {
  * @param {Object} p
  * @param {Array}  p.history     - [{role:'user'|'assistant', content}] (dialogue passé)
  * @param {string} p.message     - nouveau message utilisateur
- * @param {Object} p.entreprise  - doc Entreprise (scope société)
+ * @param {Array}  p.entreprises - docs Entreprise du périmètre (>=1)
+ * @param {string} p.mode        - "societe" | "all"
  * @param {(t:string)=>void} p.onDelta - appelé pour chaque fragment de texte
  * @returns {Promise<string>} le texte complet de la réponse
  */
-export const runAssistant = async ({ history = [], message, entreprise, onDelta }) => {
+export const runAssistant = async ({
+  history = [],
+  message,
+  entreprises = [],
+  mode = "societe",
+  onDelta,
+}) => {
   const client = getClient();
+  const ctx = { entreprises, mode };
   const messages = [
-    { role: "system", content: buildSystemPrompt(entreprise) },
+    { role: "system", content: buildSystemPrompt(entreprises, mode) },
     ...history
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
       .slice(-16)
@@ -543,7 +922,7 @@ export const runAssistant = async ({ history = [], message, entreprise, onDelta 
       }
       let result;
       try {
-        result = await runTool(tc.function.name, args, entreprise);
+        result = await runTool(tc.function.name, args, ctx);
       } catch (e) {
         result = { erreur: e.message || "Échec de l'outil" };
       }

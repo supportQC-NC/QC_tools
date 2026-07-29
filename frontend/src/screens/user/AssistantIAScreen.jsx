@@ -1,45 +1,48 @@
 // src/screens/user/AssistantIAScreen.jsx
 //
-// Assistant IA « métier » : chat branché sur les données de la société
-// sélectionnée (via des outils backend en lecture seule). Réponses streamées
-// (SSE). Historique des conversations persisté (rail à gauche). Module gaté
-// « assistant_ia ».
-import React, { useEffect, useRef, useState } from "react";
+// Assistant IA « métier » : chat branché sur les données (DBF + Mongo) via des
+// outils backend en lecture seule. Sélecteur de PÉRIMÈTRE : société courante
+// (suit l'en-tête) ou « Toutes mes sociétés » — toujours borné aux sociétés
+// autorisées. Réponses streamées (SSE) + rendu markdown (liens cliquables).
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import {
   HiSparkles,
   HiPaperAirplane,
   HiPlus,
   HiTrash,
-  HiOfficeBuilding,
   HiUser,
+  HiOfficeBuilding,
 } from "react-icons/hi";
-import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
+  useGetAiCompaniesQuery,
   useGetAiConversationsQuery,
   useDeleteAiConversationMutation,
 } from "../../slices/aiApiSlice";
 import { BASE_URL } from "../../constants";
+import Markdown from "../../components/Admin/Markdown";
 import "./AssistantIAScreen.css";
 
+const ALL = "__all__";
+
 const SUGGESTIONS = [
-  "Top 10 des meilleures ventes cette année",
-  "Quel est notre chiffre d'affaires sur 12 mois ?",
+  "Top 10 des meilleures ventes sur les 12 derniers mois",
+  "Propose des nouveautés qui font le buzz à vendre en quincaillerie",
   "Cherche les articles « perceuse » en stock",
-  "Propose des nouveautés à commander vu nos meilleures ventes",
+  "Compare le CA de mes sociétés cette année",
 ];
 
 const AssistantIAScreen = () => {
-  const nomDossierDBF = useSelector(selectGlobalDossier);
+  const globalEntrepriseId = useSelector(selectGlobalEntrepriseId);
 
-  const { data: conversations = [], refetch } = useGetAiConversationsQuery(
-    nomDossierDBF,
-    { skip: !nomDossierDBF },
-  );
+  const { data: companies = [] } = useGetAiCompaniesQuery();
+  const { data: conversations = [], refetch } = useGetAiConversationsQuery();
   const [deleteConversation] = useDeleteAiConversationMutation();
 
+  const [scope, setScope] = useState(""); // entrepriseId | ALL
   const [activeId, setActiveId] = useState(null);
-  const [messages, setMessages] = useState([]); // [{role, content}]
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
@@ -47,17 +50,32 @@ const AssistantIAScreen = () => {
   const bottomRef = useRef(null);
   const streamRef = useRef("");
 
-  // Reset quand on change de société.
+  // Périmètre par défaut = société de l'en-tête (si accessible), sinon 1re société.
   useEffect(() => {
-    setActiveId(null);
-    setMessages([]);
-    setStreamText("");
-    setError("");
-  }, [nomDossierDBF]);
+    if (companies.length === 0) return;
+    setScope((cur) => {
+      if (cur && (cur === ALL || companies.some((c) => c._id === cur))) return cur;
+      if (globalEntrepriseId && companies.some((c) => c._id === globalEntrepriseId))
+        return globalEntrepriseId;
+      return companies[0]._id;
+    });
+  }, [companies, globalEntrepriseId]);
+
+  // Changer la société de l'en-tête bascule le périmètre sur cette société.
+  useEffect(() => {
+    if (globalEntrepriseId && companies.some((c) => c._id === globalEntrepriseId)) {
+      setScope(globalEntrepriseId);
+    }
+  }, [globalEntrepriseId, companies]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);
+
+  const scopeBody = useMemo(
+    () => (scope === ALL ? { type: "all" } : { type: "societe", entrepriseId: scope }),
+    [scope],
+  );
 
   const newConversation = () => {
     setActiveId(null);
@@ -66,16 +84,14 @@ const AssistantIAScreen = () => {
     setError("");
   };
 
-  // Charge une conversation existante (messages complets).
   const openConversation = async (id) => {
     setError("");
     setStreamText("");
     setActiveId(id);
     try {
-      const r = await fetch(
-        `${BASE_URL}/api/ai/${nomDossierDBF}/conversations/${id}`,
-        { credentials: "include" },
-      );
+      const r = await fetch(`${BASE_URL}/api/ai/conversations/${id}`, {
+        credentials: "include",
+      });
       if (!r.ok) throw new Error();
       const data = await r.json();
       setMessages(data.messages || []);
@@ -88,7 +104,7 @@ const AssistantIAScreen = () => {
     e.stopPropagation();
     if (!window.confirm(`Supprimer « ${conv.titre} » ?`)) return;
     try {
-      await deleteConversation({ nomDossierDBF, id: conv._id }).unwrap();
+      await deleteConversation(conv._id).unwrap();
       if (activeId === conv._id) newConversation();
     } catch {
       alert("Suppression impossible.");
@@ -98,7 +114,7 @@ const AssistantIAScreen = () => {
   const send = async (e) => {
     e?.preventDefault?.();
     const message = input.trim();
-    if (!message || streaming || !nomDossierDBF) return;
+    if (!message || streaming) return;
 
     setError("");
     setInput("");
@@ -109,11 +125,11 @@ const AssistantIAScreen = () => {
 
     let convId = activeId;
     try {
-      const res = await fetch(`${BASE_URL}/api/ai/${nomDossierDBF}/chat`, {
+      const res = await fetch(`${BASE_URL}/api/ai/chat`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: activeId, message }),
+        body: JSON.stringify({ conversationId: activeId, message, scope: scopeBody }),
       });
       if (!res.ok || !res.body) {
         let msg = `Erreur ${res.status}`;
@@ -121,7 +137,7 @@ const AssistantIAScreen = () => {
           const j = await res.json();
           if (j?.message) msg = j.message;
         } catch {
-          /* réponse non-JSON */
+          /* non-JSON */
         }
         throw new Error(msg);
       }
@@ -129,7 +145,6 @@ const AssistantIAScreen = () => {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      // Boucle de lecture du flux SSE (« data: {json}\n\n »).
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
@@ -139,7 +154,7 @@ const AssistantIAScreen = () => {
         buffer = parts.pop() || "";
         for (const part of parts) {
           const line = part.trim();
-          if (!line.startsWith("data:")) continue;
+          if (!line.startsWith("data:")) continue; // ignore les heartbeats « : »
           let evt;
           try {
             evt = JSON.parse(line.slice(5).trim());
@@ -155,7 +170,6 @@ const AssistantIAScreen = () => {
         }
       }
 
-      // Finalise : bascule le texte streamé en message assistant.
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: streamRef.current },
@@ -171,18 +185,19 @@ const AssistantIAScreen = () => {
     }
   };
 
-  if (!nomDossierDBF) {
+  if (companies.length === 0) {
     return (
       <div className="ai-screen">
         <div className="ai-empty-company">
           <HiOfficeBuilding />
-          Sélectionnez une société dans l'en-tête pour utiliser l'assistant.
+          Vous n'avez accès à aucune société pour l'assistant.
         </div>
       </div>
     );
   }
 
   const showWelcome = messages.length === 0 && !streaming && !streamText;
+  const multi = companies.length > 1;
 
   return (
     <div className="ai-screen">
@@ -221,12 +236,24 @@ const AssistantIAScreen = () => {
           <div className="ai-head-icon">
             <HiSparkles />
           </div>
-          <div>
+          <div className="ai-head-texts">
             <h1>Assistant IA</h1>
             <p>
-              Posez vos questions sur les articles, le stock, les clients, les
-              commandes… — réponses basées uniquement sur vos données.
+              Vos données (articles, stock, ventes, clients…) + veille produits web
+              — en lecture seule.
             </p>
+          </div>
+          {/* Sélecteur de périmètre */}
+          <div className="ai-scope">
+            <HiOfficeBuilding />
+            <select value={scope} onChange={(e) => setScope(e.target.value)}>
+              {companies.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.trigramme || c.nom}
+                </option>
+              ))}
+              {multi && <option value={ALL}>Toutes mes sociétés</option>}
+            </select>
           </div>
         </header>
 
@@ -236,8 +263,13 @@ const AssistantIAScreen = () => {
               <HiSparkles className="ai-welcome-icon" />
               <h2>Comment puis-je vous aider ?</h2>
               <p>
-                Je consulte vos données (articles, stock, prix, clients,
-                fournisseurs, commandes, proformas, factures) en lecture seule.
+                Je réponds sur{" "}
+                {scope === ALL ? (
+                  <b>toutes vos sociétés</b>
+                ) : (
+                  <b>{companies.find((c) => c._id === scope)?.trigramme || "la société"}</b>
+                )}{" "}
+                et je peux chercher des nouveautés produits sur le web.
               </p>
               <div className="ai-suggestions">
                 {SUGGESTIONS.map((s) => (
@@ -254,7 +286,13 @@ const AssistantIAScreen = () => {
                   <div className="ai-msg-avatar">
                     {m.role === "assistant" ? <HiSparkles /> : <HiUser />}
                   </div>
-                  <div className="ai-msg-bubble">{m.content}</div>
+                  <div className="ai-msg-bubble">
+                    {m.role === "assistant" ? (
+                      <Markdown text={m.content} />
+                    ) : (
+                      m.content
+                    )}
+                  </div>
                 </div>
               ))}
               {(streaming || streamText) && (
@@ -263,7 +301,15 @@ const AssistantIAScreen = () => {
                     <HiSparkles />
                   </div>
                   <div className="ai-msg-bubble">
-                    {streamText || <span className="ai-typing">…</span>}
+                    {streamText ? (
+                      <Markdown text={streamText} />
+                    ) : (
+                      <span className="ai-dots" aria-label="L'assistant réfléchit…">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    )}
                     {streaming && streamText && <span className="ai-caret" />}
                   </div>
                 </div>

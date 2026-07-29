@@ -92,6 +92,7 @@ import mailingRoutes from "./routes/mailingRoutes.js";
 // ========== ROUTES ASSISTANT IA (chat métier branché sur les données) ==========
 import aiRoutes from "./routes/aiRoutes.js";
 import { startMailingScheduler } from "./services/mailingScheduler.js";
+import { startAiSnapshotScheduler } from "./services/aiSnapshotService.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -266,4 +267,5 @@ server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   startInventaireWatcher();
   startMailingScheduler();
+  startAiSnapshotScheduler();
 });

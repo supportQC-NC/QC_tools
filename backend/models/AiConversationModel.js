@@ -17,10 +17,12 @@ const aiMessageSchema = new mongoose.Schema(
 const aiConversationSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    // Optionnel : le périmètre (société ou « toutes ») est choisi À CHAQUE
+    // requête (sélecteur de l'assistant), pas figé sur la conversation.
     entreprise: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Entreprise",
-      required: true,
+      default: null,
     },
     titre: { type: String, default: "Nouvelle conversation", trim: true },
     messages: { type: [aiMessageSchema], default: [] },
