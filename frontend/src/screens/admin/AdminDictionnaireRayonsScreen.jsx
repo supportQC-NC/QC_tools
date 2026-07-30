@@ -97,6 +97,9 @@ const AdminDictionnaireRayonsScreen = () => {
       setFichier(data.fichier || "");
       setExists(!!data.exists);
       setDirty(false);
+      if (data.justMaterialized) {
+        setInfo("Sous-zones ajoutées au fichier (matérialisation initiale).");
+      }
     } catch (e) {
       setError(e.message || "Impossible de lire le dictionnaire.");
       setRows([]);

@@ -15,12 +15,38 @@ import { generateGisementLabelsPDF } from "../services/gisementLabelService.js";
 const trigOf = (e) =>
   (e?.trigramme || e?.nomDossierDBF || "societe").toString().trim();
 
-// @desc    Lit le dictionnaire des rayons de l'entreprise
+// @desc    Lit le dictionnaire des rayons de l'entreprise. Matérialise
+//          automatiquement les sous-zones dans le fichier au premier chargement
+//          (si elles manquent) — décision client.
 // @route   GET /api/dictionnaire-rayons/:nomDossierDBF
 // @access  Private (export_gisements_admin, read) + accès entreprise
 export const getDictionnaire = asyncHandler(async (req, res) => {
-  const { fichier, exists, rows } = await readDictionnaire(req.entreprise);
-  res.json({ fichier, exists, rows });
+  const { fichier, exists, rows, materialized } = await readDictionnaire(
+    req.entreprise,
+  );
+
+  // Auto-matérialisation à l'ouverture : si le fichier existe mais ne contient
+  // pas encore les sous-zones, on les écrit une fois (non bloquant si échec).
+  let justMaterialized = false;
+  if (exists && !materialized && rows.length) {
+    try {
+      await writeDictionnaire(req.entreprise, rows);
+      justMaterialized = true;
+    } catch (e) {
+      console.error(
+        `[dictionnaire-rayons] matérialisation auto échouée (${fichier}):`,
+        e.message,
+      );
+    }
+  }
+
+  res.json({
+    fichier,
+    exists,
+    rows,
+    materialized: materialized || justMaterialized,
+    justMaterialized,
+  });
 });
 
 // @desc    Enregistre (remplace) le dictionnaire des rayons
@@ -39,8 +65,16 @@ export const saveDictionnaire = asyncHandler(async (req, res) => {
     throw new Error("Au moins une ligne avec un code GISM1 est requise.");
   }
   try {
-    const { fichier, count } = await writeDictionnaire(req.entreprise, rows);
-    res.json({ message: `Dictionnaire enregistré (${count} ligne(s)).`, fichier, count });
+    const { fichier, zoneCount, rowCount } = await writeDictionnaire(
+      req.entreprise,
+      rows,
+    );
+    res.json({
+      message: `Dictionnaire enregistré : ${zoneCount} zone(s), ${rowCount} ligne(s) au total (sous-zones incluses).`,
+      fichier,
+      zoneCount,
+      rowCount,
+    });
   } catch (e) {
     res.status(500);
     throw new Error(`Écriture impossible (${e.message}). Vérifiez l'accès au partage.`);

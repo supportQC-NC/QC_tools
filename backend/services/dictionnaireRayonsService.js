@@ -48,15 +48,21 @@ export const resolveDictionnaireFile = (entreprise) => {
   return path.join(base, `${trig}_dictionnaire_rayons.xlsx`);
 };
 
-// Lit le dictionnaire. Renvoie { fichier, exists, rows:[{ gism1, libelle, metrage }] }.
+// Lit le dictionnaire. Ne renvoie QUE les lignes de ZONE (les lignes de
+// sous-zone — type=sous — sont dérivées, donc ignorées à la lecture).
+// Renvoie { fichier, exists, rows:[{ gism1, libelle, metrage }], materialized }.
+//   materialized = true si le fichier contient déjà les sous-zones matérialisées
+//   (colonne « type » présente + au moins une ligne « sous »).
 export const readDictionnaire = async (entreprise) => {
   const fichier = resolveDictionnaireFile(entreprise);
-  if (!fs.existsSync(fichier)) return { fichier, exists: false, rows: [] };
+  if (!fs.existsSync(fichier)) {
+    return { fichier, exists: false, rows: [], materialized: false };
+  }
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(fichier);
   const ws = wb.getWorksheet("Rayons") || wb.worksheets[0];
-  if (!ws) return { fichier, exists: true, rows: [] };
+  if (!ws) return { fichier, exists: true, rows: [], materialized: false };
 
   // Repérage des colonnes via la 1re ligne.
   const colIdx = {};
@@ -66,15 +72,24 @@ export const readDictionnaire = async (entreprise) => {
     else if (["LIBELLE", "NOM", "DESIGNATION"].includes(h)) colIdx.libelle = col;
     else if (["METRAGE", "METRE", "METRES", "M", "NBSOUSZONE", "SOUSZONES"].includes(h))
       colIdx.metrage = col;
+    else if (["TYPE", "TYPEZONE", "TYPELIGNE"].includes(h)) colIdx.type = col;
   });
-  if (!colIdx.gism1) return { fichier, exists: true, rows: [] };
+  if (!colIdx.gism1)
+    return { fichier, exists: true, rows: [], materialized: false };
 
   const rows = [];
+  let hasSous = false;
   ws.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // en-tête
     const cellVal = (col) => (col ? row.getCell(col).text ?? row.getCell(col).value : "");
     const gism1 = safeTrim(cellVal(colIdx.gism1));
     if (!gism1) return;
+    // Lignes de sous-zone : ignorées (dérivées du métrage de la zone).
+    const type = normHeader(cellVal(colIdx.type));
+    if (type === "SOUS" || type === "SOUSZONE") {
+      hasSous = true;
+      return;
+    }
     const metrageRaw = safeTrim(cellVal(colIdx.metrage));
     const metrageNum = Number(metrageRaw.replace(",", "."));
     rows.push({
@@ -84,15 +99,40 @@ export const readDictionnaire = async (entreprise) => {
     });
   });
 
-  return { fichier, exists: true, rows };
+  return {
+    fichier,
+    exists: true,
+    rows,
+    materialized: colIdx.type !== undefined && hasSous,
+  };
 };
 
-// Écrit le dictionnaire (crée le dossier au besoin). rows:[{ gism1, libelle, metrage }].
-export const writeDictionnaire = async (entreprise, rows) => {
+// Construit la liste PLATE (zones + sous-zones) écrite dans le fichier :
+//   pour chaque zone : 1 ligne « zone » (avec métrage) puis N lignes « sous »
+//   (<GISM1>_A … ; N = max(1, métrage) → toujours au moins « _A »).
+const buildFlatRows = (zones) => {
+  const out = [];
+  for (const z of Array.isArray(zones) ? zones : []) {
+    const gism1 = safeTrim(z?.gism1);
+    if (!gism1) continue;
+    const libelle = safeTrim(z?.libelle);
+    const metrage = Math.max(0, Math.round(Number(z?.metrage) || 0));
+    out.push({ gism1, libelle, metrage, type: "zone" });
+    const n = Math.max(1, metrage);
+    for (let i = 0; i < n; i++) {
+      out.push({ gism1: `${gism1}_${letterSuffix(i)}`, libelle, metrage: null, type: "sous" });
+    }
+  }
+  return out;
+};
+
+// Écrit le dictionnaire (zones + sous-zones matérialisées, colonne « type »).
+// `zones` = [{ gism1, libelle, metrage }] (la source éditable).
+export const writeDictionnaire = async (entreprise, zones) => {
   const fichier = resolveDictionnaireFile(entreprise);
   fs.mkdirSync(path.dirname(fichier), { recursive: true });
 
-  const clean = (Array.isArray(rows) ? rows : [])
+  const cleanZones = (Array.isArray(zones) ? zones : [])
     .map((r) => ({
       gism1: safeTrim(r?.gism1),
       libelle: safeTrim(r?.libelle),
@@ -100,18 +140,28 @@ export const writeDictionnaire = async (entreprise, rows) => {
     }))
     .filter((r) => r.gism1);
 
+  const flat = buildFlatRows(cleanZones);
+
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Rayons");
   ws.columns = [
-    { header: "GISM1", key: "gism1", width: 16 },
+    { header: "GISM1", key: "gism1", width: 18 },
     { header: "libelle", key: "libelle", width: 42 },
     { header: "metrage", key: "metrage", width: 10 },
+    { header: "type", key: "type", width: 8 },
   ];
   ws.getRow(1).font = { bold: true };
-  for (const r of clean) ws.addRow(r);
+  for (const r of flat) {
+    ws.addRow({
+      gism1: r.gism1,
+      libelle: r.libelle,
+      metrage: r.metrage == null ? null : r.metrage,
+      type: r.type,
+    });
+  }
 
   await wb.xlsx.writeFile(fichier);
-  return { fichier, count: clean.length };
+  return { fichier, zoneCount: cleanZones.length, rowCount: flat.length };
 };
 
 // Développe les lignes en items d'étiquettes { code, libelle } (1 par sous-zone).
