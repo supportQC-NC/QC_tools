@@ -110,7 +110,10 @@ const loadFilialeData = async (entreprise) => {
   }
 
   try {
-    const dbf = await DBFFile.open(dbfPath);
+    // readMode:"loose" : tolère les entêtes DBF non conformes (noms de champs
+    // dupliqués) comme partout ailleurs dans le code (sinon dbffile lève
+    // « Duplicate field name »).
+    const dbf = await DBFFile.open(dbfPath, { readMode: "loose" });
     const records = await dbf.readRecords();
 
     const filialeMap = new Map();

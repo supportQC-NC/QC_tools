@@ -1,0 +1,360 @@
+/* src/screens/admin/AdminDictionnaireRayonsScreen.css
+   Thème sombre (charte globale : --bg-*, --text-*, --accent, --border…). */
+
+.dicr-screen {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  color: var(--text-primary);
+}
+
+.dicr-placeholder {
+  padding: 48px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.dicr-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.dicr-header h1 svg {
+  color: var(--accent);
+}
+
+.dicr-header p {
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.dicr-header code,
+.dicr-filepath code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.dicr-filepath {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+
+.dicr-badge-new {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.dicr-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.dicr-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.dicr-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dicr-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.dicr-label {
+  display: block;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Table éditable */
+.dicr-table-wrap {
+  overflow-x: auto;
+}
+
+.dicr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.dicr-table th {
+  text-align: left;
+  padding: 8px 8px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dicr-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dicr-col-code {
+  width: 160px;
+}
+.dicr-col-metr {
+  width: 100px;
+}
+.dicr-col-sz {
+  width: 90px;
+}
+.dicr-col-act {
+  width: 44px;
+}
+
+.dicr-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px !important;
+}
+
+.dicr-in {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.dicr-in:focus {
+  border-color: var(--accent);
+}
+
+.dicr-in.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dicr-in-num {
+  width: 80px;
+  text-align: right;
+}
+
+.dicr-sz-cell {
+  text-align: center;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Zone principale : mise en évidence (fond + liseré accent à gauche) */
+.dicr-zone-row td {
+  border-bottom: none;
+  background: rgba(77, 166, 255, 0.05);
+  padding-top: 8px;
+}
+
+.dicr-zone-row td:first-child {
+  border-left: 3px solid var(--accent);
+}
+
+/* Ligne des sous-zones : juste sous la zone, indentée, séparée du groupe suivant */
+.dicr-subzone-row td {
+  background: rgba(77, 166, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0 8px 9px 8px;
+}
+
+.dicr-subzone-row td:first-child {
+  border-left: 3px solid var(--accent);
+}
+
+.dicr-subzones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding-left: 18px;
+}
+
+.dicr-sz-arrow {
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.dicr-sz-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.dicr-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dicr-del:hover {
+  background: rgba(255, 107, 107, 0.2);
+  border-color: rgba(255, 107, 107, 0.55);
+}
+
+/* Boutons */
+.dicr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+}
+
+.dicr-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.dicr-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dicr-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.dicr-save,
+.dicr-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 0.96rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+.dicr-save {
+  background: linear-gradient(135deg, #4ade80, #22a35a);
+  color: #04140a;
+  box-shadow: 0 6px 16px rgba(74, 222, 128, 0.25);
+}
+
+.dicr-generate {
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #05121f;
+  box-shadow: 0 6px 16px rgba(77, 166, 255, 0.3);
+}
+
+.dicr-save:hover:not(:disabled),
+.dicr-generate:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.dicr-save:disabled,
+.dicr-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Type de code */
+.dicr-types {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 4px;
+}
+
+.dicr-type-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.dicr-type-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.dicr-type-btn.active {
+  border-color: var(--accent);
+  background: rgba(77, 166, 255, 0.14);
+  color: var(--accent);
+}
+
+.dicr-hint-inline {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+/* Alertes */
+.dicr-error,
+.dicr-info {
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.dicr-error {
+  background: rgba(255, 107, 107, 0.14);
+  color: var(--danger);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+}
+
+.dicr-info {
+  background: rgba(74, 222, 128, 0.14);
+  color: var(--success);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}

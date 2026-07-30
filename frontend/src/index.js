@@ -77,6 +77,7 @@ import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
 import AdminReceptionSuiviScreen from "./screens/admin/AdminReceptionSuiviScreen";
 import AdminExportGisementsScreen from "./screens/admin/AdminExportGisementsScreen";
+import AdminDictionnaireRayonsScreen from "./screens/admin/AdminDictionnaireRayonsScreen";
 import AdminExecutablesScreen from "./screens/admin/AdminExecutablesScreen";
 import AdminExecutableDetailScreen from "./screens/admin/AdminExecutableDetailScreen";
 import AdminEquipesScreen from "./screens/admin/AdminEquipesScreen";
@@ -385,6 +386,10 @@ const router = createBrowserRouter(
         <Route
           path="/admin/export-gisements"
           element={<AdminExportGisementsScreen />}
+        />
+        <Route
+          path="/admin/dictionnaire-rayons"
+          element={<AdminDictionnaireRayonsScreen />}
         />
       </Route>
 

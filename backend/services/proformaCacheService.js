@@ -282,10 +282,13 @@ class ProformaCacheService {
         throw new Error(`Fichier prodet.dbf non trouvé: ${prodetDbfPath}`);
       }
 
-      // Charger les deux fichiers DBF en parallèle
+      // Charger les deux fichiers DBF en parallèle.
+      // readMode:"loose" : tolère les entêtes DBF non conformes (ex. noms de
+      // champs dupliqués comme « NOM » chez certaines sociétés — bricowell —
+      // sinon dbffile lève « Duplicate field name: 'NOM' »).
       const [proformaDbf, prodetDbf] = await Promise.all([
-        DBFFile.open(proformaDbfPath),
-        DBFFile.open(prodetDbfPath),
+        DBFFile.open(proformaDbfPath, { readMode: "loose" }),
+        DBFFile.open(prodetDbfPath, { readMode: "loose" }),
       ]);
 
       const [proformaRecords, prodetRecords] = await Promise.all([

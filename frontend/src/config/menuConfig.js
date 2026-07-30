@@ -71,6 +71,7 @@ export const adminMenuStructure = [
       { label: "Bipages", path: "/admin/bipages", icon: HiClipboardList },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
       { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
+      { label: "Dictionnaire des rayons", path: "/admin/dictionnaire-rayons", icon: HiTag },
       { label: "Exécutables", path: "/admin/executables", icon: HiDownload },
     ],
   },

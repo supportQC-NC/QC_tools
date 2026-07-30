@@ -81,6 +81,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/fiches-controle", key: "fiches_controle_admin" },
   { path: "/admin/suivi-receptions", key: "reception_suivi_admin" },
   { path: "/admin/export-gisements", key: "export_gisements_admin" },
+  { path: "/admin/dictionnaire-rayons", key: "export_gisements_admin" },
   { path: "/admin/executables", key: "executables_admin" },
   { path: "/admin/inventaires", key: "inventaire" },
   { path: "/admin/zones", key: "inventaire" },

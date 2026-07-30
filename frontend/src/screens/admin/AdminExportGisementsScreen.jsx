@@ -8,7 +8,7 @@
 // Libellé lu depuis un fichier de config (gisements/groupe) — non bloquant si absent.
 
 import React, { useEffect, useRef, useState } from "react";
-import { HiDownload, HiOfficeBuilding, HiTag, HiX } from "react-icons/hi";
+import { HiDownload, HiOfficeBuilding, HiTag, HiX, HiUpload } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
@@ -154,6 +154,7 @@ const AdminExportGisementsScreen = () => {
   const [niveau, setNiveau] = useState(1); // Étiquettes gisements : GISM1..5
   const [codeType, setCodeType] = useState("barcode"); // "barcode" | "qr"
   const [selectedCodes, setSelectedCodes] = useState([]);
+  const [importFile, setImportFile] = useState(null); // fichier Excel importé (étiquettes)
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState(null);
   const [error, setError] = useState("");
@@ -283,6 +284,39 @@ const AdminExportGisementsScreen = () => {
     }
   };
 
+  // ── Étiquettes depuis un fichier Excel importé (1 colonne = code) ────────────
+  const genererEtiquettesImport = async () => {
+    setError("");
+    setInfo(null);
+    if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
+    if (!importFile) return setError("Choisissez d'abord un fichier Excel.");
+
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", importFile);
+      form.append("codeType", codeType);
+
+      const res = await fetch(
+        `${BASE_URL}/api/articles/${nomDossierDBF}/etiquettes-excel`,
+        { method: "POST", credentials: "include", body: form },
+      );
+      if (!res.ok) throw await erreurReponse(res, "Génération échouée");
+
+      const nb = res.headers.get("X-Etiquettes");
+      const tronque = res.headers.get("X-Tronque") === "1";
+      await telechargerBlob(res, "etiquettes_import.pdf");
+      setInfo(
+        `${nb ?? "?"} étiquette(s) générée(s) au format A8` +
+          (tronque ? " (fichier tronqué à 5000 lignes)." : "."),
+      );
+    } catch (e) {
+      setError(e.message || "Impossible de générer les étiquettes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loadingEntreprises) {
     return (
       <div className="expg-screen">
@@ -364,10 +398,17 @@ const AdminExportGisementsScreen = () => {
           >
             <HiTag /> Étiquettes A8 (PDF)
           </button>
+          <button
+            type="button"
+            className={`expg-tab ${sortie === "import" ? "active" : ""}`}
+            onClick={() => setSortie("import")}
+          >
+            <HiUpload /> Étiquettes depuis Excel
+          </button>
         </div>
       </div>
 
-      {sortie === "excel" ? (
+      {sortie === "excel" && (
         <>
           <div className="expg-card">
             <label className="expg-label">Format d'export</label>
@@ -400,7 +441,9 @@ const AdminExportGisementsScreen = () => {
             </button>
           </div>
         </>
-      ) : (
+      )}
+
+      {sortie === "etiquettes" && (
         <>
           {!estGroupes && (
             <div className="expg-card">
@@ -469,6 +512,67 @@ const AdminExportGisementsScreen = () => {
               className="expg-generate"
               onClick={genererEtiquettes}
               disabled={loading || !nomDossierDBF}
+            >
+              {loading ? "Génération…" : "🏷️ Générer les étiquettes (A8)"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {sortie === "import" && (
+        <>
+          <div className="expg-card">
+            <label className="expg-label">Type de code</label>
+            <div className="expg-niveaux">
+              <button
+                type="button"
+                className={`expg-niveau-btn ${codeType === "barcode" ? "active" : ""}`}
+                onClick={() => setCodeType("barcode")}
+              >
+                ▐▍▐ Code-barres (Code128)
+              </button>
+              <button
+                type="button"
+                className={`expg-niveau-btn ${codeType === "qr" ? "active" : ""}`}
+                onClick={() => setCodeType("qr")}
+              >
+                ▣ QR code
+              </button>
+            </div>
+          </div>
+
+          <div className="expg-card">
+            <label className="expg-label">Fichier Excel (1 colonne = le code)</label>
+            <div className="expg-file">
+              <label className="expg-file-btn">
+                <HiUpload /> Choisir un fichier
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              <span
+                className={`expg-file-name ${importFile ? "has-file" : ""}`}
+              >
+                {importFile ? importFile.name : "Aucun fichier choisi"}
+              </span>
+            </div>
+            <span className="expg-hint-inline">
+              Une colonne de codes (un par ligne) → 1 étiquette A8 par code. Une
+              éventuelle ligne d'en-tête (« code », « gencod »…) est ignorée.
+            </span>
+          </div>
+
+          {error && <div className="expg-error">{error}</div>}
+          {info && <div className="expg-info">{info}</div>}
+
+          <div className="expg-actions">
+            <button
+              type="button"
+              className="expg-generate"
+              onClick={genererEtiquettesImport}
+              disabled={loading || !nomDossierDBF || !importFile}
             >
               {loading ? "Génération…" : "🏷️ Générer les étiquettes (A8)"}
             </button>

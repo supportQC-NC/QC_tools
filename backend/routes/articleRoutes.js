@@ -1,5 +1,6 @@
 // backend/routes/articleRoutes.js
 import express from "express";
+import multer from "multer";
 import {
   getArticles,
   getArticleByNart,
@@ -17,6 +18,7 @@ import {
 import {
   exportGisements,
   genererEtiquettesGisement,
+  genererEtiquettesDepuisExcel,
 } from "../controllers/gisementsExportController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import {
@@ -25,6 +27,12 @@ import {
 } from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
+
+// Upload en mémoire pour l'import Excel d'étiquettes (5 Mo max, 1 fichier).
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("file");
 
 // Cache stats (admin) - AVANT les routes avec paramètres
 router.get("/cache-stats", protect, admin, getCacheStats);
@@ -54,6 +62,16 @@ router.post(
   checkEntrepriseAccess,
   checkModuleAccess("export_gisements_admin", "read"),
   genererEtiquettesGisement,
+);
+
+// Étiquettes (A8, Code128/QR) à partir d'un Excel importé (1 colonne = code)
+router.post(
+  "/:nomDossierDBF/etiquettes-excel",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("export_gisements_admin", "read"),
+  uploadExcel,
+  genererEtiquettesDepuisExcel,
 );
 
 // Liste des articles avec pagination et filtres avancés

@@ -156,4 +156,79 @@ export const genererEtiquettesGisement = asyncHandler(async (req, res) => {
   });
 });
 
-export default { exportGisements, genererEtiquettesGisement };
+// Mots d'en-tête reconnus (ligne de titre à ignorer si la 1re cellule matche).
+const HEADER_WORDS = new Set([
+  "code", "codes", "gencod", "gencode", "nart", "valeur", "value",
+  "ean", "barcode", "code-barres", "qr", "ref", "reference", "référence",
+]);
+
+// @desc    Étiquettes (A8, Code128/QR) à partir d'un Excel importé.
+//          UNE seule colonne = le code (valeur encodée), 1 étiquette par ligne.
+// @route   POST /api/articles/:nomDossierDBF/etiquettes-excel   (multipart, champ "file")
+// @body    codeType?: "barcode"|"qr"
+// @access  Private (module export_gisements_admin, read) + accès entreprise
+export const genererEtiquettesDepuisExcel = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const codeType = req.body?.codeType === "qr" ? "qr" : "barcode";
+
+  if (!req.file || !req.file.buffer) {
+    res.status(400);
+    throw new Error("Fichier Excel manquant (champ « file »).");
+  }
+
+  // Lecture du classeur (xlsx/xls/csv) — 1re feuille, 1re colonne.
+  const XLSX = await import("xlsx").catch(() => {
+    throw new Error("Module 'xlsx' introuvable. Lancez : npm i xlsx");
+  });
+  let rows;
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if (!ws) throw new Error("Classeur vide");
+    rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
+  } catch (e) {
+    res.status(400);
+    throw new Error(`Fichier Excel illisible : ${e.message}`);
+  }
+
+  // Chaque ligne -> 1re cellule = code. Ignore une éventuelle ligne d'en-tête.
+  let codes = rows
+    .map((r) => (Array.isArray(r) ? String(r[0] ?? "").trim() : ""))
+    .filter(Boolean);
+  if (codes.length && HEADER_WORDS.has(codes[0].toLowerCase())) {
+    codes = codes.slice(1);
+  }
+
+  if (codes.length === 0) {
+    res.status(400);
+    throw new Error("Aucun code trouvé dans la 1re colonne du fichier.");
+  }
+
+  // Garde-fou : limite le volume d'étiquettes générées d'un coup.
+  const MAX = 5000;
+  let tronque = false;
+  if (codes.length > MAX) {
+    codes = codes.slice(0, MAX);
+    tronque = true;
+  }
+
+  const items = codes.map((code) => ({ code, libelle: "" }));
+
+  const ext = codeType === "qr" ? "qr" : "cb";
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="etiquettes_import_${ext}_${trigOf(entreprise)}.pdf"`,
+  );
+  res.setHeader("Access-Control-Expose-Headers", "X-Etiquettes, X-Tronque");
+  res.setHeader("X-Etiquettes", String(items.length));
+  res.setHeader("X-Tronque", tronque ? "1" : "0");
+
+  await generateGisementLabelsPDF({ items, codeType, stream: res });
+});
+
+export default {
+  exportGisements,
+  genererEtiquettesGisement,
+  genererEtiquettesDepuisExcel,
+};

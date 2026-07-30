@@ -91,6 +91,8 @@ import conversationRoutes from "./routes/conversationRoutes.js";
 import mailingRoutes from "./routes/mailingRoutes.js";
 // ========== ROUTES ASSISTANT IA (chat métier branché sur les données) ==========
 import aiRoutes from "./routes/aiRoutes.js";
+// ========== ROUTES DICTIONNAIRE DES RAYONS (étiquettes rayons/sous-zones) ==========
+import dictionnaireRayonsRoutes from "./routes/dictionnaireRayonsRoutes.js";
 import { startMailingScheduler } from "./services/mailingScheduler.js";
 import { startAiSnapshotScheduler } from "./services/aiSnapshotService.js";
 // =======================================
@@ -217,6 +219,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/mailing", mailingRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/dictionnaire-rayons", dictionnaireRayonsRoutes);
 // =======================================
 
 // ==========================================
