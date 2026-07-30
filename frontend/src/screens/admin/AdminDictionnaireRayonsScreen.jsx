@@ -15,6 +15,12 @@ import {
   HiTrash,
   HiSave,
   HiRefresh,
+  HiUpload,
+  HiDownload,
+  HiSearch,
+  HiEye,
+  HiEyeOff,
+  HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
@@ -65,8 +71,17 @@ const AdminDictionnaireRayonsScreen = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState(null);
+
+  // Recherche / filtres / affichage (UX pour longs dictionnaires, ex. QC)
+  const [search, setSearch] = useState("");
+  const [emplFiltre, setEmplFiltre] = useState("TOUS"); // TOUS | MAGASIN | DOCK
+  const [showSubzones, setShowSubzones] = useState(false); // sous-zones repliées par défaut
+
+  const fileInputRef = useRef(null);
 
   const erreurReponse = async (res, base) => {
     let msg = `${base} (${res.status})`;
@@ -121,7 +136,10 @@ const AdminDictionnaireRayonsScreen = () => {
     setDirty(true);
   };
   const addRow = () => {
-    setRows((prev) => [...prev, withId({ gism1: "", libelle: "", metrage: 0 })]);
+    setRows((prev) => [
+      ...prev,
+      withId({ gism1: "", libelle: "", metrage: 0, priorite: "", emplacement: "MAGASIN" }),
+    ]);
     setDirty(true);
   };
   const deleteRow = (id) => {
@@ -139,6 +157,23 @@ const AdminDictionnaireRayonsScreen = () => {
   );
   const nbCodes = rows.filter((r) => String(r.gism1).trim()).length;
 
+  // ── Recherche + filtre emplacement (affichage seulement, édition via _id) ─────
+  const visibleRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (emplFiltre !== "TOUS") {
+        const empl = r.emplacement === "DOCK" ? "DOCK" : "MAGASIN";
+        if (empl !== emplFiltre) return false;
+      }
+      if (!q) return true;
+      const code = String(r.gism1 || "").toLowerCase();
+      const lib = String(r.libelle || "").toLowerCase();
+      return code.includes(q) || lib.includes(q);
+    });
+  }, [rows, search, emplFiltre]);
+
+  const filtreActif = search.trim() !== "" || emplFiltre !== "TOUS";
+
   // ── Enregistrement ───────────────────────────────────────────────────────────
   const save = async () => {
     if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
@@ -147,11 +182,16 @@ const AdminDictionnaireRayonsScreen = () => {
     setSaving(true);
     try {
       const payload = {
-        rows: rows.map((r) => ({
-          gism1: String(r.gism1 || "").trim(),
-          libelle: String(r.libelle || "").trim(),
-          metrage: Math.max(0, Math.round(Number(r.metrage) || 0)),
-        })),
+        rows: rows.map((r) => {
+          const prioStr = String(r.priorite ?? "").trim();
+          return {
+            gism1: String(r.gism1 || "").trim(),
+            libelle: String(r.libelle || "").trim(),
+            metrage: Math.max(0, Math.round(Number(r.metrage) || 0)),
+            priorite: prioStr === "" ? null : Math.max(0, Math.round(Number(prioStr) || 0)),
+            emplacement: r.emplacement === "DOCK" ? "DOCK" : "MAGASIN",
+          };
+        }),
       };
       const res = await fetch(
         `${BASE_URL}/api/dictionnaire-rayons/${nomDossierDBF}`,
@@ -214,6 +254,64 @@ const AdminDictionnaireRayonsScreen = () => {
     }
   };
 
+  // ── Import de masse (fusion depuis un Excel) ─────────────────────────────────
+  const onPickImport = () => fileInputRef.current?.click();
+
+  const onImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permet de réimporter le même fichier
+    if (!file) return;
+    if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
+    setError("");
+    setInfo(null);
+    setImporting(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(
+        `${BASE_URL}/api/dictionnaire-rayons/${nomDossierDBF}/import`,
+        { method: "POST", credentials: "include", body: form },
+      );
+      if (!res.ok) throw await erreurReponse(res, "Import échoué");
+      const data = await res.json();
+      setInfo(data.message || "Import effectué.");
+      setExists(true);
+      load(); // recharge le dictionnaire fusionné
+    } catch (err) {
+      setError(err.message || "Impossible d'importer le fichier.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // ── Téléchargement d'une copie du fichier dictionnaire ───────────────────────
+  const telecharger = async () => {
+    if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
+    setError("");
+    setInfo(null);
+    setDownloading(true);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/dictionnaire-rayons/${nomDossierDBF}/fichier`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw await erreurReponse(res, "Téléchargement échoué");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `dictionnaire_rayons_${nomDossierDBF}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (err) {
+      setError(err.message || "Impossible de télécharger le fichier.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loadingEntreprises) {
     return (
       <div className="dicr-screen">
@@ -229,11 +327,15 @@ const AdminDictionnaireRayonsScreen = () => {
           <HiTag /> Dictionnaire des rayons
         </h1>
         <p>
-          Éditez le fichier des rayons (code GISM1 + libellé + métrage), puis
-          générez les étiquettes A8 en QR ou code-barres. Le métrage découpe
+          Éditez le fichier des rayons (code GISM1 + libellé + métrage +
+          priorité + emplacement), puis générez les étiquettes A8 en QR ou
+          code-barres. La <strong>priorité</strong> définit l'ordre de
+          préparation des commandes ; l'<strong>emplacement</strong> vaut{" "}
+          <code>MAGASIN</code> (défaut) ou <code>DOCK</code>. Le métrage découpe
           chaque rayon en sous-zones (<code>_A</code>, <code>_B</code>…) : un
           rayon de métrage 8 donne 8 sous-zones, un rayon de métrage 0 en donne 1
-          (<code>_A</code>).
+          (<code>_A</code>). Vous pouvez aussi <strong>importer</strong> un Excel
+          (fusion par GISM1) ou <strong>télécharger</strong> une copie du fichier.
         </p>
       </div>
 
@@ -263,6 +365,12 @@ const AdminDictionnaireRayonsScreen = () => {
             <div className="dicr-card-head">
               <label className="dicr-label">
                 Rayons ({nbCodes}) · {totalSousZones} sous-zone(s)
+                {filtreActif && (
+                  <span className="dicr-count-filtered">
+                    {" "}
+                    — {visibleRows.length} affiché(s)
+                  </span>
+                )}
               </label>
               <div className="dicr-head-actions">
                 <button
@@ -277,7 +385,84 @@ const AdminDictionnaireRayonsScreen = () => {
                 <button type="button" className="dicr-btn" onClick={addRow}>
                   <HiPlus /> Ajouter une ligne
                 </button>
+                <button
+                  type="button"
+                  className="dicr-btn"
+                  onClick={onPickImport}
+                  disabled={importing}
+                  title="Importer un Excel (fusion : mise à jour + ajout par GISM1)"
+                >
+                  <HiUpload /> {importing ? "Import…" : "Importer un Excel"}
+                </button>
+                <button
+                  type="button"
+                  className="dicr-btn"
+                  onClick={telecharger}
+                  disabled={downloading || !exists}
+                  title="Télécharger une copie du fichier dictionnaire"
+                >
+                  <HiDownload /> {downloading ? "…" : "Télécharger"}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  hidden
+                  onChange={onImportFile}
+                />
               </div>
+            </div>
+
+            {/* ── Barre de recherche / filtres ─────────────────────────── */}
+            <div className="dicr-filterbar">
+              <div className="dicr-search">
+                <HiSearch className="dicr-search-ic" />
+                <input
+                  className="dicr-search-in"
+                  type="text"
+                  value={search}
+                  placeholder="Rechercher un code ou un libellé…"
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    className="dicr-search-clear"
+                    onClick={() => setSearch("")}
+                    title="Effacer la recherche"
+                  >
+                    <HiX />
+                  </button>
+                )}
+              </div>
+
+              <div className="dicr-empl-filter">
+                <span className="dicr-filter-lbl">Emplacement :</span>
+                {["TOUS", "MAGASIN", "DOCK"].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`dicr-chip-btn ${emplFiltre === v ? "active" : ""}`}
+                    onClick={() => setEmplFiltre(v)}
+                  >
+                    {v === "TOUS" ? "Tous" : v}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                className="dicr-btn dicr-btn-ghost"
+                onClick={() => setShowSubzones((s) => !s)}
+                title={
+                  showSubzones
+                    ? "Masquer les sous-zones sous chaque rayon"
+                    : "Afficher les sous-zones sous chaque rayon"
+                }
+              >
+                {showSubzones ? <HiEyeOff /> : <HiEye />}{" "}
+                {showSubzones ? "Masquer les sous-zones" : "Afficher les sous-zones"}
+              </button>
             </div>
 
             <div className="dicr-table-wrap">
@@ -287,6 +472,8 @@ const AdminDictionnaireRayonsScreen = () => {
                     <th className="dicr-col-code">GISM1 (code)</th>
                     <th>Libellé</th>
                     <th className="dicr-col-metr">Métrage</th>
+                    <th className="dicr-col-prio">Priorité</th>
+                    <th className="dicr-col-empl">Emplacement</th>
                     <th className="dicr-col-sz">Sous-zones</th>
                     <th className="dicr-col-act"></th>
                   </tr>
@@ -294,14 +481,30 @@ const AdminDictionnaireRayonsScreen = () => {
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="dicr-empty">
+                      <td colSpan={7} className="dicr-empty">
                         {loading
                           ? "Chargement…"
                           : "Aucune ligne. Cliquez « Ajouter une ligne »."}
                       </td>
                     </tr>
+                  ) : visibleRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="dicr-empty">
+                        Aucun rayon ne correspond au filtre.{" "}
+                        <button
+                          type="button"
+                          className="dicr-link-btn"
+                          onClick={() => {
+                            setSearch("");
+                            setEmplFiltre("TOUS");
+                          }}
+                        >
+                          Réinitialiser
+                        </button>
+                      </td>
+                    </tr>
                   ) : (
-                    rows.map((r) => {
+                    visibleRows.map((r) => {
                       const hasCode = String(r.gism1).trim() !== "";
                       const sz = hasCode ? subZoneCodes(r.gism1, r.metrage) : [];
                       return (
@@ -339,6 +542,32 @@ const AdminDictionnaireRayonsScreen = () => {
                                 }
                               />
                             </td>
+                            <td>
+                              <input
+                                className="dicr-in dicr-in-num"
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={r.priorite ?? ""}
+                                placeholder="—"
+                                title="Ordre de préparation des commandes (1 = en premier)"
+                                onChange={(e) =>
+                                  updateRow(r._id, "priorite", e.target.value)
+                                }
+                              />
+                            </td>
+                            <td>
+                              <select
+                                className="dicr-in dicr-select"
+                                value={r.emplacement === "DOCK" ? "DOCK" : "MAGASIN"}
+                                onChange={(e) =>
+                                  updateRow(r._id, "emplacement", e.target.value)
+                                }
+                              >
+                                <option value="MAGASIN">MAGASIN</option>
+                                <option value="DOCK">DOCK</option>
+                              </select>
+                            </td>
                             <td className="dicr-sz-cell">
                               {hasCode ? sz.length : "—"}
                             </td>
@@ -353,9 +582,9 @@ const AdminDictionnaireRayonsScreen = () => {
                               </button>
                             </td>
                           </tr>
-                          {hasCode && (
+                          {hasCode && showSubzones && (
                             <tr className="dicr-subzone-row">
-                              <td colSpan={5}>
+                              <td colSpan={7}>
                                 <div className="dicr-subzones">
                                   <span className="dicr-sz-arrow">↳</span>
                                   {sz.map((c) => (

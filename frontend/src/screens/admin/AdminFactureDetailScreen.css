@@ -6,7 +6,7 @@
 }
 
 /* ===== Header ===== */
-.fa-header {
+.fa-header { 
   display: flex;
   align-items: center;
   justify-content: space-between;

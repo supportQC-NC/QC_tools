@@ -4,10 +4,14 @@
 // sur le partage « collecteur ») : lecture, écriture (éditeur), et génération
 // d'étiquettes QR/code-barres par sous-zone (metrage → « _A, _B, … »).
 
+import fs from "fs";
 import asyncHandler from "../middleware/asyncHandler.js";
 import {
   readDictionnaire,
   writeDictionnaire,
+  parseWorkbookRows,
+  mergeDictionnaire,
+  resolveDictionnaireFile,
   expandSubZones,
 } from "../services/dictionnaireRayonsService.js";
 import { generateGisementLabelsPDF } from "../services/gisementLabelService.js";
@@ -51,7 +55,7 @@ export const getDictionnaire = asyncHandler(async (req, res) => {
 
 // @desc    Enregistre (remplace) le dictionnaire des rayons
 // @route   PUT /api/dictionnaire-rayons/:nomDossierDBF
-// @body    { rows: [{ gism1, libelle, metrage }] }
+// @body    { rows: [{ gism1, libelle, metrage, priorite, emplacement }] }
 // @access  Private (export_gisements_admin, write) + accès entreprise
 export const saveDictionnaire = asyncHandler(async (req, res) => {
   const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
@@ -124,4 +128,73 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
   await generateGisementLabelsPDF({ items, codeType, stream: res });
 });
 
-export default { getDictionnaire, saveDictionnaire, genererEtiquettesRayons };
+// @desc    Import de masse : fusionne un fichier Excel dans le dictionnaire
+//          (mise à jour des rayons existants par GISM1 + ajout des nouveaux).
+// @route   POST /api/dictionnaire-rayons/:nomDossierDBF/import
+// @body    multipart/form-data, champ « file » (.xlsx)
+// @access  Private (export_gisements_admin, write) + accès entreprise
+export const importDictionnaire = asyncHandler(async (req, res) => {
+  if (!req.file?.buffer) {
+    res.status(400);
+    throw new Error("Aucun fichier reçu (champ « file » attendu).");
+  }
+
+  let importedRows;
+  try {
+    importedRows = await parseWorkbookRows(req.file.buffer);
+  } catch (e) {
+    res.status(400);
+    throw new Error(`Fichier Excel illisible (${e.message}).`);
+  }
+  if (!importedRows.length) {
+    res.status(400);
+    throw new Error(
+      "Aucune ligne exploitable : une colonne GISM1 (ou CODE/RAYON) est requise.",
+    );
+  }
+
+  const { rows: existing } = await readDictionnaire(req.entreprise);
+  const { rows: merged, ajoutes, misAJour } = mergeDictionnaire(
+    existing,
+    importedRows,
+  );
+
+  try {
+    const { fichier, zoneCount, rowCount } = await writeDictionnaire(
+      req.entreprise,
+      merged,
+    );
+    res.json({
+      message: `Import fusionné : ${misAJour} rayon(s) mis à jour, ${ajoutes} ajouté(s) (${zoneCount} au total).`,
+      fichier,
+      ajoutes,
+      misAJour,
+      total: zoneCount,
+      rowCount,
+    });
+  } catch (e) {
+    res.status(500);
+    throw new Error(`Écriture impossible (${e.message}). Vérifiez l'accès au partage.`);
+  }
+});
+
+// @desc    Télécharge une copie du fichier dictionnaire (xlsx brut).
+// @route   GET /api/dictionnaire-rayons/:nomDossierDBF/fichier
+// @access  Private (export_gisements_admin, read) + accès entreprise
+export const telechargerDictionnaire = asyncHandler(async (req, res) => {
+  const fichier = resolveDictionnaireFile(req.entreprise);
+  if (!fs.existsSync(fichier)) {
+    res.status(404);
+    throw new Error("Aucun dictionnaire enregistré pour cette société.");
+  }
+  const trig = trigOf(req.entreprise).toUpperCase();
+  res.download(fichier, `${trig}_dictionnaire_rayons.xlsx`);
+});
+
+export default {
+  getDictionnaire,
+  saveDictionnaire,
+  genererEtiquettesRayons,
+  importDictionnaire,
+  telechargerDictionnaire,
+};

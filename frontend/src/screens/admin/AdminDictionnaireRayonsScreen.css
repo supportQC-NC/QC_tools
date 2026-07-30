@@ -2,7 +2,7 @@
    Thème sombre (charte globale : --bg-*, --text-*, --accent, --border…). */
 
 .dicr-screen {
-  max-width: 960px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   color: var(--text-primary);
@@ -95,9 +95,123 @@
   letter-spacing: 0.4px;
 }
 
+/* ── Barre de recherche / filtres ── */
+.dicr-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.dicr-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.dicr-search-ic {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.dicr-search-in {
+  width: 100%;
+  padding: 8px 30px 8px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.dicr-search-in:focus {
+  border-color: var(--accent);
+}
+
+.dicr-search-clear {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.dicr-search-clear:hover {
+  color: var(--text-primary);
+}
+
+.dicr-empl-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dicr-filter-lbl {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.dicr-chip-btn {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: all 0.15s ease;
+}
+
+.dicr-chip-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.dicr-chip-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dicr-btn-ghost {
+  background: transparent;
+}
+
+.dicr-count-filtered {
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+.dicr-link-btn {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 0;
+}
+
 /* Table éditable */
 .dicr-table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 65vh;
 }
 
 .dicr-table {
@@ -113,6 +227,10 @@
   font-weight: 600;
   font-size: 0.8rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-secondary);
 }
 
 .dicr-table td {
@@ -121,10 +239,16 @@
 }
 
 .dicr-col-code {
-  width: 160px;
+  width: 180px;
 }
 .dicr-col-metr {
   width: 100px;
+}
+.dicr-col-prio {
+  width: 100px;
+}
+.dicr-col-empl {
+  width: 140px;
 }
 .dicr-col-sz {
   width: 90px;
@@ -161,6 +285,12 @@
 .dicr-in-num {
   width: 80px;
   text-align: right;
+}
+
+.dicr-select {
+  width: 100%;
+  cursor: pointer;
+  appearance: auto;
 }
 
 .dicr-sz-cell {
