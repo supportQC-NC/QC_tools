@@ -94,6 +94,81 @@ export const ordonnerMagasin = (lignes) => {
 };
 
 /**
+ * Ordonne la préparation DOCK sur la base de la quantité dock à préparer.
+ * Règle retenue (CDC §4, choix client) :
+ *   - d'abord les articles AVEC gisement, par priorité croissante (puis GISM1, NL) ;
+ *   - puis les articles SANS gisement, par ordre de la proforma (NL) en fin.
+ * Remet ordreDock à null pour les lignes sans part dock.
+ */
+export const ordonnerDock = (lignes) => {
+  lignes.forEach((l) => {
+    l.ordreDock = null;
+  });
+  const dock = lignes.filter((l) => (l.qteDockAPreparer || 0) > 0);
+  const avecGisement = dock
+    .filter((l) => l.aGisement)
+    .sort(
+      (a, b) =>
+        (a.priorite ?? Number.POSITIVE_INFINITY) -
+          (b.priorite ?? Number.POSITIVE_INFINITY) ||
+        String(a.gism1).localeCompare(String(b.gism1), "fr", {
+          sensitivity: "base",
+        }) ||
+        a.nl - b.nl,
+    );
+  const sansGisement = dock.filter((l) => !l.aGisement).sort((a, b) => a.nl - b.nl);
+  [...avecGisement, ...sansGisement].forEach((l, i) => {
+    l.ordreDock = i + 1;
+  });
+  return lignes;
+};
+
+/**
+ * Construit une Map { NART terminal -> Set(gencodes acceptables) } pour toute la
+ * base articles, en suivant la chaîne de renvois GENDOUBL EXACTEMENT comme le
+ * contrôle de scan (résolution vers l'article final). Un article X dont la
+ * chaîne aboutit au NART T fait donc entrer son GENCOD dans l'ensemble de T.
+ * Permet d'exposer à l'opérateur « tous les gencodes possibles, y compris les
+ * gencodes associés par renvoi » (CDC §5/§8) — coût O(n) calculé une seule fois
+ * par analyse, en mémoire (aucun await par ligne).
+ */
+const construireGencodesParNart = (cacheEntry) => {
+  const map = new Map();
+  if (!cacheEntry || !Array.isArray(cacheEntry.records)) return map;
+  const { records, indexByNart } = cacheEntry;
+  const MAX = 10;
+
+  const nartTerminal = (startIdx) => {
+    let idx = startIdx;
+    let it = 0;
+    while (idx !== undefined && it < MAX) {
+      const rec = records[idx];
+      const gendoubl =
+        rec && rec.GENDOUBL ? String(rec.GENDOUBL).trim().toUpperCase() : "";
+      if (!gendoubl) break;
+      const next = indexByNart.get(gendoubl);
+      if (next === undefined) break;
+      idx = next;
+      it++;
+    }
+    return idx;
+  };
+
+  records.forEach((rec, idx) => {
+    const gencod = rec && rec.GENCOD ? String(rec.GENCOD).trim() : "";
+    if (!gencod) return;
+    const termIdx = nartTerminal(idx);
+    if (termIdx === undefined) return;
+    const term = String(records[termIdx]?.NART || "").trim().toUpperCase();
+    if (!term) return;
+    if (!map.has(term)) map.set(term, new Set());
+    map.get(term).add(gencod);
+  });
+
+  return map;
+};
+
+/**
  * Liste des proformas « à préparer » (ETAT = 2), paginée.
  * @returns proformas légères pour l'écran de sélection.
  */
@@ -108,6 +183,33 @@ export const getProformasAPreparer = async (entreprise, options = {}) => {
 
   // getPaginated renvoie généralement { data|proformas, pagination }. On mappe
   // défensivement quel que soit le nom du tableau.
+  const liste = res.proformas || res.data || res.records || res.items || [];
+  const proformas = liste.map((p) => ({
+    numfact: safeTrim(p.NUMFACT),
+    clientNom: safeTrim(p.NOM),
+    clientCode: p.TIERS != null && p.TIERS !== "" ? Number(p.TIERS) : null,
+    datfact: toDate(p.DATFACT),
+    etat: p.ETAT != null ? Number(p.ETAT) : null,
+    texte: safeTrim(p.TEXTE),
+  }));
+
+  return { pagination: res.pagination || null, proformas };
+};
+
+/**
+ * Liste des réservations / commandes spéciales « à préparer » : proformas dont
+ * l'état est INFÉRIEUR à 2 (ETAT <= 1), paginée (CDC §2).
+ * @returns proformas légères pour l'écran de sélection (même forme que ci-dessus).
+ */
+export const getReservationsAPreparer = async (entreprise, options = {}) => {
+  const { search = "", page = 1, limit = 100 } = options;
+  const res = await proformaCacheService.getPaginated(entreprise, {
+    search,
+    maxEtat: 1, // état < 2 (resa ou cde spéciale)
+    page,
+    limit,
+  });
+
   const liste = res.proformas || res.data || res.records || res.items || [];
   const proformas = liste.map((p) => ({
     numfact: safeTrim(p.NUMFACT),
@@ -157,8 +259,17 @@ export const analyserProforma = async (entreprise, numpro) => {
 
   const details = await proformaCacheService.getProdetByNumfact(entreprise, numfact);
 
-  // Fichier des gisements (tri magasin uniquement).
+  // Fichier des gisements (libellé rayon + sous-rayon + priorité de parcours).
   const { map: gisMap } = await gisementsService.getGisements(entreprise);
+
+  // Table { NART -> gencodes acceptables (renvois inclus) } construite une fois.
+  let gencodesParNart = new Map();
+  try {
+    const cacheEntry = await articleCacheService.getArticles(entreprise);
+    gencodesParNart = construireGencodesParNart(cacheEntry);
+  } catch {
+    /* base articles indisponible : on retombe sur le seul gencode principal */
+  }
 
   const lignes = [];
   for (const d of details) {
@@ -189,9 +300,17 @@ export const analyserProforma = async (entreprise, numpro) => {
     const qteDock = s2 > 0 ? Math.min(qteCommandee, s2) : 0;
     const qteMagasin = qteCommandee - qteDock;
 
-    // Gisement (Excel <TRIG>_gissement.xlsx : GISM1 -> libellé + priorité).
+    // Gisement (Excel <TRIG>_gissement.xlsx : GISM1 -> libellé + sous-rayon + priorité).
     const gis = lookupGisement(gisMap, gism1);
     const aGisement = !!(gism1 && gis);
+
+    // Tous les gencodes possibles (renvois inclus) + gencode principal en tête.
+    const setGencodes = gencodesParNart.get(nart.toUpperCase());
+    const gencodes = [];
+    if (gencod) gencodes.push(gencod);
+    if (setGencodes) {
+      for (const g of setGencodes) if (g && !gencodes.includes(g)) gencodes.push(g);
+    }
 
     lignes.push({
       nl: num(d.NL),
@@ -201,6 +320,7 @@ export const analyserProforma = async (entreprise, numpro) => {
       fourn,
       fournisseurNom: await resolveFournisseurNom(entreprise, fourn),
       gencod,
+      gencodes, // tous les gencodes possibles (renvois inclus) — CDC §5/§8
       gism1,
       pvttc: num(d.PVTTC),
       qteCommandee,
@@ -213,7 +333,7 @@ export const analyserProforma = async (entreprise, numpro) => {
       gencodeBipeDock: "",
       gencodeBipeMagasin: "",
       rayon: gis ? gis.libelle : "", // libellé du gisement affiché à l'opérateur
-      sousRayon: "",
+      sousRayon: gis && gis.sousRayon ? gis.sousRayon : "", // étagère (Excel gisements)
       priorite: gis ? gis.priorite : null,
       aGisement,
       ordreDock: null,
@@ -224,13 +344,8 @@ export const analyserProforma = async (entreprise, numpro) => {
     });
   }
 
-  // --- Ordonnancement DOCK : ordre de la proforma (NL croissant) ---
-  lignes
-    .filter((l) => l.qteDockAPreparer > 0)
-    .sort((a, b) => a.nl - b.nl)
-    .forEach((l, i) => {
-      l.ordreDock = i + 1;
-    });
+  // --- Ordonnancement DOCK : gisement (priorité) puis sans-gisement par NL ---
+  ordonnerDock(lignes);
 
   // --- Ordonnancement MAGASIN ---
   ordonnerMagasin(lignes);
@@ -239,7 +354,9 @@ export const analyserProforma = async (entreprise, numpro) => {
 };
 
 export default {
+  ordonnerDock,
   ordonnerMagasin,
   getProformasAPreparer,
+  getReservationsAPreparer,
   analyserProforma,
 };

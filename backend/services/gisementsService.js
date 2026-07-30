@@ -31,7 +31,7 @@ const normHeader = (v) =>
     .toUpperCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // accents
-    .replace(/[\s_]+/g, "");
+    .replace(/[\s_.\-]+/g, ""); // espaces, _, ., - (ex. "SOUS-RAYON" -> "SOUSRAYON")
 
 // Clé de gisement normalisée (pour le rapprochement avec GISM1).
 const normCode = (v) => safeTrim(v).toUpperCase();
@@ -89,6 +89,8 @@ const parseWorkbook = async (cheminFichier) => {
       colIdx.libelle = col; // normHeader retire les accents -> "LIBELLÉ" == "LIBELLE"
     else if (h === "PRIORITE" || h === "PRIO" || h === "ORDRE")
       colIdx.priorite = col;
+    else if (h === "SOUSRAYON" || h === "ETAGERE" || h === "SSRAYON")
+      colIdx.sousRayon = col; // étagère (CDC §4/5/8)
   });
 
   if (!colIdx.gisement) return map; // fichier non exploitable
@@ -100,10 +102,12 @@ const parseWorkbook = async (cheminFichier) => {
     const gisement = normCode(cellVal(colIdx.gisement));
     if (!gisement) return;
     const libelle = safeTrim(cellVal(colIdx.libelle));
+    const sousRayon = safeTrim(cellVal(colIdx.sousRayon));
     const prioriteRaw = safeTrim(cellVal(colIdx.priorite));
     const priorite = prioriteRaw === "" ? null : Number(prioriteRaw);
     map.set(gisement, {
       libelle,
+      sousRayon,
       priorite: Number.isFinite(priorite) ? priorite : null,
     });
   });

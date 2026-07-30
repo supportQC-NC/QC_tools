@@ -89,11 +89,9 @@ const EquipeModal = ({ team, onClose }) => {
       setError("Nom et entreprise sont requis");
       return;
     }
-    if (!isResponsable && !isEdit && !form.responsable) {
-      setError("Veuillez désigner un responsable");
-      return;
-    }
 
+    // Responsable optionnel pour un admin : s'il est laissé vide, le backend le
+    // désigne lui-même responsable de l'équipe.
     // Un responsable ne renseigne pas ce champ (le backend force = lui-même).
     const payload = {
       nom: form.nom,
@@ -164,25 +162,22 @@ const EquipeModal = ({ team, onClose }) => {
               crée toujours des équipes qu'il dirige lui-même. */}
           {!isResponsable && (
             <div className="form-group">
-              <label>Responsable</label>
+              <label>Responsable (optionnel)</label>
               <select
                 name="responsable"
                 value={form.responsable}
                 onChange={handleChange}
               >
-                <option value="">Sélectionner un responsable...</option>
+                <option value="">Moi-même (par défaut)</option>
                 {responsablesDispo.map((u) => (
                   <option key={u._id} value={u._id}>
                     {u.prenom} {u.nom} ({u.email})
                   </option>
                 ))}
               </select>
-              {responsablesDispo.length === 0 && (
-                <span className="label-hint">
-                  Aucun utilisateur « responsable » disponible — créez-en un
-                  d'abord.
-                </span>
-              )}
+              <span className="label-hint">
+                Laissez vide pour devenir vous-même responsable de l'équipe.
+              </span>
             </div>
           )}
 

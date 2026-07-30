@@ -33,6 +33,7 @@ const lignePrepaSchema = new mongoose.Schema(
     fourn: { type: Number, default: null },
     fournisseurNom: { type: String, default: "" },
     gencod: { type: String, default: "" }, // gencode principal (fiche article)
+    gencodes: { type: [String], default: [] }, // tous les gencodes possibles (renvois inclus) — CDC §5/§8
     gism1: { type: String, default: "" }, // gisement (fiche article, champ GISM1)
     pvttc: { type: Number, default: 0 }, // prix TTC (prodet.PVTTC) — aide à l'identification
 
@@ -58,7 +59,7 @@ const lignePrepaSchema = new mongoose.Schema(
     // Gisement (Excel <TRIG>_gissement.xlsx, lookup par GISM1 = GisementSTOCKXL) :
     //   rayon = LIBELLÉ affiché à l'opérateur ; priorite = ordre de parcours MAGASIN.
     rayon: { type: String, default: "" }, // libellé du gisement (affichage)
-    sousRayon: { type: String, default: "" }, // (non utilisé — conservé pour compat)
+    sousRayon: { type: String, default: "" }, // étagère (Excel gisements, colonne SOUS-RAYON)
     priorite: { type: Number, default: null },
     aGisement: { type: Boolean, default: false }, // GISM1 présent ET trouvé dans l'Excel
 
@@ -105,6 +106,13 @@ const preparationSchema = new mongoose.Schema(
     // Proforma préparée (proforma.NUMFACT).
     numpro: { type: String, required: true, trim: true },
 
+    // Origine de la sélection : proforma (ETAT 2) ou réservation (ETAT < 2).
+    type: {
+      type: String,
+      enum: ["proforma", "reservation"],
+      default: "proforma",
+    },
+
     // Snapshot de l'entête proforma.
     proformaInfo: {
       numfact: { type: String, default: "" },
@@ -131,6 +139,14 @@ const preparationSchema = new mongoose.Schema(
 
     commentaire: { type: String, default: "" },
 
+    // Colisage saisi en fin de préparation (CDC §12) : nombre de colis, de
+    // palettes et de longueurs. Sert à générer une feuille de colisage par unité.
+    colisage: {
+      nbColis: { type: Number, default: 0 },
+      nbPalettes: { type: Number, default: 0 },
+      nbLongueurs: { type: Number, default: 0 },
+    },
+
     // Rapport PDF (§11 du CDC).
     rapport: {
       fileName: { type: String, default: "" },
@@ -140,6 +156,16 @@ const preparationSchema = new mongoose.Schema(
       emailSentAt: { type: Date, default: null },
       emailError: { type: String, default: "" },
     },
+
+    // Feuilles de colisage générées (une par colis / palette / longueur) (§13).
+    feuillesColisage: [
+      {
+        libelle: { type: String, default: "" }, // ex. « Colis 1 / 3 »
+        fileName: { type: String, default: "" },
+        filePath: { type: String, default: "" },
+        generatedAt: { type: Date, default: null },
+      },
+    ],
 
     // Fichier de transfert de stock (dock) déposé dans collect_sec (§12).
     fichierTransfert: {

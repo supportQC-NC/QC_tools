@@ -18,8 +18,16 @@ import {
 import UserModal from "../../components/Admin/UserModal";
 import "./AdminUsersScreen.css";
 
+const ROLE_FILTERS = [
+  { key: "tous", label: "Tous" },
+  { key: "admin", label: "Admins" },
+  { key: "responsable", label: "Responsables" },
+  { key: "user", label: "Utilisateurs" },
+];
+
 const AdminUsers = () => {
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("tous");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
@@ -32,15 +40,21 @@ const AdminUsers = () => {
   const [toggleActive, { isLoading: isToggling }] =
     useToggleUserActiveMutation();
 
-  // Filtrer les utilisateurs
+  // Filtrer les utilisateurs (recherche texte + rôle)
   const filteredUsers = users?.filter((user) => {
     const searchLower = search.toLowerCase();
-    return (
+    const matchSearch =
       user.nom?.toLowerCase().includes(searchLower) ||
       user.prenom?.toLowerCase().includes(searchLower) ||
-      user.email?.toLowerCase().includes(searchLower)
-    );
+      user.email?.toLowerCase().includes(searchLower);
+    const matchRole = roleFilter === "tous" || user.role === roleFilter;
+    return matchSearch && matchRole;
   });
+
+  const roleCount = (key) =>
+    key === "tous"
+      ? users?.length || 0
+      : users?.filter((u) => u.role === key).length || 0;
 
   const handleCreate = () => {
     setSelectedUser(null);
@@ -124,6 +138,20 @@ const AdminUsers = () => {
           </span>
           <span className="stat-label">Admins</span>
         </div>
+      </div>
+
+      <div className="role-filter">
+        {ROLE_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            className={`role-filter-btn rf-${f.key} ${roleFilter === f.key ? "active" : ""}`}
+            onClick={() => setRoleFilter(f.key)}
+          >
+            {f.label}
+            <span className="rf-count">{roleCount(f.key)}</span>
+          </button>
+        ))}
       </div>
 
       <div className="admin-users-table-container">

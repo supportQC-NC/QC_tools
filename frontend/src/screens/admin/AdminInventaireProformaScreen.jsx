@@ -31,6 +31,7 @@ const AdminInventaireProformaScreen = () => {
   const [groupBy, setGroupBy] = useState("famille"); // famille | fournisseur
   const [seuil, setSeuil] = useState(""); // seuil écart valeur (XPF)
   const [docLoading, setDocLoading] = useState(false);
+  const [gisementLoading, setGisementLoading] = useState(false); // export gisement (xlsx)
   const [excluded, setExcluded] = useState(() => new Set()); // NUMFACT décochés
 
   // Export .DAT (mode inventaire proforma)
@@ -216,6 +217,51 @@ const AdminInventaireProformaScreen = () => {
       alert(e.message || "Impossible de générer la feuille de contrôle");
     } finally {
       setFicheLoading("");
+    }
+  };
+
+  // Export « gisement » (Excel) : une ligne par article des proformas du tiers.
+  const genererGisement = async () => {
+    if (!nomDossierDBF || !tiers) return;
+    const selected = groupes
+      .map((g) => g.numfact)
+      .filter((nf) => !excluded.has(nf));
+    if (selected.length === 0) {
+      alert("Sélectionnez au moins une proforma.");
+      return;
+    }
+    setGisementLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateDebut) params.set("dateDebut", dateDebut);
+      // N'envoyer la liste que si certaines proformas sont décochées
+      if (selected.length < groupes.length)
+        params.set("numfacts", selected.join(","));
+      const url = `${BASE_URL}/api/inventaire-proforma/${nomDossierDBF}/tiers/${tiers}/export-gisement?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        let msg = `Génération échouée (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = j.message;
+        } catch {
+          /* réponse non-JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `export_gisement_${tiers}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (e) {
+      alert(e.message || "Impossible de générer l'export gisement");
+    } finally {
+      setGisementLoading(false);
     }
   };
 
@@ -416,6 +462,16 @@ const AdminInventaireProformaScreen = () => {
               title="Document d'inventaire (Excel)"
             >
               <HiTable /> {docLoading ? "Génération…" : "Excel"}
+            </button>
+            <button
+              type="button"
+              className="btn-excel"
+              onClick={genererGisement}
+              disabled={gisementLoading}
+              title="Export gisement (Excel) — une ligne par article : NUMFACT, date, NART, désignation, fournisseur, observation, localisation"
+            >
+              <HiDownload />{" "}
+              {gisementLoading ? "Génération…" : "Export gisement"}
             </button>
           </div>
 

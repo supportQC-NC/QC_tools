@@ -1385,6 +1385,187 @@ const exportProformaDat = asyncHandler(async (req, res) => {
   return res.send(zip);
 });
 
+/**
+ * @desc    Export « gisement » (Excel) : UNE LIGNE PAR ARTICLE des proformas du
+ *          tiers. Colonnes : NUMFACT (prodet), date proforma (DATFACT), NART,
+ *          DÉSIGNATION (prodet), FOURN (article), nom FOURNISSEUR (fourniss.dbf),
+ *          OBSERVATION (proforma.TEXTE), LOCALISATION (zone S1..S5 de la proforma).
+ *          Respecte le filtre date (dateDebut/dateFin) et la sélection (numfacts).
+ * @route   GET /api/inventaire-proforma/:nomDossierDBF/tiers/:tiers/export-gisement
+ * @access  Private/Admin
+ */
+const exportGisement = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const tiers = safeTrim(req.params.tiers);
+  if (!tiers) {
+    res.status(400);
+    throw new Error("N° de tiers requis");
+  }
+
+  const chk = checkFiles(entreprise);
+  if (!chk.ok) {
+    res.status(404);
+    throw new Error(chk.error);
+  }
+
+  const cache = await proformaCacheService.getProformas(entreprise);
+  const matchTiers = makeTiersMatcher(tiers);
+  const dDeb = inputDate(req.query.dateDebut);
+  const dFin = inputDate(req.query.dateFin);
+  if (dFin) dFin.setHours(23, 59, 59, 999);
+
+  // Sélection de proformas (cases cochées). Absent => toutes.
+  const selParam = safeTrim(req.query.numfacts);
+  const selected = selParam
+    ? new Set(selParam.split(",").map((x) => safeTrim(x)).filter(Boolean))
+    : null;
+
+  // 1) Entêtes du tiers → NUMFACT + date (DATFACT) + observation (TEXTE)
+  const headerByNumfact = new Map();
+  for (const h of cache.proformaRecords) {
+    if (!matchTiers(h.TIERS)) continue;
+    if (dDeb || dFin) {
+      const df = recDate(h.DATFACT);
+      if (dDeb && (!df || df < dDeb)) continue;
+      if (dFin && (!df || df > dFin)) continue;
+    }
+    const nf = safeTrim(h.NUMFACT);
+    if (!nf || (selected && !selected.has(nf))) continue;
+    if (!headerByNumfact.has(nf)) {
+      headerByNumfact.set(nf, {
+        date: recDate(h.DATFACT),
+        texte: safeTrim(h.TEXTE),
+      });
+    }
+  }
+  const numfacts = [...headerByNumfact.keys()].sort((a, b) =>
+    a.localeCompare(b, "fr"),
+  );
+  if (numfacts.length === 0) {
+    res.status(404);
+    throw new Error("Aucune proforma pour ce tiers / cette période");
+  }
+
+  // 2) Zone (localisation) par proforma — défaut S1.
+  const zonesAff = await ProformaZone.find({
+    entreprise: entreprise._id,
+    numfact: { $in: numfacts },
+  }).lean();
+  const zoneByNumfact = new Map(zonesAff.map((z) => [z.numfact, z.zone]));
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+
+  // Résolution du nom fournisseur (fourniss.dbf, lié par FOURN), mise en cache.
+  const nomFournByCode = new Map();
+  const resolveNomFourn = async (code) => {
+    const key = safeTrim(code);
+    if (key === "") return "";
+    if (nomFournByCode.has(key)) return nomFournByCode.get(key);
+    let nom = "";
+    try {
+      const f = await fournissCacheService.findByFourn(entreprise, key);
+      if (f) nom = safeTrim(f.NOM);
+    } catch {
+      nom = "";
+    }
+    nomFournByCode.set(key, nom);
+    return nom;
+  };
+
+  // 3) Une ligne par article (lignes commentaire exclues). FOURN vient de
+  //    l'article (article.dbf), résolu par NART.
+  const rows = [];
+  for (const nf of numfacts) {
+    const hdr = headerByNumfact.get(nf);
+    const localisation = zoneByNumfact.get(nf) || ZONE_DEFAUT;
+    const raw = [...(cache.prodetByNumfact.get(nf) || [])].sort(
+      (a, b) => toNum(a.NL) - toNum(b.NL),
+    );
+    for (const r of raw) {
+      const nart = safeTrim(r.NART);
+      if (isComment(nart) || !nart) continue;
+
+      let fourn = "";
+      try {
+        const art = await articleCacheService.findByNart(entreprise, nart);
+        if (art) {
+          fourn =
+            art.FOURNISS !== undefined && art.FOURNISS !== null
+              ? safeTrim(art.FOURNISS)
+              : safeTrim(art.FOURN);
+        }
+      } catch {
+        fourn = "";
+      }
+      const fournNom = await resolveNomFourn(fourn);
+
+      rows.push({
+        numfact: nf,
+        date: hdr.date,
+        nart,
+        design: safeTrim(r.DESIGN),
+        fourn,
+        fournNom,
+        observation: hdr.texte,
+        localisation,
+      });
+    }
+  }
+
+  if (rows.length === 0) {
+    res.status(404);
+    throw new Error("Aucun article à exporter pour ce tiers / cette période");
+  }
+
+  // 4) Génération Excel
+  const ExcelMod = await import("exceljs").catch(() => {
+    throw new Error("Module 'exceljs' introuvable. Lancez : npm i exceljs");
+  });
+  const ExcelJS = ExcelMod.default;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Gisement");
+
+  ws.columns = [
+    { header: "NUMFACT", key: "numfact", width: 12 },
+    { header: "Date proforma", key: "date", width: 14 },
+    { header: "NART", key: "nart", width: 12 },
+    { header: "Désignation", key: "design", width: 42 },
+    { header: "Fourn.", key: "fourn", width: 10 },
+    { header: "Fournisseur", key: "fournNom", width: 30 },
+    { header: "Observation", key: "observation", width: 32 },
+    { header: "Localisation", key: "localisation", width: 14 },
+  ];
+
+  const hr = ws.getRow(1);
+  hr.eachCell((c) => {
+    c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF333333" } };
+    c.alignment = { horizontal: "left" };
+  });
+
+  for (const r of rows) {
+    const row = ws.addRow(r);
+    const dcell = row.getCell("date");
+    if (r.date instanceof Date) {
+      dcell.value = r.date;
+      dcell.numFmt = "dd/mm/yyyy";
+    } else {
+      dcell.value = "";
+    }
+  }
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="export_gisement_${tiers}.xlsx"`,
+  );
+  await wb.xlsx.write(res);
+  res.end();
+});
+
 export {
   getTiers,
   getByTiers,
@@ -1392,4 +1573,5 @@ export {
   genererInventaireDoc,
   setProformaZone,
   exportProformaDat,
+  exportGisement,
 };

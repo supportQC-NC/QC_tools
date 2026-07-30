@@ -370,3 +370,151 @@
     position: static;
   }
 }
+/* ═══════════ Tableau de bord personnalisé (KPI + activité + tâches) ═══════════ */
+.ud-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin: 26px 0 12px;
+}
+
+/* KPI cards */
+.ud-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.ud-kpi {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.ud-kpi:hover {
+  border-color: var(--accent, #4da6ff);
+  transform: translateY(-2px);
+}
+.ud-kpi-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+.ud-kpi-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ud-kpi-value {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+.ud-kpi-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.ud-kpi-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.ud-kpi-alert {
+  color: #f87171;
+  font-weight: 700;
+}
+
+/* Panneaux activité + tâches */
+.ud-panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.ud-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.ud-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+.ud-tasks-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ud-task-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+}
+.ud-task-stat b {
+  margin-left: auto;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+.ud-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ud-dot-blue {
+  background: #3b82f6;
+}
+.ud-dot-amber {
+  background: #f59e0b;
+}
+.ud-dot-gray {
+  background: #6b7280;
+}
+.ud-task-late {
+  color: #f87171;
+}
+.ud-task-late svg {
+  color: #f87171;
+}
+.ud-task-done {
+  color: #34d399;
+}
+.ud-task-done svg {
+  color: #34d399;
+}
+.ud-task-link {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent, #4da6ff);
+  text-decoration: none;
+}
+.ud-task-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .ud-panels {
+    grid-template-columns: 1fr;
+  }
+}

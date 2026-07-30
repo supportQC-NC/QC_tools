@@ -16,6 +16,7 @@ import {
   HiSparkles,
   HiExclamationCircle,
   HiCube,
+  HiCurrencyDollar,
 } from "react-icons/hi";
 import {
   BarChart,
@@ -35,8 +36,11 @@ import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetGlobalDashboardQuery,
   useGetEntrepriseDashboardQuery,
+  useGetCaDashboardQuery,
+  useGetCaComparaisonQuery,
 } from "../../slices/dashboardApiSlice";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
+import { hasModuleAccess } from "../../config/adminModules";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminDashboardScreen.css";
 
@@ -111,6 +115,19 @@ const AdminDashboard = () => {
   const { data: entrepriseData, isFetching: loadingEntreprise } =
     useGetEntrepriseDashboardQuery(dossier, { skip: !dossier });
 
+  // CA / meilleures ventes (snapshot) — RÉSERVÉ aux users ayant l'analyse CA.
+  const { userInfo } = useSelector((state) => state.auth);
+  const canCa = hasModuleAccess(userInfo, "analyse_ca_admin", "read");
+  const { data: ca } = useGetCaDashboardQuery(dossier, {
+    skip: !dossier || !canCa,
+  });
+  const { data: caComp } = useGetCaComparaisonQuery(undefined, { skip: !canCa });
+  const caCompRows = (caComp?.societes || []).filter(
+    (s) => s.dispo && s.caTotal > 0,
+  );
+  const caCompData = caCompRows.map((s) => ({ name: s.trigramme, ca: s.caTotal }));
+  const caCompTotal = caCompRows.reduce((sum, s) => sum + s.caTotal, 0);
+
   const rec = global?.receptions || {};
   const activite = global?.activite || [];
 
@@ -176,6 +193,9 @@ const AdminDashboard = () => {
               </span>
             </div>
           </div>
+          <Link to="/admin/suivi-receptions" className="stat-card-link">
+            <HiArrowRight />
+          </Link>
         </div>
 
         <div className="stat-card stat-card-entreprises">
@@ -206,6 +226,9 @@ const AdminDashboard = () => {
               <span className="stat-detail">en réception</span>
             </div>
           </div>
+          <Link to="/admin/suivi-receptions" className="stat-card-link">
+            <HiArrowRight />
+          </Link>
         </div>
 
         <div className="stat-card stat-card-users">
@@ -248,6 +271,69 @@ const AdminDashboard = () => {
           </Link>
         </div>
       </div>
+
+      {/* ===== Comparaison CA inter-sociétés (réservé à l'analyse CA) ===== */}
+      {canCa && caCompData.length > 0 && (
+        <div className="chart-card ca-compare-card">
+          <div className="chart-card-header">
+            <h3>
+              <HiCurrencyDollar /> Comparaison du CA par société (12 mois)
+            </h3>
+            <span className="ca-compare-total">
+              Groupe : {fmtInt(caCompTotal)} XPF
+            </span>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer
+              width="100%"
+              height={Math.max(220, caCompData.length * 30)}
+            >
+              <BarChart data={caCompData} layout="vertical" margin={{ left: 6, right: 24 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  type="number"
+                  stroke="var(--text-muted)"
+                  fontSize={10}
+                  tickFormatter={(v) => fmtInt(v)}
+                />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  stroke="var(--text-muted)"
+                  fontSize={11}
+                  width={56}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="ca" name="CA (XPF)" fill={COLORS.success} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {caComp?.societes?.some((s) => !s.dispo || s.caTotal < 0) && (
+            <div className="ca-compare-note">
+              {caComp.societes.filter((s) => !s.dispo).length > 0 && (
+                <>
+                  Données en préparation :{" "}
+                  {caComp.societes
+                    .filter((s) => !s.dispo)
+                    .map((s) => s.trigramme)
+                    .join(", ")}
+                  .{" "}
+                </>
+              )}
+              {caComp.societes.some((s) => s.caTotal < 0) && (
+                <>
+                  ⚠ Anomalie CA (à vérifier) :{" "}
+                  {caComp.societes
+                    .filter((s) => s.caTotal < 0)
+                    .map((s) => s.trigramme)
+                    .join(", ")}
+                  .
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ===================== Activité + sessions ===================== */}
       <div className="dashboard-main">
@@ -386,6 +472,62 @@ const AdminDashboard = () => {
               <span className="kpi-mini-label"><HiCube /> Articles</span>
             </div>
           </div>
+
+          {/* ===== CA / meilleures ventes (réservé à l'analyse CA) ===== */}
+          {canCa && ca?.available && (
+            <div className="ca-section">
+              <div className="ca-banner">
+                <div className="ca-banner-main">
+                  <span className="ca-banner-label">
+                    <HiCurrencyDollar /> Chiffre d'affaires (12 mois)
+                  </span>
+                  <span className="ca-banner-value">
+                    {fmtInt(ca.caTotal)} <small>XPF</small>
+                  </span>
+                  <span className="ca-banner-sub">
+                    {ca.debut} → {ca.fin} · à jour du {fmtDate(ca.computedAt)}
+                  </span>
+                </div>
+                <div className="ca-banner-stats">
+                  <div className="ca-stat">
+                    <span className="ca-stat-v">{fmtInt(ca.nbFactures)}</span>
+                    <span className="ca-stat-l">Factures</span>
+                  </div>
+                  <div className="ca-stat">
+                    <span className="ca-stat-v">{fmtInt(ca.nbReferences)}</span>
+                    <span className="ca-stat-l">Réf. vendues</span>
+                  </div>
+                  <div className="ca-stat">
+                    <span className="ca-stat-v">{fmtInt(ca.quantiteTotale)}</span>
+                    <span className="ca-stat-l">Quantité</span>
+                  </div>
+                </div>
+              </div>
+              <div className="top-list-card">
+                <h3>
+                  <HiTrendingUp /> Meilleures ventes par CA (12 mois)
+                </h3>
+                <div className="top-list">
+                  {(ca.topVentes || []).map((v, i) => (
+                    <div key={v.nart || i} className="top-list-item">
+                      <span className="top-list-rank">{i + 1}</span>
+                      <span className="top-list-name">
+                        {(v.design || v.nart || "").slice(0, 34)}
+                        <span className="top-list-sub"> · {v.nart}</span>
+                      </span>
+                      <span className="top-list-value">{fmtInt(v.ca)} XPF</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {canCa && ca && !ca.available && (
+            <div className="chart-empty ca-pending">
+              <HiCurrencyDollar />
+              <p>Analyse CA en cours de préparation (calcul nocturne).</p>
+            </div>
+          )}
 
           <div className="charts-row">
             {/* Commandes par état */}

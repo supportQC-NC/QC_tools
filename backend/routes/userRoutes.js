@@ -6,6 +6,7 @@ import {
   logoutUser,
   getUserProfile,
   updateUserProfile,
+  changePassword,
   forgotPassword,
   resetPassword,
   createUser,
@@ -49,6 +50,8 @@ router.put("/reset-password/:token", resetPassword);
 router.post("/logout", protect, logoutUser);
 router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, updateUserProfile);
+// Changement de mot de passe (self) — AVANT /:id pour ne pas être capté par :id.
+router.put("/profile/password", protect, changePassword);
 // Photo de profil (self) — AVANT /:id pour ne pas être capté par :id.
 router.post("/profile/photo", protect, uploadPhoto, uploadProfilePhoto);
 router.delete("/profile/photo", protect, deleteProfilePhoto);

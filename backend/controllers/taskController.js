@@ -280,6 +280,8 @@ const updateTask = asyncHandler(async (req, res) => {
 
   // Réassignation : uniquement pour les tâches d'ÉQUIPE ; les assignés doivent
   // être membres de l'équipe. Accepte `assignes` (tableau) ou `assigneA` (mono).
+  // On mémorise les assignés AJOUTÉS pour les notifier après sauvegarde.
+  let newlyAssigned = [];
   if (task.type !== "perso" && (req.body.assignes || req.body.assigneA)) {
     const nouveaux = Array.isArray(req.body.assignes)
       ? req.body.assignes
@@ -296,6 +298,8 @@ const updateTask = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error("Les assignés doivent être des membres de l'équipe");
     }
+    const anciens = new Set((task.assignes || []).map((a) => String(a)));
+    newlyAssigned = nouveaux.filter((a) => !anciens.has(String(a)));
     task.assignes = nouveaux;
   }
 
@@ -308,6 +312,17 @@ const updateTask = asyncHandler(async (req, res) => {
   }
 
   await task.save();
+
+  // Notification « nouvelle tâche » aux assignés AJOUTÉS lors de cette mise à
+  // jour (hors l'acteur), sur leur salon personnel → badge + bandeau bureau.
+  const io = req.app.get("io");
+  if (io) {
+    for (const a of newlyAssigned) {
+      if (String(a) === String(req.user._id)) continue;
+      io.to(`user:${a}`).emit("notif:task", { taskId: task._id });
+    }
+  }
+
   res.json(await populateTask(Task.findById(task._id)));
 });
 

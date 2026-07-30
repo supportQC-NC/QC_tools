@@ -243,7 +243,9 @@ class FactureCacheService {
       console.log(`[FactureCache] Filtrage : années ${minYear} à ${currentYear}`);
 
       // ========== PHASE 1 : Charger et filtrer les entêtes facture.dbf ==========
-      const factureDbf = await DBFFile.open(factureDbfPath);
+      // readMode:"loose" : tolère les entêtes DBF non conformes (ex. noms de
+      // champs dupliqués comme chez WEL/PB — sinon dbffile lève une exception).
+      const factureDbf = await DBFFile.open(factureDbfPath, { readMode: "loose" });
       const totalFacturesInFile = factureDbf.recordCount;
       console.log(`[FactureCache] facture.dbf : ${totalFacturesInFile} records total, lecture...`);
 
@@ -268,7 +270,7 @@ class FactureCacheService {
       allFactureRecords.length = 0;
 
       // ========== PHASE 2 : Charger et filtrer les détails detail.dbf ==========
-      const detailDbf = await DBFFile.open(detailDbfPath);
+      const detailDbf = await DBFFile.open(detailDbfPath, { readMode: "loose" });
       const totalDetailsInFile = detailDbf.recordCount;
       console.log(`[FactureCache] detail.dbf : ${totalDetailsInFile} records total, lecture...`);
 

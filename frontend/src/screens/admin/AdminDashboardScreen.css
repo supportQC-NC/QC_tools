@@ -494,3 +494,100 @@
     font-size: 1.4rem;
   }
 }
+/* ═══════════ Section CA / meilleures ventes (analyse CA) ═══════════ */
+.ca-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.ca-banner {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #0e9f6e 0%, #047857 100%);
+  box-shadow: 0 8px 24px rgba(4, 120, 87, 0.35);
+}
+.ca-banner-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.92;
+}
+.ca-banner-value {
+  display: block;
+  font-size: 2.3rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: 6px;
+}
+.ca-banner-value small {
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.ca-banner-sub {
+  display: block;
+  font-size: 0.74rem;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+.ca-banner-stats {
+  display: flex;
+  gap: 22px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+.ca-stat {
+  display: flex;
+  flex-direction: column;
+}
+.ca-stat-v {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.ca-stat-l {
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+.ca-pending {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .ca-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════ Comparaison CA inter-sociétés ═══════════ */
+.ca-compare-card {
+  margin-bottom: 16px;
+}
+.ca-compare-total {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #34d399;
+}
+.ca-compare-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Carte stat cliquable : léger indice au survol. */
+.stat-card {
+  transition: border-color 0.15s, transform 0.1s;
+}
+.stat-card:has(.stat-card-link):hover {
+  border-color: var(--accent, #4da6ff);
+  transform: translateY(-2px);
+}

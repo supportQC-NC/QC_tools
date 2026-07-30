@@ -21,7 +21,26 @@ import {
   HiUserCircle,
   HiFolder,
 } from "react-icons/hi";
+import {
+  HiClipboardCheck,
+  HiExclamationCircle,
+  HiTrendingUp,
+  HiInboxIn,
+  HiClock,
+  HiCheckCircle,
+} from "react-icons/hi";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import MesTachesWidget from "../../components/user/MesTachesWidget";
+import { useGetMyDashboardQuery } from "../../slices/dashboardApiSlice";
+import { hasModuleAccess } from "../../config/adminModules";
 import "./UserdashboardScreen.css";
 
 // ─── Config des modules USER (clé permission → label, route, icône, couleur) ──
@@ -229,6 +248,61 @@ const UserDashboard = () => {
 
   const modules = isAdmin ? ADMIN_MODULES : getUserModules();
 
+  // ── Données personnalisées (KPI + activité) ──
+  const { data: dash } = useGetMyDashboardQuery();
+  const has = (key) => hasModuleAccess(userInfo, key, "read");
+  const t = dash?.taches || {};
+  const s = dash?.sessions || {};
+
+  // Tuiles KPI selon les accès de l'utilisateur.
+  const kpis = [
+    {
+      key: "taches",
+      label: "Mes tâches actives",
+      value: t.total ?? 0,
+      sub: `${t.aFaire ?? 0} à faire`,
+      alert: t.enRetard > 0 ? `${t.enRetard} en retard` : null,
+      icon: HiClipboardCheck,
+      color: "#6366f1",
+      bg: "rgba(99,102,241,.14)",
+      route: "/mes-taches",
+    },
+  ];
+  if (has("inventaire"))
+    kpis.push({
+      key: "inv",
+      label: "Inventaires en cours",
+      value: s.inventaires ?? 0,
+      icon: HiClipboardList,
+      color: "#06b6d4",
+      bg: "rgba(6,182,212,.14)",
+      route: "/inventaire",
+    });
+  if (has("releve"))
+    kpis.push({
+      key: "rel",
+      label: "Relevés en cours",
+      value: s.releves ?? 0,
+      icon: HiDocumentReport,
+      color: "#a855f7",
+      bg: "rgba(168,85,247,.14)",
+      route: "/releve",
+    });
+  if (has("reapro"))
+    kpis.push({
+      key: "rea",
+      label: "Réappros en cours",
+      value: s.reappros ?? 0,
+      icon: HiRefresh,
+      color: "#22c55e",
+      bg: "rgba(34,197,94,.14)",
+      route: "/reappro",
+    });
+
+  const showActivity =
+    has("inventaire") || has("releve") || has("reception") || has("allModules");
+  const activite = dash?.activite || [];
+
   const dateStr = now.toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
@@ -258,7 +332,97 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      {/* Grille des modules */}
+      {/* KPI personnalisés */}
+      {kpis.length > 0 && (
+        <div className="ud-kpis">
+          {kpis.map((k) => {
+            const Icon = k.icon;
+            return (
+              <Link to={k.route} key={k.key} className="ud-kpi">
+                <div
+                  className="ud-kpi-icon"
+                  style={{ background: k.bg, color: k.color }}
+                >
+                  <Icon />
+                </div>
+                <div className="ud-kpi-body">
+                  <span className="ud-kpi-value">{k.value}</span>
+                  <span className="ud-kpi-label">{k.label}</span>
+                  <span className="ud-kpi-sub">
+                    {k.sub || " "}
+                    {k.alert && <span className="ud-kpi-alert"> · {k.alert}</span>}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Panneaux : activité + tâches par statut */}
+      <div className="ud-panels">
+        {showActivity && (
+          <div className="ud-panel ud-panel-chart">
+            <h3>
+              <HiTrendingUp /> Mon activité (14 jours)
+            </h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={activite}>
+                <defs>
+                  <linearGradient id="udInv" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="udRel" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="udRec" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4da6ff" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#4da6ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="jour" stroke="var(--text-muted)" fontSize={10} />
+                <YAxis stroke="var(--text-muted)" fontSize={10} allowDecimals={false} />
+                <Tooltip />
+                <Area type="monotone" dataKey="inventaires" name="Inventaires" stroke="#06b6d4" fill="url(#udInv)" strokeWidth={2} />
+                <Area type="monotone" dataKey="releves" name="Relevés" stroke="#a855f7" fill="url(#udRel)" strokeWidth={2} />
+                <Area type="monotone" dataKey="receptions" name="Réceptions" stroke="#4da6ff" fill="url(#udRec)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <div className="ud-panel ud-tasks-panel">
+          <h3>
+            <HiClipboardCheck /> Mes tâches
+          </h3>
+          <div className="ud-task-stat">
+            <span className="ud-dot ud-dot-blue" /> À faire <b>{t.aFaire ?? 0}</b>
+          </div>
+          <div className="ud-task-stat">
+            <span className="ud-dot ud-dot-amber" /> En cours <b>{t.enCours ?? 0}</b>
+          </div>
+          <div className="ud-task-stat">
+            <span className="ud-dot ud-dot-gray" /> Bloquées <b>{t.bloque ?? 0}</b>
+          </div>
+          <div className="ud-task-stat ud-task-late">
+            <HiExclamationCircle /> En retard <b>{t.enRetard ?? 0}</b>
+          </div>
+          <div className="ud-task-stat ud-task-done">
+            <HiCheckCircle /> Terminées (7 j) <b>{t.termine7j ?? 0}</b>
+          </div>
+          <Link to="/mes-taches" className="ud-task-link">
+            Voir mes tâches →
+          </Link>
+        </div>
+      </div>
+
+      {/* Accès rapides */}
+      {modules.length > 0 && (
+        <h2 className="ud-section-title">Accès rapides</h2>
+      )}
       {modules.length > 0 ? (
         <div className="ud-grid">
           {modules.map((mod) => {

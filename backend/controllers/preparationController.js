@@ -89,6 +89,32 @@ const getProformasAPreparer = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Liste des réservations / commandes spéciales à préparer (ETAT < 2).
+ * @route   GET /api/preparations/reservations/:nomDossierDBF
+ * @query   search, page, limit
+ * @access  Private (prep_commande, read)
+ */
+const getReservationsAPreparer = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const search = safeTrim(req.query.search);
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 100;
+
+  const { pagination, proformas } =
+    await preparationService.getReservationsAPreparer(entreprise, {
+      search,
+      page,
+      limit,
+    });
+
+  res.json({
+    entreprise: formatEntreprise(entreprise),
+    pagination,
+    proformas,
+  });
+});
+
 // ===========================================
 // SESSIONS
 // ===========================================
@@ -137,11 +163,16 @@ const createPreparation = asyncHandler(async (req, res) => {
     throw new Error("Proforma sans article à préparer");
   }
 
+  // Origine : réservation si l'état de la proforma est < 2, sinon proforma.
+  const etat = analyse.proformaInfo?.etat;
+  const type = etat != null && etat < 2 ? "reservation" : "proforma";
+
   const preparation = await Preparation.create({
     entreprise: entrepriseId,
     nomDossierDBF: entreprise.nomDossierDBF,
     user: req.user._id,
     numpro: numproTrim,
+    type,
     proformaInfo: analyse.proformaInfo,
     lignes: analyse.lignes,
     phase: "dock",
@@ -499,6 +530,27 @@ const updateCommentaire = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Enregistre / met à jour le colisage (nb colis / palettes / longueurs).
+ * @route   PUT /api/preparations/:id/colisage
+ * @body    { nbColis, nbPalettes, nbLongueurs }
+ * @access  Private (prep_commande, write)
+ */
+const updateColisage = asyncHandler(async (req, res) => {
+  const prep = await loadPreparationOwned(req.params.id, req, res);
+  const toInt = (v) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  prep.colisage = {
+    nbColis: toInt(req.body.nbColis),
+    nbPalettes: toInt(req.body.nbPalettes),
+    nbLongueurs: toInt(req.body.nbLongueurs),
+  };
+  await prep.save();
+  res.json(prep);
+});
+
+/**
  * @desc    Générer les sorties de fin de préparation : PDF (-> prepa_cmd) + email
  *          + fichier de transfert dock (-> collect_sec). Clôture la préparation.
  * @route   POST /api/preparations/:id/generer-rapport
@@ -548,6 +600,12 @@ const genererRapport = asyncHandler(async (req, res) => {
     filePath: sorties.transfert.filePath || "",
     generatedAt: new Date(),
   };
+  prep.feuillesColisage = (sorties.colisage?.feuilles || []).map((f) => ({
+    libelle: f.libelle,
+    fileName: f.fileName,
+    filePath: f.filePath,
+    generatedAt: f.generatedAt || new Date(),
+  }));
   await prep.save();
 
   res.json({
@@ -557,6 +615,7 @@ const genererRapport = asyncHandler(async (req, res) => {
     preparation: prep,
     rapport: sorties.rapport,
     transfert: sorties.transfert,
+    colisage: sorties.colisage,
   });
 });
 
@@ -574,6 +633,7 @@ const deletePreparation = asyncHandler(async (req, res) => {
 export {
   // Sélection
   getProformasAPreparer,
+  getReservationsAPreparer,
   // Sessions
   createPreparation,
   getPreparationsEnCours,
@@ -588,8 +648,9 @@ export {
   terminerPreparation,
   getControleFinal,
   traiterControleFinal,
-  // Commentaire / suppression
+  // Commentaire / colisage / suppression
   updateCommentaire,
+  updateColisage,
   genererRapport,
   deletePreparation,
 };

@@ -3,6 +3,7 @@ import express from "express";
 import {
   // Sélection
   getProformasAPreparer,
+  getReservationsAPreparer,
   // Sessions
   createPreparation,
   getPreparationsEnCours,
@@ -17,8 +18,9 @@ import {
   terminerPreparation,
   getControleFinal,
   traiterControleFinal,
-  // Commentaire / suppression
+  // Commentaire / colisage / suppression
   updateCommentaire,
+  updateColisage,
   genererRapport,
   deletePreparation,
 } from "../controllers/preparationController.js";
@@ -51,6 +53,17 @@ router.get(
   checkEntrepriseAccess,
   checkModuleAccess("prep_commande", "read"),
   getProformasAPreparer,
+);
+
+// ==========================================
+// SÉLECTION — réservations à préparer (ETAT < 2)
+// ==========================================
+router.get(
+  "/reservations/:nomDossierDBF",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("prep_commande", "read"),
+  getReservationsAPreparer,
 );
 
 // ==========================================
@@ -131,6 +144,14 @@ router.put(
   protect,
   checkModuleAccess("prep_commande", "write"),
   updateCommentaire,
+);
+
+// Colisage (nb colis / palettes / longueurs)
+router.put(
+  "/:id/colisage",
+  protect,
+  checkModuleAccess("prep_commande", "write"),
+  updateColisage,
 );
 
 // Génération des sorties (PDF + email + fichier transfert) -> clôture

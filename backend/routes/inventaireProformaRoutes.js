@@ -7,6 +7,7 @@ import {
   genererInventaireDoc,
   setProformaZone,
   exportProformaDat,
+  exportGisement,
 } from "../controllers/inventaireProformaController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -38,6 +39,15 @@ router.get(
   canRead,
   checkEntrepriseAccess,
   genererInventaireDoc,
+);
+
+// Export « gisement » (Excel) : une ligne par article des proformas du tiers
+router.get(
+  "/:nomDossierDBF/tiers/:tiers/export-gisement",
+  protect,
+  canRead,
+  checkEntrepriseAccess,
+  exportGisement,
 );
 
 // Affecter une proforma à une zone/entrepôt (S1..S5)

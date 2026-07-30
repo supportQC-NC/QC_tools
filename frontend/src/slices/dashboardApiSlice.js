@@ -13,10 +13,25 @@ export const dashboardApiSlice = apiSlice.injectEndpoints({
     getEntrepriseDashboard: builder.query({
       query: (nomDossierDBF) => `${DASHBOARD_URL}/entreprise/${nomDossierDBF}`,
     }),
+    // Mon tableau de bord personnel (tout utilisateur connecté)
+    getMyDashboard: builder.query({
+      query: () => `${DASHBOARD_URL}/me`,
+    }),
+    // CA / meilleures ventes (snapshot) — réservé à l'analyse CA
+    getCaDashboard: builder.query({
+      query: (nomDossierDBF) => `${DASHBOARD_URL}/ca/${nomDossierDBF}`,
+    }),
+    // Comparaison CA entre sociétés — réservé à l'analyse CA
+    getCaComparaison: builder.query({
+      query: () => `${DASHBOARD_URL}/ca-comparaison`,
+    }),
   }),
 });
 
 export const {
   useGetGlobalDashboardQuery,
   useGetEntrepriseDashboardQuery,
+  useGetMyDashboardQuery,
+  useGetCaDashboardQuery,
+  useGetCaComparaisonQuery,
 } = dashboardApiSlice;

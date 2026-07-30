@@ -11,6 +11,8 @@ import Reception from "../models/ReceptionModel.js";
 import Inventaire from "../models/InventaireModel.js";
 import Releve from "../models/ReleveModel.js";
 import Reappro from "../models/ReaproModel.js";
+import Task from "../models/TaskModel.js";
+import AiSalesSnapshot from "../models/AiSalesSnapshotModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import commandeCacheService from "../services/commandeService.js";
 import articleCacheService from "../services/articleService.js";
@@ -322,4 +324,166 @@ export const getEntrepriseStats = asyncHandler(async (req, res) => {
   });
 });
 
-export default { getGlobalStats, getEntrepriseStats };
+// ===========================================================================
+// PERSONNEL (« mon » tableau de bord) — accessible à TOUT utilisateur connecté.
+// Données scopées à SES sociétés (getAccessibleEntreprises) et à SES tâches.
+// GET /api/dashboard/me
+// ===========================================================================
+export const getMyDashboard = asyncHandler(async (req, res) => {
+  const me = req.user._id;
+  const access = await getAccessibleEntreprises(req.user);
+  const entFilter = access.all ? {} : { entreprise: { $in: access.ids } };
+  const now = new Date();
+  const since7 = new Date(now);
+  since7.setDate(now.getDate() - 7);
+
+  // --- Mes tâches (assignées à moi OU créées par moi) ---
+  const mine = { $or: [{ assignes: me }, { creePar: me }] };
+  const actives = { ...mine, archive: { $ne: true } };
+  const [aFaire, enCoursT, bloque, enRetard, termine7j] = await Promise.all([
+    Task.countDocuments({ ...actives, statut: "a_faire" }),
+    Task.countDocuments({ ...actives, statut: "en_cours" }),
+    Task.countDocuments({ ...actives, statut: "bloque" }),
+    Task.countDocuments({
+      ...actives,
+      statut: { $ne: "termine" },
+      deadline: { $ne: null, $lt: now },
+    }),
+    Task.countDocuments({ ...mine, statut: "termine", completedAt: { $gte: since7 } }),
+  ]);
+
+  // --- Sessions en cours dans mes sociétés ---
+  const [invEnCours, relEnCours, reaEnCours, recEnCours] = await Promise.all([
+    Inventaire.countDocuments({ ...entFilter, status: "en_cours" }),
+    Releve.countDocuments({ ...entFilter, status: "en_cours" }),
+    Reappro.countDocuments({ ...entFilter, status: "en_cours" }),
+    Reception.countDocuments({ ...entFilter, status: { $ne: "termine" } }),
+  ]);
+
+  // --- Mon activité (14 jours) : inventaires / relevés / réceptions créés ---
+  const NB = 14;
+  const since = startOfDay(Date.now());
+  since.setDate(since.getDate() - (NB - 1));
+  const fetchDates = (Model) =>
+    Model.find({ ...entFilter, createdAt: { $gte: since } }, { createdAt: 1 }).lean();
+  const [iDates, lDates, rDates] = await Promise.all([
+    fetchDates(Inventaire),
+    fetchDates(Releve),
+    fetchDates(Reception),
+  ]);
+  const buckets = [];
+  const idxByKey = new Map();
+  for (let k = 0; k < NB; k++) {
+    const d = new Date(since);
+    d.setDate(d.getDate() + k);
+    idxByKey.set(ymd(d), k);
+    buckets.push({
+      jour: d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" }),
+      inventaires: 0,
+      releves: 0,
+      receptions: 0,
+    });
+  }
+  const addDates = (dates, field) => {
+    for (const o of dates) {
+      const k = idxByKey.get(ymd(o.createdAt));
+      if (k != null) buckets[k][field] += 1;
+    }
+  };
+  addDates(iDates, "inventaires");
+  addDates(lDates, "releves");
+  addDates(rDates, "receptions");
+
+  res.json({
+    taches: {
+      aFaire,
+      enCours: enCoursT,
+      bloque,
+      enRetard,
+      termine7j,
+      total: aFaire + enCoursT + bloque,
+    },
+    sessions: {
+      inventaires: invEnCours,
+      releves: relEnCours,
+      reappros: reaEnCours,
+      receptions: recEnCours,
+    },
+    activite: buckets,
+    nbEntreprises: access.all ? null : access.ids.length,
+  });
+});
+
+// ===========================================================================
+// CA / MEILLEURES VENTES (snapshot pré-calculé — INSTANTANÉ) d'une entreprise.
+// Réservé aux utilisateurs ayant l'ANALYSE CA (module analyse_ca_admin).
+// GET /api/dashboard/ca/:nomDossierDBF
+// ===========================================================================
+export const getCaDashboard = asyncHandler(async (req, res) => {
+  const snap = await AiSalesSnapshot.findOne({
+    entreprise: req.entreprise._id,
+  }).lean();
+  if (!snap || !snap.computedAt) {
+    // Snapshot non encore calculé (cron nocturne). On l'indique sans bloquer.
+    return res.json({ available: false });
+  }
+  res.json({
+    available: true,
+    debut: snap.debut,
+    fin: snap.fin,
+    computedAt: snap.computedAt,
+    caTotal: Math.round(snap.totaux?.caTotal || 0),
+    quantiteTotale: Math.round(snap.totaux?.qteTotale || 0),
+    nbFactures: snap.totaux?.nbFacturesAnalysees || 0,
+    nbReferences: snap.totaux?.nbArticlesDistincts || 0,
+    topVentes: (snap.topCa || []).slice(0, 8).map((a) => ({
+      nart: a.nart,
+      design: a.design,
+      ca: Math.round(a.ca || 0),
+      qte: Math.round(a.qte || 0),
+      partCa: Math.round((a.partCa || 0) * 10) / 10,
+    })),
+  });
+});
+
+// ===========================================================================
+// COMPARAISON CA entre les sociétés accessibles (snapshots pré-calculés).
+// Réservé à l'analyse CA. GET /api/dashboard/ca-comparaison
+// ===========================================================================
+export const getCaComparaison = asyncHandler(async (req, res) => {
+  const access = await getAccessibleEntreprises(req.user);
+  const filter = access.all ? {} : { _id: { $in: access.ids } };
+  const companies = await Entreprise.find(filter).select("nom trigramme").lean();
+  const snaps = await AiSalesSnapshot.find({
+    entreprise: { $in: companies.map((c) => c._id) },
+  }).lean();
+  const byEnt = new Map(snaps.map((s) => [String(s.entreprise), s]));
+
+  const societes = companies
+    .map((c) => {
+      const s = byEnt.get(String(c._id));
+      return {
+        trigramme: c.trigramme || c.nom,
+        nom: c.nom,
+        caTotal: s ? Math.round(s.totaux?.caTotal || 0) : null,
+        dispo: !!s,
+      };
+    })
+    .sort((a, b) => (b.caTotal || 0) - (a.caTotal || 0));
+
+  const totalGroupe = societes.reduce((sum, s) => sum + (s.caTotal || 0), 0);
+  res.json({
+    fin: snaps[0]?.fin || null,
+    totalGroupe,
+    nbAvecDonnees: societes.filter((s) => s.dispo).length,
+    societes,
+  });
+});
+
+export default {
+  getGlobalStats,
+  getEntrepriseStats,
+  getMyDashboard,
+  getCaDashboard,
+  getCaComparaison,
+};

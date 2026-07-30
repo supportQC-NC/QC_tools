@@ -229,6 +229,44 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Changer son propre mot de passe (vérifie le mot de passe actuel)
+// @route   PUT /api/users/profile/password
+// @access  Private
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    res.status(400);
+    throw new Error("Mot de passe actuel et nouveau mot de passe requis");
+  }
+  if (String(newPassword).length < 6) {
+    res.status(400);
+    throw new Error("Le nouveau mot de passe doit contenir au moins 6 caractères");
+  }
+  if (currentPassword === newPassword) {
+    res.status(400);
+    throw new Error("Le nouveau mot de passe doit être différent de l'actuel");
+  }
+
+  // password a select:false -> il faut le récupérer explicitement.
+  const user = await User.findById(req.user._id).select("+password");
+  if (!user) {
+    res.status(404);
+    throw new Error("Utilisateur non trouvé");
+  }
+
+  const ok = await user.comparePassword(currentPassword);
+  if (!ok) {
+    res.status(401);
+    throw new Error("Le mot de passe actuel est incorrect");
+  }
+
+  user.password = newPassword; // haché par le hook pre('save')
+  await user.save();
+
+  res.json({ ok: true, message: "Mot de passe modifié avec succès" });
+});
+
 // @desc    Forgot password
 // @route   POST /api/users/forgot-password
 // @access  Public
@@ -926,6 +964,7 @@ export {
   logoutUser,
   getUserProfile,
   updateUserProfile,
+  changePassword,
   forgotPassword,
   resetPassword,
   createUser,

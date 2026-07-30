@@ -743,13 +743,152 @@ const ecrirePDFPreparation = async ({ header, rows, commentaire, outPath }) => {
 };
 
 // ===========================================
+// FEUILLE DE COLISAGE (§13 CDC)
+// Une feuille A4 PAR unité (colis / palette / longueur). Chaque feuille indique
+// le client, le n° proforma/réservation, l'identité de l'unité et le colisage
+// total, puis liste TOUS les articles dans l'ordre de la proforma.
+// ===========================================
+
+// Libellé « 3 colis + 1 palette + 2 longueurs » à partir des compteurs.
+const buildColisageTotalLabel = ({ nbColis, nbPalettes, nbLongueurs }) => {
+  const parts = [];
+  const plur = (n, s, p) => `${n} ${n > 1 ? p : s}`;
+  if (nbColis > 0) parts.push(plur(nbColis, "colis", "colis"));
+  if (nbPalettes > 0) parts.push(plur(nbPalettes, "palette", "palettes"));
+  if (nbLongueurs > 0) parts.push(plur(nbLongueurs, "longueur", "longueurs"));
+  return parts.join(" + ") || "—";
+};
+
+// Liste des unités à coliser (colis 1..N, palette 1..M, longueur 1..L).
+const listerUnitesColisage = ({ nbColis, nbPalettes, nbLongueurs }) => {
+  const unites = [];
+  for (let i = 1; i <= nbColis; i++)
+    unites.push({ type: "Colis", index: i, total: nbColis, key: `colis${i}` });
+  for (let i = 1; i <= nbPalettes; i++)
+    unites.push({ type: "Palette", index: i, total: nbPalettes, key: `palette${i}` });
+  for (let i = 1; i <= nbLongueurs; i++)
+    unites.push({ type: "Longueur", index: i, total: nbLongueurs, key: `longueur${i}` });
+  return unites;
+};
+
+const ecrirePDFColisage = async ({ header, rows, outPath }) => {
+  const mod = await import("pdfkit").catch(() => {
+    throw new Error("Module 'pdfkit' introuvable. Lancez : npm i pdfkit (backend).");
+  });
+  const PDFDocument = mod.default;
+
+  const margin = 30;
+  const doc = new PDFDocument({ size: "A4", margin });
+  const stream = fs.createWriteStream(outPath);
+  doc.pipe(stream);
+
+  const left = margin;
+  const right = doc.page.width - margin;
+  const tableWidth = COLS.reduce((s, c) => s + c.w, 0);
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(16)
+    .text("FEUILLE DE COLISAGE", left, margin, { width: right - left, align: "center" });
+  // Identité de l'unité, bien visible.
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(20)
+    .fillColor("#1f6feb")
+    .text(header.identite, left, margin + 24, { width: right - left, align: "center" });
+  doc.fillColor("#000");
+
+  let y = margin + 56;
+
+  // Bloc infos (2 colonnes, 2 lignes).
+  const infoH = 18;
+  const colB = left + (right - left) / 2;
+  const halfW = (right - left) / 2;
+  const drawInfo = (x, w, label, value) => {
+    doc.font("Helvetica-Bold").fontSize(9).text(`${label} :`, x + 4, y + 5, { width: 84 });
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .text(value || "", x + 90, y + 5, { width: w - 94, lineBreak: false });
+  };
+  const blocH = infoH * 2;
+  doc.rect(left, y, right - left, blocH).stroke();
+  doc.moveTo(colB, y).lineTo(colB, y + blocH).stroke();
+  doc.moveTo(left, y + infoH).lineTo(right, y + infoH).stroke();
+
+  drawInfo(left, halfW, header.refLabel, header.numpro);
+  drawInfo(colB, halfW, "Client", header.client);
+  y += infoH;
+  drawInfo(left, halfW, "Colisage total", header.colisageTotal);
+  drawInfo(colB, halfW, "Date prépa", header.datePrepa);
+  y += infoH + 12;
+
+  // Tableau articles (mêmes colonnes que le rapport, ordre proforma).
+  const rowH = 16;
+  const drawHeader = () => {
+    let x = left;
+    doc.rect(left, y, tableWidth, rowH).fillAndStroke("#e8e8e8", "#000");
+    doc.fillColor("#000").font("Helvetica-Bold").fontSize(7.5);
+    COLS.forEach((c) => {
+      doc.text(c.label, x + 2, y + 5, { width: c.w - 4, align: c.align, lineBreak: false });
+      x += c.w;
+    });
+    y += rowH;
+  };
+  const ensureSpace = () => {
+    if (y + rowH > doc.page.height - margin - 24) {
+      doc.addPage();
+      y = margin;
+      drawHeader();
+    }
+  };
+
+  drawHeader();
+  doc.font("Helvetica").fontSize(7.5);
+  doc.strokeColor("#999");
+  rows.forEach((r) => {
+    ensureSpace();
+    let x = left;
+    COLS.forEach((c) => {
+      doc.rect(x, y, c.w, rowH).stroke();
+      let raw = r[c.key] === null || r[c.key] === undefined ? "" : String(r[c.key]);
+      let color = "#000";
+      if (c.key === "ecart" && typeof r.ecart === "number" && r.ecart !== 0) {
+        raw = r.ecart > 0 ? `+${r.ecart}` : String(r.ecart);
+        color = r.ecart > 0 ? "#1f6feb" : "#c0392b";
+      }
+      const val = fitText(doc, raw, c.w - 4);
+      doc.fillColor(color).text(val, x + 2, y + 5, {
+        width: c.w - 4,
+        align: c.align,
+        lineBreak: false,
+      });
+      x += c.w;
+    });
+    y += rowH;
+  });
+
+  doc.end();
+  await new Promise((resolve, reject) => {
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+  });
+};
+
+// ===========================================
 // FICHIER DE TRANSFERT DE STOCK (DOCK)
 // ===========================================
 // Une ligne par article prélevé au dock (qtePrepareeDock > 0).
 const construireContenuTransfert = (preparation) => {
   let contenu = "";
   (preparation.lignes || []).forEach((l) => {
-    const q = num(l.qtePrepareeDock);
+    const prepDock = num(l.qtePrepareeDock);
+    if (prepDock <= 0) return;
+    // CDC §14 : ne transférer que le stock réellement localisé au dock dans
+    // Stock XL => min(stock dock à l'analyse, quantité réellement prélevée au
+    // dock). Un prélèvement dock sur stock théorique nul/négatif (retour au
+    // contrôle final) ne génère donc aucun transfert.
+    const q = Math.min(num(l.stockDock), prepDock);
     if (q <= 0) return;
     // Toujours le NART (jamais le GENCODE). Ligne ignorée si pas de NART.
     const codeSrc = safeTrim(l.nart);
@@ -801,6 +940,44 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     outPath: filePath,
   });
 
+  // ---- 1bis) Feuilles de colisage : une par colis / palette / longueur ----
+  const refLabel = preparation.type === "reservation" ? "Réservation" : "Proforma";
+  const compteurs = {
+    nbColis: num(preparation.colisage?.nbColis),
+    nbPalettes: num(preparation.colisage?.nbPalettes),
+    nbLongueurs: num(preparation.colisage?.nbLongueurs),
+  };
+  const colisageTotalLabel = buildColisageTotalLabel(compteurs);
+  const unites = listerUnitesColisage(compteurs);
+  const colisage = { total: colisageTotalLabel, feuilles: [] };
+  for (const u of unites) {
+    try {
+      const nomFeuille =
+        sanitizeFileName(
+          `Colisage_${header.client}_${header.numpro}_${u.type}${u.index}`,
+        ) + ".pdf";
+      const cheminFeuille = path.join(dossier, nomFeuille);
+      await ecrirePDFColisage({
+        header: {
+          ...header,
+          refLabel,
+          colisageTotal: colisageTotalLabel,
+          identite: `${u.type} ${u.index} / ${u.total}`,
+        },
+        rows,
+        outPath: cheminFeuille,
+      });
+      colisage.feuilles.push({
+        libelle: `${u.type} ${u.index} / ${u.total}`,
+        fileName: nomFeuille,
+        filePath: cheminFeuille,
+        generatedAt: new Date(),
+      });
+    } catch (e) {
+      console.error(`[PREPA colisage ${u.key}] génération impossible:`, e.message);
+    }
+  }
+
   // ---- Email ----
   const destinataires = (entreprise.emailsRapportPreparation || []).filter(Boolean);
   let emailSentAt = null;
@@ -811,9 +988,15 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     try {
       await sendEmail({
         email: destinataires,
-        subject: `Préparation commande — Proforma ${header.numpro} (${header.client})`,
+        subject: `Préparation commande — ${refLabel} ${header.numpro} (${header.client})`,
         html: buildEmailHtml(header, stats, preparation),
-        attachments: [{ filename: fileName, path: filePath }],
+        attachments: [
+          { filename: fileName, path: filePath },
+          ...colisage.feuilles.map((f) => ({
+            filename: f.fileName,
+            path: f.filePath,
+          })),
+        ],
       });
       emailSentAt = new Date();
     } catch (error) {
@@ -878,7 +1061,7 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     console.error("[PREPA transfert] génération impossible:", error.message);
   }
 
-  return { rapport, transfert };
+  return { rapport, transfert, colisage };
 };
 
 const buildEmailHtml = (header, stats, preparation) => `

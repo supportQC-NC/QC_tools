@@ -12,6 +12,10 @@ import { useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getSocket, resetSocket } from "../../../socketClient";
 import {
+  requestNotificationPermission,
+  showDesktopNotification,
+} from "../../../desktopNotifications";
+import {
   applyPresenceState,
   applyPresenceUpdate,
   resetPresence,
@@ -39,11 +43,24 @@ const NotificationsSync = () => {
   const [markChatSeen] = useMarkChatSeenMutation();
   const [markTasksSeen] = useMarkTasksSeenMutation();
 
-  // Active le polling tant qu'un utilisateur est connecté.
-  useGetNotificationCountsQuery(undefined, {
+  // Active le polling tant qu'un utilisateur est connecté. On garde `counts`
+  // ({ messages, taches }) pour alimenter le titre de l'onglet (compteur).
+  const { data: counts } = useGetNotificationCountsQuery(undefined, {
     pollingInterval: POLL_MS,
     skip: !userInfo,
   });
+
+  // Titre de l'onglet : « QC tools (N) » où N = messages non lus + tâches non
+  // vues. Permet de voir les notifications en attente sans revenir sur le site.
+  useEffect(() => {
+    const BASE = "QC tools";
+    if (!userInfo) {
+      document.title = BASE;
+      return;
+    }
+    const total = (counts?.messages || 0) + (counts?.taches || 0);
+    document.title = total > 0 ? `${BASE} (${total})` : BASE;
+  }, [counts, userInfo]);
 
   // Connexion socket + écoute, PILOTÉES PAR L'IDENTITÉ de l'utilisateur.
   // Le socket est (re)créé quand l'utilisateur change et FERMÉ au changement de
@@ -54,11 +71,24 @@ const NotificationsSync = () => {
     if (!userInfo?._id) return undefined;
     const socket = getSocket();
 
+    // Demande (une fois) l'autorisation d'afficher des bandeaux bureau natifs.
+    requestNotificationPermission();
+
     const onMessage = () => {
+      // Bandeau bureau générique quand l'onglet est en arrière-plan (le helper
+      // ne fait rien si l'onglet est visible ou la permission non accordée).
+      showDesktopNotification("Nouveau message", {
+        body: "Espace équipe — vous avez un nouveau message.",
+      });
       if (pathRef.current === "/espace-equipe") markChatSeen();
       else dispatch(apiSlice.util.invalidateTags(["Notif"]));
     };
     const onTask = () => {
+      // Bandeau bureau quand une tâche est assignée (onglet en arrière-plan).
+      showDesktopNotification("Nouvelle tâche", {
+        body: "Une tâche vient de vous être assignée.",
+        tag: "tache-assignee",
+      });
       if (pathRef.current === "/mes-taches") markTasksSeen();
       else dispatch(apiSlice.util.invalidateTags(["Notif"]));
     };

@@ -64,6 +64,7 @@ class TopArticlesService {
     let nbFacturesAnalysees = 0;
     let caTotal = 0;
     let qteTotale = 0;
+    let nbLignesAberrantes = 0; // lignes ignorées (prix/quantité corrompus)
 
     for (const f of cache.factureRecords) {
       const typ = this.safeTrim(f.TYPFACT).toUpperCase();
@@ -81,8 +82,18 @@ class TopArticlesService {
         if (!this.estLigneArticle(l)) continue;
 
         const nart = this.safeTrim(l.NART);
-        const qte = signe * this.num(l.QTE);
-        const ca = signe * this.num(l.QTE) * this.num(l.PVTE); // QTE × PVTE
+        const q = this.num(l.QTE);
+        const pv = this.num(l.PVTE);
+        const caLigne = q * pv;
+        // Garde-fou anti-DONNÉES CORROMPUES : prix unitaire > 100 M XPF,
+        // quantité > 1 M, OU CA d'une seule ligne > 500 M XPF sont aberrants en
+        // quincaillerie (cf. anomalie Sitec qui faussait le CA de -353 Md). Ignorées.
+        if (Math.abs(pv) > 1e8 || Math.abs(q) > 1e6 || Math.abs(caLigne) > 5e8) {
+          nbLignesAberrantes += 1;
+          continue;
+        }
+        const qte = signe * q;
+        const ca = signe * caLigne; // QTE × PVTE
 
         if (!parArticle.has(nart)) {
           parArticle.set(nart, {
@@ -139,6 +150,7 @@ class TopArticlesService {
         qteTotale,
         nbArticlesDistincts: articles.length,
         nbFacturesAnalysees,
+        nbLignesAberrantes,
       },
       topCa,
       topQte,

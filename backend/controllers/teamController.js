@@ -84,12 +84,14 @@ const createTeam = asyncHandler(async (req, res) => {
   if (req.user.role === "responsable") {
     // Un responsable ne crée que des équipes qu'il dirige lui-même.
     leadId = req.user._id;
+  } else if (!responsable) {
+    // Admin / super-admin SANS responsable désigné : il devient lui-même le
+    // responsable de l'équipe (il peut donc créer et diriger une équipe sans
+    // dépendre d'un compte « responsable »).
+    leadId = req.user._id;
   } else {
-    // Admin / super-admin : doit désigner un responsable valide et dans son scope.
-    if (!responsable) {
-      res.status(400);
-      throw new Error("Responsable requis");
-    }
+    // Admin / super-admin AVEC responsable désigné : celui-ci doit être un
+    // utilisateur « responsable » valide et dans son périmètre.
     const lead = await User.findById(responsable);
     if (!lead || lead.role !== "responsable") {
       res.status(400);
