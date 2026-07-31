@@ -1154,57 +1154,51 @@ const resoudreZone = asyncHandler(async (req, res) => {
   // Recherche prioritaire par EAN principal, puis repli sur les autres EAN
   // (bipage / papillonnage / contrôle) pour rester tolérant à un mauvais bip.
   const rx = new RegExp(`^${escapeRegex(c)}$`);
-  let zone = await Zone.findOne({
-    entreprise: entreprise._id,
-    eanPrincipal: rx,
-  });
-
+  // 1) EAN principal (le QR du rayon encode « code|emplacement ») — match exact.
+  let zonesFound = await Zone.find({ entreprise: entreprise._id, eanPrincipal: rx });
   let viaEan = "principal";
-  if (!zone) {
-    zone = await Zone.findOne({
+  // 2) Repli sur les EAN de phase (tolérance à un mauvais bip).
+  if (zonesFound.length === 0) {
+    const z2 = await Zone.find({
       entreprise: entreprise._id,
-      $or: [
-        { eanBipage: rx },
-        { eanPapillonnage: rx },
-        { eanControle: rx },
-      ],
+      $or: [{ eanBipage: rx }, { eanPapillonnage: rx }, { eanControle: rx }],
     });
-    if (zone) {
-      viaEan =
-        zone.eanBipage?.trim() === c
-          ? "bipage"
-          : zone.eanPapillonnage?.trim() === c
-            ? "papillonnage"
-            : "controle";
-    }
+    if (z2.length) { zonesFound = z2; viaEan = "phase"; }
+  }
+  // 3) Code brut : renvoie TOUS les emplacements du code (ambigu MAGASIN/DOCK).
+  if (zonesFound.length === 0) {
+    zonesFound = await Zone.find({ entreprise: entreprise._id, code: c });
+    if (zonesFound.length) viaEan = "code";
   }
 
-  if (!zone) {
-    return res.json({
-      found: false,
-      message: "Aucune zone ne correspond à ce code",
+  if (zonesFound.length === 0) {
+    return res.json({ found: false, message: "Aucune zone ne correspond à ce code" });
+  }
+
+  // Pour chaque zone (emplacement) : collecte en cours éventuelle de l'agent,
+  // clé par (code + type) pour ne pas confondre MAGASIN et DOCK.
+  const zones = [];
+  for (const z of zonesFound) {
+    // eslint-disable-next-line no-await-in-loop
+    const enCours = await InventaireCollecte.findOne({
+      entreprise: entreprise._id,
+      user: req.user._id,
+      zoneCode: z.code,
+      zoneType: z.type,
+      status: "en_cours",
+    });
+    zones.push({
+      code: z.code,
+      libelle: z.libelle,
+      type: z.type,
+      eanPrincipal: z.eanPrincipal,
+      enCours: enCours ? collecteResume(enCours) : null,
     });
   }
 
-  // Une collecte est-elle déjà en cours pour cette zone et cet agent ?
-  const enCours = await InventaireCollecte.findOne({
-    entreprise: entreprise._id,
-    user: req.user._id,
-    zoneCode: zone.code,
-    status: "en_cours",
-  });
-
-  res.json({
-    found: true,
-    viaEan,
-    zone: {
-      code: zone.code,
-      libelle: zone.libelle,
-      type: zone.type,
-      eanPrincipal: zone.eanPrincipal,
-    },
-    enCours: enCours ? collecteResume(enCours) : null,
-  });
+  // `zones` = toutes les correspondances (l'app demande MAGASIN/DOCK si > 1).
+  // `zone`/`enCours` = 1re correspondance (compat rétro).
+  res.json({ found: true, viaEan, zones, zone: zones[0], enCours: zones[0].enCours });
 });
 
 // ===========================================
@@ -1214,10 +1208,12 @@ const resoudreZone = asyncHandler(async (req, res) => {
  * @desc    Démarrer (ou reprendre) la collecte d'une zone
  * @route   POST /api/inventaires-collecte
  * @access  Private
- * @body    { entrepriseId, zoneCode }
+ * @body    { entrepriseId, zoneCode, type? }
+ *          `type` (MAGASIN/DOCK) désambiguïse un même code présent aux deux
+ *          emplacements → on ouvre la BONNE zone.
  */
 const createCollecte = asyncHandler(async (req, res) => {
-  const { entrepriseId, zoneCode } = req.body;
+  const { entrepriseId, zoneCode, type } = req.body;
 
   if (!zoneCode || !String(zoneCode).trim()) {
     res.status(400);
@@ -1230,22 +1226,24 @@ const createCollecte = asyncHandler(async (req, res) => {
     throw new Error("Entreprise non trouvée");
   }
 
-  const zone = await Zone.findOne({
-    entreprise: entreprise._id,
-    code: String(zoneCode).trim(),
-  });
+  const emplacement = type && String(type).trim() ? String(type).trim() : null;
+  const zoneQuery = { entreprise: entreprise._id, code: String(zoneCode).trim() };
+  if (emplacement) zoneQuery.type = emplacement; // MAGASIN ou DOCK
+  const zone = await Zone.findOne(zoneQuery);
   if (!zone) {
     res.status(404);
     throw new Error("Zone non trouvée");
   }
 
-  // Reprise si une collecte est déjà en cours pour cette zone
-  const enCours = await InventaireCollecte.findOne({
+  // Reprise si une collecte est déjà en cours pour cette zone (code + emplacement)
+  const enCoursQuery = {
     entreprise: entreprise._id,
     user: req.user._id,
     zoneCode: zone.code,
     status: "en_cours",
-  });
+  };
+  if (emplacement) enCoursQuery.zoneType = zone.type;
+  const enCours = await InventaireCollecte.findOne(enCoursQuery);
   if (enCours) {
     articleCacheService.preload(entreprise).catch(() => {});
     return res.json(enCours);

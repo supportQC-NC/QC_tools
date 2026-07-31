@@ -126,7 +126,9 @@ const inventaireCollecteSchema = new mongoose.Schema(
     },
     modeExport: {
       type: String,
-      enum: ["", "session", "annee"],
+      // "session" (dev, dossierDat surveillé) | "annee" (repli dev) |
+      // "entite" (prod, dépôt dans cheminExportInventaire de l'entité).
+      enum: ["", "session", "annee", "entite"],
       default: "",
     },
     exportedAt: {
