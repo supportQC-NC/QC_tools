@@ -43,6 +43,12 @@ const ficheControleSchema = new mongoose.Schema(
     printError: { type: String, default: "" },
     archived: { type: Boolean, default: false },
 
+    // Réimpression demandée depuis l'app web. Le VPS (Linux) ne peut pas
+    // imprimer : il POSE ce drapeau ; c'est le watcher/agent local (là où sont
+    // l'imprimante + le Rcommun) qui l'exécute puis le remet à false.
+    reprintRequested: { type: Boolean, default: false },
+    reprintRequestedAt: { type: Date, default: null },
+
     // Statistiques
     stats: {
       total: { type: Number, default: 0 },

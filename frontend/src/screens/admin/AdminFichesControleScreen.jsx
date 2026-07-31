@@ -281,7 +281,14 @@ const AdminFichesControleScreen = () => {
                         </div>
                       </td>
                       <td>
-                        {f.printed ? (
+                        {f.reprintRequested ? (
+                          <span
+                            className="print-wait"
+                            title="Réimpression envoyée à l'imprimante du magasin — sortie imminente"
+                          >
+                            <HiClock /> Réimpression…
+                          </span>
+                        ) : f.printed ? (
                           <span className="print-ok">
                             <HiCheckCircle /> Imprimée
                           </span>

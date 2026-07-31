@@ -62,6 +62,37 @@ export const ensureInventaireDirs = (nom) => {
   return dirs;
 };
 
+/**
+ * Reconstruit le chemin du PDF d'une fiche POUR L'ENVIRONNEMENT COURANT.
+ *
+ * Le PDF est généré par l'agent local (Windows → chemin UNC) mais peut devoir
+ * être servi/relu par le VPS (Linux → /mnt/rcommun) : on ne se fie donc PAS au
+ * chemin absolu stocké (`fiche.pdfPath`, propre à la machine qui l'a créé). On
+ * le recalcule depuis `config.sharePath` + <nom d'inventaire> (getInventaireDirs)
+ * puis on cherche le fichier dans archive_pdf (si archivé) ou à la racine.
+ * Renvoie le premier chemin EXISTANT, sinon "".
+ */
+export const resoudreCheminPdf = (fiche) => {
+  if (!fiche) return "";
+  const nom = fiche.inventaireNom || "";
+  const fileName = fiche.pdfFileName || "";
+  const candidats = [];
+  if (nom && fileName) {
+    const dirs = getInventaireDirs(nom);
+    candidats.push(path.join(dirs.archivePdf, fileName)); // archivé
+    candidats.push(path.join(dirs.base, fileName)); // pas encore archivé
+  }
+  if (fiche.pdfPath) candidats.push(fiche.pdfPath); // dernier recours
+  for (const p of candidats) {
+    try {
+      if (p && fs.existsSync(p)) return p;
+    } catch {
+      /* ignore */
+    }
+  }
+  return "";
+};
+
 /** Extrait le code zone d'un nom de fichier "stock.dat_<code>[.dat]". */
 export const extraireCodeZone = (fileName) => {
   const m = fileName.match(config.filenameRegex);

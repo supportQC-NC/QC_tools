@@ -14,6 +14,8 @@ import {
   ecrirePDF,
   extraireCodeZone,
   estFichierDat,
+  getInventaireDirs,
+  resoudreCheminPdf,
 } from "./ficheControleService.js";
 
 let isRunning = false;
@@ -94,17 +96,44 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
 
   const content = fs.readFileSync(filePath, "utf8");
   const lignesDat = parseDat(content);
-  const zoneCode = extraireCodeZone(fileName) || "";
 
-  // Zone (fiche importée) : exact puis insensible à la casse
+  // Le nom de fichier peut porter un suffixe d'emplacement ajouté au dépôt :
+  // "stock.dat <code>_MAGASIN" / "..._DOCK". On sépare le vrai code du type
+  // pour lever l'ambiguïté d'un même code présent aux deux emplacements.
+  const rawZoneToken = extraireCodeZone(fileName) || "";
+  let zoneCode = rawZoneToken;
+  let zoneTypeHint = "";
+  const mType = rawZoneToken.match(/^(.*)_(MAGASIN|DOCK)$/i);
+  if (mType) {
+    zoneCode = mType[1];
+    zoneTypeHint = mType[2].toUpperCase();
+  }
+
+  // Zone (fiche importée) : d'abord code + emplacement si connu, puis code seul.
+  // Exact puis insensible à la casse à chaque étape.
   let zone = null;
   if (zoneCode) {
-    zone =
-      (await Zone.findOne({ entreprise: entreprise._id, code: zoneCode })) ||
-      (await Zone.findOne({
-        entreprise: entreprise._id,
-        code: new RegExp(`^${escapeRegex(zoneCode)}$`, "i"),
-      }));
+    if (zoneTypeHint) {
+      zone =
+        (await Zone.findOne({
+          entreprise: entreprise._id,
+          code: zoneCode,
+          type: zoneTypeHint,
+        })) ||
+        (await Zone.findOne({
+          entreprise: entreprise._id,
+          code: new RegExp(`^${escapeRegex(zoneCode)}$`, "i"),
+          type: zoneTypeHint,
+        }));
+    }
+    if (!zone) {
+      zone =
+        (await Zone.findOne({ entreprise: entreprise._id, code: zoneCode })) ||
+        (await Zone.findOne({
+          entreprise: entreprise._id,
+          code: new RegExp(`^${escapeRegex(zoneCode)}$`, "i"),
+        }));
+    }
   }
 
   // Zone introuvable → pas de fiche, pas d'impression : déplacer le .DAT
@@ -280,7 +309,51 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
   };
 };
 
-/** Un passage : parcourt les inventaires actifs et traite les nouveaux .DAT.
+/**
+ * Traite les demandes de réimpression posées depuis l'app web
+ * (FicheControle.reprintRequested === true). Le VPS ne pouvant pas imprimer,
+ * il pose le drapeau ; c'est ici (agent local, imprimante branchée) qu'on
+ * réimprime réellement puis qu'on remet le drapeau à false.
+ * N'agit que si l'impression auto est active sur cette machine.
+ */
+const traiterReimpressions = async (report) => {
+  report.reimpressions = [];
+  if (!config.autoprint) return; // machine sans imprimante (ex. VPS) : on ignore
+
+  const fiches = await FicheControle.find({ reprintRequested: true });
+  for (const fiche of fiches) {
+    const rr = { fiche: fiche.datFileName, ok: false, message: "" };
+    const pdfPath = resoudreCheminPdf(fiche);
+    if (!pdfPath) {
+      rr.message = "PDF introuvable sur le disque";
+      // On laisse le drapeau : un prochain passage retentera (ex. partage revenu).
+      report.reimpressions.push(rr);
+      continue;
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await imprimerPdf(pdfPath);
+      fiche.reprintRequested = false;
+      fiche.reprintRequestedAt = null;
+      fiche.printed = true;
+      fiche.printedAt = new Date();
+      fiche.printError = "";
+      // eslint-disable-next-line no-await-in-loop
+      await fiche.save();
+      rr.ok = true;
+      rr.message = "réimprimée";
+    } catch (err) {
+      fiche.printError = `Réimpression échouée : ${err.message}`;
+      // eslint-disable-next-line no-await-in-loop
+      await fiche.save();
+      rr.message = fiche.printError;
+    }
+    report.reimpressions.push(rr);
+  }
+};
+
+/** Un passage : parcourt les inventaires actifs et traite les nouveaux .DAT,
+ *  puis exécute les réimpressions demandées depuis le web.
  *  Renvoie un rapport de diagnostic. */
 export const tickOnce = async () => {
   const report = { sessions: [] };
@@ -295,9 +368,14 @@ export const tickOnce = async () => {
       files: [],
     };
 
-    const base = session.dossierDat;
+    // Dossier surveillé, recalculé pour l'ENVIRONNEMENT COURANT (config.sharePath
+    // + <nom>). On NE se fie PAS à session.dossierDat, qui peut avoir été figé en
+    // chemin d'un autre OS (session créée sur le VPS Linux → "/mnt/..." ; l'agent
+    // local Windows a besoin de "\\192.168.0.250\Rcommun\STOCK\<nom>").
+    const base = session.nom ? getInventaireDirs(session.nom).base : session.dossierDat;
+    sr.dossierDat = base;
     if (!base) {
-      sr.error = "Aucun dossier (dossierDat vide) — réinitialisez l'inventaire.";
+      sr.error = "Aucun dossier (nom de session vide) — réinitialisez l'inventaire.";
       report.sessions.push(sr);
       continue;
     }
@@ -359,6 +437,13 @@ export const tickOnce = async () => {
     report.sessions.push(sr);
   }
 
+  // Réimpressions demandées depuis le web (indépendant des sessions actives).
+  try {
+    await traiterReimpressions(report);
+  } catch (err) {
+    report.reimpressionsError = err.message;
+  }
+
   return report;
 };
 
@@ -374,8 +459,19 @@ const tick = async () => {
   }
 };
 
-/** Scan manuel sérialisé : attend la fin d'un tick en cours puis renvoie le rapport. */
+/** Scan manuel sérialisé : attend la fin d'un tick en cours puis renvoie le rapport.
+ *  Ne s'exécute QUE si cette instance porte réellement la surveillance
+ *  (intervalHandle actif). Sinon (ex. VPS de prod, qui ne peut pas imprimer et
+ *  ne doit pas « voler » les .DAT à l'agent local) on renvoie un rapport neutre
+ *  sans traiter aucun fichier. */
 export const scanManuel = async () => {
+  if (!intervalHandle) {
+    return {
+      sessions: [],
+      skipped:
+        "Cette instance n'assure pas l'impression des fiches. L'agent local (poste imprimante) scanne automatiquement.",
+    };
+  }
   // attendre qu'un tick automatique en cours se termine (max ~10s)
   for (let i = 0; i < 50 && isRunning; i++) {
     await new Promise((r) => setTimeout(r, 200));

@@ -270,7 +270,28 @@ initChat(io);
 // Démarrage du serveur
 server.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  startInventaireWatcher();
+
+  // Surveillance .DAT + impression des fiches de contrôle.
+  // Elle ne doit tourner QUE là où sont l'imprimante ET le Rcommun :
+  //   - en dev (tout-en-un local) → on la lance ici ;
+  //   - en prod, le backend est le VPS Ubuntu (ne peut PAS imprimer) → NE PAS
+  //     la lancer ici ; c'est l'« agent d'impression » local (npm run print-agent,
+  //     sur le serveur 192.168.0.250) qui la porte.
+  // Règle : on démarre le watcher dans le serveur sauf si on est en prod
+  // (RCOMMON_STOCK_ROOT défini) ; surcharge possible via RUN_FICHE_WATCHER.
+  const forceWatcher = process.env.RUN_FICHE_WATCHER; // "true" / "false"
+  const watcherInServer =
+    forceWatcher != null
+      ? String(forceWatcher).toLowerCase() === "true"
+      : !process.env.RCOMMON_STOCK_ROOT;
+  if (watcherInServer) {
+    startInventaireWatcher();
+  } else {
+    console.log(
+      "🖨️  Watcher fiches NON démarré dans le serveur (prod VPS) — utiliser l'agent local `npm run print-agent` sur le poste imprimante.",
+    );
+  }
+
   startMailingScheduler();
   startAiSnapshotScheduler();
 });

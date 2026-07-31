@@ -984,6 +984,7 @@ import articleCacheService from "../services/articleService.js";
 import {
   construireLignes,
   ecrirePDF,
+  getInventaireDirs,
 } from "../services/ficheControleService.js";
 import path from "path";
 import fs from "fs";
@@ -1018,20 +1019,34 @@ const genererContenuFichier = (lignes) => {
   return contenu;
 };
 
-// Nom de fichier déposé : "stock.dat <codeZone>" (reconnu par le watcher).
-const nomFichierZone = (zoneCode) =>
-  `stock.dat ${String(zoneCode).trim().replace(/[\\/:*?"<>|]/g, "_")}`;
+// Nom de fichier déposé : "stock.dat <codeZone>[_<EMPLACEMENT>]" (reconnu par le
+// watcher). Le suffixe _MAGASIN / _DOCK évite qu'un MÊME code compté aux deux
+// emplacements dans la même session ne se télescope (2 fichiers distincts →
+// 2 fiches de contrôle). Le watcher re-sépare code et emplacement.
+const nomFichierZone = (zoneCode, zoneType) => {
+  const code = String(zoneCode).trim().replace(/[\\/:*?"<>|]/g, "_");
+  const t = String(zoneType || "").trim().toUpperCase();
+  return `stock.dat ${code}${t ? `_${t}` : ""}`;
+};
 
 /**
- * Détermine le dossier de dépôt du .DAT :
- *  - en prod (RCOMMON_STOCK_ROOT défini) : on dépose dans le dossier d'export
- *    PROPRE À L'ENTREPRISE (cheminExportInventaire, déjà traduit par le getter
- *    du modèle vers le montage Linux : collect_sec, collect_sec_aw, ...). On
- *    ignore alors un dossierDat de session stocké en chemin Windows (\\...),
- *    car les "\" cassent l'écriture sous Linux.
- *  - en dev (env non défini) : si une session est active → son dossierDat,
- *    sinon repli sur le cheminExportInventaire de l'entreprise.
- * Crée le dossier si nécessaire.
+ * Détermine le dossier de dépôt du .DAT.
+ *
+ * RÈGLE CLÉ : le .DAT doit atterrir dans le dossier que SURVEILLE le watcher,
+ * sinon il n'est jamais imprimé. Le watcher surveille le dossier de la session
+ * = `getInventaireDirs(nom).base` = `config.sharePath` + <nom d'inventaire>.
+ *
+ * On recalcule ce dossier pour l'ENVIRONNEMENT COURANT à chaque dépôt :
+ *  - en dev : config.sharePath = partage Windows UNC (\\...\STOCK) ;
+ *  - en prod : config.sharePath = STOCK_SHARE_PATH (montage Linux).
+ * Ainsi dépôt et surveillance pointent TOUJOURS le même dossier, quel que soit
+ * l'OS — même si `session.dossierDat` avait été figé en chemin Windows lors
+ * d'une création depuis un poste dev (Mongo partagé).
+ *
+ * Repli (aucune session active) : dossier d'export de l'entité (collect_xxx).
+ * ⚠ Ce repli n'est PAS surveillé → pas d'impression auto (cas anormal, la porte
+ * d'entrée mobile exige une session active).
+ * Crée le dossier si nécessaire (fait par l'appelant).
  */
 const resoudreDossierDepot = async (entreprise) => {
   const session = await InventaireZoneSession.findOne({
@@ -1039,27 +1054,20 @@ const resoudreDossierDepot = async (entreprise) => {
     statut: "actif",
   });
 
-  const enProd = !!process.env.RCOMMON_STOCK_ROOT;
-
-  // En dev uniquement : le dossier de session (chemin Windows) reste prioritaire.
-  if (
-    !enProd &&
-    session &&
-    session.dossierDat &&
-    session.dossierDat.trim()
-  ) {
-    return {
-      dossier: session.dossierDat.trim(),
-      mode: "session",
-      session,
-    };
+  if (session && session.nom) {
+    // Dossier surveillé, recalculé pour l'environnement courant.
+    const dossier = getInventaireDirs(session.nom).base;
+    return { dossier, mode: "session", session };
   }
 
-  // Réappro ET inventaire déposent dans le MÊME dossier collect_xxx de l'entité.
+  // Aucune session active : repli sur le dossier d'export de l'entité.
   const dossier =
     entreprise.cheminExportInventaire || "/mnt/rcommun/STOCK/collect_sec";
-
-  return { dossier, mode: enProd ? "entite" : "annee", session: session || null };
+  return {
+    dossier,
+    mode: process.env.RCOMMON_STOCK_ROOT ? "entite" : "annee",
+    session: null,
+  };
 };
 
 /**
@@ -1537,7 +1545,7 @@ const exportCollecte = asyncHandler(async (req, res) => {
   }
 
   const contenu = genererContenuFichier(collecte.lignes);
-  const nomFichier = nomFichierZone(collecte.zoneCode);
+  const nomFichier = nomFichierZone(collecte.zoneCode, collecte.zoneType);
 
   // Dossier de dépôt (en prod : montage ; en dev : session active sinon repli)
   const { dossier, mode, session } = await resoudreDossierDepot(

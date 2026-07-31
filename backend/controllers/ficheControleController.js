@@ -1,13 +1,10 @@
 // backend/controllers/ficheControleController.js
 import fs from "fs";
-import path from "path";
 import asyncHandler from "../middleware/asyncHandler.js";
 import FicheControle from "../models/FicheControleModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
-import { config } from "../services/ficheControleService.js";
+import { config, resoudreCheminPdf } from "../services/ficheControleService.js";
 import {
-  imprimerPdf,
-  deplacerVers,
   scanManuel,
   isWatching,
   startInventaireWatcher,
@@ -82,7 +79,11 @@ const arreterSurveillance = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Réimprimer une fiche
+ * @desc    Demander la réimpression d'une fiche.
+ *          L'impression a lieu là où sont l'imprimante + le Rcommun (agent
+ *          local). Le backend web (potentiellement le VPS Linux) ne peut pas
+ *          imprimer : il POSE le drapeau `reprintRequested`, que le watcher/
+ *          agent local exécute au passage suivant (~quelques secondes).
  * @route   POST /api/fiches-controle/:entrepriseId/:id/reprint
  * @access  Private/Admin
  */
@@ -97,43 +98,17 @@ const reimprimer = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Fiche non trouvée");
   }
-  if (!fiche.pdfPath || !fs.existsSync(fiche.pdfPath)) {
-    res.status(400);
-    throw new Error("Fichier PDF introuvable sur le disque");
-  }
 
-  try {
-    if (fiche.archived) {
-      // Déjà archivée → impression sur place
-      await imprimerPdf(fiche.pdfPath);
-    } else {
-      // Pas encore archivée → impression puis déplacement PDF + .DAT
-      const base = path.dirname(fiche.pdfPath);
-      const archivePdf = path.join(base, config.archivePdfDirName);
-      const archiveDat = path.join(base, config.archiveDatDirName);
-      await imprimerPdf(fiche.pdfPath);
-      fiche.pdfPath = deplacerVers(fiche.pdfPath, archivePdf);
-      const datPath = path.join(base, fiche.datFileName);
-      if (fs.existsSync(datPath)) {
-        try {
-          deplacerVers(datPath, archiveDat);
-        } catch {
-          /* .DAT déjà déplacé ou verrouillé */
-        }
-      }
-      fiche.archived = true;
-    }
-    fiche.printed = true;
-    fiche.printedAt = new Date();
-    fiche.printError = "";
-    await fiche.save();
-    res.json({ message: "Fiche réimprimée", fiche });
-  } catch (err) {
-    fiche.printError = err.message;
-    await fiche.save();
-    res.status(500);
-    throw new Error(`Échec de l'impression : ${err.message}`);
-  }
+  fiche.reprintRequested = true;
+  fiche.reprintRequestedAt = new Date();
+  fiche.printError = "";
+  await fiche.save();
+
+  res.json({
+    message:
+      "Réimpression envoyée : la fiche va sortir sur l'imprimante du magasin.",
+    fiche,
+  });
 });
 
 /**
@@ -152,7 +127,10 @@ const telechargerPdf = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Fiche non trouvée");
   }
-  if (!fiche.pdfPath || !fs.existsSync(fiche.pdfPath)) {
+  // Chemin recalculé pour CET environnement (le PDF a pu être créé par l'agent
+  // Windows ; le VPS Linux le relit via son montage /mnt/rcommun).
+  const pdfPath = resoudreCheminPdf(fiche);
+  if (!pdfPath) {
     res.status(404);
     throw new Error("Fichier PDF introuvable");
   }
@@ -162,7 +140,7 @@ const telechargerPdf = asyncHandler(async (req, res) => {
     "Content-Disposition",
     `inline; filename="${fiche.pdfFileName || "fiche.pdf"}"`,
   );
-  fs.createReadStream(fiche.pdfPath).pipe(res);
+  fs.createReadStream(pdfPath).pipe(res);
 });
 
 /**
@@ -183,8 +161,9 @@ const supprimerFiche = asyncHandler(async (req, res) => {
   }
 
   try {
-    if (fiche.pdfPath && fs.existsSync(fiche.pdfPath)) {
-      fs.unlinkSync(fiche.pdfPath);
+    const pdfPath = resoudreCheminPdf(fiche);
+    if (pdfPath) {
+      fs.unlinkSync(pdfPath);
     }
   } catch {
     // ignore : suppression du PDF best-effort
