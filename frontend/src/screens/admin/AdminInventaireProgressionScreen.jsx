@@ -24,7 +24,7 @@ import {
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
-import "./AdminInventaireProgressionScreen.css";
+import "./AdminProgressionScreen.css";
 
 const POLL = 4000;
 
@@ -33,6 +33,24 @@ const PHASE_META = {
   papillonnage: { label: "Papillonnage", color: "#8b5cf6" },
   bipage: { label: "Bipage", color: "#4da6ff" },
   controle: { label: "Contrôle", color: "#4ade80" },
+};
+
+// Statut d'avancement d'une zone (même règle que le récap par zone) :
+//   3 phases → vert (complet) ; bipage → violet ; papillonnage → orange ; sinon rouge.
+const STATUT_META = {
+  complet: { label: "Complet", color: "#4ade80" },
+  comptage: { label: "Comptage", color: "#8b5cf6" },
+  papillonnage: { label: "Papillonnage", color: "#f59e0b" },
+  todo: { label: "Pas commencé", color: "#ff6b6b" },
+};
+const zoneStatut = (z) => {
+  const pap = !!z?.papillonnage?.fait;
+  const bip = !!z?.bipage?.fait;
+  const ctrl = !!z?.controle?.fait;
+  if (pap && bip && ctrl) return "complet";
+  if (bip) return "comptage";
+  if (pap) return "papillonnage";
+  return "todo";
 };
 
 const AdminInventaireProgressionScreen = () => {
@@ -122,12 +140,17 @@ const AdminInventaireProgressionScreen = () => {
         code,
       }).unwrap();
       const tone =
-        res.action === "deja_fait"
+        res.action === "deja_fait" || res.action === "verrouille"
           ? "warning"
           : res.action === "identifiee"
             ? "info"
             : "success";
-      setBipFeedback({ tone, message: res.message });
+      const phaseLabel = res.phase ? PHASE_META[res.phase]?.label : null;
+      const detail =
+        res.zone?.code && phaseLabel
+          ? `${res.zone.code} · ${phaseLabel} — ${res.message}`
+          : res.message;
+      setBipFeedback({ tone, message: detail });
     } catch (err) {
       setBipFeedback({
         tone: "error",
@@ -273,8 +296,12 @@ const AdminInventaireProgressionScreen = () => {
           {/* Bip */}
           <div className="bip-card">
             <h2>
-              <HiClipboardCheck /> Bip code-barres
+              <HiClipboardCheck /> Scanner un coupon détachable
             </h2>
+            <p className="bip-hint">
+              Scannez le code-barres du coupon (papillonnage / bipage / contrôle)
+              rapporté par l'agent : la phase est aussitôt marquée réalisée.
+            </p>
             <div className="bip-row">
               <input
                 ref={bipInputRef}
@@ -350,6 +377,7 @@ const AdminInventaireProgressionScreen = () => {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th className="statut-col"></th>
                   <th>Code</th>
                   <th>Libellé</th>
                   {PHASES.map((ph) => (
@@ -362,13 +390,22 @@ const AdminInventaireProgressionScreen = () => {
               <tbody>
                 {filteredZones.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="no-data">
+                    <td colSpan={6} className="no-data">
                       Aucune zone.
                     </td>
                   </tr>
                 ) : (
-                  filteredZones.map((z) => (
+                  filteredZones.map((z) => {
+                    const st = zoneStatut(z);
+                    return (
                     <tr key={z.code}>
+                      <td className="statut-col">
+                        <span
+                          className="statut-dot"
+                          style={{ background: STATUT_META[st].color }}
+                          title={STATUT_META[st].label}
+                        />
+                      </td>
                       <td className="code-cell">{z.code}</td>
                       <td>{z.libelle}</td>
                       {PHASES.map((ph) => {
@@ -397,7 +434,8 @@ const AdminInventaireProgressionScreen = () => {
                         );
                       })}
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -10,6 +10,8 @@ import {
   updateZone,
   deleteZone,
   deleteAllZones,
+  genererZonesDepuisDictionnaire,
+  genererFichesPDF,
 } from "../controllers/zoneController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -49,8 +51,28 @@ router.post(
 );
 
 // ==========================================
+// GÉNÉRATION depuis le dictionnaire des rayons (remplacement total)
+// ==========================================
+router.post(
+  "/generer-dictionnaire/:entrepriseId",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("inventaire", "write"),
+  genererZonesDepuisDictionnaire,
+);
+
+// ==========================================
 // CRUD — routes les plus spécifiques d'abord
 // ==========================================
+
+// Fiches PDF imprimables (préfixe statique /fiches-pdf : AVANT /:id)
+router.post(
+  "/:entrepriseId/fiches-pdf",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("inventaire", "read"),
+  genererFichesPDF,
+);
 
 // Zone par code (préfixe statique /code/ : avant /:id)
 router.get(

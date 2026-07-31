@@ -68,7 +68,7 @@ export const adminMenuStructure = [
       { label: "Commandes", path: "/admin/commandes", icon: HiTruck },
       { label: "Proformas", path: "/admin/proformas", icon: HiDocumentReport },
       { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
-      { label: "Bipages", path: "/admin/bipages", icon: HiClipboardList },
+      { label: "Bipages", path: "/admin/demandes-bipage", icon: HiClipboardList },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
       { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
       { label: "Dictionnaire des rayons", path: "/admin/dictionnaire-rayons", icon: HiTag },

@@ -10,24 +10,30 @@ import {
   HiCheckCircle,
   HiExclamationCircle,
   HiDocumentText,
+  HiBookOpen,
+  HiQrcode,
+  HiDownload,
 } from "react-icons/hi";
 import {
   useGetZonesQuery,
   useImportZonesMutation,
+  useGenererZonesDepuisDictionnaireMutation,
   useDeleteAllZonesMutation,
 } from "../../slices/zoneApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { useSelector } from "react-redux";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
+import { BASE_URL } from "../../constants";
 import "./AdminZonesScreen.css";
 
 const AdminZonesScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [file, setFile] = useState(null);
   const [search, setSearch] = useState("");
-  const [confirm, setConfirm] = useState(null); // "import" | "deleteAll" | null
+  const [confirm, setConfirm] = useState(null); // "import" | "generateDico" | "deleteAll" | null
   const [importResult, setImportResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { data: entreprises } = useGetMyEntreprisesQuery();
 
@@ -43,6 +49,8 @@ const AdminZonesScreen = () => {
   );
 
   const [importZones, { isLoading: importing }] = useImportZonesMutation();
+  const [genererDepuisDico, { isLoading: generatingDico }] =
+    useGenererZonesDepuisDictionnaireMutation();
   const [deleteAllZones, { isLoading: deleting }] = useDeleteAllZonesMutation();
 
   const zones = useMemo(() => zonesData?.zones || [], [zonesData]);
@@ -96,6 +104,57 @@ const AdminZonesScreen = () => {
       if (input) input.value = "";
     } catch (err) {
       setErrorMsg(err?.data?.message || "Erreur lors de l'import");
+    }
+  };
+
+  const handleConfirmGenerateDico = async () => {
+    setConfirm(null);
+    setErrorMsg("");
+    try {
+      const res = await genererDepuisDico({
+        entrepriseId: selectedEntreprise,
+      }).unwrap();
+      setImportResult(res);
+    } catch (err) {
+      setErrorMsg(
+        err?.data?.message ||
+          "Erreur lors de la génération depuis le dictionnaire des rayons",
+      );
+    }
+  };
+
+  const handleDownloadFiches = async () => {
+    if (!selectedEntreprise) return;
+    setErrorMsg("");
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/zones/${selectedEntreprise}/fiches-pdf`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!res.ok) {
+        let msg = `Génération du PDF échouée (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = j.message;
+        } catch {
+          /* non-JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `fiches_rayons_${entrepriseObj?.trigramme || selectedEntreprise}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (err) {
+      setErrorMsg(err.message || "Impossible de générer le PDF des fiches.");
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -218,6 +277,52 @@ const AdminZonesScreen = () => {
             )}
           </div>
 
+          {/* Carte : source dictionnaire + fiches PDF */}
+          <div className="import-card">
+            <div className="import-card-head">
+              <h2>
+                <HiBookOpen /> Générer depuis le dictionnaire des rayons
+              </h2>
+            </div>
+
+            <p className="import-warning">
+              <HiExclamationCircle />
+              Alternative au CSV : crée une fiche par rayon du{" "}
+              <strong>dictionnaire des rayons</strong> (jamais les sous-zones) et{" "}
+              <strong>remplace la totalité</strong> des zones existantes. Les 3 EAN
+              (papillonnage / bipage / contrôle) sont <strong>générés</strong> ; le
+              code principal est un <strong>QR code</strong>.
+            </p>
+
+            <div className="import-row">
+              <button
+                className="btn-primary"
+                disabled={!selectedEntreprise || generatingDico}
+                onClick={() => setConfirm("generateDico")}
+              >
+                <HiBookOpen />{" "}
+                {generatingDico
+                  ? "Génération en cours…"
+                  : "Générer depuis le dictionnaire"}
+              </button>
+
+              <button
+                className="btn-secondary"
+                disabled={downloadingPdf || zones.length === 0}
+                onClick={handleDownloadFiches}
+                title="Télécharger le PDF imprimable des fiches (QR principal + 3 codes-barres)"
+              >
+                <HiDownload />{" "}
+                {downloadingPdf
+                  ? "Préparation…"
+                  : "Télécharger les fiches (PDF)"}
+              </button>
+              <span className="import-target">
+                <HiQrcode /> QR principal + EAN-13 papillonnage/bipage/contrôle
+              </span>
+            </div>
+          </div>
+
           {/* Stats + recherche */}
           <div className="admin-zones-toolbar">
             <div className="zones-stats">
@@ -270,7 +375,7 @@ const AdminZonesScreen = () => {
                         {fetchingZones
                           ? "Chargement…"
                           : zones.length === 0
-                            ? "Aucune zone. Importez un fichier CSV pour commencer."
+                            ? "Aucune zone. Importez un CSV ou générez depuis le dictionnaire des rayons."
                             : "Aucune zone ne correspond à la recherche."}
                       </td>
                     </tr>
@@ -307,6 +412,10 @@ const AdminZonesScreen = () => {
                   <>
                     <HiUpload /> Confirmer l'import
                   </>
+                ) : confirm === "generateDico" ? (
+                  <>
+                    <HiBookOpen /> Générer depuis le dictionnaire
+                  </>
                 ) : (
                   <>
                     <HiTrash /> Tout supprimer
@@ -327,6 +436,14 @@ const AdminZonesScreen = () => {
                   de <strong>{entrepriseObj?.trigramme}</strong> puis insérer
                   celles du fichier <strong>{file?.name}</strong>. Continuer ?
                 </p>
+              ) : confirm === "generateDico" ? (
+                <p>
+                  La génération va{" "}
+                  <strong>supprimer toutes les zones existantes</strong> de{" "}
+                  <strong>{entrepriseObj?.trigramme}</strong> puis créer une fiche
+                  par rayon du <strong>dictionnaire des rayons</strong> (EAN générés,
+                  principal en QR). Continuer ?
+                </p>
               ) : (
                 <p>
                   Supprimer <strong>toutes les zones</strong> de{" "}
@@ -337,15 +454,21 @@ const AdminZonesScreen = () => {
             </div>
             <div className="modal-footer">
               <button
-                className={confirm === "import" ? "btn-primary" : "btn-danger"}
+                className={confirm === "deleteAll" ? "btn-danger" : "btn-primary"}
                 onClick={
                   confirm === "import"
                     ? handleConfirmImport
-                    : handleConfirmDeleteAll
+                    : confirm === "generateDico"
+                      ? handleConfirmGenerateDico
+                      : handleConfirmDeleteAll
                 }
-                disabled={importing || deleting}
+                disabled={importing || deleting || generatingDico}
               >
-                {confirm === "import" ? "Importer" : "Supprimer"}
+                {confirm === "import"
+                  ? "Importer"
+                  : confirm === "generateDico"
+                    ? "Générer"
+                    : "Supprimer"}
               </button>
               <button className="btn-secondary" onClick={() => setConfirm(null)}>
                 Annuler

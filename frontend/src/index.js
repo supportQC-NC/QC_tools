@@ -31,6 +31,7 @@ import AdminZonesScreen from "./screens/admin/AdminZonesScreen";
 import AdminInventaireProgressionScreen from "./screens/admin/AdminInventaireProgressionScreen";
 import AdminFichesControleScreen from "./screens/admin/AdminFichesControleScreen";
 import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
+import AdminDemandesBipageScreen from "./screens/admin/AdminDemandesBipageScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
@@ -274,8 +275,9 @@ const router = createBrowserRouter(
         />
       </Route>
 
-      {/* Données · Bipages -> module "bipage" */}
+      {/* Données · Bipages (demandes) + Inventaire Zones · Détail des bipages -> module "bipage" */}
       <Route element={<ModuleRoute module="bipage" />}>
+        <Route path="/admin/demandes-bipage" element={<AdminDemandesBipageScreen />} />
         <Route path="/admin/bipages" element={<AdminBipagesScreen />} />
       </Route>
 

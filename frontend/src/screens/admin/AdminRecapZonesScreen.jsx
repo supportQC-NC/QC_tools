@@ -1,505 +1,287 @@
-// src/screens/admin/AdminReceptionSuiviScreen.jsx
+// src/screens/admin/AdminRecapZonesScreen.jsx
 //
-// Suivi des réceptions : MÊME liste que le module Réception mobile (commandes
-// à contrôler, ETAT >= 4, via /api/receptions/a-controler) + superposition de
-// la PROGRESSION du contrôle (articles contrôlés, anomalies, photos, statut).
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSelector } from "react-redux";
+// Récap par zone de l'inventaire ACTIF : une carte par zone (fiche rayon), colorée
+// selon son avancement.
+//   rouge  = pas commencé (0 phase)
+//   orange = papillonnage fait
+//   violet = comptage (bipage) fait
+//   vert   = complet (papillonnage + bipage + contrôle)
+// Données : session active (inventaireZoneApiSlice → getActiveSession), zones[] avec
+// les 3 sous-docs de phase { fait, at, by }.
+
+import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-  HiRefresh, HiClipboardList, HiExclamation, HiCube, HiPhotograph, HiDownload, HiX, HiSparkles,
+  HiViewGrid,
+  HiRefresh,
+  HiSearch,
+  HiClipboardCheck,
+  HiCheck,
 } from "react-icons/hi";
-import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
-import {
-  useGetCommandesAControlerQuery,
-  useGetReceptionProgressQuery,
-  useGetCommandesAgregatsQuery,
-  useGetRecentesControleesQuery,
-} from "../../slices/receptionSuiviApiSlice";
-import Loader from "../../components/Shared/Loader/Loader";
-import { BASE_URL } from "../../constants";
-import "./AdminReceptionSuiviScreen.css";
+import { useSelector } from "react-redux";
+import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
+import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
+import "./AdminRecapZonesScreen.css";
 
-const ANOMALIE = {
-  avarie: { label: "Avarie", cls: "rs-ano-warn" },
-  cassee: { label: "Cassée", cls: "rs-ano-danger" },
-  manquant: { label: "Manquant", cls: "rs-ano-danger" },
-  abimee: { label: "Abîmée", cls: "rs-ano-warn" },
+const POLL = 5000;
+
+const PHASES = [
+  { key: "papillonnage", label: "Papillonnage" },
+  { key: "bipage", label: "Comptage" },
+  { key: "controle", label: "Contrôle" },
+];
+
+// Statut d'avancement d'une zone (évalué de haut en bas).
+const STATUTS = {
+  complet: { label: "Complet", color: "#4ade80" },
+  comptage: { label: "Comptage", color: "#8b5cf6" },
+  papillonnage: { label: "Papillonnage", color: "#f59e0b" },
+  todo: { label: "Pas commencé", color: "#ff6b6b" },
 };
-const up = (v) => String(v || "").trim().toUpperCase();
-const fmtNb = (n) => (n ?? 0).toLocaleString("fr-FR");
-const fmtDate = (iso) => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("fr-FR");
+const ORDRE_STATUTS = ["todo", "papillonnage", "comptage", "complet"];
+
+const zoneStatut = (z) => {
+  const pap = !!z?.papillonnage?.fait;
+  const bip = !!z?.bipage?.fait;
+  const ctrl = !!z?.controle?.fait;
+  if (pap && bip && ctrl) return "complet";
+  if (bip) return "comptage";
+  if (pap) return "papillonnage";
+  return "todo";
 };
-const photoSrc = (recId, sigId) =>
-  `${BASE_URL}/api/reception-suivi/${recId}/signalement/${sigId}/photo`;
 
-const AdminReceptionSuiviScreen = () => {
-  const selectedEnt = useSelector(selectGlobalDossier) || "";
-  const [selectedNumcde, setSelectedNumcde] = useState(null);
-  const [filter, setFilter] = useState("tous"); // tous | encours
-  const [zoom, setZoom] = useState(null);
-  const [photoUrls, setPhotoUrls] = useState({});
-  const urlsRef = useRef({});
-  const [openRec, setOpenRec] = useState(null);
-  const [recPhotos, setRecPhotos] = useState({});
-  const recUrlsRef = useRef({});
+const AdminRecapZonesScreen = () => {
+  const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
+  const [search, setSearch] = useState("");
+  const [filtre, setFiltre] = useState("tous"); // "tous" | clé de STATUTS
+  const [emplFiltre, setEmplFiltre] = useState("tous"); // "tous" | "MAGASIN" | "DOCK"
 
-  const { data: cmdData, isFetching: fCmd, refetch: refetchCmd } =
-    useGetCommandesAControlerQuery(selectedEnt, { skip: !selectedEnt });
-  const { data: progressList = [], isFetching: fProg, refetch: refetchProg } =
-    useGetReceptionProgressQuery(selectedEnt, { skip: !selectedEnt });
-  const { data: agregats = {}, refetch: refetchAgg } =
-    useGetCommandesAgregatsQuery(selectedEnt, { skip: !selectedEnt });
-  const { data: recentes = [], refetch: refetchRec } =
-    useGetRecentesControleesQuery(selectedEnt, { skip: !selectedEnt });
+  const { data: entreprises } = useGetMyEntreprisesQuery();
+  const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
 
-  // Réinitialise la commande sélectionnée au changement d'entreprise.
-  useEffect(() => {
-    setSelectedNumcde(null);
-  }, [selectedEnt]);
+  const {
+    data: activeData,
+    isLoading,
+    refetch,
+  } = useGetActiveSessionQuery(selectedEntreprise, {
+    skip: !selectedEntreprise,
+    pollingInterval: selectedEntreprise ? POLL : 0,
+  });
 
-  const commandes = cmdData?.commandes || [];
-  const progressByNumcde = useMemo(() => {
-    const m = new Map();
-    progressList.forEach((p) => m.set(up(p.numcde), p));
-    return m;
-  }, [progressList]);
+  const session = activeData?.active || null;
+  const progress = activeData?.progress || null;
+  const zones = useMemo(() => session?.zones || [], [session]);
 
-  const merged = useMemo(
-    () =>
-      commandes.map((c) => ({
-        ...c,
-        progress: progressByNumcde.get(up(c.numcde)) || null,
-        agg: agregats[up(c.numcde)] || null,
-      })),
-    [commandes, progressByNumcde, agregats],
+  // Statut calculé par zone.
+  const zonesAvecStatut = useMemo(
+    () => zones.map((z) => ({ z, statut: zoneStatut(z) })),
+    [zones],
   );
 
-  const controlledCount = (c) =>
-    (c.progress?.comptages || []).filter((x) => x.dansCommande).length;
-  const pctControle = (c) => {
-    const total = c.agg?.nbArticles || 0;
-    if (!c.progress || total === 0) return null;
-    return Math.min(100, Math.round((controlledCount(c) / total) * 100));
-  };
+  const compteurs = useMemo(() => {
+    const c = { todo: 0, papillonnage: 0, comptage: 0, complet: 0 };
+    for (const { statut } of zonesAvecStatut) c[statut] += 1;
+    return c;
+  }, [zonesAvecStatut]);
 
-  const nbEnCours = merged.filter((c) => c.progress).length;
-  const nbTodo = merged.length - nbEnCours;
-  const displayed = useMemo(() => {
-    const base = filter === "encours" ? merged.filter((c) => c.progress) : merged;
-    return [...base].sort((a, b) => (a.progress ? 0 : 1) - (b.progress ? 0 : 1));
-  }, [merged, filter]);
+  const emplOf = (z) => (String(z?.type || "").toUpperCase() === "DOCK" ? "DOCK" : "MAGASIN");
 
-  const selected = merged.find((c) => c.numcde === selectedNumcde) || null;
-  const busy = Boolean(selectedEnt) && (fCmd || fProg);
+  const compteursEmpl = useMemo(() => {
+    const c = { MAGASIN: 0, DOCK: 0 };
+    for (const { z } of zonesAvecStatut) c[emplOf(z)] += 1;
+    return c;
+  }, [zonesAvecStatut]);
 
-  // Photos des anomalies du contrôle sélectionné (fetch + cookie -> blob URL).
-  useEffect(() => {
-    Object.values(urlsRef.current).forEach((u) => {
-      if (typeof u === "string" && u.startsWith("blob:")) URL.revokeObjectURL(u);
+  const zonesFiltrees = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return zonesAvecStatut.filter(({ z, statut }) => {
+      if (filtre !== "tous" && statut !== filtre) return false;
+      if (emplFiltre !== "tous" && emplOf(z) !== emplFiltre) return false;
+      if (!q) return true;
+      return [z.code, z.libelle, z.type].some((v) =>
+        (v || "").toLowerCase().includes(q),
+      );
     });
-    urlsRef.current = {};
-    setPhotoUrls({});
-    const prog = selected?.progress;
-    if (!prog?.receptionId) return undefined;
-    let alive = true;
-    (prog.signalements || [])
-      .filter((s) => s.hasPhoto)
-      .forEach(async (s) => {
-        try {
-          const res = await fetch(photoSrc(prog.receptionId, s._id), {
-            credentials: "include",
-          });
-          if (!res.ok) throw new Error("http " + res.status);
-          const blob = await res.blob();
-          if (!alive || !blob || blob.size === 0) return;
-          const url = URL.createObjectURL(blob);
-          urlsRef.current[s._id] = url;
-          setPhotoUrls((p) => ({ ...p, [s._id]: url }));
-        } catch {
-          if (alive) setPhotoUrls((p) => ({ ...p, [s._id]: "error" }));
-        }
-      });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedNumcde]);
-
-  // Photos des anomalies dans "dernières contrôlées" (chargées à l'ouverture).
-  useEffect(() => {
-    if (!openRec) return undefined;
-    const rec = recentes.find((r) => r._id === openRec);
-    if (!rec) return undefined;
-    let alive = true;
-    (rec.signalements || [])
-      .filter((s) => s.hasPhoto)
-      .forEach(async (s) => {
-        if (recUrlsRef.current[s._id]) return;
-        try {
-          const res = await fetch(photoSrc(rec._id, s._id), { credentials: "include" });
-          if (!res.ok) throw new Error("http");
-          const blob = await res.blob();
-          if (!alive || !blob || !blob.size) return;
-          const url = URL.createObjectURL(blob);
-          recUrlsRef.current[s._id] = url;
-          setRecPhotos((p) => ({ ...p, [s._id]: url }));
-        } catch {
-          if (alive) setRecPhotos((p) => ({ ...p, [s._id]: "error" }));
-        }
-      });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openRec]);
-
-  useEffect(
-    () => () => {
-      Object.values(recUrlsRef.current).forEach(
-        (u) => typeof u === "string" && u.startsWith("blob:") && URL.revokeObjectURL(u),
-      );
-    },
-    [],
-  );
-
-  const refresh = () => { refetchCmd(); refetchProg(); refetchAgg(); refetchRec(); };
-
-  const downloadFile = async (id, name) => {
-    try {
-      const res = await fetch(
-        `${BASE_URL}/api/reception-suivi/${id}/fichier/${encodeURIComponent(name)}`,
-        { credentials: "include" },
-      );
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-    } catch {
-      /* ignore */
-    }
-  };
+  }, [zonesAvecStatut, search, filtre, emplFiltre]);
 
   return (
-    <div className="reception-suivi">
-      <div className="rs-header">
-        <div className="rs-head-title">
-          <span className="rs-head-icon"><HiClipboardList /></span>
-          <div>
-            <h1>Suivi des réceptions</h1>
-            <p>Commandes à contrôler (ETAT ≥ 4) + progression, anomalies et photos.</p>
-          </div>
-        </div>
-        <div className="rs-head-actions">
-          <button className="rs-refresh" onClick={refresh} disabled={busy}>
-            <HiRefresh className={busy ? "spin" : ""} /> Rafraîchir
-          </button>
-        </div>
+    <div className="recap-zones">
+      {/* En-tête */}
+      <div className="rz-header">
+        <h1>
+          <HiViewGrid /> Récap par zone
+        </h1>
+        <button
+          className="btn-icon"
+          onClick={refetch}
+          disabled={!selectedEntreprise}
+          title="Rafraîchir"
+        >
+          <HiRefresh />
+        </button>
       </div>
 
-      {selectedEnt && merged.length > 0 && (
-        <div className="rs-toolbar">
-          <button
-            className={`rs-chip ${filter === "tous" ? "on" : ""}`}
-            onClick={() => setFilter("tous")}
-          >
-            Toutes <span>{merged.length}</span>
-          </button>
-          <button
-            className={`rs-chip rs-chip-cours ${filter === "encours" ? "on" : ""}`}
-            onClick={() => setFilter("encours")}
-          >
-            <span className="rs-dot" /> En cours <span>{nbEnCours}</span>
-          </button>
-          {nbTodo > 0 && <span className="rs-toolbar-info">{nbTodo} à contrôler</span>}
+      {!selectedEntreprise ? (
+        <div className="rz-placeholder">
+          <HiViewGrid />
+          <p>Sélectionnez une société dans l'en-tête pour voir l'avancement.</p>
         </div>
-      )}
-
-      {!selectedEnt ? (
-        <div className="rs-empty">Choisissez une entreprise dans le sélecteur en haut de page.</div>
-      ) : busy && merged.length === 0 ? (
-        <Loader />
+      ) : isLoading ? (
+        <div className="rz-placeholder">Chargement…</div>
+      ) : !session ? (
+        <div className="rz-placeholder">
+          <HiClipboardCheck />
+          <p>Aucun inventaire actif pour {entrepriseObj?.trigramme}.</p>
+          <Link className="btn-primary" to="/admin/inventaire-progression">
+            Initialiser un inventaire
+          </Link>
+        </div>
       ) : (
-        <div className="rs-layout">
-          {/* Liste des commandes à contrôler */}
-          <div className="rs-list">
-            {displayed.length === 0 ? (
-              <div className="rs-empty">
-                {filter === "encours" ? "Aucun contrôle en cours." : "Aucune commande à contrôler."}
+        <>
+          {/* Bandeau récap + avancement global */}
+          <div className="rz-summary">
+            <div className="rz-summary-info">
+              <strong>{session.nom}</strong>
+              <span>
+                {zones.length} zone(s) · {progress?.pct ?? 0}% complété
+              </span>
+              <div className="rz-progress">
+                <div
+                  className="rz-progress-fill"
+                  style={{ width: `${progress?.pct ?? 0}%` }}
+                />
               </div>
-            ) : (
-              displayed.map((c) => {
-                const p = c.progress;
-                return (
-                  <button
-                    key={c.numcde}
-                    className={`rs-card ${c.progress ? "encours" : "todo"} ${selectedNumcde === c.numcde ? "active" : ""}`}
-                    onClick={() => setSelectedNumcde(c.numcde)}
-                  >
-                    <div className="rs-card-top">
-                      <span className="rs-cde">Cmd {c.numcde}</span>
-                      {p ? (
-                        <span className="rs-badge rs-st-cours"><span className="rs-dot" /> En cours</span>
-                      ) : (
-                        <span className="rs-badge rs-st-todo">À contrôler</span>
-                      )}
-                    </div>
-                    <div className="rs-card-meta">{c.fournisseurNom || "—"}</div>
-                    <div className="rs-card-stats">
-                      {c.etatLabel ? <span>{c.etatLabel}</span> : c.etat != null && <span>ETAT {c.etat}</span>}
-                      {!!c.bateau && <span>🚢 {c.bateau}</span>}
-                      {c.arrivee && <span>Arr. {fmtDate(c.arrivee)}</span>}
-                    </div>
-                    {c.agg && (
-                      <div className="rs-card-stats">
-                        <span><HiCube /> {fmtNb(c.agg.nbArticles)} art.</span>
-                        <span>{fmtNb(c.agg.totalUnites)} u.</span>
-                        {c.agg.nbNouveautes > 0 && (
-                          <span className="rs-nouv"><HiSparkles /> {c.agg.nbNouveautes} nouv.</span>
-                        )}
-                      </div>
-                    )}
-                    {p && (
-                      <div className="rs-card-stats">
-                        <span><HiCube /> {p.nbComptages} contrôlé(s)</span>
-                        {p.nbSignalements > 0 && (
-                          <span className="rs-warn"><HiExclamation /> {p.nbSignalements} anomalie(s)</span>
-                        )}
-                      </div>
-                    )}
-                    {pctControle(c) != null && (
-                      <div className="rs-progress">
-                        <div className="rs-progress-bar">
-                          <div className="rs-progress-fill" style={{ width: `${pctControle(c)}%` }} />
-                        </div>
-                        <span className="rs-progress-txt">{pctControle(c)}%</span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-
-          {/* Détail */}
-          <div className="rs-detail">
-            {!selected ? (
-              <div className="rs-detail-empty">
-                <HiClipboardList />
-                <p>Sélectionnez une commande</p>
-                <span>Cliquez une commande à gauche pour voir sa progression, ses anomalies et ses photos.</span>
-              </div>
-            ) : (
-              <>
-                <div className="rs-detail-head">
-                  <h2>Cmd {selected.numcde}</h2>
-                  <span className="rs-detail-sub">
-                    {selected.fournisseurNom || "—"}
-                    {selected.bateau ? ` · 🚢 ${selected.bateau}` : ""}
-                    {selected.arrivee ? ` · Arrivée ${fmtDate(selected.arrivee)}` : ""}
-                    {selected.etatLabel ? ` · ${selected.etatLabel}` : ""}
-                  </span>
-                  {selected.agg && (
-                    <div className="rs-detail-agg">
-                      <span><HiCube /> {fmtNb(selected.agg.nbArticles)} articles</span>
-                      <span>{fmtNb(selected.agg.totalUnites)} unités</span>
-                      {selected.agg.nbNouveautes > 0 && (
-                        <span className="rs-nouv"><HiSparkles /> {selected.agg.nbNouveautes} nouveautés</span>
-                      )}
-                    </div>
-                  )}
-                  {pctControle(selected) != null && (
-                    <div className="rs-progress rs-progress-lg">
-                      <div className="rs-progress-bar">
-                        <div className="rs-progress-fill" style={{ width: `${pctControle(selected)}%` }} />
-                      </div>
-                      <span className="rs-progress-txt">{pctControle(selected)}% contrôlé</span>
-                    </div>
-                  )}
+            </div>
+            <div className="rz-counts">
+              {ORDRE_STATUTS.map((k) => (
+                <div key={k} className="rz-count">
+                  <span
+                    className="rz-count-dot"
+                    style={{ background: STATUTS[k].color }}
+                  />
+                  <span className="rz-count-n">{compteurs[k]}</span>
+                  <span className="rz-count-lbl">{STATUTS[k].label}</span>
                 </div>
-
-                {!selected.progress ? (
-                  <p className="rs-none">Contrôle non commencé pour cette commande.</p>
-                ) : (
-                  <>
-                    {/* Anomalies */}
-                    <h3 className="rs-section">
-                      <HiExclamation /> Anomalies ({(selected.progress.signalements || []).length})
-                    </h3>
-                    {(selected.progress.signalements || []).length === 0 ? (
-                      <p className="rs-none">Aucune anomalie signalée.</p>
-                    ) : (
-                      <div className="rs-ano-grid">
-                        {selected.progress.signalements.map((s) => {
-                          const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
-                          const pu = photoUrls[s._id];
-                          return (
-                            <div key={s._id} className="rs-ano">
-                              {s.hasPhoto ? (
-                                pu && pu !== "error" ? (
-                                  <img className="rs-ano-photo" src={pu} alt={s.nart} onClick={() => setZoom({ url: pu, name: `anomalie_${up(s.nart) || "photo"}.jpg` })} />
-                                ) : (
-                                  <div className="rs-ano-nophoto">
-                                    {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
-                                  </div>
-                                )
-                              ) : (
-                                <div className="rs-ano-nophoto"><HiPhotograph /></div>
-                              )}
-                              <div className="rs-ano-info">
-                                <span className={`rs-badge ${a.cls}`}>{a.label}</span>
-                                <span className="rs-ano-nart">{s.nart || "—"}</span>
-                                {!!s.designation && <span className="rs-ano-design">{s.designation}</span>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Articles contrôlés */}
-                    <h3 className="rs-section">
-                      <HiCube /> Articles contrôlés ({(selected.progress.comptages || []).length})
-                    </h3>
-                    {(selected.progress.comptages || []).length === 0 ? (
-                      <p className="rs-none">Aucun article compté.</p>
-                    ) : (
-                      <div className="rs-table-wrap">
-                        <table className="rs-table">
-                          <thead>
-                            <tr>
-                              <th>NART</th>
-                              <th>Désignation</th>
-                              <th className="num">Compté</th>
-                              <th>État</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selected.progress.comptages.map((c, i) => (
-                              <tr key={`${c.nart}-${i}`}>
-                                <td className="mono">{c.nart || (c.isInconnu ? "Inconnu" : "—")}</td>
-                                <td className="design" title={c.designation}>{c.designation || c.gencod}</td>
-                                <td className="num strong">{c.qteValidee != null ? c.qteValidee : c.qteComptee}</td>
-                                <td>
-                                  {c.isInconnu ? (
-                                    <span className="rs-tag rs-tag-warn">hors base</span>
-                                  ) : !c.dansCommande ? (
-                                    <span className="rs-tag">hors cmd</span>
-                                  ) : (
-                                    <span className="rs-tag rs-tag-ok">commande</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
 
-      {selectedEnt && recentes.length > 0 && (
-        <div className="rs-recentes">
-          <h3 className="rs-section">
-            <HiClipboardList /> Dernières réceptions contrôlées ({recentes.length})
-          </h3>
-          <div className="rs-rec-list">
-            {recentes.map((r) => {
-              const anoPhotos = (r.signalements || []).filter((s) => s.hasPhoto);
-              const isOpen = openRec === r._id;
-              return (
-                <div key={r._id} className="rs-rec-item">
-                  <div className="rs-rec-row">
-                    <div className="rs-rec-info">
-                      <span className="rs-rec-cde">Cmd {r.numcde}</span>
-                      <span className="rs-rec-four">{r.fournisseurNom || "—"}</span>
-                      <span className="rs-rec-date">{fmtDate(r.generatedAt)}</span>
+          {/* Filtres + recherche */}
+          <div className="rz-toolbar">
+            <div className="rz-filters">
+              {/* Filtre par statut */}
+              <div className="rz-chips">
+                <button
+                  className={`rz-chip ${filtre === "tous" ? "on" : ""}`}
+                  onClick={() => setFiltre("tous")}
+                >
+                  Tous ({zones.length})
+                </button>
+                {ORDRE_STATUTS.map((k) => (
+                  <button
+                    key={k}
+                    className={`rz-chip ${filtre === k ? "on" : ""}`}
+                    onClick={() => setFiltre(k)}
+                    style={
+                      filtre === k
+                        ? { borderColor: STATUTS[k].color, color: STATUTS[k].color }
+                        : undefined
+                    }
+                  >
+                    <span
+                      className="rz-dot"
+                      style={{ background: STATUTS[k].color }}
+                    />
+                    {STATUTS[k].label} ({compteurs[k]})
+                  </button>
+                ))}
+              </div>
+              {/* Filtre par emplacement */}
+              <div className="rz-chips">
+                <span className="rz-filter-lbl">Emplacement :</span>
+                <button
+                  className={`rz-chip ${emplFiltre === "tous" ? "on" : ""}`}
+                  onClick={() => setEmplFiltre("tous")}
+                >
+                  Tous
+                </button>
+                {["MAGASIN", "DOCK"].map((e) => (
+                  <button
+                    key={e}
+                    className={`rz-chip ${emplFiltre === e ? "on" : ""}`}
+                    onClick={() => setEmplFiltre(e)}
+                  >
+                    {e} ({compteursEmpl[e]})
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="rz-search">
+              <HiSearch />
+              <input
+                type="text"
+                placeholder="Rechercher (code, libellé)…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Grille de cartes */}
+          {zonesFiltrees.length === 0 ? (
+            <div className="rz-placeholder">
+              <p>Aucune zone ne correspond au filtre.</p>
+            </div>
+          ) : (
+            <div className="rz-grid">
+              {zonesFiltrees.map(({ z, statut }) => {
+                const color = STATUTS[statut].color;
+                return (
+                  <div
+                    key={z.code}
+                    className="rz-card"
+                    style={{
+                      borderColor: color,
+                      background: `linear-gradient(180deg, ${color}14, transparent 60%)`,
+                    }}
+                  >
+                    <div className="rz-card-head">
+                      <span className="rz-card-code">{z.code}</span>
+                      <span
+                        className="rz-card-statut"
+                        style={{ background: color }}
+                      >
+                        {STATUTS[statut].label}
+                      </span>
                     </div>
-                    <div className="rs-rec-files">
-                      {anoPhotos.length > 0 && (
-                        <button
-                          className={`rs-file rs-file-ano ${isOpen ? "on" : ""}`}
-                          onClick={() => setOpenRec(isOpen ? null : r._id)}
-                          title="Voir les photos d'anomalies"
-                        >
-                          <HiPhotograph /> {anoPhotos.length} photo{anoPhotos.length > 1 ? "s" : ""}
-                        </button>
-                      )}
-                      {r.fichiers.length === 0 ? (
-                        <span className="rs-rec-nofile">Aucun fichier</span>
-                      ) : (
-                        r.fichiers.map((f) => (
-                          <button
-                            key={f.name}
-                            className={`rs-file rs-file-${f.ext}`}
-                            onClick={() => downloadFile(r._id, f.name)}
-                            title={f.name}
-                          >
-                            <HiDownload /> {f.ext.toUpperCase()}
-                          </button>
-                        ))
-                      )}
+                    <div className="rz-card-lib" title={z.libelle}>
+                      {z.libelle || "—"}
                     </div>
-                  </div>
-                  {isOpen && anoPhotos.length > 0 && (
-                    <div className="rs-rec-photos">
-                      {anoPhotos.map((s) => {
-                        const a = ANOMALIE[s.type] || { label: s.type, cls: "" };
-                        const pu = recPhotos[s._id];
+                    {z.type && <div className="rz-card-empl">{z.type}</div>}
+                    <div className="rz-card-phases">
+                      {PHASES.map((p) => {
+                        const fait = !!z[p.key]?.fait;
                         return (
-                          <div key={s._id} className="rs-rec-thumb-wrap">
-                            {pu && pu !== "error" ? (
-                              <img
-                                className="rs-rec-thumb"
-                                src={pu}
-                                alt={s.nart}
-                                onClick={() => setZoom({ url: pu, name: `anomalie_${up(s.nart) || "photo"}.jpg` })}
-                              />
-                            ) : (
-                              <div className="rs-rec-thumb rs-rec-thumb-ph">
-                                {pu === "error" ? <HiPhotograph /> : <span className="rs-spin-dot" />}
-                              </div>
-                            )}
-                            <span className={`rs-badge ${a.cls}`}>{a.label}</span>
-                            <span className="rs-rec-thumb-nart">{s.nart || "—"}</span>
-                          </div>
+                          <span
+                            key={p.key}
+                            className={`rz-phase ${fait ? "done" : ""}`}
+                            title={`${p.label} : ${fait ? "fait" : "à faire"}`}
+                          >
+                            {fait ? <HiCheck /> : "○"} {p.label}
+                          </span>
                         );
                       })}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {zoom && (
-        <div className="rs-zoom" onClick={() => setZoom(null)}>
-          <div className="rs-zoom-box" onClick={(e) => e.stopPropagation()}>
-            <img src={zoom.url} alt="" />
-            <div className="rs-zoom-actions">
-              <a className="rs-zoom-btn dl" href={zoom.url} download={zoom.name}>
-                <HiDownload /> Télécharger
-              </a>
-              <button className="rs-zoom-btn" onClick={() => setZoom(null)}>
-                <HiX /> Fermer
-              </button>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );
 };
 
-export default AdminReceptionSuiviScreen;
+export default AdminRecapZonesScreen;

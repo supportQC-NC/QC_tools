@@ -1,4 +1,3 @@
-Set-Content -Path .gitignore -Encoding ascii -Value @"
 # dependencies
 node_modules
 /.pnp
@@ -25,5 +24,6 @@ yarn-error.log*
 
 # Database files
 *.dbf
-"@
 
+# App mobile (dépôt git séparé — ne pas pousser dans ce repo)
+test-app-qc/

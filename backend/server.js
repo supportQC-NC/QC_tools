@@ -67,6 +67,7 @@ import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
 import topArticlesRoutes from "./routes/topArticlesRoutes.js";
 import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
 import demandeReapproRoutes from "./routes/demandeReapproRoutes.js";
+import demandeBipageRoutes from "./routes/demandeBipageRoutes.js";
 import receptionSuiviRoutes from "./routes/receptionSuiviRoutes.js";
 import ficheArticleRoutes from "./routes/ficheArticleRoutes.js";
 // ========== ROUTES ÉQUIPES (hiérarchie responsables) ==========
@@ -201,6 +202,7 @@ app.use("/api/journal-caisse", journalCaisseRoutes);
 app.use("/api/top-articles", topArticlesRoutes);
 app.use("/api/analyse-reappro", analyseReapproRoutes);
 app.use("/api/demande-reappro", demandeReapproRoutes);
+app.use("/api/demande-bipage", demandeBipageRoutes);
 app.use("/api/reception-suivi", receptionSuiviRoutes);
 app.use("/api/fiche-article", ficheArticleRoutes);
 // ========== ROUTES ÉQUIPES ==========

@@ -2,6 +2,7 @@
 import express from "express";
 import {
   resoudreZone,
+  getSessionActive,
   createCollecte,
   getCollectesEnCours,
   getCollecteById,
@@ -20,6 +21,8 @@ const router = express.Router();
 
 // Routes littérales d'abord, puis routes paramétrées
 router.route("/resoudre-zone").post(protect, resoudreZone);
+// Porte d'entrée mobile : un inventaire est-il en cours ?
+router.route("/session-active/:entrepriseId").get(protect, getSessionActive);
 router.route("/en-cours/:entrepriseId").get(protect, getCollectesEnCours);
 // Récap de la session active, regroupé par zone (avec écarts qté + XPF)
 router.route("/recap-zones/:entrepriseId").get(protect, getRecapZones);

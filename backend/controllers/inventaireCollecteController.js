@@ -1002,9 +1002,15 @@ const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const genererContenuFichier = (lignes) => {
   let contenu = "";
   lignes.forEach((ligne) => {
-    // Toujours le NART (jamais le GENCODE), complété par des espaces à droite
-    // jusqu'à 13 caractères au total (NART de 6 -> 6 + 7 espaces).
-    const code = (ligne.nart || "").trim().padEnd(13, " ");
+    // Le CODE écrit est le GENCOD (code-barres) de l'article scanné si présent,
+    // sinon le NART en repli (article sans code-barre / scan inconnu). Complété
+    // par des espaces à droite jusqu'à 13 caractères (NART de 6 -> 6 + 7 espaces).
+    // La résolution article aval (findByCode) est GENCOD-d'abord puis NART.
+    const brut =
+      ligne.gencod && ligne.gencod.trim()
+        ? ligne.gencod.trim()
+        : (ligne.nart || "").trim();
+    const code = brut.padEnd(13, " ");
     const quantiteFormatee = ligne.quantite.toString().padStart(8, "0");
     const suffixe = "000";
     contenu += `${code}|${quantiteFormatee}|${suffixe}\r\n`;
@@ -1932,8 +1938,33 @@ const deleteCollecte = asyncHandler(async (req, res) => {
   res.json({ message: "Collecte supprimée" });
 });
 
+// @desc    Indique si un inventaire (session ZONE) est EN COURS pour l'entreprise.
+//          Sert de porte d'entrée à l'app mobile : on n'entre dans l'inventaire
+//          que s'il y a une session active (sinon le dépôt .dat ne serait pas
+//          surveillé/imprimé).
+// @route   GET /api/inventaires-collecte/session-active/:entrepriseId
+// @access  Private
+const getSessionActive = asyncHandler(async (req, res) => {
+  const session = await InventaireZoneSession.findOne({
+    entreprise: req.params.entrepriseId,
+    statut: "actif",
+  }).select("nom totalZones createdAt");
+  res.json({
+    active: !!session,
+    session: session
+      ? {
+          _id: session._id,
+          nom: session.nom,
+          totalZones: session.totalZones,
+          createdAt: session.createdAt,
+        }
+      : null,
+  });
+});
+
 export {
   resoudreZone,
+  getSessionActive,
   createCollecte,
   getCollectesEnCours,
   getCollecteById,

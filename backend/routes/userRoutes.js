@@ -5,6 +5,7 @@ import {
   authUser,
   logoutUser,
   getUserProfile,
+  getSocketToken,
   updateUserProfile,
   changePassword,
   forgotPassword,
@@ -49,6 +50,8 @@ router.put("/reset-password/:token", resetPassword);
 // Private (utilisateur connecté) — self-service, jamais gaté par module
 router.post("/logout", protect, logoutUser);
 router.get("/profile", protect, getUserProfile);
+// Token pour l'authentification Socket.IO (app mobile).
+router.post("/socket-token", protect, getSocketToken);
 router.put("/profile", protect, updateUserProfile);
 // Changement de mot de passe (self) — AVANT /:id pour ne pas être capté par :id.
 router.put("/profile/password", protect, changePassword);

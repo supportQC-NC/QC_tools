@@ -200,9 +200,30 @@
   color: #8b5cf6;
 }
 
+.bip-hint {
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 .bip-row {
   display: flex;
   gap: 10px;
+}
+
+/* Pastille de statut d'avancement par zone (tableau) */
+.statut-col {
+  width: 34px;
+  text-align: center;
+}
+
+.statut-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06);
 }
 
 .bip-input {
@@ -349,33 +370,40 @@
 }
 
 /* Recherche */
-.search-box {
-  display: flex;
+.admin-prog .search-box {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
   transition: border-color 0.2s;
-  max-width: 360px;
+  width: 100%;
+  max-width: 300px;
+  /* annule un éventuel `flex:1` global qui l'étirait en hauteur */
+  flex: 0 0 auto;
+  align-self: flex-start;
+  height: auto;
 }
 
-.search-box:focus-within {
+.admin-prog .search-box:focus-within {
   border-color: #8b5cf6;
 }
 
-.search-box svg {
+.admin-prog .search-box svg {
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
-.search-box input {
+.admin-prog .search-box input {
   background: transparent;
   border: none;
   outline: none;
   color: var(--text-primary);
   font-size: 13px;
   width: 100%;
+  min-width: 0;
 }
 
 /* Tableau */

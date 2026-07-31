@@ -60,8 +60,11 @@ const zoneSchema = new mongoose.Schema(
   },
 );
 
-// Code unique par entreprise (sensible à la casse : B_5d ≠ B_5g)
-zoneSchema.index({ entreprise: 1, code: 1 }, { unique: true });
+// Identité d'une zone = code + emplacement (type) : un même code rayon peut exister
+// en MAGASIN ET en DOCK (deux fiches distinctes). Sensible à la casse (B_5d ≠ B_5g).
+// NB : l'ancien index unique { entreprise, code } est supprimé au démarrage /
+// avant écriture par ensureZoneIndexes() (voir zoneController.js).
+zoneSchema.index({ entreprise: 1, code: 1, type: 1 }, { unique: true });
 
 // Index pour retrouver une zone par n'importe lequel de ses codes-barres
 // (utile pour la future gestion d'inventaire au scan)

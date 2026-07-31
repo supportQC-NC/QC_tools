@@ -20,6 +20,15 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Zone"],
     }),
 
+    // Génération des fiches rayons depuis le dictionnaire des rayons (remplacement total)
+    genererZonesDepuisDictionnaire: builder.mutation({
+      query: ({ entrepriseId }) => ({
+        url: `${ZONES_URL}/generer-dictionnaire/${entrepriseId}`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Zone"],
+    }),
+
     // Liste des zones d'une entreprise (recherche serveur optionnelle via ?search=)
     getZones: builder.query({
       query: ({ entrepriseId, search }) => ({
@@ -73,6 +82,7 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useImportZonesMutation,
+  useGenererZonesDepuisDictionnaireMutation,
   useGetZonesQuery,
   useLazyGetZonesQuery,
   useGetZoneByCodeQuery,

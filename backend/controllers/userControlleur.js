@@ -1,5 +1,6 @@
 // backend/controllers/userControlleur.js
 import asyncHandler from "../middleware/asyncHandler.js";
+import jwt from "jsonwebtoken";
 import User from "../models/UserModel.js";
 import Permission from "../models/PermissionModel.js";
 import generateToken from "../utils/generateToken.js";
@@ -123,6 +124,19 @@ const getUserProfile = asyncHandler(async (req, res) => {
     photoUpdatedAt: user.photoUpdatedAt || null,
     permissions: permissions || null,
   });
+});
+
+// @desc    Émet un JWT pour l'authentification Socket.IO (app mobile, qui ne peut
+//          pas relire le cookie httpOnly). Le mobile le passe dans handshake.auth.
+// @route   POST /api/users/socket-token
+// @access  Privé (cookie)
+const getSocketToken = asyncHandler(async (req, res) => {
+  const token = jwt.sign(
+    { userId: req.user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: "24h" },
+  );
+  res.json({ token });
 });
 
 // ---------------------------------------------------------------------------
@@ -963,6 +977,7 @@ export {
   authUser,
   logoutUser,
   getUserProfile,
+  getSocketToken,
   updateUserProfile,
   changePassword,
   forgotPassword,

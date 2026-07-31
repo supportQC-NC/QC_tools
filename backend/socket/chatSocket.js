@@ -43,11 +43,13 @@ const presenceSnapshot = () =>
     status: userStatus.get(id) || "actif",
   }));
 
-// Authentifie une connexion socket à partir du cookie JWT du handshake.
+// Authentifie une connexion socket : token dans le handshake (app mobile, qui ne
+// peut pas relire le cookie httpOnly) OU cookie JWT (web same-origin).
 const authenticateSocket = async (socket, next) => {
   try {
     const rawCookie = socket.handshake.headers?.cookie || "";
-    const token = readCookie(rawCookie, "token");
+    const token =
+      socket.handshake.auth?.token || readCookie(rawCookie, "token");
     if (!token) return next(new Error("Non authentifié"));
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).select("-password");
