@@ -50,6 +50,10 @@ const sessionSchema = new mongoose.Schema(
     nom: { type: String, default: "" },
     // Dossier réseau (partage STOCK) où le collecteur dépose les .DAT
     dossierDat: { type: String, default: "" },
+    // Slug UNIQUE du dossier (nom + horodatage) : chaque réinitialisation crée un
+    // dossier distinct. Le watcher / le dépôt recalculent le chemin via
+    // getInventaireDirs(dossierSlug) pour l'environnement courant (cross-OS).
+    dossierSlug: { type: String, default: "" },
     statut: {
       type: String,
       enum: ["actif", "archive"],

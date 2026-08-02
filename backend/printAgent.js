@@ -13,7 +13,7 @@
 //   2. lance le watcher (services/inventaireWatchService) qui, à intervalle :
 //        - surveille le dossier de chaque inventaire actif sur le Rcommun
 //          (config.sharePath = STOCK_SHARE_PATH + <nom d'inventaire>),
-//        - pour chaque nouveau stock.dat <code>[_MAGASIN/_DOCK] : génère le PDF
+//        - pour chaque nouveau stock.dat <code>[_<EMPLACEMENT>] : génère le PDF
 //          de la fiche, l'imprime (SumatraPDF via pdf-to-printer), archive le
 //          .DAT et le PDF, et enregistre la FicheControle (Mongo) ;
 //        - exécute les demandes de réimpression posées depuis l'app web

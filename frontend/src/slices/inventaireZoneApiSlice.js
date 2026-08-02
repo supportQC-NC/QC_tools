@@ -15,6 +15,15 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["InventaireZone"],
     }),
 
+    // Annuler l'inventaire actif (supprime dossier + session : table rase)
+    annulerInventaireZone: builder.mutation({
+      query: (entrepriseId) => ({
+        url: `${BASE}/${entrepriseId}/annuler`,
+        method: "POST",
+      }),
+      invalidatesTags: ["InventaireZone"],
+    }),
+
     // Biper un code-barres
     biperZone: builder.mutation({
       query: ({ entrepriseId, code }) => ({
@@ -66,6 +75,7 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useInitInventaireZoneMutation,
+  useAnnulerInventaireZoneMutation,
   useBiperZoneMutation,
   useGetActiveSessionQuery,
   useGetZoneProgressQuery,

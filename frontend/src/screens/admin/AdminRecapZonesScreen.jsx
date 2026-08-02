@@ -85,12 +85,20 @@ const AdminRecapZonesScreen = () => {
     return c;
   }, [zonesAvecStatut]);
 
-  const emplOf = (z) => (String(z?.type || "").toUpperCase() === "DOCK" ? "DOCK" : "MAGASIN");
+  // Emplacement = valeur libre de zone.type (MAGASIN/DOCK ou tout autre
+  // emplacement du dictionnaire). Les zones sans type sont regroupées sous "—".
+  const emplOf = (z) => String(z?.type || "").trim() || "—";
 
-  const compteursEmpl = useMemo(() => {
-    const c = { MAGASIN: 0, DOCK: 0 };
-    for (const { z } of zonesAvecStatut) c[emplOf(z)] += 1;
-    return c;
+  // Liste des emplacements réellement présents (avec compteurs), triée.
+  const emplacements = useMemo(() => {
+    const c = new Map();
+    for (const { z } of zonesAvecStatut) {
+      const e = emplOf(z);
+      c.set(e, (c.get(e) || 0) + 1);
+    }
+    return [...c.entries()].sort((a, b) =>
+      a[0].localeCompare(b[0], "fr", { numeric: true }),
+    );
   }, [zonesAvecStatut]);
 
   const zonesFiltrees = useMemo(() => {
@@ -197,25 +205,27 @@ const AdminRecapZonesScreen = () => {
                   </button>
                 ))}
               </div>
-              {/* Filtre par emplacement */}
-              <div className="rz-chips">
-                <span className="rz-filter-lbl">Emplacement :</span>
-                <button
-                  className={`rz-chip ${emplFiltre === "tous" ? "on" : ""}`}
-                  onClick={() => setEmplFiltre("tous")}
-                >
-                  Tous
-                </button>
-                {["MAGASIN", "DOCK"].map((e) => (
+              {/* Filtre par emplacement (dynamique : un bouton par type présent) */}
+              {emplacements.length > 1 && (
+                <div className="rz-chips">
+                  <span className="rz-filter-lbl">Emplacement :</span>
                   <button
-                    key={e}
-                    className={`rz-chip ${emplFiltre === e ? "on" : ""}`}
-                    onClick={() => setEmplFiltre(e)}
+                    className={`rz-chip ${emplFiltre === "tous" ? "on" : ""}`}
+                    onClick={() => setEmplFiltre("tous")}
                   >
-                    {e} ({compteursEmpl[e]})
+                    Tous
                   </button>
-                ))}
-              </div>
+                  {emplacements.map(([e, n]) => (
+                    <button
+                      key={e}
+                      className={`rz-chip ${emplFiltre === e ? "on" : ""}`}
+                      onClick={() => setEmplFiltre(e)}
+                    >
+                      {e} ({n})
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="rz-search">
               <HiSearch />

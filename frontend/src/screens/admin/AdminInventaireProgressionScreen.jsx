@@ -16,6 +16,7 @@ import {
 import {
   useGetActiveSessionQuery,
   useInitInventaireZoneMutation,
+  useAnnulerInventaireZoneMutation,
   useBiperZoneMutation,
   useSetPhaseManuelleMutation,
   useGetZoneHistoriqueQuery,
@@ -59,6 +60,7 @@ const AdminInventaireProgressionScreen = () => {
   const [bipFeedback, setBipFeedback] = useState(null); // { tone, message }
   const [search, setSearch] = useState("");
   const [showInitConfirm, setShowInitConfirm] = useState(false);
+  const [showAnnulerConfirm, setShowAnnulerConfirm] = useState(false);
   const [showHistorique, setShowHistorique] = useState(false);
 
   const bipInputRef = useRef(null);
@@ -81,6 +83,8 @@ const AdminInventaireProgressionScreen = () => {
 
   const [initInventaire, { isLoading: initializing }] =
     useInitInventaireZoneMutation();
+  const [annulerInventaire, { isLoading: annulating }] =
+    useAnnulerInventaireZoneMutation();
   const [biperZone, { isLoading: biping }] = useBiperZoneMutation();
   const [setPhaseManuelle] = useSetPhaseManuelleMutation();
   const [deleteZoneSession, { isLoading: deletingSession }] =
@@ -127,6 +131,27 @@ const AdminInventaireProgressionScreen = () => {
       setBipFeedback({
         tone: "error",
         message: err?.data?.message || "Erreur lors de l'initialisation",
+      });
+    }
+  };
+
+  const handleConfirmAnnuler = async () => {
+    setShowAnnulerConfirm(false);
+    setBipFeedback(null);
+    try {
+      const res = await annulerInventaire(selectedEntreprise).unwrap();
+      if (res?.dossierSupprime === false) {
+        setBipFeedback({
+          tone: "warning",
+          message: `Inventaire annulé, mais le dossier réseau n'a pas pu être supprimé${
+            res.dossierErreur ? ` : ${res.dossierErreur}` : ""
+          }. Supprimez-le manuellement si besoin.`,
+        });
+      }
+    } catch (err) {
+      setBipFeedback({
+        tone: "error",
+        message: err?.data?.message || "Erreur lors de l'annulation",
       });
     }
   };
@@ -250,6 +275,17 @@ const AdminInventaireProgressionScreen = () => {
         <div className="admin-prog-placeholder">
           <HiClipboardCheck />
           <p>Aucun inventaire actif pour {entrepriseObj?.trigramme}.</p>
+          {bipFeedback && (
+            <div className={`bip-feedback ${bipFeedback.tone}`}>
+              {bipFeedback.tone === "error" ||
+              bipFeedback.tone === "warning" ? (
+                <HiExclamationCircle />
+              ) : (
+                <HiCheckCircle />
+              )}
+              <span>{bipFeedback.message}</span>
+            </div>
+          )}
           <button
             className="btn-primary"
             onClick={() => setShowInitConfirm(true)}
@@ -289,6 +325,14 @@ const AdminInventaireProgressionScreen = () => {
                 disabled={initializing}
               >
                 <HiRefresh /> Réinitialiser
+              </button>
+              <button
+                className="btn-danger"
+                onClick={() => setShowAnnulerConfirm(true)}
+                disabled={annulating}
+                title="Supprime le dossier de dépôt et l'inventaire actif"
+              >
+                <HiTrash /> Annuler l'inventaire
               </button>
             </div>
           </div>
@@ -484,6 +528,62 @@ const AdminInventaireProgressionScreen = () => {
                 onClick={() => setShowInitConfirm(false)}
               >
                 Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmation annulation */}
+      {showAnnulerConfirm && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setShowAnnulerConfirm(false)}
+        >
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <HiTrash /> Annuler l'inventaire
+              </h2>
+              <button
+                className="btn-close-modal"
+                onClick={() => setShowAnnulerConfirm(false)}
+              >
+                <HiX />
+              </button>
+            </div>
+            <div className="modal-content">
+              <p>
+                L'inventaire actif de{" "}
+                <strong>{entrepriseObj?.trigramme}</strong> sera{" "}
+                <strong>définitivement supprimé</strong> :
+              </p>
+              <ul>
+                <li>
+                  le dossier de dépôt réseau et son contenu (fichiers .DAT et
+                  fiches PDF) seront <strong>effacés</strong> ;
+                </li>
+                <li>
+                  les collectes, bipages et fiches de contrôle liés seront
+                  purgés ;
+                </li>
+                <li>aucun historique ne sera conservé.</li>
+              </ul>
+              <p>Cette action est irréversible.</p>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-danger"
+                onClick={handleConfirmAnnuler}
+                disabled={annulating}
+              >
+                {annulating ? "Annulation…" : "Oui, annuler l'inventaire"}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowAnnulerConfirm(false)}
+              >
+                Retour
               </button>
             </div>
           </div>

@@ -998,19 +998,21 @@ const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // Format IDENTIQUE à celui des réappros / inventaires :
 //   CODE(13, justifié à gauche, complété par des espaces) | QTE(8, zéros à gauche) | 000
 //   fin de ligne CRLF (\r\n)
-// Le CODE écrit est le GENCOD (code-barres) si l'article en a un, sinon le NART.
+// Le CODE écrit est le NART en PRIORITÉ, et seulement à défaut le GENCOD.
 // Un NART de 6 caractères (ex. "550460") est donc bien suivi de 7 espaces.
 const genererContenuFichier = (lignes) => {
   let contenu = "";
   lignes.forEach((ligne) => {
-    // Le CODE écrit est le GENCOD (code-barres) de l'article scanné si présent,
-    // sinon le NART en repli (article sans code-barre / scan inconnu). Complété
-    // par des espaces à droite jusqu'à 13 caractères (NART de 6 -> 6 + 7 espaces).
-    // La résolution article aval (findByCode) est GENCOD-d'abord puis NART.
+    // Le CODE écrit est le NART de l'article en priorité (référence interne ERP),
+    // et uniquement à défaut le GENCOD (code-barres) en repli — cas d'un article
+    // sans NART (scan inconnu). Complété par des espaces à droite jusqu'à 13
+    // caractères (NART de 6 -> 6 + 7 espaces).
+    // La résolution article aval (findByCode) reste GENCOD-d'abord puis NART :
+    // un NART de 13 chiffres ne collisionne pas avec un GENCOD en pratique.
     const brut =
-      ligne.gencod && ligne.gencod.trim()
-        ? ligne.gencod.trim()
-        : (ligne.nart || "").trim();
+      ligne.nart && ligne.nart.trim()
+        ? ligne.nart.trim()
+        : (ligne.gencod || "").trim();
     const code = brut.padEnd(13, " ");
     const quantiteFormatee = ligne.quantite.toString().padStart(8, "0");
     const suffixe = "000";
@@ -1054,9 +1056,11 @@ const resoudreDossierDepot = async (entreprise) => {
     statut: "actif",
   });
 
-  if (session && session.nom) {
-    // Dossier surveillé, recalculé pour l'environnement courant.
-    const dossier = getInventaireDirs(session.nom).base;
+  const slug = session && (session.dossierSlug || session.nom);
+  if (slug) {
+    // Dossier surveillé, recalculé pour l'environnement courant (slug unique
+    // horodaté si présent, sinon nom pour les anciennes sessions).
+    const dossier = getInventaireDirs(slug).base;
     return { dossier, mode: "session", session };
   }
 

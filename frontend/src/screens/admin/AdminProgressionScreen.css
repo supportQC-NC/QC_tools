@@ -103,7 +103,8 @@
 
 /* Boutons */
 .btn-primary,
-.btn-secondary {
+.btn-secondary,
+.btn-danger {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -135,8 +136,18 @@
   color: var(--text-primary);
 }
 
+.btn-danger {
+  background: var(--danger, #ef4444);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
 .btn-primary:disabled,
-.btn-secondary:disabled {
+.btn-secondary:disabled,
+.btn-danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

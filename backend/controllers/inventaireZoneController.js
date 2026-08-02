@@ -1,4 +1,5 @@
 // backend/controllers/inventaireZoneController.js
+import fs from "fs";
 import asyncHandler from "../middleware/asyncHandler.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import InventaireCollecte from "../models/InventaireCollecteModel.js";
@@ -8,6 +9,7 @@ import Zone from "../models/ZoneModel.js";
 import {
   ensureInventaireDirs,
   getInventaireDirs,
+  makeInventaireSlug,
 } from "../services/ficheControleService.js";
 
 const PHASES = ["papillonnage", "bipage", "controle"];
@@ -139,11 +141,15 @@ const initInventaireZone = asyncHandler(async (req, res) => {
     (nom && nom.trim()) ||
     `Inventaire du ${new Date().toLocaleString("fr-FR")}`;
 
-  // Création des dossiers réseau (\\...\STOCK\<nom>\ + archive_dat, archive_pdf, zone_non_trouvee)
+  // Slug de dossier UNIQUE (nom + horodatage) : une réinitialisation ne réutilise
+  // JAMAIS le dossier d'un inventaire précédent, même à nom identique.
+  const dossierSlug = makeInventaireSlug(nomFinal);
+
+  // Création des dossiers réseau (\\...\STOCK\<slug>\ + archive_dat, archive_pdf, zone_non_trouvee)
   // Best-effort : si le partage est inaccessible, on n'empêche pas l'init.
-  let dossierDat = getInventaireDirs(nomFinal).base;
+  let dossierDat = getInventaireDirs(dossierSlug).base;
   try {
-    const dirs = ensureInventaireDirs(nomFinal);
+    const dirs = ensureInventaireDirs(dossierSlug);
     dossierDat = dirs.base;
   } catch (err) {
     console.error(
@@ -155,6 +161,7 @@ const initInventaireZone = asyncHandler(async (req, res) => {
     entreprise: entreprise._id,
     nom: nomFinal,
     dossierDat,
+    dossierSlug,
     statut: "actif",
     zones: zonesSnapshot,
     totalZones: zonesSnapshot.length,
@@ -382,6 +389,63 @@ const setPhaseManuelle = asyncHandler(async (req, res) => {
 });
 
 // ===========================================
+// ANNULATION (session active : table rase)
+// ===========================================
+
+/**
+ * @desc    Annuler l'inventaire ACTIF : supprime le dossier réseau de dépôt
+ *          (.DAT + PDF + sous-dossiers), purge les données liées et SUPPRIME
+ *          la session. Contrairement à la réinitialisation, rien n'est archivé
+ *          et aucun nouvel inventaire n'est créé → table rase.
+ * @route   POST /api/inventaires-zones/:entrepriseId/annuler
+ * @access  Private/Admin
+ */
+const annulerInventaireZone = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif à annuler.");
+  }
+
+  // 1) Suppression du dossier réseau de dépôt (best-effort : le partage peut
+  //    être injoignable depuis le VPS ; on n'échoue pas pour autant).
+  let dossierSupprime = false;
+  let dossierErreur = "";
+  const slug = session.dossierSlug || session.nom;
+  const base = slug ? getInventaireDirs(slug).base : session.dossierDat;
+  if (base) {
+    try {
+      fs.rmSync(base, { recursive: true, force: true });
+      dossierSupprime = true;
+    } catch (err) {
+      dossierErreur = err.message;
+    }
+  }
+
+  // 2) Purge des données liées (fiches de cette session + collectes/bipages de
+  //    l'entreprise, comme une réinitialisation).
+  await FicheControle.deleteMany({ session: session._id });
+  await InventaireCollecte.deleteMany({ entreprise: entreprise._id });
+  await LigneBipage.deleteMany({ entreprise: entreprise._id });
+
+  // 3) Suppression de la session active.
+  await InventaireZoneSession.deleteOne({ _id: session._id });
+
+  res.json({
+    message: "Inventaire annulé",
+    dossier: base,
+    dossierSupprime,
+    dossierErreur,
+  });
+});
+
+// ===========================================
 // SUPPRESSION (sessions archivées uniquement)
 // ===========================================
 
@@ -416,6 +480,7 @@ const deleteSession = asyncHandler(async (req, res) => {
 
 export {
   initInventaireZone,
+  annulerInventaireZone,
   biperZone,
   getActiveSession,
   getProgress,

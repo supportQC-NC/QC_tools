@@ -41,7 +41,26 @@ export const sanitizeName = (nom) =>
     .trim()
     .slice(0, 120) || "inventaire";
 
-/** Renvoie les chemins des dossiers d'un inventaire. */
+/**
+ * Construit le SLUG de dossier UNIQUE d'un inventaire : nom nettoyé + horodatage.
+ * Deux réinitialisations (même nom) donnent ainsi deux dossiers distincts →
+ * aucun mélange avec d'anciens .DAT. Le slug est stocké sur la session
+ * (dossierSlug) et sur chaque fiche (inventaireSlug), puis passé à
+ * getInventaireDirs pour retrouver le dossier dans l'environnement courant.
+ * On borne la partie "nom" pour que le slug complet reste < 120 car.
+ * (sanitizeName tronque à 120 : le suffixe horodaté ne doit pas être coupé).
+ */
+export const makeInventaireSlug = (nom, date = new Date()) => {
+  const d = new Date(date);
+  const p = (n) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(
+    d.getHours(),
+  )}h${p(d.getMinutes())}m${p(d.getSeconds())}`;
+  const base = sanitizeName(nom).slice(0, 90);
+  return `${base} ${stamp}`.trim();
+};
+
+/** Renvoie les chemins des dossiers d'un inventaire (nom OU slug de dossier). */
 export const getInventaireDirs = (nom) => {
   const base = path.join(config.sharePath, sanitizeName(nom));
   return {
@@ -74,7 +93,9 @@ export const ensureInventaireDirs = (nom) => {
  */
 export const resoudreCheminPdf = (fiche) => {
   if (!fiche) return "";
-  const nom = fiche.inventaireNom || "";
+  // Slug de dossier en priorité (dossier unique horodaté) ; repli sur le nom
+  // pour les anciennes fiches créées avant l'introduction du slug.
+  const nom = fiche.inventaireSlug || fiche.inventaireNom || "";
   const fileName = fiche.pdfFileName || "";
   const candidats = [];
   if (nom && fileName) {

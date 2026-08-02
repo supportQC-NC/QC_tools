@@ -2,6 +2,7 @@
 import express from "express";
 import {
   initInventaireZone,
+  annulerInventaireZone,
   biperZone,
   getActiveSession,
   getProgress,
@@ -23,6 +24,15 @@ router.post(
   admin,
   checkEntrepriseAccess,
   initInventaireZone,
+);
+
+// Annulation de l'inventaire actif (table rase : supprime dossier + session)
+router.post(
+  "/:entrepriseId/annuler",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  annulerInventaireZone,
 );
 
 // Bip d'un code-barres

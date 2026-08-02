@@ -21,6 +21,9 @@ const ficheControleSchema = new mongoose.Schema(
       index: true,
     },
     inventaireNom: { type: String, default: "" },
+    // Slug du dossier de l'inventaire (unique/horodaté) : sert à retrouver le
+    // PDF dans le bon dossier lors d'une réimpression (getInventaireDirs(slug)).
+    inventaireSlug: { type: String, default: "" },
 
     // Fichier source
     datFileName: { type: String, required: true },

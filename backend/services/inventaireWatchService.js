@@ -98,41 +98,53 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
   const lignesDat = parseDat(content);
 
   // Le nom de fichier peut porter un suffixe d'emplacement ajouté au dépôt :
-  // "stock.dat <code>_MAGASIN" / "..._DOCK". On sépare le vrai code du type
-  // pour lever l'ambiguïté d'un même code présent aux deux emplacements.
+  // "stock.dat <code>_<EMPLACEMENT>" (le collecteur nomme le fichier
+  // `stock.dat ${code}_${zone.type}`). L'emplacement N'EST PLUS limité à
+  // MAGASIN/DOCK : ce peut être n'importe quel type de zone (dictionnaire des
+  // rayons, etc.). On sépare donc le code du type sans liste figée :
+  //  1) on retire le DERNIER segment "_xxx" (= emplacement/type) et on cherche
+  //     {code, type} — c'est exactement ainsi que le fichier est nommé ;
+  //  2) à défaut, on essaie le token ENTIER comme code (zone sans emplacement,
+  //     dont le code peut lui-même contenir des "_", ex. "B_5d").
+  // Exact puis insensible à la casse à chaque étape.
   const rawZoneToken = extraireCodeZone(fileName) || "";
   let zoneCode = rawZoneToken;
-  let zoneTypeHint = "";
-  const mType = rawZoneToken.match(/^(.*)_(MAGASIN|DOCK)$/i);
-  if (mType) {
-    zoneCode = mType[1];
-    zoneTypeHint = mType[2].toUpperCase();
-  }
-
-  // Zone (fiche importée) : d'abord code + emplacement si connu, puis code seul.
-  // Exact puis insensible à la casse à chaque étape.
   let zone = null;
-  if (zoneCode) {
-    if (zoneTypeHint) {
-      zone =
+
+  const trouverZone = async (code, type) => {
+    if (!code) return null;
+    const base = { entreprise: entreprise._id };
+    if (type) {
+      return (
+        (await Zone.findOne({ ...base, code, type })) ||
         (await Zone.findOne({
-          entreprise: entreprise._id,
-          code: zoneCode,
-          type: zoneTypeHint,
-        })) ||
-        (await Zone.findOne({
-          entreprise: entreprise._id,
-          code: new RegExp(`^${escapeRegex(zoneCode)}$`, "i"),
-          type: zoneTypeHint,
-        }));
+          ...base,
+          code: new RegExp(`^${escapeRegex(code)}$`, "i"),
+          type: new RegExp(`^${escapeRegex(type)}$`, "i"),
+        }))
+      );
     }
+    return (
+      (await Zone.findOne({ ...base, code })) ||
+      (await Zone.findOne({
+        ...base,
+        code: new RegExp(`^${escapeRegex(code)}$`, "i"),
+      }))
+    );
+  };
+
+  if (rawZoneToken) {
+    // 1) <code>_<EMPLACEMENT> : on isole le dernier segment comme type.
+    const mSplit = rawZoneToken.match(/^(.+)_([^_]+)$/);
+    if (mSplit) {
+      zone = await trouverZone(mSplit[1], mSplit[2]);
+      if (zone) {
+        zoneCode = mSplit[1];
+      }
+    }
+    // 2) Repli : token entier = code (zone sans emplacement).
     if (!zone) {
-      zone =
-        (await Zone.findOne({ entreprise: entreprise._id, code: zoneCode })) ||
-        (await Zone.findOne({
-          entreprise: entreprise._id,
-          code: new RegExp(`^${escapeRegex(zoneCode)}$`, "i"),
-        }));
+      zone = await trouverZone(rawZoneToken);
     }
   }
 
@@ -186,6 +198,7 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
         entreprise: entreprise._id,
         session: session._id,
         inventaireNom: session.nom,
+        inventaireSlug: session.dossierSlug || session.nom,
         datFileName: fileName,
         datMtimeMs: stat.mtimeMs,
         datSize: stat.size,
@@ -276,6 +289,7 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
         entreprise: entreprise._id,
         session: session._id,
         inventaireNom: session.nom,
+        inventaireSlug: session.dossierSlug || session.nom,
         datFileName: fileName,
         datMtimeMs: stat.mtimeMs,
         datSize: stat.size,
@@ -372,7 +386,10 @@ export const tickOnce = async () => {
     // + <nom>). On NE se fie PAS à session.dossierDat, qui peut avoir été figé en
     // chemin d'un autre OS (session créée sur le VPS Linux → "/mnt/..." ; l'agent
     // local Windows a besoin de "\\192.168.0.250\Rcommun\STOCK\<nom>").
-    const base = session.nom ? getInventaireDirs(session.nom).base : session.dossierDat;
+    // Dossier = slug UNIQUE (horodaté) si présent, sinon repli sur le nom pour
+    // les anciennes sessions créées avant l'introduction du slug.
+    const slug = session.dossierSlug || session.nom;
+    const base = slug ? getInventaireDirs(slug).base : session.dossierDat;
     sr.dossierDat = base;
     if (!base) {
       sr.error = "Aucun dossier (nom de session vide) — réinitialisez l'inventaire.";
