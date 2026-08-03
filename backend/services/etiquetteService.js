@@ -376,12 +376,15 @@ const drawBigOne = (rl, record, logoBuf, title, dateLineFn) => {
 
   const gencod = String(record.GENCOD || "");
   if (gencod && /^\d+$/.test(gencod)) {
-    const bw = 100;
-    const bh = 50;
-    const bx = x + labelW - bw - 10;
-    const by = y - 60;
+    // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
+    // On garde le bord haut à la même position (by + bh = y - 10) et on agrandit
+    // vers le bas et la gauche ; marge droite = zone de silence.
+    const bw = 175;
+    const bh = 72;
+    const bx = x + labelW - bw - 18;
+    const by = y - 82;
     drawEAN13(rl, gencod, bx, by, bw, bh);
-    rl.setFont("Helvetica-Bold", 12);
+    rl.setFont("Helvetica-Bold", 14);
     rl.setFillColorRGB(0, 0, 0);
     rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
   }
@@ -442,12 +445,15 @@ const drawSansPrixOne = (rl, record, logoBuf) => {
 
   const gencod = String(record.GENCOD || "");
   if (gencod && /^\d+$/.test(gencod)) {
-    const bw = 100;
-    const bh = 50;
-    const bx = x + labelW - bw - 10;
-    const by = y - 60;
+    // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
+    // On garde le bord haut à la même position (by + bh = y - 10) et on agrandit
+    // vers le bas et la gauche ; marge droite = zone de silence.
+    const bw = 175;
+    const bh = 72;
+    const bx = x + labelW - bw - 18;
+    const by = y - 82;
     drawEAN13(rl, gencod, bx, by, bw, bh);
-    rl.setFont("Helvetica-Bold", 12);
+    rl.setFont("Helvetica-Bold", 14);
     rl.setFillColorRGB(0, 0, 0);
     rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
   }
@@ -481,12 +487,15 @@ const drawNormalOne = (rl, record, logoBuf) => {
 
   const gencod = String(record.GENCOD || "");
   if (gencod && /^\d+$/.test(gencod)) {
-    const bw = 100;
-    const bh = 50;
-    const bx = x + labelW - bw - 10;
-    const by = y - 60;
+    // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
+    // On garde le bord haut à la même position (by + bh = y - 10) et on agrandit
+    // vers le bas et la gauche ; marge droite = zone de silence.
+    const bw = 175;
+    const bh = 72;
+    const bx = x + labelW - bw - 18;
+    const by = y - 82;
     drawEAN13(rl, gencod, bx, by, bw, bh);
-    rl.setFont("Helvetica-Bold", 12);
+    rl.setFont("Helvetica-Bold", 14);
     rl.setFillColorRGB(0, 0, 0);
     rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
   }

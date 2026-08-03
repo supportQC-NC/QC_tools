@@ -150,9 +150,41 @@ table {
   --warning: #fbbf24;
   --danger: #ff6b6b;
 
+  /* Palette « admin » (thème SOMBRE). De nombreux écrans admin référencent
+     var(--admin-*) sans les définir → rendu "plat" / cartes blanches / options
+     de menus déroulants transparentes. On les définit ici GLOBALEMENT (les
+     écrans qui les redéfinissent, ex. Réservations, gardent la main). */
+  --admin-bg: #0a0a0f;
+  --admin-bg-secondary: #12121a;
+  --admin-bg-tertiary: #1a1a25;
+  --admin-bg-hover: #22222e;
+  --admin-border: #2a2a3a;
+  --admin-text: #f0f0f5;
+  --admin-text-secondary: #a7a7b8;
+  --admin-text-muted: #8b8b9e;
+  --admin-primary: #4da6ff;
+  --admin-primary-dark: #3d8bd9;
+  --admin-info: #3b82f6;
+  --admin-info-light: rgba(59, 130, 246, 0.16);
+  --admin-success: #10b981;
+  --admin-success-light: rgba(16, 185, 129, 0.16);
+  --admin-warning: #f59e0b;
+  --admin-warning-light: rgba(245, 158, 11, 0.16);
+  --admin-danger: #ef4444;
+  --admin-radius: 12px;
+  --admin-radius-sm: 8px;
+  --admin-radius-xs: 4px;
+  --admin-transition: all 0.18s ease;
+  --admin-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --admin-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
   /* Variables pour le layout mobile */
   --sidebar-toggle-size: 44px;
   --sidebar-toggle-margin: 10px;
+
+  /* App en thème SOMBRE : rend les contrôles natifs (menus déroulants,
+     sélecteurs de date, scrollbars) sombres au lieu du blanc par défaut. */
+  color-scheme: dark;
 }
 
 * {
@@ -197,6 +229,20 @@ textarea,
 select {
   font-family: inherit;
   font-size: inherit;
+}
+
+/* Menus déroulants natifs en thème sombre : sans ça, la liste d'options
+   s'affiche sur fond BLANC (texte illisible en dark). `color-scheme` rend le
+   popup natif sombre (Chrome/Edge) ; la règle `option` couvre Firefox et les
+   cas résiduels. S'applique à TOUTE l'application. */
+select {
+  color-scheme: dark;
+}
+
+option,
+optgroup {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 /* ============================================================================ 

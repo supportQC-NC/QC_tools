@@ -433,3 +433,255 @@
     display: none;
   }
 }
+
+/* ==========================================================================
+   Filtres rapides par ÉTAT (pastilles) + barre de filtres horizontale
+   ========================================================================== */
+
+/* Pastilles d'état (segmented control) */
+.commandes-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0;
+}
+.cmd-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-secondary);
+  border-radius: 50px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+.cmd-tab:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+.cmd-tab.active {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: #f59e0b;
+  color: #fcd34d;
+}
+.cmd-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cmd-tab-dot.dot-info {
+  background: #3b82f6;
+}
+.cmd-tab-dot.dot-warning {
+  background: #f59e0b;
+}
+.cmd-tab-dot.dot-success {
+  background: #10b981;
+}
+.cmd-tab-dot.dot-muted {
+  background: #6b6b7d;
+}
+.cmd-tab-dot.dot-all {
+  background: linear-gradient(135deg, #3b82f6, #10b981);
+}
+.cmd-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--admin-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.cmd-tab.active .cmd-tab-count {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fcd34d;
+}
+
+/* ==========================================================================
+   Barre de filtres horizontale + saut N° commande (style écran Réservations)
+   ========================================================================== */
+
+/* Saisie directe d'un N° de commande (à droite du header) */
+.commandes-jump {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius, 12px);
+  padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+}
+.commandes-jump-icon {
+  color: var(--admin-text-muted);
+  flex-shrink: 0;
+}
+.commandes-jump input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  width: 170px;
+  font-family: "Monaco", "Consolas", monospace;
+}
+.commandes-jump input::placeholder {
+  color: var(--admin-text-muted);
+  font-family: inherit;
+}
+.commandes-jump button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f59e0b;
+  color: #1a1a25;
+  border: none;
+  border-radius: var(--admin-radius-sm);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+.commandes-jump button:hover:not(:disabled) {
+  background: #d97706;
+}
+.commandes-jump button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Barre de filtres */
+.commandes-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0;
+  align-items: center;
+}
+.commandes-filters.advanced {
+  padding-top: 0.75rem;
+}
+
+.cmd-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.4rem 0.75rem;
+  min-width: 180px;
+}
+.cmd-filter-group.grow {
+  flex: 1;
+  min-width: 240px;
+}
+.cmd-filter-group > svg {
+  color: var(--admin-text-muted);
+  flex-shrink: 0;
+}
+.cmd-filter-group input,
+.cmd-filter-group select {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  width: 100%;
+}
+.cmd-filter-group select option {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+}
+.cmd-filter-group input::placeholder {
+  color: var(--admin-text-muted);
+}
+.cmd-filter-group input[type="date"] {
+  color-scheme: dark;
+}
+
+/* Bouton « Filtres avancés » */
+.cmd-adv-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px dashed var(--admin-border);
+  color: var(--admin-text-secondary);
+  border-radius: 50px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+.cmd-adv-toggle:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+.cmd-adv-toggle.active {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid #f59e0b;
+  color: #fcd34d;
+}
+.cmd-adv-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #f59e0b;
+  color: #1a1a25;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+/* Bouton « Réinitialiser » */
+.cmd-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-secondary);
+  border-radius: 50px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+.cmd-reset:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+@media (max-width: 900px) {
+  .commandes-jump input {
+    width: 120px;
+  }
+  .commandes-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cmd-filter-group,
+  .cmd-filter-group.grow {
+    min-width: 0;
+  }
+}

@@ -3,6 +3,30 @@
    ========================================================================== */
 
 .commande-detail-page {
+  /* Variables --admin-* (thème SOMBRE) scopées à la page : sans elles, tout le
+     CSS qui les référence tombait en fallback clair (cartes blanches). */
+  --admin-bg: #0a0a0f;
+  --admin-bg-secondary: #12121a;
+  --admin-bg-tertiary: #1a1a25;
+  --admin-bg-hover: #22222e;
+  --admin-border: #2a2a3a;
+  --admin-text: #f0f0f5;
+  --admin-text-secondary: #a7a7b8;
+  --admin-text-muted: #8b8b9e;
+  --admin-primary: #f59e0b;
+  --admin-primary-dark: #d97706;
+  --admin-info: #3b82f6;
+  --admin-info-light: rgba(59, 130, 246, 0.16);
+  --admin-success: #10b981;
+  --admin-success-light: rgba(16, 185, 129, 0.16);
+  --admin-warning: #f59e0b;
+  --admin-warning-light: rgba(245, 158, 11, 0.16);
+  --admin-danger: #ef4444;
+  --admin-radius: 12px;
+  --admin-radius-sm: 8px;
+  --admin-radius-xs: 4px;
+  --admin-transition: all 0.18s ease;
+
   min-height: 100vh;
   background: var(--admin-bg);
   color: var(--admin-text);
@@ -295,7 +319,9 @@
   gap: 1rem;
 }
 
-.info-card {
+/* Scopé sous .commande-detail-page pour battre la règle GLOBALE
+   `.info-card { background: var(--search-bg) }` (fond blanc d'un autre écran). */
+.commande-detail-page .info-card {
   display: flex;
   align-items: center;
   gap: 0.875rem;
@@ -305,7 +331,7 @@
   border: 1px solid var(--admin-border);
 }
 
-.info-card-icon {
+.commande-detail-page .info-card-icon {
   width: 40px;
   height: 40px;
   background: var(--admin-bg);
@@ -318,31 +344,28 @@
   flex-shrink: 0;
 }
 
-.info-card-content {
+.commande-detail-page .info-card-content {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.info-card-content label {
-  font-size: 0.95rem;
-  color: var(--admin-text-muted);
-  color:#8a5d0f;
+.commande-detail-page .info-card-content label {
+  font-size: 0.8rem;
+  color: #fcd34d;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: 800;
- 
+  margin-bottom: 0.15rem;
 }
 
-.info-card-content span {
+.commande-detail-page .info-card-content span {
   font-size: 0.95rem;
-  font-weight: 600;
-  font-weight: bolder;
+  font-weight: 700;
   color: var(--admin-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgb(19, 19, 19);
 }
 
 /* Observations */

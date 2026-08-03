@@ -1,22 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HiSearch,
   HiRefresh,
-  HiFilter,
   HiChevronLeft,
   HiChevronRight,
   HiEye,
   HiX,
-  HiChevronDown,
-  HiChevronUp,
   HiAdjustments,
   HiExternalLink,
   HiDocumentText,
   HiTruck,
   HiCalendar,
   HiLockClosed,
-  HiLockOpen,
   HiCurrencyDollar,
   HiClipboardList,
   HiShoppingCart,
@@ -25,7 +21,7 @@ import {
   HiCheckCircle,
   HiClock,
   HiExclamation,
-  HiArchive,
+  HiArrowRight,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
@@ -104,14 +100,9 @@ const AdminCommandesScreen = () => {
   const debouncedFilters = useDebounce(filters, 400);
 
   // États UI
-  const [showFilters, setShowFilters] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedCommande, setSelectedCommande] = useState(null);
-  const [expandedSections, setExpandedSections] = useState({
-    identification: true,
-    logistique: true,
-    statut: true,
-    dates: false,
-  });
+  const [numcdeInput, setNumcdeInput] = useState("");
 
   // Queries
   const { data: entreprises, isLoading: loadingEntreprises } =
@@ -213,6 +204,7 @@ const AdminCommandesScreen = () => {
     }
     setSelectedEntrepriseData(null);
     resetFilters();
+    setNumcdeInput("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEntreprise]);
 
@@ -239,12 +231,18 @@ const AdminCommandesScreen = () => {
     setPage(1);
   };
 
-  const toggleSection = (section) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
+  const handleGoToNumcde = (e) => {
+    e.preventDefault();
+    const n = numcdeInput.trim();
+    if (!n || !selectedEntreprise) return;
+    navigate(`/admin/commandes/${selectedEntreprise}/${n}`);
   };
+
+  // Total des commandes tous états confondus (pour la pastille « Tous »)
+  const totalEtats = useMemo(
+    () => (etatsData?.etats || []).reduce((s, e) => s + (e.count || 0), 0),
+    [etatsData],
+  );
 
   // Compteurs de filtres actifs
   const activeFiltersCount = useMemo(() => {
@@ -340,6 +338,23 @@ const AdminCommandesScreen = () => {
             </p>
           </div>
         </div>
+
+        {/* Saisie directe d'un N° de commande */}
+        {selectedEntreprise && (
+          <form className="commandes-jump" onSubmit={handleGoToNumcde}>
+            <HiSearch className="commandes-jump-icon" />
+            <input
+              type="text"
+              placeholder="N° de commande…"
+              value={numcdeInput}
+              onChange={(e) => setNumcdeInput(e.target.value)}
+            />
+            <button type="submit" disabled={!numcdeInput.trim()}>
+              <span>Ouvrir</span>
+              <HiArrowRight />
+            </button>
+          </form>
+        )}
       </header>
 
       {!selectedEntreprise ? (
@@ -355,285 +370,190 @@ const AdminCommandesScreen = () => {
         </div>
       ) : (
         <div className="admin-commandes-content">
-          {/* Sidebar Filtres */}
-          <aside className={`filters-sidebar ${showFilters ? "open" : ""}`}>
-            <div className="filters-header">
-              <div className="filters-title">
-                <HiFilter />
-                <span>Filtres</span>
-                {activeFiltersCount > 0 && (
-                  <span className="filters-badge">{activeFiltersCount}</span>
-                )}
-              </div>
-              <button
-                className="btn-toggle-filters"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                {showFilters ? <HiX /> : <HiFilter />}
-              </button>
-            </div>
-
-            <div className="filters-body">
-              {/* Section Identification */}
-              <div className="filter-section">
-                <button
-                  className="section-header"
-                  onClick={() => toggleSection("identification")}
-                >
-                  <span className="section-icon">🔍</span>
-                  <span>Identification</span>
-                  {expandedSections.identification ? (
-                    <HiChevronUp />
-                  ) : (
-                    <HiChevronDown />
-                  )}
-                </button>
-                {expandedSections.identification && (
-                  <div className="section-content">
-                    <div className="filter-group">
-                      <label>
-                        <HiSearch /> Recherche globale
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="N° commande, observation, bateau..."
-                        value={filters.search}
-                        onChange={(e) =>
-                          handleFilterChange("search", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiDocumentText /> N° Commande
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Rechercher par numéro..."
-                        value={filters.numcde}
-                        onChange={(e) =>
-                          handleFilterChange("numcde", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiShoppingCart /> Fournisseur
-                      </label>
-                      <select
-                        value={filters.fourn}
-                        onChange={(e) =>
-                          handleFilterChange("fourn", e.target.value)
-                        }
-                      >
-                        <option value="">Tous les fournisseurs</option>
-                        {fournisseursData?.fournisseurs?.map((f) => (
-                          <option key={f.code} value={f.code}>
-                            {f.code} ({f.count} cmd)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Section Logistique */}
-              <div className="filter-section">
-                <button
-                  className="section-header"
-                  onClick={() => toggleSection("logistique")}
-                >
-                  <span className="section-icon">🚢</span>
-                  <span>Logistique</span>
-                  {expandedSections.logistique ? (
-                    <HiChevronUp />
-                  ) : (
-                    <HiChevronDown />
-                  )}
-                </button>
-                {expandedSections.logistique && (
-                  <div className="section-content">
-                    <div className="filter-group">
-                      <label>
-                        <HiTruck /> Bateau
-                      </label>
-                      <select
-                        value={filters.bateau}
-                        onChange={(e) =>
-                          handleFilterChange("bateau", e.target.value)
-                        }
-                      >
-                        <option value="">Tous les bateaux</option>
-                        {bateauxData?.bateaux?.map((b) => (
-                          <option key={b.nom} value={b.nom}>
-                            {b.nom} ({b.count})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiGlobe /> Devise
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Code devise (EUR, USD...)"
-                        value={filters.cdvise}
-                        onChange={(e) =>
-                          handleFilterChange("cdvise", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiDocumentDuplicate /> Groupage
-                      </label>
-                      <select
-                        value={filters.groupage}
-                        onChange={(e) =>
-                          handleFilterChange("groupage", e.target.value)
-                        }
-                      >
-                        <option value="TOUT">Tous</option>
-                        <option value="OUI">En groupage</option>
-                        <option value="NON">Hors groupage</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Section Statut */}
-              <div className="filter-section">
-                <button
-                  className="section-header"
-                  onClick={() => toggleSection("statut")}
-                >
-                  <span className="section-icon">📋</span>
-                  <span>Statut</span>
-                  {expandedSections.statut ? (
-                    <HiChevronUp />
-                  ) : (
-                    <HiChevronDown />
-                  )}
-                </button>
-                {expandedSections.statut && (
-                  <div className="section-content">
-                    <div className="filter-group">
-                      <label>
-                        <HiCheckCircle /> État
-                      </label>
-                      <select
-                        value={filters.etat}
-                        onChange={(e) =>
-                          handleFilterChange("etat", e.target.value)
-                        }
-                      >
-                        <option value="TOUT">Tous les états</option>
-                        {etatsData?.etats?.map((et) => (
-                          <option key={et.code} value={et.code}>
-                            {getEtatInfo(et.code).label} ({et.count})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiLockClosed /> Verrouillage
-                      </label>
-                      <select
-                        value={filters.verrou}
-                        onChange={(e) =>
-                          handleFilterChange("verrou", e.target.value)
-                        }
-                      >
-                        <option value="TOUT">Tous</option>
-                        <option value="OUI">Verrouillées</option>
-                        <option value="NON">Non verrouillées</option>
-                      </select>
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiCurrencyDollar /> Facture
-                      </label>
-                      <select
-                        value={filters.hasFacture}
-                        onChange={(e) =>
-                          handleFilterChange("hasFacture", e.target.value)
-                        }
-                      >
-                        <option value="TOUT">Tous</option>
-                        <option value="OUI">Facturées</option>
-                        <option value="NON">Non facturées</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Section Dates */}
-              <div className="filter-section">
-                <button
-                  className="section-header"
-                  onClick={() => toggleSection("dates")}
-                >
-                  <span className="section-icon">📅</span>
-                  <span>Période</span>
-                  {expandedSections.dates ? (
-                    <HiChevronUp />
-                  ) : (
-                    <HiChevronDown />
-                  )}
-                </button>
-                {expandedSections.dates && (
-                  <div className="section-content">
-                    <div className="filter-group">
-                      <label>
-                        <HiCalendar /> Date début
-                      </label>
-                      <input
-                        type="date"
-                        value={filters.dateDebut}
-                        onChange={(e) =>
-                          handleFilterChange("dateDebut", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className="filter-group">
-                      <label>
-                        <HiCalendar /> Date fin
-                      </label>
-                      <input
-                        type="date"
-                        value={filters.dateFin}
-                        onChange={(e) =>
-                          handleFilterChange("dateFin", e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="filters-footer">
-              <button className="btn-reset" onClick={resetFilters}>
-                <HiRefresh />
-                <span>Réinitialiser</span>
-              </button>
-            </div>
-          </aside>
-
-          {/* Main Content */}
           <main className="commandes-main">
+            {/* ── Filtres rapides par ÉTAT (pastilles) ───────────────────── */}
+            <div className="commandes-tabs">
+              <button
+                className={`cmd-tab ${filters.etat === "TOUT" ? "active" : ""}`}
+                onClick={() => handleFilterChange("etat", "TOUT")}
+              >
+                <span className="cmd-tab-dot dot-all" />
+                Tous
+                {totalEtats > 0 && (
+                  <span className="cmd-tab-count">{totalEtats}</span>
+                )}
+              </button>
+              {etatsData?.etats?.map((et) => {
+                const info = getEtatInfo(et.code);
+                const active = String(filters.etat) === String(et.code);
+                return (
+                  <button
+                    key={et.code}
+                    className={`cmd-tab ${active ? "active" : ""}`}
+                    onClick={() => handleFilterChange("etat", String(et.code))}
+                    title={`Filtrer : ${info.label}`}
+                  >
+                    <span className={`cmd-tab-dot dot-${info.color}`} />
+                    {info.label}
+                    <span className="cmd-tab-count">{et.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ── Barre de filtres (horizontale, style Réservations) ─────── */}
+            <div className="commandes-filters">
+              <div className="cmd-filter-group grow">
+                <HiSearch />
+                <input
+                  type="text"
+                  placeholder="Recherche (n°, observation, bateau…)"
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange("search", e.target.value)}
+                />
+              </div>
+              <div className="cmd-filter-group">
+                <HiDocumentText />
+                <input
+                  type="text"
+                  placeholder="N° commande…"
+                  value={filters.numcde}
+                  onChange={(e) => handleFilterChange("numcde", e.target.value)}
+                />
+              </div>
+              <div className="cmd-filter-group">
+                <HiShoppingCart />
+                <select
+                  value={filters.fourn}
+                  onChange={(e) => handleFilterChange("fourn", e.target.value)}
+                >
+                  <option value="">Tous les fournisseurs</option>
+                  {fournisseursData?.fournisseurs?.map((f) => (
+                    <option key={f.code} value={f.code}>
+                      {f.code} ({f.count} cmd)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                className={`cmd-adv-toggle ${showAdvanced ? "active" : ""}`}
+                onClick={() => setShowAdvanced((v) => !v)}
+                title="Afficher/masquer les filtres avancés"
+              >
+                <HiAdjustments />
+                <span>Filtres avancés</span>
+                {activeFiltersCount > 0 && (
+                  <span className="cmd-adv-badge">{activeFiltersCount}</span>
+                )}
+              </button>
+
+              {activeFiltersCount > 0 && (
+                <button
+                  className="cmd-reset"
+                  onClick={resetFilters}
+                  title="Réinitialiser les filtres"
+                >
+                  <HiX />
+                  <span>Réinitialiser</span>
+                </button>
+              )}
+            </div>
+
+            {/* ── Filtres avancés (repliables) ───────────────────────────── */}
+            {showAdvanced && (
+              <div className="commandes-filters advanced">
+                <div className="cmd-filter-group">
+                  <HiTruck />
+                  <select
+                    value={filters.bateau}
+                    onChange={(e) =>
+                      handleFilterChange("bateau", e.target.value)
+                    }
+                  >
+                    <option value="">Tous les bateaux</option>
+                    {bateauxData?.bateaux?.map((b) => (
+                      <option key={b.nom} value={b.nom}>
+                        {b.nom} ({b.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="cmd-filter-group">
+                  <HiGlobe />
+                  <input
+                    type="text"
+                    placeholder="Devise (EUR, USD…)"
+                    value={filters.cdvise}
+                    onChange={(e) =>
+                      handleFilterChange("cdvise", e.target.value)
+                    }
+                  />
+                </div>
+                <div className="cmd-filter-group">
+                  <HiDocumentDuplicate />
+                  <select
+                    value={filters.groupage}
+                    onChange={(e) =>
+                      handleFilterChange("groupage", e.target.value)
+                    }
+                  >
+                    <option value="TOUT">Groupage : tous</option>
+                    <option value="OUI">En groupage</option>
+                    <option value="NON">Hors groupage</option>
+                  </select>
+                </div>
+                <div className="cmd-filter-group">
+                  <HiLockClosed />
+                  <select
+                    value={filters.verrou}
+                    onChange={(e) =>
+                      handleFilterChange("verrou", e.target.value)
+                    }
+                  >
+                    <option value="TOUT">Verrou : tous</option>
+                    <option value="OUI">Verrouillées</option>
+                    <option value="NON">Non verrouillées</option>
+                  </select>
+                </div>
+                <div className="cmd-filter-group">
+                  <HiCurrencyDollar />
+                  <select
+                    value={filters.hasFacture}
+                    onChange={(e) =>
+                      handleFilterChange("hasFacture", e.target.value)
+                    }
+                  >
+                    <option value="TOUT">Facture : toutes</option>
+                    <option value="OUI">Facturées</option>
+                    <option value="NON">Non facturées</option>
+                  </select>
+                </div>
+                <div className="cmd-filter-group">
+                  <HiCalendar />
+                  <input
+                    type="date"
+                    value={filters.dateDebut}
+                    onChange={(e) =>
+                      handleFilterChange("dateDebut", e.target.value)
+                    }
+                    title="Date de début"
+                  />
+                </div>
+                <div className="cmd-filter-group">
+                  <HiCalendar />
+                  <input
+                    type="date"
+                    value={filters.dateFin}
+                    onChange={(e) =>
+                      handleFilterChange("dateFin", e.target.value)
+                    }
+                    title="Date de fin"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Stats Bar */}
             <div className="stats-bar">
               <div className="stat-item primary">
@@ -670,13 +590,6 @@ const AdminCommandesScreen = () => {
               )}
 
               <div className="stats-actions">
-                <button
-                  className={`btn-icon-action ${showFilters ? "active" : ""}`}
-                  onClick={() => setShowFilters(!showFilters)}
-                  title="Afficher/Masquer les filtres"
-                >
-                  <HiAdjustments />
-                </button>
                 <button
                   className="btn-icon-action"
                   onClick={refetch}
