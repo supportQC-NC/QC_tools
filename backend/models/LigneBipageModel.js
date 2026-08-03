@@ -22,6 +22,9 @@ const ligneBipageSchema = new mongoose.Schema(
     },
     datFileName: { type: String, default: "" },
     zoneCode: { type: String, default: "", index: true },
+    // Emplacement de la zone (MAGASIN / DOCK / …) : indispensable pour
+    // distinguer deux zones portant le MÊME code à des emplacements différents.
+    zoneType: { type: String, default: "", index: true },
     ordre: { type: Number, default: 0 },
 
     // Code brut scanné, tel quel dans le .DAT

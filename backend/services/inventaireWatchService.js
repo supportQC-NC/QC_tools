@@ -262,6 +262,7 @@ const traiterFichier = async (
         session: session._id,
         datFileName: logicalName,
         zoneCode,
+        zoneType: zone.type || "",
         ordre: r.n,
         eanArticle: r.code,
         qteScan: r.qte,

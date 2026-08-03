@@ -62,10 +62,14 @@ const AdminBipagesScreen = () => {
   const types = data?.types || [];
   const zonesMeta = data?.zonesMeta || [];
 
-  // Options de zones filtrées par le type sélectionné
-  const zoneOptions = (
-    type ? zonesMeta.filter((z) => z.type === type) : zonesMeta
-  ).map((z) => z.code);
+  // Options de zones filtrées par le type sélectionné (codes distincts).
+  const zoneOptions = [
+    ...new Set(
+      (type ? zonesMeta.filter((z) => z.type === type) : zonesMeta).map(
+        (z) => z.code,
+      ),
+    ),
+  ];
 
   const onTypeChange = (e) => {
     setType(e.target.value);
@@ -276,6 +280,7 @@ const AdminBipagesScreen = () => {
               <thead>
                 <tr>
                   <th>Zone</th>
+                  <th>Emplacement</th>
                   <th>EAN article</th>
                   <th>Qté scan</th>
                   <th>NART</th>
@@ -287,7 +292,7 @@ const AdminBipagesScreen = () => {
               <tbody>
                 {lignes.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="no-data">
+                    <td colSpan={8} className="no-data">
                       Aucune ligne. Les bipages apparaissent ici dès qu'un .DAT
                       est traité.
                     </td>
@@ -296,6 +301,7 @@ const AdminBipagesScreen = () => {
                   lignes.map((l) => (
                     <tr key={l._id} className={l.found ? "" : "row-unknown"}>
                       <td className="zone-cell">{l.zoneCode}</td>
+                      <td className="zone-cell">{l.zoneType || "—"}</td>
                       <td className="mono">{l.eanArticle}</td>
                       <td>
                         <input
