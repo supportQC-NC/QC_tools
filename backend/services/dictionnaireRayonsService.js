@@ -274,6 +274,46 @@ export const writeDictionnaire = async (entreprise, zones) => {
   return { fichier, zoneCount: cleanZones.length, rowCount: flat.length };
 };
 
+// Génère un buffer xlsx des RAYONS uniquement — SANS sous-zones et SANS colonne
+// « type ». `rows` = [{ gism1, libelle, metrage, priorite, emplacement }].
+// `emplacement` optionnel : "MAGASIN" | "DOCK" pour ne garder que ces rayons.
+// Renvoie { buffer, count }.
+export const buildZonesWorkbookBuffer = async (rows, emplacement = null) => {
+  const empl = emplacement ? normEmplacement(emplacement) : null;
+  const zones = (Array.isArray(rows) ? rows : [])
+    .map((r) => ({
+      gism1: safeTrim(r?.gism1),
+      libelle: safeTrim(r?.libelle),
+      metrage: Math.max(0, Math.round(Number(r?.metrage) || 0)),
+      priorite: normPriorite(r?.priorite),
+      emplacement: normEmplacement(r?.emplacement),
+    }))
+    .filter((r) => r.gism1 && (!empl || r.emplacement === empl));
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Rayons");
+  // GISM1/libelle/metrage en colonnes 1/2/3 (cohérent avec le fichier source).
+  ws.columns = [
+    { header: "GISM1", key: "gism1", width: 18 },
+    { header: "libelle", key: "libelle", width: 42 },
+    { header: "metrage", key: "metrage", width: 10 },
+    { header: "priorite", key: "priorite", width: 10 },
+    { header: "emplacement", key: "emplacement", width: 14 },
+  ];
+  ws.getRow(1).font = { bold: true };
+  for (const z of zones) {
+    ws.addRow({
+      gism1: z.gism1,
+      libelle: z.libelle,
+      metrage: z.metrage,
+      priorite: z.priorite == null ? null : z.priorite,
+      emplacement: z.emplacement,
+    });
+  }
+  const buffer = await wb.xlsx.writeBuffer();
+  return { buffer, count: zones.length };
+};
+
 // Développe les lignes en items d'étiquettes { code, libelle } (1 par sous-zone).
 // `filtre` : Set de codes GISM1 à conserver (optionnel ; sinon tous).
 export const expandSubZones = (rows, filtre = null) => {
@@ -298,6 +338,7 @@ export default {
   parseWorkbookRows,
   mergeDictionnaire,
   expandSubZones,
+  buildZonesWorkbookBuffer,
   letterSuffix,
   normEmplacement,
   normPriorite,

@@ -312,6 +312,36 @@ const AdminDictionnaireRayonsScreen = () => {
     }
   };
 
+  // ── Téléchargement des RAYONS SEULS (sans sous-zones), selon l'emplacement ────
+  const telechargerRayons = async () => {
+    if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
+    setError("");
+    setInfo(null);
+    setDownloading(true);
+    try {
+      const empl = emplFiltre && emplFiltre !== "TOUS" ? emplFiltre : "";
+      const q = empl ? `?emplacement=${encodeURIComponent(empl)}` : "";
+      const res = await fetch(
+        `${BASE_URL}/api/dictionnaire-rayons/${nomDossierDBF}/rayons${q}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw await erreurReponse(res, "Téléchargement échoué");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `rayons${empl ? `_${empl}` : ""}_${nomDossierDBF}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (err) {
+      setError(err.message || "Impossible de télécharger les rayons.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loadingEntreprises) {
     return (
       <div className="dicr-screen">
@@ -399,9 +429,25 @@ const AdminDictionnaireRayonsScreen = () => {
                   className="dicr-btn"
                   onClick={telecharger}
                   disabled={downloading || !exists}
-                  title="Télécharger une copie du fichier dictionnaire"
+                  title="Télécharger une copie du fichier complet (avec sous-zones)"
                 >
-                  <HiDownload /> {downloading ? "…" : "Télécharger"}
+                  <HiDownload /> {downloading ? "…" : "Télécharger (complet)"}
+                </button>
+                <button
+                  type="button"
+                  className="dicr-btn"
+                  onClick={telechargerRayons}
+                  disabled={downloading || !exists}
+                  title="Télécharger les rayons SANS sous-zones (selon l'emplacement sélectionné ci-dessous)"
+                >
+                  <HiDownload />{" "}
+                  {downloading
+                    ? "…"
+                    : `Rayons seuls${
+                        emplFiltre && emplFiltre !== "TOUS"
+                          ? ` (${emplFiltre})`
+                          : ""
+                      }`}
                 </button>
                 <input
                   ref={fileInputRef}

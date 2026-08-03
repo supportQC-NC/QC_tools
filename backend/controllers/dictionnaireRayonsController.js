@@ -13,6 +13,8 @@ import {
   mergeDictionnaire,
   resolveDictionnaireFile,
   expandSubZones,
+  buildZonesWorkbookBuffer,
+  normEmplacement,
 } from "../services/dictionnaireRayonsService.js";
 import { generateGisementLabelsPDF } from "../services/gisementLabelService.js";
 
@@ -191,10 +193,48 @@ export const telechargerDictionnaire = asyncHandler(async (req, res) => {
   res.download(fichier, `${trig}_dictionnaire_rayons.xlsx`);
 });
 
+// @desc    Télécharge un xlsx des RAYONS SEULS (sans sous-zones), filtrable par
+//          emplacement (MAGASIN / DOCK). Reconstruit à la volée depuis les zones.
+// @route   GET /api/dictionnaire-rayons/:nomDossierDBF/rayons?emplacement=MAGASIN|DOCK
+// @access  Private (export_gisements_admin, read) + accès entreprise
+export const telechargerRayonsSansSousZones = asyncHandler(async (req, res) => {
+  const { rows, exists } = await readDictionnaire(req.entreprise);
+  if (!exists || !rows.length) {
+    res.status(404);
+    throw new Error("Aucun dictionnaire enregistré pour cette société.");
+  }
+
+  const emplParam = (req.query?.emplacement ?? "").toString().trim();
+  // "" ou "TOUS" → pas de filtre ; sinon MAGASIN/DOCK.
+  const emplacement =
+    emplParam && emplParam.toUpperCase() !== "TOUS" ? emplParam : null;
+
+  const { buffer, count } = await buildZonesWorkbookBuffer(rows, emplacement);
+  if (!count) {
+    res.status(404);
+    throw new Error(
+      `Aucun rayon${emplacement ? ` pour l'emplacement ${normEmplacement(emplacement)}` : ""}.`,
+    );
+  }
+
+  const trig = trigOf(req.entreprise).toUpperCase();
+  const suffix = emplacement ? `_${normEmplacement(emplacement)}` : "";
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${trig}_rayons${suffix}.xlsx"`,
+  );
+  res.send(Buffer.from(buffer));
+});
+
 export default {
   getDictionnaire,
   saveDictionnaire,
   genererEtiquettesRayons,
   importDictionnaire,
   telechargerDictionnaire,
+  telechargerRayonsSansSousZones,
 };

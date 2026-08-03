@@ -7,6 +7,7 @@ import {
   genererEtiquettesRayons,
   importDictionnaire,
   telechargerDictionnaire,
+  telechargerRayonsSansSousZones,
 } from "../controllers/dictionnaireRayonsController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -28,13 +29,22 @@ const uploadExcel = multer({
 // Lecture du dictionnaire des rayons
 router.get("/:nomDossierDBF", protect, checkEntrepriseAccess, canRead, getDictionnaire);
 
-// Téléchargement d'une copie du fichier (xlsx brut)
+// Téléchargement d'une copie du fichier (xlsx brut, sous-zones incluses)
 router.get(
   "/:nomDossierDBF/fichier",
   protect,
   checkEntrepriseAccess,
   canRead,
   telechargerDictionnaire,
+);
+
+// Téléchargement des RAYONS SEULS (sans sous-zones), filtrable ?emplacement=
+router.get(
+  "/:nomDossierDBF/rayons",
+  protect,
+  checkEntrepriseAccess,
+  canRead,
+  telechargerRayonsSansSousZones,
 );
 
 // Enregistrement (remplace le fichier)
