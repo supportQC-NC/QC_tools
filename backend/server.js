@@ -50,6 +50,7 @@ import inventaireProformaRoutes from "./routes/inventaireProformaRoutes.js";
 // =======================================
 // ========== ROUTES FOURNISS ==========
 import fournissRoutes from "./routes/fournissRoutes.js";
+import envoiCdeFournisseurRoutes from "./routes/envoiCdeFournisseurRoutes.js";
 import factureRoutes from "./routes/factureRoutes.js";
 import clientRoutes from "./routes/clientRoutes.js";
 import filialesRoutes from "./routes/filialesRoutes.js";
@@ -185,6 +186,7 @@ app.use("/api/etiquettes", etiquetteRoutes);
 app.use("/api/edition-promo", editionPromoRoutes);
 // ========== ROUTES FOURNISSEURS ==========
 app.use("/api/fournisseurs", fournissRoutes);
+app.use("/api/envoi-cde-fournisseur", envoiCdeFournisseurRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/commerciaux", commerciauxRoutes);

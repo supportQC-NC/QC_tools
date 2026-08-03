@@ -58,6 +58,13 @@ export const apiSlice = createApi({
     "EtiquetteTemplate",
     // ========== TAGS ASSISTANT IA ==========
     "AiConversation",
+    // ========== TAGS ENVOI CDE FOURNISSEUR ==========
+    "EnvoiCdeCommande",
+    "FournisseurEmail",
+    "MessageFournisseur",
+    "ResponsableCc",
+    "EnvoiCdeHistorique",
+    "EnvoiCdeParametre",
   ],
   endpoints: (builder) => ({}),
 });

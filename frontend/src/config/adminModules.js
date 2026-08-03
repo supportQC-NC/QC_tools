@@ -20,6 +20,7 @@ export const PERMISSION_MODULES = [
   { key: "ctr_commande", label: "Contrôle Commandes", group: "gestion" },
   { key: "reception", label: "Réception marchandises", group: "gestion" },
   { key: "prep_commande", label: "Préparation Commandes", group: "gestion" },
+  { key: "envoi_cde_fournisseur", label: "Envoi Cde Fournisseur", group: "gestion" },
   { key: "ctrl_info_produit", label: "Contrôle Infos Produit", group: "gestion" },
   { key: "releve", label: "Relevé de prix", group: "gestion" },
   { key: "etiquettes", label: "Générateur d'étiquettes", group: "gestion" },
@@ -90,6 +91,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/bipages", key: "bipage" },
   { path: "/admin/demandes-bipage", key: "bipage" },
   { path: "/admin/reappros", key: "reapro" },
+  { path: "/admin/envoi-cde-fournisseur", key: "envoi_cde_fournisseur" },
   // Analyse
   { path: "/admin/commerciaux", key: "commerciaux_admin" },
   { path: "/admin/filiales", key: "filiales_admin" },

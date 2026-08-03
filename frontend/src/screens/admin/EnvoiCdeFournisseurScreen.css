@@ -1,0 +1,312 @@
+/* Module « Envoi Commande Fournisseur » — styles scopés .ecf-* */
+.ecf-wrap {
+  padding: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.ecf-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.ecf-head h1 {
+  font-size: 1.4rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ecf-soc {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.ecf-soc b {
+  color: var(--admin-text, #e2e8f0);
+}
+
+/* Bandeau mode test */
+.ecf-testbanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 0.88rem;
+  border: 1px solid;
+}
+.ecf-testbanner.on {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #eab308;
+}
+.ecf-testbanner.off {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+/* Onglets */
+.ecf-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--admin-border, #334155);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.ecf-tab {
+  padding: 9px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--admin-text-muted, #94a3b8);
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ecf-tab:hover {
+  color: var(--admin-text, #e2e8f0);
+}
+.ecf-tab.active {
+  color: var(--admin-primary, #6366f1);
+  border-bottom-color: var(--admin-primary, #6366f1);
+  font-weight: 600;
+}
+
+/* Barre d'actions */
+.ecf-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ecf-input {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #e2e8f0);
+  font-size: 0.88rem;
+}
+.ecf-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ecf-btn:hover {
+  background: var(--admin-hover, #334155);
+}
+.ecf-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ecf-btn.primary {
+  background: var(--admin-primary, #6366f1);
+  border-color: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+.ecf-btn.danger {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+.ecf-btn.success {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+.ecf-spacer {
+  margin-left: auto;
+}
+
+/* Tableaux */
+.ecf-tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 8px;
+}
+.ecf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.ecf-table th,
+.ecf-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--admin-border, #334155);
+  white-space: nowrap;
+}
+.ecf-table th {
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text-muted, #94a3b8);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.ecf-table tbody tr:hover {
+  background: var(--admin-hover, #1e293b);
+}
+.ecf-table td.wrap {
+  white-space: normal;
+  max-width: 320px;
+}
+.ecf-right {
+  text-align: right;
+}
+.ecf-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.ecf-badge.f {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+.ecf-badge.a {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+.ecf-badge.ok {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+.ecf-badge.err {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+.ecf-badge.test {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+/* Modales */
+.ecf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.ecf-modal {
+  background: var(--admin-card-bg, #0f172a);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 760px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+.ecf-modal.lg {
+  max-width: 960px;
+}
+.ecf-modal h3 {
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ecf-modal .ecf-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.ecf-field {
+  margin-bottom: 12px;
+}
+.ecf-field label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted, #94a3b8);
+  margin-bottom: 4px;
+}
+.ecf-field input,
+.ecf-field select,
+.ecf-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #e2e8f0);
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+.ecf-field textarea {
+  min-height: 150px;
+  font-family: ui-monospace, monospace;
+  resize: vertical;
+}
+.ecf-hint {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted, #94a3b8);
+  margin-top: 3px;
+}
+.ecf-preview {
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: #111;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.ecf-recip {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.ecf-recip .tag {
+  color: var(--admin-text-muted, #94a3b8);
+}
+.ecf-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.ecf-msg {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+}
+.ecf-msg.err {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+.ecf-msg.ok {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+.ecf-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.ecf-langtabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}

@@ -42,6 +42,7 @@ import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
 import AdminCommandeDetailScreen from "./screens/admin/AdminCommandeDetailsScreen";
+import EnvoiCdeFournisseurScreen from "./screens/admin/EnvoiCdeFournisseurScreen";
 
 import ArticleSearch from "./screens/user/UserArticleSearch";
 import InventaireScreen from "./screens/user/UserInventaire";
@@ -284,6 +285,14 @@ const router = createBrowserRouter(
       {/* Données · Réappros (admin) -> module "reapro" */}
       <Route element={<ModuleRoute module="reapro" />}>
         <Route path="/admin/reappros" element={<AdminReapprosScreen />} />
+      </Route>
+
+      {/* Gestion · Envoi Commande Fournisseur -> module "envoi_cde_fournisseur" */}
+      <Route element={<ModuleRoute module="envoi_cde_fournisseur" />}>
+        <Route
+          path="/admin/envoi-cde-fournisseur"
+          element={<EnvoiCdeFournisseurScreen />}
+        />
       </Route>
 
       {/* Analyse · Commerciaux -> module "commerciaux_admin" */}

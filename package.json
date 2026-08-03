@@ -21,7 +21,9 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "print-agent": "node backend/printAgent.js",
     "data:import": "node backend/seeder.js",
-    "data:destroy": "node backend/seeder.js -d"
+    "data:destroy": "node backend/seeder.js -d",
+    "data:import:envoi-cde": "node backend/seedEnvoiCdeFournisseur.js",
+    "data:destroy:envoi-cde": "node backend/seedEnvoiCdeFournisseur.js -d"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

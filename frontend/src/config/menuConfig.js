@@ -66,6 +66,7 @@ export const adminMenuStructure = [
       { label: "Clients", path: "/admin/clients", icon: HiUserGroup },
       { label: "Réservations", path: "/admin/reservations", icon: HiClipboardList },
       { label: "Commandes", path: "/admin/commandes", icon: HiTruck },
+      { label: "Envoi Cde Fournisseur", path: "/admin/envoi-cde-fournisseur", icon: HiMail },
       { label: "Proformas", path: "/admin/proformas", icon: HiDocumentReport },
       { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
       { label: "Bipages", path: "/admin/demandes-bipage", icon: HiClipboardList },
