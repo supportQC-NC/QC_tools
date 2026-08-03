@@ -23,10 +23,13 @@ export const config = {
   // Impression automatique
   autoprint:
     (process.env.FICHE_AUTOPRINT || "true").toLowerCase() !== "false",
-  // Dossiers dédiés (créés automatiquement à l'init)
+  // Dossiers dédiés, créés PAR EMPLACEMENT (à l'intérieur de chaque sous-dossier)
   archiveDatDirName: "archive_dat", // .DAT traités/imprimés
   archivePdfDirName: "archive_pdf", // fiches PDF imprimées
   zoneInconnueDirName: "zone_non_trouvee", // .DAT dont la zone est inconnue
+  // Sous-dossier des zones SANS emplacement (type vide) : rien n'est jamais
+  // déposé à la racine de l'inventaire.
+  sansEmplacementDirName: "SANS_EMPLACEMENT",
 };
 
 // ===========================================
@@ -40,6 +43,17 @@ export const sanitizeName = (nom) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120) || "inventaire";
+
+/**
+ * Nom du SOUS-DOSSIER d'un emplacement (zone.type). SOURCE UNIQUE de vérité,
+ * utilisée par le dépôt, le watcher, la réimpression et le « recommencer » :
+ * tous doivent pointer le MÊME dossier. Un type vide → dossier par défaut
+ * (jamais de fichier à la racine de l'inventaire).
+ */
+export const emplacementDir = (type) => {
+  const t = String(type || "").trim();
+  return t ? sanitizeName(t) : config.sansEmplacementDirName;
+};
 
 /**
  * Construit le SLUG de dossier UNIQUE d'un inventaire : nom nettoyé + horodatage.
@@ -87,19 +101,26 @@ export const ensureInventaireDirs = (nom) => {
  * Le PDF est généré par l'agent local (Windows → chemin UNC) mais peut devoir
  * être servi/relu par le VPS (Linux → /mnt/rcommun) : on ne se fie donc PAS au
  * chemin absolu stocké (`fiche.pdfPath`, propre à la machine qui l'a créé). On
- * le recalcule depuis `config.sharePath` + <nom d'inventaire> (getInventaireDirs)
- * puis on cherche le fichier dans archive_pdf (si archivé) ou à la racine.
- * Renvoie le premier chemin EXISTANT, sinon "".
+ * le recalcule depuis `config.sharePath` + <slug d'inventaire> (getInventaireDirs)
+ * puis on cherche le fichier dans le SOUS-DOSSIER d'emplacement (zone.type) —
+ * archive_pdf puis racine du sous-dossier — avec repli sur la racine de
+ * l'inventaire (fiches sans emplacement / legacy). Renvoie le 1er chemin EXISTANT.
  */
 export const resoudreCheminPdf = (fiche) => {
   if (!fiche) return "";
   // Slug de dossier en priorité (dossier unique horodaté) ; repli sur le nom
   // pour les anciennes fiches créées avant l'introduction du slug.
   const nom = fiche.inventaireSlug || fiche.inventaireNom || "";
-  const fileName = fiche.pdfFileName || "";
+  // pdfFileName est un nom "pur" ; on garantit le basename par sécurité.
+  const fileName = fiche.pdfFileName ? path.basename(fiche.pdfFileName) : "";
   const candidats = [];
   if (nom && fileName) {
     const dirs = getInventaireDirs(nom);
+    // Sous-dossier d'emplacement (MAGASIN/DOCK/… ou défaut) où vit le PDF.
+    const scanDir = path.join(dirs.base, emplacementDir(fiche.zoneType));
+    candidats.push(path.join(scanDir, config.archivePdfDirName, fileName));
+    candidats.push(path.join(scanDir, fileName));
+    // Replis racine : anciennes fiches à plat (avant les sous-dossiers).
     candidats.push(path.join(dirs.archivePdf, fileName)); // archivé
     candidats.push(path.join(dirs.base, fileName)); // pas encore archivé
   }

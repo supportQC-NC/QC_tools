@@ -7,7 +7,6 @@ import LigneBipage from "../models/LigneBipageModel.js";
 import FicheControle from "../models/FicheControleModel.js";
 import Zone from "../models/ZoneModel.js";
 import {
-  ensureInventaireDirs,
   getInventaireDirs,
   makeInventaireSlug,
 } from "../services/ficheControleService.js";
@@ -145,12 +144,13 @@ const initInventaireZone = asyncHandler(async (req, res) => {
   // JAMAIS le dossier d'un inventaire précédent, même à nom identique.
   const dossierSlug = makeInventaireSlug(nomFinal);
 
-  // Création des dossiers réseau (\\...\STOCK\<slug>\ + archive_dat, archive_pdf, zone_non_trouvee)
+  // Création du SEUL dossier de base (\\...\STOCK\<slug>\). Les sous-dossiers
+  // par emplacement (+ leurs archive_dat/archive_pdf/zone_non_trouvee) sont
+  // créés à la demande, au dépôt et par le watcher : rien à la racine.
   // Best-effort : si le partage est inaccessible, on n'empêche pas l'init.
-  let dossierDat = getInventaireDirs(dossierSlug).base;
+  const dossierDat = getInventaireDirs(dossierSlug).base;
   try {
-    const dirs = ensureInventaireDirs(dossierSlug);
-    dossierDat = dirs.base;
+    fs.mkdirSync(dossierDat, { recursive: true });
   } catch (err) {
     console.error(
       `[Inventaire] Dossier réseau non créé (${dossierDat}): ${err.message}`,

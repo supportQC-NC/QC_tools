@@ -16,6 +16,7 @@ import {
   estFichierDat,
   getInventaireDirs,
   resoudreCheminPdf,
+  emplacementDir,
 } from "./ficheControleService.js";
 
 let isRunning = false;
@@ -76,15 +77,27 @@ export const deplacerVers = (srcPath, destDir) => {
   return dest;
 };
 
-const traiterFichier = async (session, entreprise, dirs, fileName) => {
+const traiterFichier = async (
+  session,
+  entreprise,
+  dirs,
+  fileName,
+  folderName,
+) => {
   const { base, archiveDat, archivePdf, zoneInconnue } = dirs;
   const filePath = path.join(base, fileName);
   const stat = fs.statSync(filePath);
 
+  // Clé LOGIQUE du fichier en BDD : préfixée par le dossier d'emplacement pour
+  // qu'un même code présent à 2 emplacements (MAGASIN/DOCK) donne 2 fiches /
+  // 2 jeux de lignes DISTINCTS, alors que le fichier disque garde un nom "pur"
+  // (stock.dat <code>).
+  const logicalName = `${folderName}/${fileName}`;
+
   // Déjà traité et inchangé ?
   const existing = await FicheControle.findOne({
     session: session._id,
-    datFileName: fileName,
+    datFileName: logicalName,
   });
   if (
     existing &&
@@ -97,54 +110,33 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
   const content = fs.readFileSync(filePath, "utf8");
   const lignesDat = parseDat(content);
 
-  // Le nom de fichier peut porter un suffixe d'emplacement ajouté au dépôt :
-  // "stock.dat <code>_<EMPLACEMENT>" (le collecteur nomme le fichier
-  // `stock.dat ${code}_${zone.type}`). L'emplacement N'EST PLUS limité à
-  // MAGASIN/DOCK : ce peut être n'importe quel type de zone (dictionnaire des
-  // rayons, etc.). On sépare donc le code du type sans liste figée :
-  //  1) on retire le DERNIER segment "_xxx" (= emplacement/type) et on cherche
-  //     {code, type} — c'est exactement ainsi que le fichier est nommé ;
-  //  2) à défaut, on essaie le token ENTIER comme code (zone sans emplacement,
-  //     dont le code peut lui-même contenir des "_", ex. "B_5d").
-  // Exact puis insensible à la casse à chaque étape.
+  // Nom de fichier canonique : "stock.dat <code>" — le token EST le code de zone
+  // (le code peut contenir des "_", ex. "B_5d"). L'emplacement vient du nom du
+  // SOUS-DOSSIER (folderName), pas du nom de fichier. On récupère toutes les
+  // zones de ce code, puis on départage par le dossier d'emplacement
+  // (emplacementDir(zone.type) === folderName) — même source de vérité que le
+  // dépôt. Exact puis insensible à la casse.
   const rawZoneToken = extraireCodeZone(fileName) || "";
-  let zoneCode = rawZoneToken;
+  const zoneCode = rawZoneToken;
   let zone = null;
 
-  const trouverZone = async (code, type) => {
-    if (!code) return null;
-    const base = { entreprise: entreprise._id };
-    if (type) {
-      return (
-        (await Zone.findOne({ ...base, code, type })) ||
-        (await Zone.findOne({
-          ...base,
-          code: new RegExp(`^${escapeRegex(code)}$`, "i"),
-          type: new RegExp(`^${escapeRegex(type)}$`, "i"),
-        }))
-      );
-    }
-    return (
-      (await Zone.findOne({ ...base, code })) ||
-      (await Zone.findOne({
-        ...base,
-        code: new RegExp(`^${escapeRegex(code)}$`, "i"),
-      }))
-    );
-  };
-
   if (rawZoneToken) {
-    // 1) <code>_<EMPLACEMENT> : on isole le dernier segment comme type.
-    const mSplit = rawZoneToken.match(/^(.+)_([^_]+)$/);
-    if (mSplit) {
-      zone = await trouverZone(mSplit[1], mSplit[2]);
-      if (zone) {
-        zoneCode = mSplit[1];
-      }
+    let zones = await Zone.find({
+      entreprise: entreprise._id,
+      code: rawZoneToken,
+    });
+    if (!zones.length) {
+      zones = await Zone.find({
+        entreprise: entreprise._id,
+        code: new RegExp(`^${escapeRegex(rawZoneToken)}$`, "i"),
+      });
     }
-    // 2) Repli : token entier = code (zone sans emplacement).
-    if (!zone) {
-      zone = await trouverZone(rawZoneToken);
+    if (zones.length === 1) {
+      zone = zones[0];
+    } else if (zones.length > 1) {
+      // Plusieurs zones même code (ex. MAGASIN + DOCK) → on prend celle dont
+      // l'emplacement correspond au sous-dossier où était le fichier.
+      zone = zones.find((z) => emplacementDir(z.type) === folderName) || null;
     }
   }
 
@@ -173,7 +165,7 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
     const res = await FicheControle.updateOne(
       {
         session: session._id,
-        datFileName: fileName,
+        datFileName: logicalName,
         datMtimeMs: existing.datMtimeMs,
         datSize: existing.datSize,
       },
@@ -199,7 +191,7 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
         session: session._id,
         inventaireNom: session.nom,
         inventaireSlug: session.dossierSlug || session.nom,
-        datFileName: fileName,
+        datFileName: logicalName,
         datMtimeMs: stat.mtimeMs,
         datSize: stat.size,
         zoneCode,
@@ -218,13 +210,16 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
 
   // Persistance des lignes pour l'écran "Détail des bipages"
   // (remplace les lignes éventuelles de ce même fichier).
-  await LigneBipage.deleteMany({ session: session._id, datFileName: fileName });
+  await LigneBipage.deleteMany({
+    session: session._id,
+    datFileName: logicalName,
+  });
   if (rows.length) {
     await LigneBipage.insertMany(
       rows.map((r) => ({
         entreprise: entreprise._id,
         session: session._id,
-        datFileName: fileName,
+        datFileName: logicalName,
         zoneCode,
         ordre: r.n,
         eanArticle: r.code,
@@ -283,14 +278,14 @@ const traiterFichier = async (session, entreprise, dirs, fileName) => {
   }
 
   await FicheControle.findOneAndUpdate(
-    { session: session._id, datFileName: fileName },
+    { session: session._id, datFileName: logicalName },
     {
       $set: {
         entreprise: entreprise._id,
         session: session._id,
         inventaireNom: session.nom,
         inventaireSlug: session.dossierSlug || session.nom,
-        datFileName: fileName,
+        datFileName: logicalName,
         datMtimeMs: stat.mtimeMs,
         datSize: stat.size,
         zoneCode,
@@ -396,24 +391,6 @@ export const tickOnce = async () => {
       report.sessions.push(sr);
       continue;
     }
-    const dirs = {
-      base,
-      archiveDat: path.join(base, config.archiveDatDirName),
-      archivePdf: path.join(base, config.archivePdfDirName),
-      zoneInconnue: path.join(base, config.zoneInconnueDirName),
-    };
-
-    try {
-      fs.mkdirSync(dirs.base, { recursive: true });
-      fs.mkdirSync(dirs.archiveDat, { recursive: true });
-      fs.mkdirSync(dirs.archivePdf, { recursive: true });
-      fs.mkdirSync(dirs.zoneInconnue, { recursive: true });
-    } catch (err) {
-      sr.error = `Dossier inaccessible : ${err.message}`;
-      report.sessions.push(sr);
-      continue;
-    }
-
     const entreprise = await Entreprise.findById(session.entreprise);
     if (!entreprise) {
       sr.error = "Entreprise introuvable";
@@ -421,34 +398,103 @@ export const tickOnce = async () => {
       continue;
     }
 
-    let entries = [];
+    // Sous-dossiers réservés (jamais interprétés comme un emplacement).
+    const reserved = new Set([
+      config.archiveDatDirName.toLowerCase(),
+      config.archivePdfDirName.toLowerCase(),
+      config.zoneInconnueDirName.toLowerCase(),
+    ]);
+
+    // Traite les .DAT d'un SOUS-DOSSIER d'emplacement. Chaque sous-dossier est
+    // autonome (ses propres archive_dat / archive_pdf / zone_non_trouvee).
+    // `folderName` = nom du sous-dossier = emplacement.
+    const scanDossier = async (folderName) => {
+      const scanDir = path.join(base, folderName);
+      const dirs = {
+        base: scanDir,
+        archiveDat: path.join(scanDir, config.archiveDatDirName),
+        archivePdf: path.join(scanDir, config.archivePdfDirName),
+        zoneInconnue: path.join(scanDir, config.zoneInconnueDirName),
+      };
+      try {
+        // mkdir récursif des archives → crée aussi scanDir au besoin.
+        fs.mkdirSync(dirs.archiveDat, { recursive: true });
+        fs.mkdirSync(dirs.archivePdf, { recursive: true });
+        fs.mkdirSync(dirs.zoneInconnue, { recursive: true });
+      } catch (err) {
+        sr.files.push({
+          name: `${folderName}/`,
+          status: "erreur",
+          message: `Dossier inaccessible : ${err.message}`,
+        });
+        return;
+      }
+
+      let entries = [];
+      try {
+        entries = fs.readdirSync(scanDir, { withFileTypes: true });
+      } catch (err) {
+        sr.files.push({
+          name: `${folderName}/`,
+          status: "erreur",
+          message: `Lecture impossible : ${err.message}`,
+        });
+        return;
+      }
+
+      for (const d of entries) {
+        if (!d.isFile()) continue;
+        const name = d.name;
+        if (name.toLowerCase().endsWith(".pdf")) continue;
+        const label = `${folderName}/${name}`;
+        if (!estFichierDat(name)) {
+          sr.files.push({
+            name: label,
+            status: "ignore",
+            message: "nom ne correspond pas au motif stock.dat_<zone>",
+          });
+          continue;
+        }
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const r = await traiterFichier(
+            session,
+            entreprise,
+            dirs,
+            name,
+            folderName,
+          );
+          sr.files.push({ name: label, ...r });
+        } catch (err) {
+          sr.files.push({ name: label, status: "erreur", message: err.message });
+        }
+      }
+    };
+
+    // On NE recrée PAS le dossier de base. S'il n'existe pas (rien encore
+    // déposé, ou dossier supprimé à la main après une annulation), il n'y a rien
+    // à traiter : il sera recréé À LA DEMANDE lors du prochain dépôt d'un .DAT.
+    // → un dossier supprimé ne "revient" plus tout seul à chaque passage.
+    let rootEntries = [];
     try {
-      entries = fs.readdirSync(base, { withFileTypes: true });
+      rootEntries = fs.readdirSync(base, { withFileTypes: true });
     } catch (err) {
+      if (err.code === "ENOENT") {
+        sr.ok = true; // dossier absent = normal (aucun dépôt) → rien à faire
+        report.sessions.push(sr);
+        continue;
+      }
       sr.error = `Lecture du dossier impossible : ${err.message}`;
       report.sessions.push(sr);
       continue;
     }
 
     sr.ok = true;
-    for (const d of entries) {
-      if (!d.isFile()) continue;
-      const name = d.name;
-      if (name.toLowerCase().endsWith(".pdf")) continue;
-      if (!estFichierDat(name)) {
-        sr.files.push({
-          name,
-          status: "ignore",
-          message: "nom ne correspond pas au motif stock.dat_<zone>",
-        });
-        continue;
-      }
-      try {
-        const r = await traiterFichier(session, entreprise, dirs, name);
-        sr.files.push({ name, ...r });
-      } catch (err) {
-        sr.files.push({ name, status: "erreur", message: err.message });
-      }
+    for (const d of rootEntries) {
+      if (!d.isDirectory()) continue;
+      if (reserved.has(d.name.toLowerCase())) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await scanDossier(d.name);
     }
 
     report.sessions.push(sr);

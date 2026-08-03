@@ -6,7 +6,11 @@ import LigneBipage from "../models/LigneBipageModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import FicheControle from "../models/FicheControleModel.js";
 import articleCacheService from "../services/articleService.js";
-import { config } from "../services/ficheControleService.js";
+import {
+  config,
+  getInventaireDirs,
+  emplacementDir,
+} from "../services/ficheControleService.js";
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -247,9 +251,10 @@ const recommencerZone = asyncHandler(async (req, res) => {
     zoneCode: code,
   });
 
-  const base = session.dossierDat || "";
-  const archiveDat = base ? path.join(base, config.archiveDatDirName) : "";
-  const archivePdf = base ? path.join(base, config.archivePdfDirName) : "";
+  // Base recalculée pour l'environnement courant (slug unique), comme le watcher
+  // — plus fiable que session.dossierDat (figé, potentiellement cross-OS).
+  const slug = session.dossierSlug || session.nom;
+  const base = slug ? getInventaireDirs(slug).base : session.dossierDat || "";
 
   const fichiersSupprimes = [];
   const avertissements = [];
@@ -266,16 +271,32 @@ const recommencerZone = asyncHandler(async (req, res) => {
   };
 
   for (const f of fiches) {
-    // PDF : chemin final archivé, puis replis archive_pdf/<nom> et base/<nom>.
+    // Le fichier vit dans le SOUS-DOSSIER de son emplacement (même source de
+    // vérité que le dépôt/watcher : emplacementDir). On prend le basename car
+    // datFileName/pdfFileName peuvent être préfixés par l'emplacement (clé BDD).
+    const scanDir = base ? path.join(base, emplacementDir(f.zoneType)) : base;
+    const pdfBase = f.pdfFileName ? path.basename(f.pdfFileName) : "";
+    const datBase = f.datFileName ? path.basename(f.datFileName) : "";
+
     tryUnlink(f.pdfPath);
-    if (f.pdfFileName) {
-      if (archivePdf) tryUnlink(path.join(archivePdf, f.pdfFileName));
-      if (base) tryUnlink(path.join(base, f.pdfFileName));
+    if (pdfBase && scanDir) {
+      tryUnlink(path.join(scanDir, config.archivePdfDirName, pdfBase));
+      tryUnlink(path.join(scanDir, pdfBase));
     }
-    // .DAT : archivé dans archive_dat, puis repli base/<nom> (non archivé).
-    if (f.datFileName) {
-      if (archiveDat) tryUnlink(path.join(archiveDat, f.datFileName));
-      if (base) tryUnlink(path.join(base, f.datFileName));
+    if (datBase && scanDir) {
+      tryUnlink(path.join(scanDir, config.archiveDatDirName, datBase));
+      tryUnlink(path.join(scanDir, datBase));
+    }
+    // Repli LEGACY : anciens fichiers à plat, directement sous la base.
+    if (base && base !== scanDir) {
+      if (pdfBase) {
+        tryUnlink(path.join(base, config.archivePdfDirName, pdfBase));
+        tryUnlink(path.join(base, pdfBase));
+      }
+      if (datBase) {
+        tryUnlink(path.join(base, config.archiveDatDirName, datBase));
+        tryUnlink(path.join(base, datBase));
+      }
     }
   }
 

@@ -985,6 +985,7 @@ import {
   construireLignes,
   ecrirePDF,
   getInventaireDirs,
+  emplacementDir,
 } from "../services/ficheControleService.js";
 import path from "path";
 import fs from "fs";
@@ -1021,14 +1022,15 @@ const genererContenuFichier = (lignes) => {
   return contenu;
 };
 
-// Nom de fichier déposé : "stock.dat <codeZone>[_<EMPLACEMENT>]" (reconnu par le
-// watcher). Le suffixe _MAGASIN / _DOCK évite qu'un MÊME code compté aux deux
-// emplacements dans la même session ne se télescope (2 fichiers distincts →
-// 2 fiches de contrôle). Le watcher re-sépare code et emplacement.
-const nomFichierZone = (zoneCode, zoneType) => {
+// Nom de fichier déposé : "stock.dat <codeZone>" (reconnu par le watcher).
+// On N'AJOUTE PLUS de suffixe d'emplacement : le fichier ne doit porter QUE le
+// code de zone, sinon il n'est pas reconnu et part dans zone_non_trouvee.
+// Le code de zone est censé être unique (il encode déjà l'emplacement au besoin,
+// ex. "B_5d") ; deux collectes du même code dans une session écriraient le même
+// fichier (la dernière prime).
+const nomFichierZone = (zoneCode) => {
   const code = String(zoneCode).trim().replace(/[\\/:*?"<>|]/g, "_");
-  const t = String(zoneType || "").trim().toUpperCase();
-  return `stock.dat ${code}${t ? `_${t}` : ""}`;
+  return `stock.dat ${code}`;
 };
 
 /**
@@ -1549,12 +1551,19 @@ const exportCollecte = asyncHandler(async (req, res) => {
   }
 
   const contenu = genererContenuFichier(collecte.lignes);
-  const nomFichier = nomFichierZone(collecte.zoneCode, collecte.zoneType);
+  const nomFichier = nomFichierZone(collecte.zoneCode);
 
   // Dossier de dépôt (en prod : montage ; en dev : session active sinon repli)
-  const { dossier, mode, session } = await resoudreDossierDepot(
+  const { dossier: dossierBase, mode, session } = await resoudreDossierDepot(
     collecte.entreprise,
   );
+
+  // Dépôt TOUJOURS dans un sous-dossier par EMPLACEMENT (zone.type) — jamais à
+  // la racine. Le nom de fichier reste "pur" (stock.dat <code>) ; un même code
+  // présent à 2 emplacements (MAGASIN/DOCK) ne se télescope pas. Zone sans
+  // emplacement → sous-dossier par défaut. Le watcher déduit l'emplacement du
+  // nom du sous-dossier (via emplacementDir, même source de vérité).
+  const dossier = path.join(dossierBase, emplacementDir(collecte.zoneType));
 
   try {
     if (!fs.existsSync(dossier)) {
