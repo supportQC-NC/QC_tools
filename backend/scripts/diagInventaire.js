@@ -53,6 +53,9 @@ const main = async () => {
   await connectDB();
 
   console.log("\n=== CONFIG ===");
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || "";
+  const dbName = (uri.match(/mongodb(?:\+srv)?:\/\/[^/]+\/([^?]+)/i) || [])[1] || "(défaut)";
+  console.log("BASE MongoDB     :", decodeURIComponent(dbName), "  ⚠ doit être IDENTIQUE à celle du backend de prod");
   console.log("sharePath        :", config.sharePath);
   console.log("STOCK_SHARE_PATH :", process.env.STOCK_SHARE_PATH || "(non défini)");
   console.log("autoprint        :", config.autoprint);
