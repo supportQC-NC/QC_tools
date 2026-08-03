@@ -26,6 +26,7 @@ import {
   useVerifierFournisseursMutation,
   useEnvoyerCommandesMutation,
   useGetFournisseurEmailsQuery,
+  useImportReferenceMutation,
   useCreateFournisseurEmailMutation,
   useUpdateFournisseurEmailMutation,
   useDeleteFournisseurEmailMutation,
@@ -52,6 +53,17 @@ const fmtDate = (v) => {
 };
 const fmtMoney = (n) =>
   (Number(n) || 0).toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " F";
+
+// Affiche le champ BATEAU : "OK" en vert, "P/VERIF" en orange, sinon texte brut.
+const renderBateau = (b) => {
+  const v = (b || "").trim();
+  if (!v) return <span className="ecf-recip tag">—</span>;
+  const up = v.toUpperCase();
+  if (up === "OK") return <span className="ecf-badge ok">OK</span>;
+  if (up.includes("VERIF") || up.includes("VÉRIF"))
+    return <span className="ecf-badge test">{v}</span>;
+  return v;
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ÉCRAN PRINCIPAL
@@ -202,6 +214,7 @@ const EnvoiCdeFournisseurScreen = () => {
 const CommandesTab = ({ dossier, params }) => {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState([]);
+  const [bateau, setBateau] = useState("");
   const [detailNumcde, setDetailNumcde] = useState(null);
   const [apercuNumcde, setApercuNumcde] = useState(null);
   const [showSend, setShowSend] = useState(false);
@@ -209,7 +222,7 @@ const CommandesTab = ({ dossier, params }) => {
   const [result, setResult] = useState(null);
 
   const { data, isLoading, isFetching, refetch, error } =
-    useGetCommandesPrepareesQuery({ nomDossierDBF: dossier, search });
+    useGetCommandesPrepareesQuery({ nomDossierDBF: dossier, search, bateau });
 
   const [verifier, { isLoading: verifying }] = useVerifierFournisseursMutation();
   const [envoyer, { isLoading: sending }] = useEnvoyerCommandesMutation();
@@ -266,15 +279,30 @@ const CommandesTab = ({ dossier, params }) => {
       <div className="ecf-toolbar">
         <input
           className="ecf-input"
-          placeholder="Rechercher (n° cmd, bateau…)"
+          placeholder="Rechercher (n° cmd…)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <select
+          className="ecf-input"
+          value={bateau}
+          onChange={(e) => setBateau(e.target.value)}
+          title="Filtrer par bateau"
+        >
+          <option value="">Bateau : tous</option>
+          {(data?.bateaux || []).map((b) => (
+            <option key={b.value} value={b.value}>
+              {b.value === "__vide__" ? "(sans bateau)" : b.value} ({b.count})
+            </option>
+          ))}
+        </select>
         <button className="ecf-btn" onClick={() => refetch()} disabled={isFetching}>
           <HiRefresh /> Rafraîchir
         </button>
         <div className="ecf-spacer" />
-        <span className="ecf-soc">{data?.totalRecords ?? 0} commande(s) préparée(s)</span>
+        <span className="ecf-soc">
+          {data?.totalRecords ?? 0} commande(s){bateau ? " (filtrées)" : ""} · « OK » en tête
+        </span>
         <button
           className="ecf-btn primary"
           disabled={selected.length === 0 || verifying}
@@ -373,7 +401,7 @@ const CommandesTab = ({ dossier, params }) => {
                   <td>{c.FOURN}</td>
                   <td className="wrap">{c.NOM}</td>
                   <td>{fmtDate(c.DATCDE)}</td>
-                  <td>{c.BATEAU}</td>
+                  <td>{renderBateau(c.BATEAU)}</td>
                   <td className="ecf-right">{c.NB_LIGNES}</td>
                   <td className="ecf-right">{fmtMoney(c.COUT_ACHAT_PREV)}</td>
                   <td>
@@ -614,7 +642,23 @@ const EmailsTab = ({ dossier }) => {
   const [createEmail] = useCreateFournisseurEmailMutation();
   const [updateEmail] = useUpdateFournisseurEmailMutation();
   const [deleteEmail] = useDeleteFournisseurEmailMutation();
+  const [importer, { isLoading: importing }] = useImportReferenceMutation();
   const [msg, setMsg] = useState(null);
+
+  const handleImport = async () => {
+    if (
+      !window.confirm(
+        "Importer / mettre à jour la base fournisseurs de référence (migrée depuis Access) pour cette société ?\n\nLes fiches existantes seront mises à jour, les manquantes créées.",
+      )
+    )
+      return;
+    try {
+      const r = await importer(dossier).unwrap();
+      setMsg({ type: "ok", text: r.message });
+    } catch (e) {
+      setMsg({ type: "err", text: e?.data?.message || "Erreur d'import." });
+    }
+  };
 
   const handleSave = async (form) => {
     try {
@@ -652,6 +696,14 @@ const EmailsTab = ({ dossier }) => {
         />
         <div className="ecf-spacer" />
         <span className="ecf-soc">{emails.length} fournisseur(s)</span>
+        <button
+          className="ecf-btn"
+          onClick={handleImport}
+          disabled={importing}
+          title="Importer la base migrée depuis Access (fichier de référence)"
+        >
+          <HiRefresh /> {importing ? "Import…" : "Importer la base de référence"}
+        </button>
         <button className="ecf-btn primary" onClick={() => setEditing({})}>
           <HiPlus /> Ajouter
         </button>

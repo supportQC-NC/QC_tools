@@ -9,17 +9,24 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // ─── Commandes préparées + envoi ─────────────────────────────────────
     getCommandesPreparees: builder.query({
-      query: ({ nomDossierDBF, search, fourn, page, limit }) => ({
+      query: ({ nomDossierDBF, search, fourn, bateau }) => ({
         url: `${ENVOI_CDE_URL}/${nomDossierDBF}/commandes`,
         params: {
           ...(search && { search }),
           ...(fourn && { fourn }),
-          ...(page && { page }),
-          ...(limit && { limit }),
+          ...(bateau && { bateau }),
         },
       }),
       providesTags: ["EnvoiCdeCommande"],
       keepUnusedDataFor: 30,
+    }),
+
+    importReference: builder.mutation({
+      query: (nomDossierDBF) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/import-reference`,
+        method: "POST",
+      }),
+      invalidatesTags: ["FournisseurEmail", "MessageFournisseur", "ResponsableCc"],
     }),
 
     getCommandeDetail: builder.query({
@@ -151,6 +158,7 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetCommandesPrepareesQuery,
+  useImportReferenceMutation,
   useGetCommandeDetailQuery,
   useGetEnvoiParametresQuery,
   useUpdateEnvoiParametresMutation,

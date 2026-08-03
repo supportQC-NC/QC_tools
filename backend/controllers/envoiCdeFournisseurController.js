@@ -14,6 +14,7 @@ import {
   appliquerModeTest,
   getParametres,
   setParametres,
+  importerReference,
   DEFAULT_MESSAGE_F,
   DEFAULT_MESSAGE_A,
 } from "../services/envoiCdeFournisseurService.js";
@@ -40,14 +41,22 @@ const toEmailArray = (v) => {
 
 // GET /:nomDossierDBF/commandes
 export const listCommandes = asyncHandler(async (req, res) => {
-  const { page, limit, search, fourn } = req.query;
+  const { search, fourn, bateau } = req.query;
   const data = await getCommandesPreparees(req.entreprise, {
-    page: parseInt(page) || 1,
-    limit: parseInt(limit) || 100,
     search: search || "",
     fourn: fourn || undefined,
+    bateau: bateau || undefined,
   });
   res.json(data);
+});
+
+// POST /:nomDossierDBF/import-reference  (peuple la BDD depuis les fichiers migrés)
+export const importReference = asyncHandler(async (req, res) => {
+  const result = await importerReference(req.entreprise);
+  res.json({
+    message: `Import terminé : ${result.emails} email(s), ${result.messages} modèle(s), ${result.responsables} responsable(s).`,
+    ...result,
+  });
 });
 
 // GET /:nomDossierDBF/commandes/:numcde/detail

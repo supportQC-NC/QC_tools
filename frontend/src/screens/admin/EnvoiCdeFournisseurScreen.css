@@ -1,8 +1,11 @@
 /* Module « Envoi Commande Fournisseur » — styles scopés .ecf-* */
+/* Outil destiné aux écrans PC : on occupe toute la largeur disponible. */
 .ecf-wrap {
-  padding: 16px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 18px 28px;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
 }
 .ecf-head {
   display: flex;

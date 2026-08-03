@@ -74,20 +74,27 @@ const construireCorpsHtml = (message) => {
 // LECTURE DES COMMANDES PRÉPARÉES (DBF)
 // ────────────────────────────────────────────────────────────────────────────
 
-// Liste paginée des commandes préparées (ETAT=1), enrichie du nom fournisseur.
-export const getCommandesPreparees = async (entreprise, options = {}) => {
-  const { page = 1, limit = 100, search = "", fourn } = options;
+// Sentinelle du filtre « bateau vide ».
+export const BATEAU_VIDE = "__vide__";
 
+// Liste des commandes préparées (ETAT=1), enrichie du nom fournisseur.
+// - tri par défaut : BATEAU = "OK" en tête, puis le reste (par date décroissante) ;
+// - filtre optionnel par bateau (valeur exacte, ou BATEAU_VIDE pour « sans bateau ») ;
+// - renvoie aussi la liste des bateaux distincts (pour le dropdown de filtre).
+export const getCommandesPreparees = async (entreprise, options = {}) => {
+  const { search = "", fourn, bateau } = options;
+
+  // On récupère TOUTES les commandes préparées (tri/filtre bateau global).
   const res = await commandeCacheService.getPaginated(entreprise, {
-    page,
-    limit,
+    page: 1,
+    limit: 1000000,
     etat: ETAT_PREPAREE,
     search: search || undefined,
     fourn: fourn || undefined,
     withDetailTotals: true,
   });
 
-  const commandes = await Promise.all(
+  let commandes = await Promise.all(
     res.commandes.map(async (c) => {
       let nom = "";
       try {
@@ -110,7 +117,41 @@ export const getCommandesPreparees = async (entreprise, options = {}) => {
     }),
   );
 
-  return { ...res, commandes };
+  // Liste des bateaux distincts (avant filtrage) pour le dropdown.
+  // Regroupement INSENSIBLE À LA CASSE (ex. "P/VERIF" et "p/verif" -> une entrée).
+  const compteur = new Map();
+  for (const c of commandes) {
+    const raw = c.BATEAU || BATEAU_VIDE;
+    const key = raw === BATEAU_VIDE ? BATEAU_VIDE : raw.toUpperCase();
+    const cur = compteur.get(key) || { value: key, count: 0 };
+    cur.count += 1;
+    compteur.set(key, cur);
+  }
+  const bateaux = [...compteur.values()].sort((a, b) => {
+    // "OK" en tête, puis "(vide)" en fin, sinon alpha.
+    const rank = (v) =>
+      v.value === "OK" ? 0 : v.value === BATEAU_VIDE ? 2 : 1;
+    return rank(a) - rank(b) || a.value.localeCompare(b.value);
+  });
+
+  // Filtre bateau optionnel.
+  if (bateau) {
+    if (bateau === BATEAU_VIDE) {
+      commandes = commandes.filter((c) => !c.BATEAU);
+    } else {
+      const bl = bateau.toLowerCase();
+      commandes = commandes.filter((c) => (c.BATEAU || "").toLowerCase() === bl);
+    }
+  }
+
+  // Tri par défaut : BATEAU = "OK" d'abord (le reste garde l'ordre date décroissante).
+  commandes.sort(
+    (a, b) =>
+      (a.BATEAU.toUpperCase() === "OK" ? 0 : 1) -
+      (b.BATEAU.toUpperCase() === "OK" ? 0 : 1),
+  );
+
+  return { totalRecords: commandes.length, commandes, bateaux };
 };
 
 // Entête d'une commande (cmdref) + nom fournisseur.
@@ -481,6 +522,67 @@ export const envoyerCommandes = async (entreprise, numcdes = [], user = null) =>
   return { nbOk, nbErr, testMode: params.testMode, resultats };
 };
 
+// ────────────────────────────────────────────────────────────────────────────
+// IMPORT DE LA BASE DE RÉFÉRENCE (fichiers commités -> Mongo), PAR SOCIÉTÉ.
+// Permet de peupler la prod (VPS) sans CLI : upsert des emails/modèles/responsable
+// de la société courante depuis backend/data/*.js (migrés depuis Access).
+// ────────────────────────────────────────────────────────────────────────────
+export const importerReference = async (entreprise) => {
+  const [
+    { default: fournisseurEmails },
+    { default: messagesFournisseur },
+    { default: responsablesCc },
+  ] = await Promise.all([
+    import("../data/fournisseurEmails.js"),
+    import("../data/messagesFournisseur.js"),
+    import("../data/responsablesCc.js"),
+  ]);
+
+  const dossier = String(entreprise.nomDossierDBF).toLowerCase();
+  const match = (row) => String(row.nomDossierDBF || "").toLowerCase() === dossier;
+
+  let emails = 0;
+  for (const row of fournisseurEmails.filter(match)) {
+    await FournisseurEmail.updateOne(
+      { entreprise: entreprise._id, fournId: row.fournId },
+      {
+        $set: {
+          fournLbl: row.fournLbl || "",
+          langue: row.langue === "A" ? "A" : "F",
+          emails: row.emails || [],
+          emailsTransitaire: row.emailsTransitaire || [],
+          emailsCC: row.emailsCC || [],
+        },
+        $setOnInsert: { actif: true },
+      },
+      { upsert: true },
+    );
+    emails += 1;
+  }
+
+  let messages = 0;
+  for (const row of messagesFournisseur.filter(match)) {
+    await MessageFournisseur.updateOne(
+      { entreprise: entreprise._id, langue: row.langue },
+      { $set: { message: row.message || "" } },
+      { upsert: true },
+    );
+    messages += 1;
+  }
+
+  let responsables = 0;
+  for (const row of responsablesCc.filter(match)) {
+    await ResponsableCc.updateOne(
+      { entreprise: entreprise._id },
+      { $set: { nom: row.nom || "", emails: row.emails || [] } },
+      { upsert: true },
+    );
+    responsables += 1;
+  }
+
+  return { emails, messages, responsables };
+};
+
 export default {
   getCommandesPreparees,
   getDetailCommande,
@@ -491,4 +593,5 @@ export default {
   getParametres,
   setParametres,
   getDefaultMessage,
+  importerReference,
 };

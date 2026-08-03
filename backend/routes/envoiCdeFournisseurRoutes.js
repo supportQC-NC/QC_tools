@@ -12,6 +12,7 @@ import {
   envoyer,
   getParametresCtrl,
   updateParametresCtrl,
+  importReference,
   listEmails,
   createEmail,
   updateEmail,
@@ -43,6 +44,9 @@ router.put("/:nomDossierDBF/parametres", ...write, updateParametresCtrl);
 router.get("/:nomDossierDBF/apercu/:numcde", ...read, apercu);
 router.post("/:nomDossierDBF/verifier", ...read, verifier);
 router.post("/:nomDossierDBF/envoyer", ...write, envoyer);
+
+// ─── Import de la base de référence (migrée depuis Access) ─────────────────
+router.post("/:nomDossierDBF/import-reference", ...write, importReference);
 
 // ─── Emails fournisseurs (CRUD) ────────────────────────────────────────────
 router.get("/:nomDossierDBF/emails", ...read, listEmails);
