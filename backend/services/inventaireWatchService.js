@@ -80,42 +80,19 @@ export const deplacerVers = (srcPath, destDir) => {
 const traiterFichier = async (
   session,
   entreprise,
-  dirs,
+  base,
+  currentDir,
   fileName,
   folderName,
 ) => {
-  const { base, archiveDat, archivePdf, zoneInconnue } = dirs;
-  const filePath = path.join(base, fileName);
+  const filePath = path.join(currentDir, fileName);
   const stat = fs.statSync(filePath);
 
-  // Clé LOGIQUE du fichier en BDD : préfixée par le dossier d'emplacement pour
-  // qu'un même code présent à 2 emplacements (MAGASIN/DOCK) donne 2 fiches /
-  // 2 jeux de lignes DISTINCTS, alors que le fichier disque garde un nom "pur"
-  // (stock.dat <code>).
-  const logicalName = `${folderName}/${fileName}`;
-
-  // Déjà traité et inchangé ?
-  const existing = await FicheControle.findOne({
-    session: session._id,
-    datFileName: logicalName,
-  });
-  if (
-    existing &&
-    existing.datMtimeMs === stat.mtimeMs &&
-    existing.datSize === stat.size
-  ) {
-    return { status: "inchange", message: "déjà traité" };
-  }
-
-  const content = fs.readFileSync(filePath, "utf8");
-  const lignesDat = parseDat(content);
-
-  // Nom de fichier canonique : "stock.dat <code>" — le token EST le code de zone
-  // (le code peut contenir des "_", ex. "B_5d"). L'emplacement vient du nom du
-  // SOUS-DOSSIER (folderName), pas du nom de fichier. On récupère toutes les
-  // zones de ce code, puis on départage par le dossier d'emplacement
-  // (emplacementDir(zone.type) === folderName) — même source de vérité que le
-  // dépôt. Exact puis insensible à la casse.
+  // Résolution de la zone. Le nom de fichier = code de zone (peut contenir "_",
+  // ex. "B_5d"). L'emplacement vient du SOUS-DOSSIER (folderName) quand le
+  // fichier y est déjà ; à la RACINE (folderName vide) on résout par code seul.
+  // On récupère toutes les zones du code puis on départage par le sous-dossier.
+  // Exact puis insensible à la casse.
   const rawZoneToken = extraireCodeZone(fileName) || "";
   const zoneCode = rawZoneToken;
   let zone = null;
@@ -134,15 +111,21 @@ const traiterFichier = async (
     if (zones.length === 1) {
       zone = zones[0];
     } else if (zones.length > 1) {
-      // Plusieurs zones même code (ex. MAGASIN + DOCK) → on prend celle dont
-      // l'emplacement correspond au sous-dossier où était le fichier.
-      zone = zones.find((z) => emplacementDir(z.type) === folderName) || null;
+      // Plusieurs zones même code (MAGASIN + DOCK) : départageables uniquement
+      // si le fichier est DÉJÀ dans un sous-dossier d'emplacement.
+      zone = folderName
+        ? zones.find((z) => emplacementDir(z.type) === folderName) || null
+        : null;
     }
   }
 
-  // Zone introuvable → pas de fiche, pas d'impression : déplacer le .DAT
-  // dans zone_non_trouvee. Si le déplacement échoue, on REMONTE l'erreur.
+  // Zone introuvable (ou code dupliqué déposé à la racine, ambigu) → on déplace
+  // le .DAT dans zone_non_trouvee (du sous-dossier courant, ou de la racine).
   if (!zone) {
+    const zoneInconnue = path.join(
+      folderName ? currentDir : base,
+      config.zoneInconnueDirName,
+    );
     try {
       deplacerVers(filePath, zoneInconnue);
       return {
@@ -155,6 +138,49 @@ const traiterFichier = async (
         message: `zone "${zoneCode || "?"}" introuvable, déplacement IMPOSSIBLE : ${err.message}`,
       };
     }
+  }
+
+  // Dossier CIBLE = sous-dossier de l'emplacement de la zone résolue. TOUT (le
+  // .DAT, le PDF, l'archivage, les non-trouvés) vit dans ce sous-dossier.
+  const emplacement = emplacementDir(zone.type);
+  const targetDir = path.join(base, emplacement);
+  const dirs = {
+    base: targetDir,
+    archiveDat: path.join(targetDir, config.archiveDatDirName),
+    archivePdf: path.join(targetDir, config.archivePdfDirName),
+  };
+  fs.mkdirSync(dirs.archiveDat, { recursive: true });
+  fs.mkdirSync(dirs.archivePdf, { recursive: true });
+
+  // Fichier déposé à la RACINE (ou mauvais dossier) → on le range dans son
+  // sous-dossier d'emplacement AVANT traitement.
+  let workFilePath = filePath;
+  if (path.resolve(currentDir) !== path.resolve(targetDir)) {
+    try {
+      workFilePath = deplacerVers(filePath, targetDir);
+    } catch (err) {
+      return {
+        status: "erreur",
+        message: `Rangement dans "${emplacement}" impossible : ${err.message}`,
+      };
+    }
+  }
+
+  // Clé LOGIQUE en BDD, préfixée par l'emplacement → 2 fiches distinctes pour un
+  // même code présent à 2 emplacements, sans changer les index uniques.
+  const logicalName = `${emplacement}/${fileName}`;
+
+  // Déjà traité et inchangé ?
+  const existing = await FicheControle.findOne({
+    session: session._id,
+    datFileName: logicalName,
+  });
+  if (
+    existing &&
+    existing.datMtimeMs === stat.mtimeMs &&
+    existing.datSize === stat.size
+  ) {
+    return { status: "inchange", message: "déjà traité" };
   }
 
   // VERROU ATOMIQUE anti double-impression : on "réserve" le fichier via
@@ -206,6 +232,8 @@ const traiterFichier = async (
   }
 
   // À partir d'ici : nous sommes le SEUL à traiter ce fichier.
+  const content = fs.readFileSync(workFilePath, "utf8");
+  const lignesDat = parseDat(content);
   const { rows, stats } = await construireLignes(entreprise, lignesDat);
 
   // Persistance des lignes pour l'écran "Détail des bipages"
@@ -242,7 +270,7 @@ const traiterFichier = async (
   };
 
   const pdfFileName = `${fileName.replace(/\.dat$/i, "")}.pdf`;
-  const workPath = path.join(base, pdfFileName);
+  const workPath = path.join(dirs.base, pdfFileName);
   await ecrirePDF({ header, rows, outPath: workPath });
 
   let printed = false;
@@ -263,12 +291,12 @@ const traiterFichier = async (
   // Les échecs de déplacement sont REMONTÉS dans printError (plus jamais avalés).
   if (printed) {
     try {
-      finalPath = deplacerVers(workPath, archivePdf);
+      finalPath = deplacerVers(workPath, dirs.archivePdf);
     } catch (err) {
       printError = `Imprimée mais PDF non archivé : ${err.message}`;
     }
     try {
-      deplacerVers(filePath, archiveDat);
+      deplacerVers(workFilePath, dirs.archiveDat);
       archived = true;
     } catch (err) {
       printError = printError
@@ -405,69 +433,33 @@ export const tickOnce = async () => {
       config.zoneInconnueDirName.toLowerCase(),
     ]);
 
-    // Traite les .DAT d'un SOUS-DOSSIER d'emplacement. Chaque sous-dossier est
-    // autonome (ses propres archive_dat / archive_pdf / zone_non_trouvee).
-    // `folderName` = nom du sous-dossier = emplacement.
-    const scanDossier = async (folderName) => {
-      const scanDir = path.join(base, folderName);
-      const dirs = {
-        base: scanDir,
-        archiveDat: path.join(scanDir, config.archiveDatDirName),
-        archivePdf: path.join(scanDir, config.archivePdfDirName),
-        zoneInconnue: path.join(scanDir, config.zoneInconnueDirName),
-      };
-      try {
-        // mkdir récursif des archives → crée aussi scanDir au besoin.
-        fs.mkdirSync(dirs.archiveDat, { recursive: true });
-        fs.mkdirSync(dirs.archivePdf, { recursive: true });
-        fs.mkdirSync(dirs.zoneInconnue, { recursive: true });
-      } catch (err) {
+    // Traite un .DAT : traiterFichier le range dans le sous-dossier de son
+    // emplacement (via la zone résolue), génère le PDF, imprime et archive.
+    // `currentDir` = où est le fichier ; `folderName` = sous-dossier d'emplacement
+    // ("" si le fichier est à la racine).
+    const traiterUn = async (currentDir, folderName, name) => {
+      const label = folderName ? `${folderName}/${name}` : name;
+      if (name.toLowerCase().endsWith(".pdf")) return;
+      if (!estFichierDat(name)) {
         sr.files.push({
-          name: `${folderName}/`,
-          status: "erreur",
-          message: `Dossier inaccessible : ${err.message}`,
+          name: label,
+          status: "ignore",
+          message: "nom ne correspond pas au motif stock.dat_<zone>",
         });
         return;
       }
-
-      let entries = [];
       try {
-        entries = fs.readdirSync(scanDir, { withFileTypes: true });
+        const r = await traiterFichier(
+          session,
+          entreprise,
+          base,
+          currentDir,
+          name,
+          folderName,
+        );
+        sr.files.push({ name: label, ...r });
       } catch (err) {
-        sr.files.push({
-          name: `${folderName}/`,
-          status: "erreur",
-          message: `Lecture impossible : ${err.message}`,
-        });
-        return;
-      }
-
-      for (const d of entries) {
-        if (!d.isFile()) continue;
-        const name = d.name;
-        if (name.toLowerCase().endsWith(".pdf")) continue;
-        const label = `${folderName}/${name}`;
-        if (!estFichierDat(name)) {
-          sr.files.push({
-            name: label,
-            status: "ignore",
-            message: "nom ne correspond pas au motif stock.dat_<zone>",
-          });
-          continue;
-        }
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          const r = await traiterFichier(
-            session,
-            entreprise,
-            dirs,
-            name,
-            folderName,
-          );
-          sr.files.push({ name: label, ...r });
-        } catch (err) {
-          sr.files.push({ name: label, status: "erreur", message: err.message });
-        }
+        sr.files.push({ name: label, status: "erreur", message: err.message });
       }
     };
 
@@ -490,11 +482,34 @@ export const tickOnce = async () => {
     }
 
     sr.ok = true;
+    // 1) Fichiers déposés À LA RACINE → rangés dans leur sous-dossier d'emplacement.
+    for (const d of rootEntries) {
+      if (!d.isFile()) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await traiterUn(base, "", d.name);
+    }
+    // 2) Fichiers déjà DANS un sous-dossier d'emplacement (dépôt direct).
     for (const d of rootEntries) {
       if (!d.isDirectory()) continue;
       if (reserved.has(d.name.toLowerCase())) continue;
-      // eslint-disable-next-line no-await-in-loop
-      await scanDossier(d.name);
+      const scanDir = path.join(base, d.name);
+      let subEntries = [];
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        subEntries = fs.readdirSync(scanDir, { withFileTypes: true });
+      } catch (err) {
+        sr.files.push({
+          name: `${d.name}/`,
+          status: "erreur",
+          message: `Lecture impossible : ${err.message}`,
+        });
+        continue;
+      }
+      for (const f of subEntries) {
+        if (!f.isFile()) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await traiterUn(scanDir, d.name, f.name);
+      }
     }
 
     report.sessions.push(sr);
