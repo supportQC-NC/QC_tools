@@ -63,6 +63,15 @@ export const imprimerPdf = async (filePath) => {
 export const deplacerVers = (srcPath, destDir) => {
   fs.mkdirSync(destDir, { recursive: true });
   const dest = path.join(destDir, path.basename(srcPath));
+  // Déplacement "sur lui-même" (même fichier, éventuellement à la casse près sous
+  // Windows) → NO-OP. Sinon le unlink(dest) ci-dessous effacerait la source.
+  const norm = (p) =>
+    process.platform === "win32"
+      ? path.resolve(p).toLowerCase()
+      : path.resolve(p);
+  if (norm(dest) === norm(srcPath)) {
+    return srcPath;
+  }
   if (fs.existsSync(dest)) {
     try {
       fs.unlinkSync(dest);
@@ -140,9 +149,12 @@ const traiterFichier = async (
     }
   }
 
-  // Dossier CIBLE = sous-dossier de l'emplacement de la zone résolue. TOUT (le
-  // .DAT, le PDF, l'archivage, les non-trouvés) vit dans ce sous-dossier.
-  const emplacement = emplacementDir(zone.type);
+  // Emplacement = le SOUS-DOSSIER où le fichier se trouve DÉJÀ (folderName) ;
+  // à la RACINE seulement (folderName vide), on le déduit de la zone résolue.
+  // → un fichier déjà rangé dans un sous-dossier est traité SUR PLACE (aucun
+  //   déplacement) ; seul un fichier trouvé à la racine est rangé. Ça évite un
+  //   "déplacement sur lui-même" (qui, sous Windows, supprimait le .DAT).
+  const emplacement = folderName || emplacementDir(zone.type);
   const targetDir = path.join(base, emplacement);
   const dirs = {
     base: targetDir,
@@ -152,8 +164,9 @@ const traiterFichier = async (
   fs.mkdirSync(dirs.archiveDat, { recursive: true });
   fs.mkdirSync(dirs.archivePdf, { recursive: true });
 
-  // Fichier déposé à la RACINE (ou mauvais dossier) → on le range dans son
-  // sous-dossier d'emplacement AVANT traitement.
+  // Fichier déposé à la RACINE → on le range dans son sous-dossier d'emplacement
+  // AVANT traitement. (Fichier déjà en sous-dossier : currentDir === targetDir,
+  // donc aucun déplacement.)
   let workFilePath = filePath;
   if (path.resolve(currentDir) !== path.resolve(targetDir)) {
     try {
