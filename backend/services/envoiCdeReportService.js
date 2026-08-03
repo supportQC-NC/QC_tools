@@ -81,6 +81,8 @@ const XL_COLS = [
   { key: "QTE", label: "QTE", width: 8 },
   { key: "NL", label: "NL", width: 6 },
   { key: "DATCDE", label: "DATCDE", width: 12 },
+  // PACHAT (prix d'achat article) — TOUJOURS en dernière colonne.
+  { key: "PACHAT", label: "PACHAT", width: 12 },
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -126,6 +128,7 @@ export const genererExcelCommande = async (header, lignes) => {
     row.getCell(9).value = Number(l.QTE) || 0;
     row.getCell(10).value = l.NL ?? "";
     row.getCell(11).value = dat;
+    row.getCell(12).value = Number(l.PACHAT) || 0;
     row.commit();
     r += 1;
   });

@@ -29,6 +29,14 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["FournisseurEmail", "MessageFournisseur", "ResponsableCc"],
     }),
 
+    importReferenceGlobal: builder.mutation({
+      query: () => ({
+        url: `${ENVOI_CDE_URL}/import-reference-global`,
+        method: "POST",
+      }),
+      invalidatesTags: ["FournisseurEmail", "MessageFournisseur", "ResponsableCc"],
+    }),
+
     getCommandeDetail: builder.query({
       query: ({ nomDossierDBF, numcde }) => ({
         url: `${ENVOI_CDE_URL}/${nomDossierDBF}/commandes/${numcde}/detail`,
@@ -111,6 +119,26 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["FournisseurEmail"],
     }),
 
+    // ─── Envoi en masse (vœux / annonces) ────────────────────────────────
+    compterMasse: builder.query({
+      query: ({ nomDossierDBF, cible, fournIds }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/masse/compter`,
+        params: {
+          cible,
+          ...(fournIds && fournIds.length ? { fournIds: fournIds.join(",") } : {}),
+        },
+      }),
+    }),
+
+    envoyerMasse: builder.mutation({
+      query: ({ nomDossierDBF, ...body }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/masse`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["EnvoiCdeHistorique"],
+    }),
+
     // ─── Modèles de message ──────────────────────────────────────────────
     getMessagesFournisseur: builder.query({
       query: (nomDossierDBF) => ({
@@ -159,6 +187,7 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetCommandesPrepareesQuery,
   useImportReferenceMutation,
+  useImportReferenceGlobalMutation,
   useGetCommandeDetailQuery,
   useGetEnvoiParametresQuery,
   useUpdateEnvoiParametresMutation,
@@ -169,6 +198,8 @@ export const {
   useCreateFournisseurEmailMutation,
   useUpdateFournisseurEmailMutation,
   useDeleteFournisseurEmailMutation,
+  useCompterMasseQuery,
+  useEnvoyerMasseMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
   useGetResponsableCcQuery,

@@ -13,6 +13,9 @@ import {
   getParametresCtrl,
   updateParametresCtrl,
   importReference,
+  importReferenceGlobal,
+  compterMasse,
+  envoyerMasseCtrl,
   listEmails,
   createEmail,
   updateEmail,
@@ -23,7 +26,7 @@ import {
   upsertResponsable,
   getHistorique,
 } from "../controllers/envoiCdeFournisseurController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
 import {
   checkEntrepriseAccess,
   checkModuleAccess,
@@ -36,6 +39,10 @@ const read = [protect, checkEntrepriseAccess, checkModuleAccess(MODULE, "read")]
 const write = [protect, checkEntrepriseAccess, checkModuleAccess(MODULE, "write")];
 const del = [protect, checkEntrepriseAccess, checkModuleAccess(MODULE, "delete")];
 
+// Import GLOBAL (toutes sociétés) — admin, PAS de scoping société (route sans :nomDossierDBF).
+// Déclarée en premier pour ne pas être capturée par les routes paramétrées.
+router.post("/import-reference-global", protect, admin, importReferenceGlobal);
+
 // ─── Commandes préparées + envoi ───────────────────────────────────────────
 router.get("/:nomDossierDBF/commandes", ...read, listCommandes);
 router.get("/:nomDossierDBF/commandes/:numcde/detail", ...read, getDetail);
@@ -47,6 +54,10 @@ router.post("/:nomDossierDBF/envoyer", ...write, envoyer);
 
 // ─── Import de la base de référence (migrée depuis Access) ─────────────────
 router.post("/:nomDossierDBF/import-reference", ...write, importReference);
+
+// ─── Envoi en masse (vœux / annonces, texte simple FR/EN) ──────────────────
+router.get("/:nomDossierDBF/masse/compter", ...read, compterMasse);
+router.post("/:nomDossierDBF/masse", ...write, envoyerMasseCtrl);
 
 // ─── Emails fournisseurs (CRUD) ────────────────────────────────────────────
 router.get("/:nomDossierDBF/emails", ...read, listEmails);

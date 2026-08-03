@@ -13,6 +13,11 @@ const envoiCdeHistoriqueSchema = new mongoose.Schema(
     },
     nomDossierDBF: { type: String, default: "" },
 
+    // Type d'envoi : commande fournisseur, ou message groupé (vœux/annonces).
+    type: { type: String, enum: ["commande", "masse"], default: "commande" },
+    // Pour un envoi en masse : nombre de destinataires réels concernés.
+    nbDestinataires: { type: Number, default: 0 },
+
     // Commande envoyée (cmdref.NUMCDE) + fournisseur (cmdref.FOURN).
     numcde: { type: String, required: true },
     fournId: { type: Number, default: null },

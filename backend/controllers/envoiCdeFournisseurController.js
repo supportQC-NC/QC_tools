@@ -15,6 +15,9 @@ import {
   getParametres,
   setParametres,
   importerReference,
+  importerReferenceGlobale,
+  compterCiblesMasse,
+  envoyerMasse,
   DEFAULT_MESSAGE_F,
   DEFAULT_MESSAGE_A,
 } from "../services/envoiCdeFournisseurService.js";
@@ -57,6 +60,44 @@ export const importReference = asyncHandler(async (req, res) => {
     message: `Import terminé : ${result.emails} email(s), ${result.messages} modèle(s), ${result.responsables} responsable(s).`,
     ...result,
   });
+});
+
+// POST /import-reference-global  (admin) — importe TOUTES les sociétés d'un coup
+export const importReferenceGlobal = asyncHandler(async (req, res) => {
+  const result = await importerReferenceGlobale();
+  res.json({
+    message: `Import global terminé : ${result.emails} email(s), ${result.messages} modèle(s), ${result.responsables} responsable(s) répartis sur ${result.parSociete.length} société(s).`,
+    ...result,
+  });
+});
+
+// GET /:nomDossierDBF/masse/compter?cible=..&fournIds=..  (aperçu destinataires)
+export const compterMasse = asyncHandler(async (req, res) => {
+  const { cible = "selection", fournIds } = req.query;
+  const ids = fournIds
+    ? String(fournIds).split(",").map((s) => parseInt(s)).filter((n) => !isNaN(n))
+    : [];
+  const counts = await compterCiblesMasse(req.entreprise, cible, ids);
+  res.json(counts);
+});
+
+// POST /:nomDossierDBF/masse  (envoi groupé — texte simple FR/EN)
+export const envoyerMasseCtrl = asyncHandler(async (req, res) => {
+  const { cible, fournIds, sujetF, messageF, sujetA, messageA } = req.body;
+  if (!["francais", "anglais", "selection"].includes(cible)) {
+    res.status(400);
+    throw new Error("Cible invalide.");
+  }
+  if (cible === "selection" && (!Array.isArray(fournIds) || fournIds.length === 0)) {
+    res.status(400);
+    throw new Error("Aucun fournisseur sélectionné.");
+  }
+  const result = await envoyerMasse(
+    req.entreprise,
+    { cible, fournIds, sujetF, messageF, sujetA, messageA },
+    req.user,
+  );
+  res.json(result);
 });
 
 // GET /:nomDossierDBF/commandes/:numcde/detail

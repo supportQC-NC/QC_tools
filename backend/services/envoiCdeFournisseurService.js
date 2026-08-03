@@ -20,6 +20,7 @@ import {
   logoFromEntreprise,
 } from "./envoiCdeReportService.js";
 
+import Entreprise from "../models/EntrepriseModel.js";
 import FournisseurEmail from "../models/FournisseurEmailModel.js";
 import MessageFournisseur from "../models/MessageFournisseurModel.js";
 import ResponsableCc from "../models/ResponsableCcModel.js";
@@ -68,6 +69,19 @@ const construireCorpsHtml = (message) => {
     .replace(/<\/?body>/gi, "")
     .trim();
   return `<html><body>${inner}<br><br>${SIGNATURE_HTML}</body></html>`;
+};
+
+// Échappe le HTML d'un texte SIMPLE saisi par un utilisateur non technicien.
+const escapeHtml = (s) =>
+  String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+// Corps HTML à partir d'un texte simple (retours ligne -> <br>) + signature.
+const construireCorpsTexte = (texte) => {
+  const html = escapeHtml(texte).replace(/\r?\n/g, "<br>");
+  return `<html><body>${html}<br><br>${SIGNATURE_HTML}</body></html>`;
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -195,6 +209,8 @@ export const getDetailCommande = async (entreprise, numcde) => {
         REFER: trim(art?.REFER || l.REFER),
         GENCOD: trim(art?.GENCOD),
         QTE: Number(l.QTE) || 0,
+        // Prix d'achat depuis la fiche article (article.PACHAT).
+        PACHAT: Number(art?.PACHAT) || 0,
       };
     }),
   );
@@ -523,11 +539,155 @@ export const envoyerCommandes = async (entreprise, numcdes = [], user = null) =>
 };
 
 // ────────────────────────────────────────────────────────────────────────────
+// ENVOI EN MASSE (vœux / annonces) — message TEXTE simple, FR et/ou EN.
+// cible : "francais" | "anglais" | "selection" (+ fournIds).
+// « toujours laisser la partie transitaire » -> le transitaire reste en copie.
+// En MODE TEST : on n'envoie PAS un mail par fournisseur (anti-flood) ; on envoie
+// un seul mail de contrôle par langue vers les adresses de test.
+// ────────────────────────────────────────────────────────────────────────────
+export const compterCiblesMasse = async (entreprise, cible, fournIds = []) => {
+  const base = { entreprise: entreprise._id, actif: { $ne: false } };
+  let q = base;
+  if (cible === "francais") q = { ...base, langue: "F" };
+  else if (cible === "anglais") q = { ...base, langue: "A" };
+  else if (cible === "selection")
+    q = { ...base, fournId: { $in: (fournIds || []).map(Number) } };
+  const docs = await FournisseurEmail.find(q).lean();
+  const avecMail = docs.filter((d) => (d.emails || []).filter(Boolean).length);
+  return {
+    total: avecMail.length,
+    francais: avecMail.filter((d) => d.langue !== "A").length,
+    anglais: avecMail.filter((d) => d.langue === "A").length,
+  };
+};
+
+export const envoyerMasse = async (entreprise, payload = {}, user = null) => {
+  const {
+    cible = "selection",
+    fournIds = [],
+    sujetF = "",
+    messageF = "",
+    sujetA = "",
+    messageA = "",
+  } = payload;
+
+  const params = await getParametres(entreprise);
+
+  // Résolution des destinataires.
+  const base = { entreprise: entreprise._id, actif: { $ne: false } };
+  let q = base;
+  if (cible === "francais") q = { ...base, langue: "F" };
+  else if (cible === "anglais") q = { ...base, langue: "A" };
+  else if (cible === "selection")
+    q = { ...base, fournId: { $in: (fournIds || []).map(Number) } };
+  const cibles = (await FournisseurEmail.find(q).lean()).filter(
+    (d) => (d.emails || []).filter(Boolean).length,
+  );
+
+  const contenu = (langue) =>
+    langue === "A"
+      ? { sujet: trim(sujetA), message: messageA }
+      : { sujet: trim(sujetF), message: messageF };
+
+  const resultats = [];
+
+  if (params.testMode) {
+    // Anti-flood : un seul mail de contrôle par langue réellement ciblée.
+    const languesCiblees = [...new Set(cibles.map((d) => (d.langue === "A" ? "A" : "F")))];
+    for (const langue of languesCiblees) {
+      const { sujet, message } = contenu(langue);
+      const nb = cibles.filter((d) => (d.langue === "A" ? "A" : "F") === langue).length;
+      if (!trim(message) || !sujet) {
+        resultats.push({ langue, statut: "erreur", message: `Sujet/message ${langue} manquant.`, nbDestinataires: nb });
+        continue;
+      }
+      try {
+        await sendEmail({
+          email: params.testEmails,
+          subject: `[TEST x${nb}] ${sujet}`,
+          html: construireCorpsTexte(message),
+        });
+        await EnvoiCdeHistorique.create({
+          entreprise: entreprise._id,
+          nomDossierDBF: entreprise.nomDossierDBF,
+          type: "masse",
+          numcde: `MASSE-${langue}`,
+          fournNom: `Message groupé ${langue} (${nb} fournisseurs)`,
+          sujet,
+          langue,
+          destinataires: params.testEmails,
+          nbDestinataires: nb,
+          testMode: true,
+          envoyePar: user?._id || null,
+          statut: "envoye",
+        });
+        resultats.push({ langue, statut: "envoye", nbDestinataires: nb, testMode: true });
+      } catch (err) {
+        resultats.push({ langue, statut: "erreur", message: err.message, nbDestinataires: nb });
+      }
+    }
+    const nbOk = resultats.filter((r) => r.statut === "envoye").length;
+    return { testMode: true, nbOk, nbErr: resultats.length - nbOk, nbCibles: cibles.length, resultats };
+  }
+
+  // MODE RÉEL : un mail par fournisseur, dans sa langue.
+  for (const fe of cibles) {
+    const langue = fe.langue === "A" ? "A" : "F";
+    const { sujet, message } = contenu(langue);
+    if (!trim(message) || !sujet) {
+      resultats.push({ fournId: fe.fournId, statut: "ignore", message: `Message ${langue} vide.` });
+      continue;
+    }
+    const to = (fe.emails || []).filter(Boolean);
+    // « toujours laisser la partie transitaire » -> transitaire en copie.
+    const cc = (fe.emailsTransitaire || []).filter(Boolean);
+    try {
+      await sendEmail({
+        email: to,
+        cc: cc.length ? cc : undefined,
+        subject: sujet,
+        html: construireCorpsTexte(message),
+      });
+      await EnvoiCdeHistorique.create({
+        entreprise: entreprise._id,
+        nomDossierDBF: entreprise.nomDossierDBF,
+        type: "masse",
+        numcde: `MASSE-${fe.fournId}`,
+        fournId: fe.fournId,
+        fournNom: fe.fournLbl,
+        sujet,
+        langue,
+        destinataires: to,
+        cc,
+        destinatairesReels: to,
+        nbDestinataires: 1,
+        testMode: false,
+        envoyePar: user?._id || null,
+        statut: "envoye",
+      });
+      resultats.push({ fournId: fe.fournId, fournNom: fe.fournLbl, langue, statut: "envoye", destinataires: to });
+    } catch (err) {
+      resultats.push({ fournId: fe.fournId, fournNom: fe.fournLbl, statut: "erreur", message: err.message });
+    }
+  }
+  const nbOk = resultats.filter((r) => r.statut === "envoye").length;
+  return {
+    testMode: false,
+    nbOk,
+    nbErr: resultats.filter((r) => r.statut === "erreur").length,
+    nbIgnore: resultats.filter((r) => r.statut === "ignore").length,
+    nbCibles: cibles.length,
+    resultats,
+  };
+};
+
+// ────────────────────────────────────────────────────────────────────────────
 // IMPORT DE LA BASE DE RÉFÉRENCE (fichiers commités -> Mongo), PAR SOCIÉTÉ.
 // Permet de peupler la prod (VPS) sans CLI : upsert des emails/modèles/responsable
 // de la société courante depuis backend/data/*.js (migrés depuis Access).
 // ────────────────────────────────────────────────────────────────────────────
-export const importerReference = async (entreprise) => {
+// Charge les 3 fichiers de données migrés depuis Access.
+const chargerDonneesReference = async () => {
   const [
     { default: fournisseurEmails },
     { default: messagesFournisseur },
@@ -537,14 +697,18 @@ export const importerReference = async (entreprise) => {
     import("../data/messagesFournisseur.js"),
     import("../data/responsablesCc.js"),
   ]);
+  return { fournisseurEmails, messagesFournisseur, responsablesCc };
+};
 
-  const dossier = String(entreprise.nomDossierDBF).toLowerCase();
-  const match = (row) => String(row.nomDossierDBF || "").toLowerCase() === dossier;
-
-  let emails = 0;
-  for (const row of fournisseurEmails.filter(match)) {
+// Upsert des emails/modèles/responsable d'UNE société à partir de ses lignes.
+const upsertReferencePourEntreprise = async (
+  entrepriseId,
+  { emails = [], messages = [], responsable = null },
+) => {
+  let nbEmails = 0;
+  for (const row of emails) {
     await FournisseurEmail.updateOne(
-      { entreprise: entreprise._id, fournId: row.fournId },
+      { entreprise: entrepriseId, fournId: row.fournId },
       {
         $set: {
           fournLbl: row.fournLbl || "",
@@ -557,30 +721,104 @@ export const importerReference = async (entreprise) => {
       },
       { upsert: true },
     );
-    emails += 1;
+    nbEmails += 1;
   }
-
-  let messages = 0;
-  for (const row of messagesFournisseur.filter(match)) {
+  let nbMessages = 0;
+  for (const row of messages) {
     await MessageFournisseur.updateOne(
-      { entreprise: entreprise._id, langue: row.langue },
+      { entreprise: entrepriseId, langue: row.langue },
       { $set: { message: row.message || "" } },
       { upsert: true },
     );
-    messages += 1;
+    nbMessages += 1;
   }
-
-  let responsables = 0;
-  for (const row of responsablesCc.filter(match)) {
+  let nbResp = 0;
+  if (responsable) {
     await ResponsableCc.updateOne(
-      { entreprise: entreprise._id },
-      { $set: { nom: row.nom || "", emails: row.emails || [] } },
+      { entreprise: entrepriseId },
+      { $set: { nom: responsable.nom || "", emails: responsable.emails || [] } },
       { upsert: true },
     );
-    responsables += 1;
+    nbResp = 1;
   }
+  return { emails: nbEmails, messages: nbMessages, responsables: nbResp };
+};
 
-  return { emails, messages, responsables };
+// Import PAR SOCIÉTÉ (bouton de l'écran). Matching robuste :
+// nomDossierDBF OU code société (et) OU trigramme.
+export const importerReference = async (entreprise) => {
+  const { fournisseurEmails, messagesFournisseur, responsablesCc } =
+    await chargerDonneesReference();
+
+  const dossier = String(entreprise.nomDossierDBF || "").toLowerCase();
+  const trig = String(entreprise.trigramme || "").toUpperCase();
+  const match = (row) =>
+    (row.nomDossierDBF && String(row.nomDossierDBF).toLowerCase() === dossier) ||
+    (row.et && String(row.et).toUpperCase() === trig) ||
+    (row.trigramme && String(row.trigramme).toUpperCase() === trig);
+
+  return upsertReferencePourEntreprise(entreprise._id, {
+    emails: fournisseurEmails.filter(match),
+    messages: messagesFournisseur.filter(match),
+    responsable: responsablesCc.find(match) || null,
+  });
+};
+
+// Import GLOBAL (toutes les sociétés d'un coup) — équivalent du CLI, exposé en UI.
+// Résout chaque ligne vers son entreprise par nomDossierDBF puis par trigramme (et).
+export const importerReferenceGlobale = async () => {
+  const { fournisseurEmails, messagesFournisseur, responsablesCc } =
+    await chargerDonneesReference();
+
+  const entreprises = await Entreprise.find({}, "trigramme nomDossierDBF").lean();
+  const parDossier = new Map();
+  const parTrig = new Map();
+  for (const e of entreprises) {
+    if (e.nomDossierDBF) parDossier.set(String(e.nomDossierDBF).toLowerCase(), e);
+    if (e.trigramme) parTrig.set(String(e.trigramme).toUpperCase(), e);
+  }
+  const resoudre = (row) =>
+    (row.nomDossierDBF && parDossier.get(String(row.nomDossierDBF).toLowerCase())) ||
+    (row.et && parTrig.get(String(row.et).toUpperCase())) ||
+    (row.trigramme && parTrig.get(String(row.trigramme).toUpperCase())) ||
+    null;
+
+  // Regroupe les lignes par entreprise résolue.
+  const groupes = new Map(); // entrepriseId -> { ent, emails, messages, responsable }
+  const ignores = new Set();
+  const ajouter = (row, cle) => {
+    const ent = resoudre(row);
+    if (!ent) {
+      ignores.add(row.nomDossierDBF || row.et || row.trigramme || "?");
+      return;
+    }
+    const id = String(ent._id);
+    if (!groupes.has(id))
+      groupes.set(id, { ent, emails: [], messages: [], responsable: null });
+    const g = groupes.get(id);
+    if (cle === "email") g.emails.push(row);
+    else if (cle === "message") g.messages.push(row);
+    else if (cle === "responsable") g.responsable = row;
+  };
+  fournisseurEmails.forEach((r) => ajouter(r, "email"));
+  messagesFournisseur.forEach((r) => ajouter(r, "message"));
+  responsablesCc.forEach((r) => ajouter(r, "responsable"));
+
+  const parSociete = [];
+  const total = { emails: 0, messages: 0, responsables: 0 };
+  for (const { ent, emails, messages, responsable } of groupes.values()) {
+    const n = await upsertReferencePourEntreprise(ent._id, {
+      emails,
+      messages,
+      responsable,
+    });
+    total.emails += n.emails;
+    total.messages += n.messages;
+    total.responsables += n.responsables;
+    parSociete.push({ trigramme: ent.trigramme, nomDossierDBF: ent.nomDossierDBF, ...n });
+  }
+  parSociete.sort((a, b) => b.emails - a.emails);
+  return { ...total, parSociete, ignores: [...ignores] };
 };
 
 export default {
@@ -594,4 +832,7 @@ export default {
   setParametres,
   getDefaultMessage,
   importerReference,
+  importerReferenceGlobale,
+  compterCiblesMasse,
+  envoyerMasse,
 };

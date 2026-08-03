@@ -27,9 +27,11 @@ import {
   useEnvoyerCommandesMutation,
   useGetFournisseurEmailsQuery,
   useImportReferenceMutation,
+  useImportReferenceGlobalMutation,
   useCreateFournisseurEmailMutation,
   useUpdateFournisseurEmailMutation,
   useDeleteFournisseurEmailMutation,
+  useEnvoyerMasseMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
   useGetResponsableCcQuery,
@@ -113,6 +115,7 @@ const EnvoiCdeFournisseurScreen = () => {
 
   const tabs = [
     { key: "commandes", label: "Commandes préparées", icon: HiClipboardList },
+    { key: "masse", label: "Message en masse", icon: HiMail },
     { key: "emails", label: "Emails fournisseurs", icon: HiUserGroup },
     { key: "messages", label: "Modèles de message", icon: HiDocumentText },
     { key: "responsable", label: "Responsable (CC)", icon: HiUserGroup },
@@ -200,6 +203,7 @@ const EnvoiCdeFournisseurScreen = () => {
       </div>
 
       {tab === "commandes" && <CommandesTab dossier={dossier} params={params} />}
+      {tab === "masse" && <MasseTab dossier={dossier} params={params} />}
       {tab === "emails" && <EmailsTab dossier={dossier} />}
       {tab === "messages" && <MessagesTab dossier={dossier} />}
       {tab === "responsable" && <ResponsableTab dossier={dossier} />}
@@ -630,6 +634,350 @@ const SendModal = ({ commandes, testInfo, sending, onConfirm, onClose }) => (
 );
 
 // ════════════════════════════════════════════════════════════════════════════
+//  ONGLET MESSAGE EN MASSE (vœux / annonces — texte simple FR/EN)
+// ════════════════════════════════════════════════════════════════════════════
+const MasseTab = ({ dossier, params }) => {
+  const { data: emails = [] } = useGetFournisseurEmailsQuery({ nomDossierDBF: dossier });
+  const [envoyer, { isLoading: sending }] = useEnvoyerMasseMutation();
+
+  const [cible, setCible] = useState("francais");
+  const [selected, setSelected] = useState([]); // fournIds
+  const [search, setSearch] = useState("");
+  const [sujetF, setSujetF] = useState("");
+  const [messageF, setMessageF] = useState("");
+  const [sujetA, setSujetA] = useState("");
+  const [messageA, setMessageA] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const avecMail = useMemo(
+    () => emails.filter((e) => (e.emails || []).length > 0),
+    [emails],
+  );
+  const nbF = avecMail.filter((e) => e.langue !== "A").length;
+  const nbA = avecMail.filter((e) => e.langue === "A").length;
+
+  const selectedDocs = avecMail.filter((e) => selected.includes(e.fournId));
+  const selNbF = selectedDocs.filter((e) => e.langue !== "A").length;
+  const selNbA = selectedDocs.filter((e) => e.langue === "A").length;
+
+  // Langues réellement concernées par la cible (pour savoir quels champs exiger).
+  const besoinF = cible === "francais" || (cible === "selection" && selNbF > 0);
+  const besoinA = cible === "anglais" || (cible === "selection" && selNbA > 0);
+
+  const nbCibles =
+    cible === "francais" ? nbF : cible === "anglais" ? nbA : selectedDocs.length;
+
+  const filtered = avecMail.filter((e) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      String(e.fournId).includes(s) ||
+      (e.fournLbl || "").toLowerCase().includes(s)
+    );
+  });
+
+  const toggle = (id) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const cocherAffiches = () =>
+    setSelected((s) => [...new Set([...s, ...filtered.map((e) => e.fournId)])]);
+
+  const canSend =
+    nbCibles > 0 &&
+    (!besoinF || (sujetF.trim() && messageF.trim())) &&
+    (!besoinA || (sujetA.trim() && messageA.trim()));
+
+  const doSend = async () => {
+    try {
+      const r = await envoyer({
+        nomDossierDBF: dossier,
+        cible,
+        fournIds: selected,
+        sujetF,
+        messageF,
+        sujetA,
+        messageA,
+      }).unwrap();
+      setResult(r);
+      setConfirm(false);
+    } catch (e) {
+      setResult({ erreur: e?.data?.message || "Erreur d'envoi." });
+      setConfirm(false);
+    }
+  };
+
+  const etapeMsg = cible === "selection" ? 3 : 2;
+  const destF = cible === "francais" ? nbF : selNbF;
+  const destA = cible === "anglais" ? nbA : selNbA;
+
+  return (
+    <div className="ecf-mass">
+      <div className="ecf-mass-intro">
+        <HiMail />
+        <div>
+          Envoyez un <b>message groupé</b> (vœux, annonces…) à vos fournisseurs, en{" "}
+          <b>texte simple</b> (aucun code/HTML). Chaque fournisseur reçoit le
+          message dans <b>sa langue</b> ; le transitaire reste en copie.{" "}
+          {params?.testMode
+            ? "Mode test actif : rien n'atteint les fournisseurs."
+            : "Mode réel : les emails partent aux fournisseurs."}
+        </div>
+      </div>
+
+      {/* Étape 1 — cible */}
+      <div className="ecf-step">
+        <div className="ecf-step-head">
+          <span className="ecf-step-num">1</span>
+          <h4 className="ecf-step-title">À qui envoyer&nbsp;?</h4>
+        </div>
+        <div className="ecf-choices">
+          {[
+            { v: "francais", big: nbF, t: "Tous les français", s: "Fournisseurs en langue FR" },
+            { v: "anglais", big: nbA, t: "Tous les anglais", s: "Fournisseurs en langue EN" },
+            {
+              v: "selection",
+              big: selectedDocs.length,
+              t: "Une sélection",
+              s: "Choisir des fournisseurs précis",
+            },
+          ].map((o) => (
+            <div
+              key={o.v}
+              className={`ecf-choice ${cible === o.v ? "active" : ""}`}
+              onClick={() => setCible(o.v)}
+            >
+              <span className="ecf-choice-big">{o.big}</span>
+              <div>
+                <div className="ecf-choice-t">
+                  {o.t}{" "}
+                  {cible === o.v && (
+                    <HiCheckCircle style={{ verticalAlign: "-2px", color: "#4ade80" }} />
+                  )}
+                </div>
+                <div className="ecf-choice-s">{o.s}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Étape 2 — sélection de fournisseurs */}
+      {cible === "selection" && (
+        <div className="ecf-step">
+          <div className="ecf-step-head">
+            <span className="ecf-step-num">2</span>
+            <h4 className="ecf-step-title">Choisir les fournisseurs</h4>
+          </div>
+          <div className="ecf-toolbar" style={{ marginBottom: 8 }}>
+            <input
+              className="ecf-input"
+              placeholder="Rechercher (code ou nom)…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button className="ecf-btn" onClick={cocherAffiches}>
+              Tout cocher (affichés)
+            </button>
+            <button className="ecf-btn" onClick={() => setSelected([])}>
+              Tout décocher
+            </button>
+            <div className="ecf-spacer" />
+            <span className="ecf-soc">
+              {selectedDocs.length} choisi(s) · {selNbF} FR / {selNbA} EN
+            </span>
+          </div>
+          <div className="ecf-tablewrap" style={{ maxHeight: 300 }}>
+            <table className="ecf-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Code</th>
+                  <th>Fournisseur</th>
+                  <th>Langue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((e) => (
+                  <tr
+                    key={e._id}
+                    onClick={() => toggle(e.fournId)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="ecf-checkbox"
+                        checked={selected.includes(e.fournId)}
+                        readOnly
+                      />
+                    </td>
+                    <td>{e.fournId}</td>
+                    <td className="wrap">{e.fournLbl}</td>
+                    <td>
+                      <span className={`ecf-badge ${e.langue === "A" ? "a" : "f"}`}>
+                        {e.langue}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Étape 3 — message(s) */}
+      <div className="ecf-step">
+        <div className="ecf-step-head">
+          <span className="ecf-step-num">{etapeMsg}</span>
+          <h4 className="ecf-step-title">Votre message</h4>
+        </div>
+        {!besoinF && !besoinA ? (
+          <div className="ecf-choice-s">
+            Choisissez d'abord des destinataires à l'étape précédente.
+          </div>
+        ) : (
+          <div className="ecf-compose">
+            {besoinF && (
+              <div className="ecf-lang">
+                <div className="ecf-lang-head fr">
+                  🇫🇷 Message français · {destF} destinataire(s)
+                </div>
+                <div className="ecf-lang-body">
+                  <span className="ecf-mini">Objet de l'email</span>
+                  <input
+                    value={sujetF}
+                    onChange={(e) => setSujetF(e.target.value)}
+                    placeholder="Ex. Joyeuses fêtes de fin d'année"
+                  />
+                  <div style={{ height: 10 }} />
+                  <span className="ecf-mini">Message (texte simple)</span>
+                  <textarea
+                    value={messageF}
+                    onChange={(e) => setMessageF(e.target.value)}
+                    placeholder={"Bonjour,\n\nToute l'équipe vous souhaite…"}
+                  />
+                  <div className="ecf-charcount">{messageF.length} caractères</div>
+                </div>
+              </div>
+            )}
+            {besoinA && (
+              <div className="ecf-lang">
+                <div className="ecf-lang-head en">
+                  🇬🇧 Message anglais · {destA} destinataire(s)
+                </div>
+                <div className="ecf-lang-body">
+                  <span className="ecf-mini">Subject</span>
+                  <input
+                    value={sujetA}
+                    onChange={(e) => setSujetA(e.target.value)}
+                    placeholder="E.g. Season's greetings"
+                  />
+                  <div style={{ height: 10 }} />
+                  <span className="ecf-mini">Message (plain text)</span>
+                  <textarea
+                    value={messageA}
+                    onChange={(e) => setMessageA(e.target.value)}
+                    placeholder={"Hello,\n\nOur whole team wishes you…"}
+                  />
+                  <div className="ecf-charcount">{messageA.length} caractères</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {result && (
+        <div className={`ecf-msg ${result.erreur || result.nbErr ? "err" : "ok"}`}>
+          {result.erreur ? (
+            result.erreur
+          ) : result.testMode ? (
+            <>
+              <b>Mode test :</b> {result.nbOk} message(s) de contrôle envoyé(s) aux
+              adresses de test. {result.nbCibles} fournisseur(s) auraient été
+              contactés en réel.
+            </>
+          ) : (
+            <>
+              <b>Envoi réel :</b> {result.nbOk} envoyé(s), {result.nbErr || 0} erreur(s),{" "}
+              {result.nbIgnore || 0} ignoré(s) sur {result.nbCibles} fournisseur(s).
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Barre d'action collante */}
+      <div className="ecf-massbar">
+        <span className="recap">
+          {params?.testMode ? (
+            <span className="ecf-badge test">MODE TEST</span>
+          ) : (
+            <span className="ecf-badge err">MODE RÉEL</span>
+          )}{" "}
+          Cible : <b>{nbCibles}</b> fournisseur(s)
+        </span>
+        <div className="ecf-spacer" />
+        {!canSend && (
+          <span className="ecf-choice-s">
+            Complétez les destinataires et le(s) message(s).
+          </span>
+        )}
+        <button
+          className="ecf-btn primary big"
+          disabled={!canSend}
+          onClick={() => {
+            setResult(null);
+            setConfirm(true);
+          }}
+        >
+          <HiPaperAirplane /> Envoyer le message groupé
+        </button>
+      </div>
+
+      {confirm && (
+        <div className="ecf-overlay" onClick={() => setConfirm(false)}>
+          <div className="ecf-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>
+              <HiPaperAirplane /> Confirmer l'envoi groupé
+            </h3>
+            <div
+              className={`ecf-testbanner ${params?.testMode ? "on" : "off"}`}
+              style={{ marginBottom: 12 }}
+            >
+              <HiShieldCheck />
+              {params?.testMode ? (
+                <span>
+                  <b>Mode test :</b> rien n'atteint les fournisseurs — un mail de
+                  contrôle par langue part vers {(params.testEmails || []).join(", ")}.
+                </span>
+              ) : (
+                <span>
+                  <b>Mode réel :</b> le message partira à <b>{nbCibles}</b>{" "}
+                  fournisseur(s) réel(s).
+                </span>
+              )}
+            </div>
+            <p>
+              Cible : <b>{nbCibles}</b> fournisseur(s)
+              {cible === "selection" ? ` (${selNbF} FR, ${selNbA} EN)` : ""}.
+            </p>
+            <div className="ecf-actions">
+              <button className="ecf-btn" onClick={() => setConfirm(false)} disabled={sending}>
+                Annuler
+              </button>
+              <button className="ecf-btn success" onClick={doSend} disabled={sending}>
+                <HiPaperAirplane /> {sending ? "Envoi…" : "Confirmer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 //  ONGLET EMAILS FOURNISSEURS (CRUD)
 // ════════════════════════════════════════════════════════════════════════════
 const EmailsTab = ({ dossier }) => {
@@ -643,12 +991,16 @@ const EmailsTab = ({ dossier }) => {
   const [updateEmail] = useUpdateFournisseurEmailMutation();
   const [deleteEmail] = useDeleteFournisseurEmailMutation();
   const [importer, { isLoading: importing }] = useImportReferenceMutation();
+  const [importerGlobal, { isLoading: importingGlobal }] =
+    useImportReferenceGlobalMutation();
+  const { userInfo } = useSelector((s) => s.auth);
+  const isAdmin = userInfo?.role === "admin";
   const [msg, setMsg] = useState(null);
 
   const handleImport = async () => {
     if (
       !window.confirm(
-        "Importer / mettre à jour la base fournisseurs de référence (migrée depuis Access) pour cette société ?\n\nLes fiches existantes seront mises à jour, les manquantes créées.",
+        "Importer / mettre à jour la base fournisseurs de référence (migrée depuis Access) pour CETTE société ?\n\n(Astuce : utilisez « Tout importer » pour toutes les sociétés d'un coup.)",
       )
     )
       return;
@@ -657,6 +1009,24 @@ const EmailsTab = ({ dossier }) => {
       setMsg({ type: "ok", text: r.message });
     } catch (e) {
       setMsg({ type: "err", text: e?.data?.message || "Erreur d'import." });
+    }
+  };
+
+  const handleImportGlobal = async () => {
+    if (
+      !window.confirm(
+        "Importer TOUTES les sociétés (base Access complète : 417 emails) ?\n\nRépartit automatiquement les données vers chaque société. À utiliser une fois en prod.",
+      )
+    )
+      return;
+    try {
+      const r = await importerGlobal().unwrap();
+      const detail = (r.parSociete || [])
+        .map((s) => `${s.trigramme}: ${s.emails}`)
+        .join(", ");
+      setMsg({ type: "ok", text: `${r.message} — ${detail}` });
+    } catch (e) {
+      setMsg({ type: "err", text: e?.data?.message || "Erreur d'import global." });
     }
   };
 
@@ -700,10 +1070,20 @@ const EmailsTab = ({ dossier }) => {
           className="ecf-btn"
           onClick={handleImport}
           disabled={importing}
-          title="Importer la base migrée depuis Access (fichier de référence)"
+          title="Importer la base de référence pour la société courante"
         >
-          <HiRefresh /> {importing ? "Import…" : "Importer la base de référence"}
+          <HiRefresh /> {importing ? "Import…" : "Importer (cette société)"}
         </button>
+        {isAdmin && (
+          <button
+            className="ecf-btn"
+            onClick={handleImportGlobal}
+            disabled={importingGlobal}
+            title="Importer la base Access complète pour TOUTES les sociétés"
+          >
+            <HiRefresh /> {importingGlobal ? "Import…" : "Tout importer (toutes sociétés)"}
+          </button>
+        )}
         <button className="ecf-btn primary" onClick={() => setEditing({})}>
           <HiPlus /> Ajouter
         </button>
@@ -913,14 +1293,7 @@ const MessagesTab = ({ dossier }) => {
           onChange={(e) => setText(e.target.value)}
         />
         <div className="ecf-hint">
-          Une signature société est automatiquement ajoutée à l'envoi.{" "}
-          <button
-            className="ecf-btn"
-            style={{ padding: "2px 8px", fontSize: "0.75rem" }}
-            onClick={() => setText(defauts[langue] || "")}
-          >
-            Charger le modèle par défaut
-          </button>
+          Une signature société est automatiquement ajoutée à l'envoi.
         </div>
       </div>
       <div className="ecf-field">
@@ -1021,7 +1394,8 @@ const HistoriqueTab = ({ dossier }) => {
           <thead>
             <tr>
               <th>Date</th>
-              <th>N° Cmd</th>
+              <th>Type</th>
+              <th>Réf.</th>
               <th>Fourn.</th>
               <th>Destinataires</th>
               <th>Statut</th>
@@ -1031,13 +1405,13 @@ const HistoriqueTab = ({ dossier }) => {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="ecf-empty">
+                <td colSpan={7} className="ecf-empty">
                   Chargement…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="ecf-empty">
+                <td colSpan={7} className="ecf-empty">
                   Aucun envoi enregistré.
                 </td>
               </tr>
@@ -1045,9 +1419,17 @@ const HistoriqueTab = ({ dossier }) => {
               rows.map((h) => (
                 <tr key={h._id}>
                   <td>{new Date(h.createdAt).toLocaleString("fr-FR")}</td>
-                  <td>{h.numcde}</td>
+                  <td>
+                    {h.type === "masse" ? (
+                      <span className="ecf-badge a">masse</span>
+                    ) : (
+                      <span className="ecf-badge f">commande</span>
+                    )}
+                  </td>
+                  <td>{h.type === "masse" ? `${h.langue} · ${h.nbDestinataires || 0} frs` : h.numcde}</td>
                   <td className="wrap">
-                    {h.fournId} {h.fournNom ? `— ${h.fournNom}` : ""}
+                    {h.fournId ? `${h.fournId} ` : ""}
+                    {h.fournNom || ""}
                   </td>
                   <td className="wrap">{(h.destinataires || []).join(", ")}</td>
                   <td>
