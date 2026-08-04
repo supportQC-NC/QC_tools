@@ -119,6 +119,30 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["FournisseurEmail"],
     }),
 
+    // Import Excel (multipart) — le fichier est envoyé dans un FormData.
+    importEmailsExcel: builder.mutation({
+      query: ({ nomDossierDBF, file }) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return {
+          url: `${ENVOI_CDE_URL}/${nomDossierDBF}/emails/import-excel`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["FournisseurEmail"],
+    }),
+
+    // Suppression en masse : ids (sélection) ou all (tout).
+    deleteEmailsBulk: builder.mutation({
+      query: ({ nomDossierDBF, ids, all }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/emails/delete-bulk`,
+        method: "POST",
+        body: { ids, all },
+      }),
+      invalidatesTags: ["FournisseurEmail"],
+    }),
+
     // ─── Envoi en masse (vœux / annonces) ────────────────────────────────
     compterMasse: builder.query({
       query: ({ nomDossierDBF, cible, fournIds }) => ({
@@ -198,6 +222,8 @@ export const {
   useCreateFournisseurEmailMutation,
   useUpdateFournisseurEmailMutation,
   useDeleteFournisseurEmailMutation,
+  useImportEmailsExcelMutation,
+  useDeleteEmailsBulkMutation,
   useCompterMasseQuery,
   useEnvoyerMasseMutation,
   useGetMessagesFournisseurQuery,

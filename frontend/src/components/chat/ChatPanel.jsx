@@ -150,6 +150,7 @@ const ChatPanel = ({
   const [reads, setReads] = useState([]); // [{user, lastReadAt}] (hors global)
   const [typingUsers, setTypingUsers] = useState({}); // {uid: user}
   const [replyingTo, setReplyingTo] = useState(null); // message cité en cours
+  const [reactFor, setReactFor] = useState(null); // id du message dont le sélecteur d'emoji est ouvert
   const [mentions, setMentions] = useState([]); // [{user, display}] ajoutées
   const [mentionState, setMentionState] = useState({
     open: false,
@@ -528,12 +529,30 @@ const ChatPanel = ({
   };
 
   const react = async (m, type) => {
+    setReactFor(null); // referme le sélecteur après le choix
     try {
       await reactMsg({ id: m._id, type }).unwrap();
     } catch {
       /* silencieux */
     }
   };
+
+  // Ferme le sélecteur d'emoji au clic extérieur ou sur Échap.
+  useEffect(() => {
+    if (!reactFor) return undefined;
+    const onDocClick = (e) => {
+      if (!e.target.closest || !e.target.closest(".chat-react")) setReactFor(null);
+    };
+    const onEsc = (e) => {
+      if (e.key === "Escape") setReactFor(null);
+    };
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("click", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [reactFor]);
 
   // ── Édition ──
   const startEdit = (m) => {
@@ -917,9 +936,18 @@ const ChatPanel = ({
                             <HiBookmark />
                           </button>
                         )}
-                        {/* Déclencheur de réaction (survol) */}
-                        <div className="chat-react">
-                          <button type="button" className="chat-react-btn" title="Réagir">
+                        {/* Déclencheur de réaction (clic pour ouvrir/fermer) */}
+                        <div className={`chat-react ${reactFor === m._id ? "open" : ""}`}>
+                          <button
+                            type="button"
+                            className={`chat-react-btn ${reactFor === m._id ? "on" : ""}`}
+                            title="Réagir"
+                            aria-expanded={reactFor === m._id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReactFor((cur) => (cur === m._id ? null : m._id));
+                            }}
+                          >
                             <HiEmojiHappy />
                           </button>
                           <div className="chat-react-picker">

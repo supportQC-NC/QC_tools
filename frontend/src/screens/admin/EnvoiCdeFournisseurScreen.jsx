@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
 import {
   HiMail,
@@ -15,6 +15,8 @@ import {
   HiExclamation,
   HiCheckCircle,
   HiShieldCheck,
+  HiDownload,
+  HiUpload,
 } from "react-icons/hi";
 import { selectGlobalDossier, selectGlobalEntreprise } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -31,6 +33,8 @@ import {
   useCreateFournisseurEmailMutation,
   useUpdateFournisseurEmailMutation,
   useDeleteFournisseurEmailMutation,
+  useImportEmailsExcelMutation,
+  useDeleteEmailsBulkMutation,
   useEnvoyerMasseMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
@@ -38,6 +42,7 @@ import {
   useUpsertResponsableCcMutation,
   useGetEnvoiHistoriqueQuery,
 } from "../../slices/envoiCdeApiSlice";
+import { ENVOI_CDE_URL } from "../../constants";
 import "./EnvoiCdeFournisseurScreen.css";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -993,9 +998,96 @@ const EmailsTab = ({ dossier }) => {
   const [importer, { isLoading: importing }] = useImportReferenceMutation();
   const [importerGlobal, { isLoading: importingGlobal }] =
     useImportReferenceGlobalMutation();
+  const [importerExcel, { isLoading: importingXlsx }] =
+    useImportEmailsExcelMutation();
+  const [deleteBulk, { isLoading: deleting }] = useDeleteEmailsBulkMutation();
   const { userInfo } = useSelector((s) => s.auth);
   const isAdmin = userInfo?.role === "admin";
   const [msg, setMsg] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const fileRef = useRef(null);
+
+  const allSelected = emails.length > 0 && selectedIds.length === emails.length;
+  const toggleId = (id) =>
+    setSelectedIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleAllIds = () =>
+    setSelectedIds(allSelected ? [] : emails.map((e) => e._id));
+
+  // Télécharge le modèle Excel (fetch + blob, avec cookie d'auth).
+  const handleDownloadModele = async () => {
+    try {
+      const res = await fetch(
+        `${ENVOI_CDE_URL}/${dossier}/emails/modele-excel`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Téléchargement impossible.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "modele_import_fournisseurs.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsg({ type: "err", text: e.message || "Erreur de téléchargement." });
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = ""; // reset pour re-import du même fichier
+    if (!file) return;
+    try {
+      const r = await importerExcel({ nomDossierDBF: dossier, file }).unwrap();
+      let text = r.message;
+      if (r.erreurs?.length)
+        text += ` ⚠️ ${r.erreurs.length} ligne(s) ignorée(s) (ex. ligne ${r.erreurs[0].ligne} : ${r.erreurs[0].raison}).`;
+      setMsg({ type: r.erreurs?.length ? "err" : "ok", text });
+    } catch (err) {
+      setMsg({ type: "err", text: err?.data?.message || "Erreur d'import Excel." });
+    }
+  };
+
+  const handleDeleteSelection = async () => {
+    if (
+      !window.confirm(
+        `Supprimer les ${selectedIds.length} fournisseur(s) sélectionné(s) ?\n\n⚠️ Action IRRÉVERSIBLE — les emails supprimés ne pourront pas être récupérés.`,
+      )
+    )
+      return;
+    try {
+      const r = await deleteBulk({ nomDossierDBF: dossier, ids: selectedIds }).unwrap();
+      setSelectedIds([]);
+      setMsg({ type: "ok", text: r.message });
+    } catch (e) {
+      setMsg({ type: "err", text: e?.data?.message || "Erreur de suppression." });
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (
+      !window.confirm(
+        `⚠️ SUPPRIMER TOUS les ${emails.length} fournisseurs de cette société ?\n\nAction IRRÉVERSIBLE. Tapez OK pour confirmer.`,
+      )
+    )
+      return;
+    // Double confirmation pour une action aussi destructrice.
+    if (
+      !window.confirm(
+        "Dernière confirmation : cette suppression est DÉFINITIVE et ne peut pas être annulée. Continuer ?",
+      )
+    )
+      return;
+    try {
+      const r = await deleteBulk({ nomDossierDBF: dossier, all: true }).unwrap();
+      setSelectedIds([]);
+      setMsg({ type: "ok", text: r.message });
+    } catch (e) {
+      setMsg({ type: "err", text: e?.data?.message || "Erreur de suppression." });
+    }
+  };
 
   const handleImport = async () => {
     if (
@@ -1066,13 +1158,38 @@ const EmailsTab = ({ dossier }) => {
         />
         <div className="ecf-spacer" />
         <span className="ecf-soc">{emails.length} fournisseur(s)</span>
+        <button className="ecf-btn primary" onClick={() => setEditing({})}>
+          <HiPlus /> Ajouter
+        </button>
+      </div>
+
+      {/* Barre outils import / suppression Excel */}
+      <div className="ecf-toolbar" style={{ marginTop: 4 }}>
+        <button className="ecf-btn" onClick={handleDownloadModele} title="Télécharger un modèle Excel d'exemple">
+          <HiDownload /> Modèle Excel
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,.xls"
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
+        <button
+          className="ecf-btn"
+          onClick={() => fileRef.current?.click()}
+          disabled={importingXlsx}
+          title="Importer des fournisseurs depuis un fichier Excel"
+        >
+          <HiUpload /> {importingXlsx ? "Import…" : "Importer un Excel"}
+        </button>
         <button
           className="ecf-btn"
           onClick={handleImport}
           disabled={importing}
-          title="Importer la base de référence pour la société courante"
+          title="Importer la base de référence (migrée depuis Access) pour la société courante"
         >
-          <HiRefresh /> {importing ? "Import…" : "Importer (cette société)"}
+          <HiRefresh /> {importing ? "Import…" : "Base de référence"}
         </button>
         {isAdmin && (
           <button
@@ -1081,11 +1198,25 @@ const EmailsTab = ({ dossier }) => {
             disabled={importingGlobal}
             title="Importer la base Access complète pour TOUTES les sociétés"
           >
-            <HiRefresh /> {importingGlobal ? "Import…" : "Tout importer (toutes sociétés)"}
+            <HiRefresh /> {importingGlobal ? "Import…" : "Tout importer"}
           </button>
         )}
-        <button className="ecf-btn primary" onClick={() => setEditing({})}>
-          <HiPlus /> Ajouter
+        <div className="ecf-spacer" />
+        <button
+          className="ecf-btn danger"
+          onClick={handleDeleteSelection}
+          disabled={selectedIds.length === 0 || deleting}
+          title="Supprimer les fournisseurs cochés"
+        >
+          <HiTrash /> Supprimer la sélection ({selectedIds.length})
+        </button>
+        <button
+          className="ecf-btn danger"
+          onClick={handleDeleteAll}
+          disabled={emails.length === 0 || deleting}
+          title="Supprimer TOUS les fournisseurs de cette société"
+        >
+          <HiTrash /> Tout supprimer
         </button>
       </div>
 
@@ -1095,6 +1226,15 @@ const EmailsTab = ({ dossier }) => {
         <table className="ecf-table">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  className="ecf-checkbox"
+                  checked={allSelected}
+                  onChange={toggleAllIds}
+                  title="Tout sélectionner"
+                />
+              </th>
               <th>Code</th>
               <th>Libellé</th>
               <th>Langue</th>
@@ -1107,19 +1247,27 @@ const EmailsTab = ({ dossier }) => {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="ecf-empty">
+                <td colSpan={8} className="ecf-empty">
                   Chargement…
                 </td>
               </tr>
             ) : emails.length === 0 ? (
               <tr>
-                <td colSpan={7} className="ecf-empty">
+                <td colSpan={8} className="ecf-empty">
                   Aucun email fournisseur pour cette société.
                 </td>
               </tr>
             ) : (
               emails.map((e) => (
                 <tr key={e._id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      className="ecf-checkbox"
+                      checked={selectedIds.includes(e._id)}
+                      onChange={() => toggleId(e._id)}
+                    />
+                  </td>
                   <td>
                     <b>{e.fournId}</b>
                   </td>

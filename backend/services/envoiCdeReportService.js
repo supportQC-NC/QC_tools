@@ -138,6 +138,133 @@ export const genererExcelCommande = async (header, lignes) => {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
+// IMPORT / MODÈLE EXCEL DES EMAILS FOURNISSEURS
+// ────────────────────────────────────────────────────────────────────────────
+const splitMails = (v) => {
+  if (!v) return [];
+  const out = [];
+  for (const p of String(v).split(/[;,\n]/)) {
+    const t = p.trim();
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+};
+
+// Colonnes attendues dans le fichier d'import (ordre du modèle).
+const IMPORT_COLS = [
+  { key: "fournId", label: "FOURN_ID" },
+  { key: "fournLbl", label: "FOURN_LBL" },
+  { key: "langue", label: "LANGUE" },
+  { key: "emails", label: "MAILS" },
+  { key: "emailsTransitaire", label: "MAIL_TRANSITAIRE" },
+  { key: "emailsCC", label: "MAIL_CC" },
+];
+
+// Génère un modèle Excel d'exemple (en-têtes + 2 lignes + feuille d'aide).
+export const genererModeleEmailsExcel = async () => {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Krysto - Envoi Cde Fournisseur";
+  const ws = wb.addWorksheet("Fournisseurs", {
+    properties: { tabColor: { argb: "FF0066CC" } },
+  });
+  ws.columns = IMPORT_COLS.map((c) => ({ key: c.key, width: 30 }));
+
+  const head = ws.getRow(1);
+  IMPORT_COLS.forEach((c, i) => {
+    const cell = head.getCell(i + 1);
+    cell.value = c.label;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF34495E" } };
+  });
+  head.commit();
+
+  // Lignes d'exemple.
+  ws.addRow([226, "SIKA", "F", "contact1@sika.com; contact2@sika.com", "transit@sifalogistics.com", ""]);
+  ws.addRow([229, "STANLEY AUSTRALIE", "A", "sales@stanley.com", "transit@ltn.nc", "achat@quincaillerie.nc"]);
+
+  // Feuille d'aide.
+  const aide = wb.addWorksheet("Aide");
+  aide.columns = [{ width: 22 }, { width: 80 }];
+  const lignes = [
+    ["Colonne", "Explication"],
+    ["FOURN_ID", "OBLIGATOIRE. Code fournisseur (nombre) — identique au code de l'ERP."],
+    ["FOURN_LBL", "Nom du fournisseur (texte, facultatif)."],
+    ["LANGUE", "F (français) ou A (anglais). Détermine le modèle de message. Défaut : F."],
+    ["MAILS", "Adresse(s) du fournisseur. Séparez plusieurs adresses par un point-virgule ;"],
+    ["MAIL_TRANSITAIRE", "Adresse(s) du transitaire (mises en copie). Séparateur ;"],
+    ["MAIL_CC", "Copies supplémentaires (facultatif). Séparateur ;"],
+    ["", ""],
+    ["Note", "Un import met à jour les fournisseurs existants (même FOURN_ID) et crée les nouveaux."],
+  ];
+  lignes.forEach((l, i) => {
+    const r = aide.addRow(l);
+    if (i === 0) r.font = { bold: true };
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+};
+
+// Parse un buffer Excel d'import -> lignes normalisées (colonnes reconnues par nom).
+export const parserEmailsExcel = async (buffer) => {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const ws = wb.worksheets[0];
+  if (!ws) return [];
+
+  const norm = (s) =>
+    String(s || "")
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^A-Z0-9]/g, "");
+  const colMap = {};
+  ws.getRow(1).eachCell((cell, col) => {
+    colMap[norm(cell.value)] = col;
+  });
+  const find = (...names) => {
+    for (const n of names) {
+      const k = norm(n);
+      if (colMap[k]) return colMap[k];
+    }
+    return null;
+  };
+  const cFourn = find("FOURNID", "FOURN", "CODE", "CODEFOURNISSEUR");
+  const cLbl = find("FOURNLBL", "LIBELLE", "NOM", "FOURNISSEUR");
+  const cLang = find("LANGUE", "LANG");
+  const cMail = find("MAILS", "MAIL", "EMAILS", "EMAIL", "EMAILSFOURNISSEUR");
+  const cTrans = find("MAILTRANSITAIRE", "TRANSITAIRE", "EMAILSTRANSITAIRE");
+  const cCC = find("MAILCC", "MAILCCI", "CC", "EMAILSCC");
+
+  const cellVal = (row, c) => {
+    if (!c) return "";
+    const v = row.getCell(c).value;
+    if (v == null) return "";
+    if (typeof v === "object") return String(v.text || v.result || "").trim();
+    return String(v).trim();
+  };
+
+  const rows = [];
+  ws.eachRow((row, n) => {
+    if (n === 1) return;
+    const fournRaw = cellVal(row, cFourn);
+    if (!fournRaw) return; // ligne vide
+    const fournId = parseInt(fournRaw);
+    const lang = cellVal(row, cLang).toUpperCase();
+    rows.push({
+      _ligne: n,
+      fournId: isNaN(fournId) ? null : fournId,
+      fournLbl: cellVal(row, cLbl),
+      langue: lang === "A" ? "A" : "F",
+      emails: splitMails(cellVal(row, cMail)),
+      emailsTransitaire: splitMails(cellVal(row, cTrans)),
+      emailsCC: splitMails(cellVal(row, cCC)),
+    });
+  });
+  return rows;
+};
+
+// ────────────────────────────────────────────────────────────────────────────
 // PDF (buffer en mémoire)
 // ────────────────────────────────────────────────────────────────────────────
 const fitText = (doc, text, maxWidth) => {
@@ -285,4 +412,7 @@ export default {
   genererPdfCommande,
   buildBaseName,
   formatDate,
+  genererModeleEmailsExcel,
+  parserEmailsExcel,
+  logoFromEntreprise,
 };

@@ -4,6 +4,7 @@
 // Chaîne : protect -> checkEntrepriseAccess (scoping société via :nomDossierDBF)
 //          -> checkModuleAccess("envoi_cde_fournisseur", action).
 import express from "express";
+import multer from "multer";
 import {
   listCommandes,
   getDetail,
@@ -16,6 +17,9 @@ import {
   importReferenceGlobal,
   compterMasse,
   envoyerMasseCtrl,
+  modeleExcelEmails,
+  importEmailsExcel,
+  deleteEmailsBulk,
   listEmails,
   createEmail,
   updateEmail,
@@ -39,6 +43,12 @@ const read = [protect, checkEntrepriseAccess, checkModuleAccess(MODULE, "read")]
 const write = [protect, checkEntrepriseAccess, checkModuleAccess(MODULE, "write")];
 const del = [protect, checkEntrepriseAccess, checkModuleAccess(MODULE, "delete")];
 
+// Upload Excel en mémoire (5 Mo max, 1 fichier).
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("file");
+
 // Import GLOBAL (toutes sociétés) — admin, PAS de scoping société (route sans :nomDossierDBF).
 // Déclarée en premier pour ne pas être capturée par les routes paramétrées.
 router.post("/import-reference-global", protect, admin, importReferenceGlobal);
@@ -59,7 +69,10 @@ router.post("/:nomDossierDBF/import-reference", ...write, importReference);
 router.get("/:nomDossierDBF/masse/compter", ...read, compterMasse);
 router.post("/:nomDossierDBF/masse", ...write, envoyerMasseCtrl);
 
-// ─── Emails fournisseurs (CRUD) ────────────────────────────────────────────
+// ─── Emails fournisseurs (CRUD + import Excel + suppression masse) ──────────
+router.get("/:nomDossierDBF/emails/modele-excel", ...read, modeleExcelEmails);
+router.post("/:nomDossierDBF/emails/import-excel", ...write, uploadExcel, importEmailsExcel);
+router.post("/:nomDossierDBF/emails/delete-bulk", ...del, deleteEmailsBulk);
 router.get("/:nomDossierDBF/emails", ...read, listEmails);
 router.post("/:nomDossierDBF/emails", ...write, createEmail);
 router.put("/:nomDossierDBF/emails/:id", ...write, updateEmail);

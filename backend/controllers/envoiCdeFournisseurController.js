@@ -16,11 +16,14 @@ import {
   setParametres,
   importerReference,
   importerReferenceGlobale,
+  importerEmailsExcel,
+  supprimerEmails,
   compterCiblesMasse,
   envoyerMasse,
   DEFAULT_MESSAGE_F,
   DEFAULT_MESSAGE_A,
 } from "../services/envoiCdeFournisseurService.js";
+import { genererModeleEmailsExcel } from "../services/envoiCdeReportService.js";
 
 import FournisseurEmail from "../models/FournisseurEmailModel.js";
 import MessageFournisseur from "../models/MessageFournisseurModel.js";
@@ -195,6 +198,40 @@ export const updateParametresCtrl = asyncHandler(async (req, res) => {
 // ────────────────────────────────────────────────────────────────────────────
 // CRUD EMAILS FOURNISSEURS
 // ────────────────────────────────────────────────────────────────────────────
+
+// GET /:nomDossierDBF/emails/modele-excel  (télécharge un modèle d'import)
+export const modeleExcelEmails = asyncHandler(async (req, res) => {
+  const buffer = await genererModeleEmailsExcel();
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    'attachment; filename="modele_import_fournisseurs.xlsx"',
+  );
+  res.send(buffer);
+});
+
+// POST /:nomDossierDBF/emails/import-excel  (multipart, champ "file")
+export const importEmailsExcel = asyncHandler(async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    res.status(400);
+    throw new Error("Aucun fichier reçu.");
+  }
+  const result = await importerEmailsExcel(req.entreprise, req.file.buffer);
+  res.json({
+    message: `${result.importes} fournisseur(s) importé(s) sur ${result.total} ligne(s).`,
+    ...result,
+  });
+});
+
+// POST /:nomDossierDBF/emails/delete-bulk  body: { ids?: [], all?: bool }
+export const deleteEmailsBulk = asyncHandler(async (req, res) => {
+  const { ids, all } = req.body;
+  const result = await supprimerEmails(req.entreprise, { ids, all });
+  res.json({ message: `${result.deleted} fournisseur(s) supprimé(s).`, ...result });
+});
 
 // GET /:nomDossierDBF/emails
 export const listEmails = asyncHandler(async (req, res) => {

@@ -18,6 +18,7 @@ import {
   genererPdfCommande,
   buildBaseName,
   logoFromEntreprise,
+  parserEmailsExcel,
 } from "./envoiCdeReportService.js";
 
 import Entreprise from "../models/EntrepriseModel.js";
@@ -682,6 +683,61 @@ export const envoyerMasse = async (entreprise, payload = {}, user = null) => {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
+// IMPORT EXCEL DES EMAILS FOURNISSEURS (upload utilisateur) + SUPPRESSION MASSE
+// ────────────────────────────────────────────────────────────────────────────
+export const importerEmailsExcel = async (entreprise, buffer) => {
+  const lignes = await parserEmailsExcel(buffer);
+  let importes = 0;
+  const erreurs = [];
+  for (const l of lignes) {
+    if (l.fournId === null) {
+      erreurs.push({ ligne: l._ligne, raison: "FOURN_ID manquant ou non numérique." });
+      continue;
+    }
+    if (!l.emails.length) {
+      erreurs.push({ ligne: l._ligne, raison: `Aucun email (fourn ${l.fournId}).` });
+      continue;
+    }
+    try {
+      await FournisseurEmail.updateOne(
+        { entreprise: entreprise._id, fournId: l.fournId },
+        {
+          $set: {
+            fournLbl: l.fournLbl || "",
+            langue: l.langue === "A" ? "A" : "F",
+            emails: l.emails,
+            emailsTransitaire: l.emailsTransitaire,
+            emailsCC: l.emailsCC,
+          },
+          $setOnInsert: { actif: true },
+        },
+        { upsert: true },
+      );
+      importes += 1;
+    } catch (e) {
+      erreurs.push({ ligne: l._ligne, raison: e.message });
+    }
+  }
+  return { total: lignes.length, importes, erreurs };
+};
+
+// Suppression : soit une liste d'_id, soit TOUS les fournisseurs de la société.
+export const supprimerEmails = async (entreprise, { ids, all } = {}) => {
+  if (all) {
+    const r = await FournisseurEmail.deleteMany({ entreprise: entreprise._id });
+    return { deleted: r.deletedCount || 0 };
+  }
+  if (Array.isArray(ids) && ids.length) {
+    const r = await FournisseurEmail.deleteMany({
+      entreprise: entreprise._id,
+      _id: { $in: ids },
+    });
+    return { deleted: r.deletedCount || 0 };
+  }
+  return { deleted: 0 };
+};
+
+// ────────────────────────────────────────────────────────────────────────────
 // IMPORT DE LA BASE DE RÉFÉRENCE (fichiers commités -> Mongo), PAR SOCIÉTÉ.
 // Permet de peupler la prod (VPS) sans CLI : upsert des emails/modèles/responsable
 // de la société courante depuis backend/data/*.js (migrés depuis Access).
@@ -833,6 +889,8 @@ export default {
   getDefaultMessage,
   importerReference,
   importerReferenceGlobale,
+  importerEmailsExcel,
+  supprimerEmails,
   compterCiblesMasse,
   envoyerMasse,
 };
