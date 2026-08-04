@@ -2,15 +2,32 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { getUserMenus } from "../../../config/menuConfig";
+import { getMenuHint, buildSidebar } from "../../../config/menuConfig";
 import { HiHome, HiX, HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { useSidebar } from "../../../contexte/SidebarContext";
 import { useGetNotificationCountsQuery } from "../../../slices/notificationApiSlice";
+import { useGetMenuHintsQuery } from "../../../slices/menuHintsApiSlice";
+import { useGetMenuLayoutQuery } from "../../../slices/menuLayoutApiSlice";
 import "./Sidebar.css";
 
 const Sidebar = () => {
   const { userInfo } = useSelector((state) => state.auth);
-  const menus = getUserMenus(userInfo);
+
+  // Personnalisation admin : infobulles + organisation (chapitres) — globales.
+  const { data: menuHints } = useGetMenuHintsQuery(undefined, { skip: !userInfo });
+  const { data: menuLayout } = useGetMenuLayoutQuery(undefined, { skip: !userInfo });
+
+  // Menus = chapitres définis en base (ou défaut code), filtrés par permissions.
+  const menus = buildSidebar(userInfo, menuLayout, menuHints);
+
+  // Infobulle flottante (position fixe -> jamais coupée par le scroll de la sidebar).
+  const [tip, setTip] = useState({ text: "", top: 0, left: 0, visible: false });
+  const showTip = (e, text) => {
+    if (!text) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ text, top: r.top + r.height / 2, left: r.right + 10, visible: true });
+  };
+  const hideTip = () => setTip((t) => ({ ...t, visible: false }));
 
   // Compteurs de notifications -> badges. Map par path des items de la sidebar.
   const { data: notifCounts } = useGetNotificationCountsQuery(undefined, {
@@ -47,13 +64,15 @@ const Sidebar = () => {
   const renderMenuItem = (item, key) => {
     const IconComponent = item.icon || HiHome;
     const count = badges[item.path] || 0;
+    const hint = getMenuHint(item.path, menuHints) || item.label;
     return (
       <NavLink
         key={key}
         to={item.path}
         end={item.exact}
         className={({ isActive }) => `sidebar-link ${isActive ? "active" : ""}`}
-        title={item.label}
+        onMouseEnter={(e) => showTip(e, hint)}
+        onMouseLeave={hideTip}
         onClick={isMobile ? closeSidebar : undefined}
       >
         <span className="sidebar-icon">
@@ -115,8 +134,20 @@ const Sidebar = () => {
 
   // Render une section principale
   const renderSection = (section, index) => {
-    const sectionKey = `section-${section.label}`;
+    const sectionKey = `section-${section.label || index}`;
     const isSectionCollapsed = collapsedSections[sectionKey];
+
+    // Section sans titre (constructeur de menu) : on rend directement les items
+    // (les chapitres sont des sous-groupes avec leur propre en-tête).
+    if (!section.label) {
+      return (
+        <div key={sectionKey} className="sidebar-section">
+          <div className="sidebar-section-items">
+            {renderSectionItems(section.items, sectionKey)}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div key={sectionKey} className="sidebar-section">
@@ -176,6 +207,17 @@ const Sidebar = () => {
           <span className="sidebar-version">v1.0.0</span>
         </div>
       </aside>
+
+      {/* Infobulle flottante (survol des onglets) — desktop uniquement */}
+      {!isMobile && tip.visible && tip.text && (
+        <div
+          className="sidebar-tip"
+          style={{ top: tip.top, left: tip.left }}
+          role="tooltip"
+        >
+          {tip.text}
+        </div>
+      )}
     </>
   );
 };

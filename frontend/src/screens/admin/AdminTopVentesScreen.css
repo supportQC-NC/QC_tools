@@ -1,0 +1,201 @@
+/* Écran « Top Ventes » (groupe Commerciaux) — styles scopés .tv-* */
+.tv-wrap {
+  padding: 18px 28px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.tv-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.tv-head h1 {
+  font-size: 1.4rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tv-soc {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.tv-soc b {
+  color: var(--admin-text, #e2e8f0);
+}
+
+/* Barre d'outils */
+.tv-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.tv-seg {
+  display: inline-flex;
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tv-seg button {
+  padding: 9px 16px;
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text-muted, #94a3b8);
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.tv-seg button.active {
+  background: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+.tv-input {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #f1f5f9);
+  font-size: 0.9rem;
+  min-width: 240px;
+}
+.tv-spacer {
+  margin-left: auto;
+}
+
+/* Cartes KPI */
+.tv-kpis {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.tv-kpi {
+  flex: 1;
+  min-width: 160px;
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--admin-card-bg, #111a2e);
+}
+.tv-kpi .lbl {
+  font-size: 0.78rem;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.tv-kpi .val {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--admin-primary, #818cf8);
+}
+
+/* Tableaux */
+.tv-tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 10px;
+}
+.tv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.tv-table th,
+.tv-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--admin-border, #334155);
+  white-space: nowrap;
+}
+.tv-table th {
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #e2e8f0);
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  cursor: pointer;
+  user-select: none;
+}
+.tv-table th.num,
+.tv-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tv-table th .arrow {
+  color: var(--admin-primary, #818cf8);
+  margin-left: 4px;
+}
+.tv-table tbody tr {
+  cursor: pointer;
+}
+.tv-table tbody tr:hover {
+  background: var(--admin-hover, #1e293b);
+}
+.tv-table td.wrap {
+  white-space: normal;
+  max-width: 380px;
+}
+.tv-rank {
+  color: var(--admin-text-muted, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+.tv-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--admin-text-muted, #94a3b8);
+}
+
+/* Modale drill-down */
+.tv-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.tv-modal {
+  background: var(--admin-card-bg, #0f172a);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+.tv-modal h3 {
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tv-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tv-btn:hover {
+  background: var(--admin-hover, #334155);
+}
+.tv-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}

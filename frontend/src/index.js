@@ -43,6 +43,9 @@ import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
 import AdminCommandeDetailScreen from "./screens/admin/AdminCommandeDetailsScreen";
 import EnvoiCdeFournisseurScreen from "./screens/admin/EnvoiCdeFournisseurScreen";
+import AdminTopVentesScreen from "./screens/admin/AdminTopVentesScreen";
+import AdminInfobullesScreen from "./screens/admin/AdminInfobullesScreen";
+import AdminSmtpScreen from "./screens/admin/AdminSmtpScreen";
 
 import ArticleSearch from "./screens/user/UserArticleSearch";
 import InventaireScreen from "./screens/user/UserInventaire";
@@ -150,6 +153,16 @@ const router = createBrowserRouter(
       {/* Administration · Entreprises -> module "entreprises_admin" */}
       <Route element={<ModuleRoute module="entreprises_admin" />}>
         <Route path="/admin/entreprises" element={<AdminEntreprises />} />
+      </Route>
+
+      {/* Administration · Infobulles menu -> module "infobulles_admin" */}
+      <Route element={<ModuleRoute module="infobulles_admin" />}>
+        <Route path="/admin/infobulles" element={<AdminInfobullesScreen />} />
+      </Route>
+
+      {/* Administration · Paramètres SMTP -> module "smtp_admin" (backend admin-only) */}
+      <Route element={<ModuleRoute module="smtp_admin" />}>
+        <Route path="/admin/smtp" element={<AdminSmtpScreen />} />
       </Route>
 
       {/* Données · Articles / Fournisseurs / Meilleures ventes -> "stock" */}
@@ -293,6 +306,11 @@ const router = createBrowserRouter(
           path="/admin/envoi-cde-fournisseur"
           element={<EnvoiCdeFournisseurScreen />}
         />
+      </Route>
+
+      {/* Commerciaux · Top Ventes -> module "commerciaux_outils" */}
+      <Route element={<ModuleRoute module="commerciaux_outils" />}>
+        <Route path="/admin/top-ventes" element={<AdminTopVentesScreen />} />
       </Route>
 
       {/* Analyse · Commerciaux -> module "commerciaux_admin" */}

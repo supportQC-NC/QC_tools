@@ -24,7 +24,8 @@ import {
   HiDownload,
   HiChatAlt2,
   HiMail,
-  HiSparkles
+  HiSparkles,
+  HiTrendingUp
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -51,6 +52,8 @@ export const adminMenuStructure = [
       { label: "Équipes", path: "/admin/equipes", icon: HiUserGroup },
       { label: "Tâches", path: "/admin/taches", icon: HiClipboardCheck },
       { label: "Entreprises", path: "/admin/entreprises", icon: HiOfficeBuilding },
+      { label: "Organisation du menu", path: "/admin/infobulles", icon: HiInformationCircle },
+      { label: "Paramètres Email (SMTP)", path: "/admin/smtp", icon: HiMail },
       { label: "Concurrents", path: "/admin/concurrents", icon: HiUserGroup },
       { label: "Installation app", path: "/install", icon: HiQrcode },
     ],
@@ -74,6 +77,15 @@ export const adminMenuStructure = [
       { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
       { label: "Dictionnaire des rayons", path: "/admin/dictionnaire-rayons", icon: HiTag },
       { label: "Exécutables", path: "/admin/executables", icon: HiDownload },
+    ],
+  },
+  {
+    type: "subgroup",
+    label: "Commerciaux",
+    icon: HiTrendingUp,
+    collapsible: true,
+    items: [
+      { label: "Top Ventes", path: "/admin/top-ventes", icon: HiTrendingUp },
     ],
   },
   {
@@ -528,4 +540,298 @@ export const getAccessibleEntreprises = (userInfo, allEntreprises = []) => {
   return allEntreprises.filter((entreprise) =>
     permissions.entreprises.includes(entreprise.nom || entreprise),
   );
+};
+
+// =============================================
+// INFOBULLES DES ONGLETS (survol) — textes par défaut
+// =============================================
+// Texte court affiché au survol de chaque onglet. Peut être surchargé par
+// l'administrateur (stocké en base, clé = path). Voir Sidebar + AdminInfobulles.
+export const DEFAULT_MENU_HINTS = {
+  "/admin": "Vue d'ensemble et indicateurs clés.",
+  "/mes-taches": "Vos tâches personnelles à traiter.",
+  "/espace-equipe": "Messagerie et espace de travail de vos équipes.",
+  // Gestion
+  "/admin/users": "Gérer les comptes utilisateurs et leurs accès.",
+  "/admin/equipes": "Créer et gérer les équipes.",
+  "/admin/taches": "Suivre et assigner les tâches.",
+  "/admin/entreprises": "Configurer les sociétés et leurs chemins de données.",
+  "/admin/infobulles": "Réorganiser, masquer et décrire les onglets du menu.",
+  "/admin/smtp": "Paramètres d'envoi d'emails (SMTP) global et par module.",
+  "/admin/concurrents": "Relevés et suivi des prix concurrents.",
+  "/install": "Installer l'application mobile (QR code).",
+  // Données
+  "/articles": "Rechercher un article (stock, prix, gencode).",
+  "/admin/articles": "Rechercher et consulter les articles.",
+  "/admin/fournisseurs": "Consulter les fournisseurs.",
+  "/admin/clients": "Consulter les clients.",
+  "/admin/reservations": "Réservations clients (proformas en cours).",
+  "/admin/commandes": "Commandes fournisseurs et leur suivi.",
+  "/admin/envoi-cde-fournisseur":
+    "Envoyer les commandes préparées aux fournisseurs par email.",
+  "/admin/proformas": "Proformas / devis clients.",
+  "/admin/factures": "Factures clients.",
+  "/admin/demandes-bipage": "Demandes d'articles à biper (collecteur).",
+  "/admin/bipages": "Détail des bipages remontés.",
+  "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
+  "/admin/export-gisements": "Export Excel des gisements et groupes.",
+  "/admin/dictionnaire-rayons": "Dictionnaire des rayons (libellés, métrage).",
+  "/admin/executables": "Téléchargements et exécutables.",
+  // Inventaire
+  "/admin/zones": "Fiches d'inventaire par zone.",
+  "/admin/inventaire-progression": "Progression de l'inventaire en cours.",
+  "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
+  "/admin/fiches-controle": "Fiches de contrôle d'inventaire.",
+  "/admin/inventaire-proforma": "Inventaire à partir d'une proforma.",
+  // Commerciaux
+  "/admin/top-ventes": "Classement des ventes par fournisseur ou rayon.",
+  // Analyse
+  "/admin/commerciaux": "Chiffre d'affaires par commercial (REPRES).",
+  "/admin/filiales": "Analyse des filiales.",
+  "/admin/analyse-ca": "Analyse du chiffre d'affaires.",
+  "/admin/facture-analyse": "Analyse de la facturation.",
+  "/admin/journal-caisse": "Journal de caisse.",
+  "/admin/top-articles": "Meilleures ventes par article (facture).",
+  "/admin/reappro-local": "Réapprovisionnement local.",
+  "/admin/analyse-reappro": "Analyse des réapprovisionnements.",
+  "/admin/debit-comptant": "Répartition débit / comptant.",
+  "/admin/gencod-doublons": "Détection des doublons de gencode.",
+  "/admin/performance-dock": "Performance du dock (réceptions).",
+  "/admin/collecteurs": "Collecteurs (terminaux de scan).",
+  "/admin/collecteurs-carte": "Carte de localisation des collecteurs.",
+  // Modules (gestion utilisateur)
+  "/releve": "Relevé de prix terrain.",
+  "/etiquettes": "Générateur d'étiquettes.",
+  "/edition-promo": "Édition des promotions.",
+  "/mailing": "Emailing clients (campagnes).",
+  "/assistant-ia": "Assistant IA branché sur les données société.",
+};
+
+// Onglets de l'espace personnel (section fixe, non gérée par le constructeur).
+const PERSONAL_ITEMS = [
+  { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
+  { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
+];
+
+// Aplatit toutes les structures de menu -> liste { path, label, group } unique.
+// Sert à l'écran d'administration des infobulles.
+export const getAllMenuItems = () => {
+  const out = [];
+  const seen = new Set();
+  const push = (item, group) => {
+    if (!item?.path || seen.has(item.path)) return;
+    seen.add(item.path);
+    out.push({ path: item.path, label: item.label, group });
+  };
+  PERSONAL_ITEMS.forEach((it) => push(it, "Mon espace"));
+  const walk = (nodes, group) => {
+    (nodes || []).forEach((node) => {
+      if (node.type === "subgroup") walk(node.items, node.label);
+      else push(node, group);
+    });
+  };
+  walk(adminMenuStructure, "Administration");
+  walk(moduleMenuStructure, "Modules");
+  return out;
+};
+
+// Texte d'infobulle effectif : override admin > défaut > vide.
+// `config` = map { path: { hint, ordre, masque } } renvoyée par l'API.
+export const getMenuHint = (path, config = {}) =>
+  (config && config[path] && config[path].hint) ||
+  DEFAULT_MENU_HINTS[path] ||
+  "";
+
+// =============================================
+// CONSTRUCTEUR DE MENU — catalogue + structure base + assemblage
+// =============================================
+
+// Icônes proposées pour les chapitres (map nom -> composant). Repli : HiFolder.
+export const CHAPTER_ICONS = {
+  folder: HiFolder,
+  database: HiDatabase,
+  cube: HiCube,
+  chart: HiChartBar,
+  trending: HiTrendingUp,
+  cart: HiShoppingCart,
+  truck: HiTruck,
+  tag: HiTag,
+  users: HiUserGroup,
+  building: HiOfficeBuilding,
+  mail: HiMail,
+  document: HiDocumentReport,
+  money: HiCurrencyDollar,
+  grid: HiViewGrid,
+  device: HiDeviceMobile,
+  sparkles: HiSparkles,
+};
+export const chapterIcon = (name) => CHAPTER_ICONS[name] || HiFolder;
+
+const slug = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "chap";
+
+// Catalogue = TOUS les onglets connus du code (hors espace perso), avec leur
+// permission (moduleKey explicite sinon déduite du path).
+export const getMenuCatalog = () => {
+  const out = [];
+  const seen = new Set();
+  const add = (item) => {
+    if (!item?.path || seen.has(item.path)) return;
+    seen.add(item.path);
+    out.push({
+      path: item.path,
+      label: item.label,
+      icon: item.icon || null,
+      permKey: item.moduleKey || moduleForPath(item.path) || null,
+    });
+  };
+  const walk = (nodes) =>
+    (nodes || []).forEach((n) =>
+      n.type === "subgroup" ? walk(n.items) : add(n),
+    );
+  walk(adminMenuStructure);
+  walk(moduleMenuStructure);
+  return out;
+};
+
+// Structure par défaut (repli si la base est vide) = calque de la structure code.
+export const getDefaultLayout = () => {
+  const chapitres = [];
+  const topItems = [];
+  const walkTop = (nodes) =>
+    (nodes || []).forEach((n) => {
+      if (n.type === "subgroup") {
+        chapitres.push({
+          key: slug(n.label),
+          label: n.label,
+          icon: "",
+          items: (n.items || []).map((i) => i.path).filter(Boolean),
+        });
+      } else if (n.path) {
+        topItems.push(n.path);
+      }
+    });
+  walkTop(adminMenuStructure);
+  walkTop(moduleMenuStructure);
+  if (topItems.length) {
+    chapitres.unshift({ key: "general", label: "Général", icon: "", items: topItems });
+  }
+  return { chapitres, masques: [] };
+};
+
+// Onglets admin visibles par un responsable (gestion d'équipe).
+const RESP_PATHS = ["/admin/users", "/admin/equipes", "/admin/taches"];
+
+// Un utilisateur voit-il un onglet du catalogue ? (mêmes règles que canSeeAdminItem)
+const catalogItemVisible = (userInfo, cat) => {
+  if (!userInfo) return false;
+  if (userInfo.role === "responsable" && RESP_PATHS.includes(cat.path)) return true;
+  if (cat.permKey) return hasModulePermission(userInfo, cat.permKey, "read");
+  return isAdmin(userInfo); // onglet sans permission -> admin uniquement
+};
+
+// Assemble les sections à rendre dans la sidebar à partir de la structure base.
+// Retourne UNE section sans titre contenant des sous-groupes (Mon espace + chapitres
+// + Non classé), chacun filtré par les permissions de l'utilisateur.
+export const buildSidebar = (userInfo, layout, hints) => {
+  if (!userInfo) return [];
+  const catalog = getMenuCatalog();
+  const byPath = new Map(catalog.map((c) => [c.path, c]));
+  const lay =
+    layout && Array.isArray(layout.chapitres) && layout.chapitres.length
+      ? layout
+      : getDefaultLayout();
+  const masques = new Set(lay.masques || []);
+  const placed = new Set();
+
+  const subgroups = [];
+
+  // 1. Mon espace (fixe).
+  subgroups.push({
+    type: "subgroup",
+    label: "Mon espace",
+    icon: HiChatAlt2,
+    items: PERSONAL_ITEMS.map((it) => ({ ...it })),
+  });
+
+  // 2. Chapitres définis par l'admin.
+  for (const ch of lay.chapitres || []) {
+    const items = [];
+    for (const path of ch.items || []) {
+      placed.add(path);
+      if (masques.has(path)) continue;
+      const cat = byPath.get(path);
+      if (!cat || !catalogItemVisible(userInfo, cat)) continue;
+      items.push({ label: cat.label, path: cat.path, icon: cat.icon });
+    }
+    if (items.length) {
+      subgroups.push({
+        type: "subgroup",
+        label: ch.label || "Sans nom",
+        icon: chapterIcon(ch.icon),
+        items,
+      });
+    }
+  }
+
+  // 3. Non classé : onglets du catalogue non rangés, non masqués, visibles.
+  const nonClasses = catalog
+    .filter(
+      (c) => !placed.has(c.path) && !masques.has(c.path) && catalogItemVisible(userInfo, c),
+    )
+    .map((c) => ({ label: c.label, path: c.path, icon: c.icon }));
+  if (nonClasses.length) {
+    subgroups.push({
+      type: "subgroup",
+      label: "Non classé",
+      icon: HiFolder,
+      items: nonClasses,
+    });
+  }
+
+  return [{ type: "section", label: "", collapsible: false, items: subgroups }];
+};
+
+// Applique l'ordre + le masquage définis par l'admin aux menus (getUserMenus).
+// - trie les items de chaque sous-groupe par `ordre` (null => ordre du code) ;
+// - retire les items masqués ; supprime les sous-groupes/sections devenus vides.
+const isMasque = (config, path) => !!(config && config[path] && config[path].masque);
+const ordreOf = (config, path) => {
+  const o = config && config[path] ? config[path].ordre : null;
+  return o === null || o === undefined ? null : o;
+};
+const trierEtFiltrer = (items, config) =>
+  (items || [])
+    .filter((it) => !(it.path && isMasque(config, it.path)))
+    .map((it, i) => ({ it, i }))
+    .sort((a, b) => {
+      const oa = a.it.path ? ordreOf(config, a.it.path) : null;
+      const ob = b.it.path ? ordreOf(config, b.it.path) : null;
+      if (oa === null && ob === null) return a.i - b.i;
+      if (oa === null) return 1;
+      if (ob === null) return -1;
+      return oa - ob || a.i - b.i;
+    })
+    .map((x) => x.it);
+
+export const applyMenuConfig = (menus, config = {}) => {
+  const out = [];
+  for (const section of menus || []) {
+    const nodes = [];
+    for (const node of section.items || []) {
+      if (node.type === "subgroup") {
+        const its = trierEtFiltrer(node.items, config);
+        if (its.length) nodes.push({ ...node, items: its });
+      } else if (!(node.path && isMasque(config, node.path))) {
+        nodes.push(node);
+      }
+    }
+    if (nodes.length) out.push({ ...section, items: nodes });
+  }
+  return out;
 };

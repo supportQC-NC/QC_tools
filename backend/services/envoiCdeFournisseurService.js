@@ -484,6 +484,7 @@ export const envoyerCommandes = async (entreprise, numcdes = [], user = null) =>
       );
 
       await sendEmail({
+        module: "envoi_cde_fournisseur",
         email: to,
         cc: cc.length ? cc : undefined,
         subject: sujet,
@@ -604,6 +605,7 @@ export const envoyerMasse = async (entreprise, payload = {}, user = null) => {
       }
       try {
         await sendEmail({
+        module: "envoi_cde_fournisseur",
           email: params.testEmails,
           subject: `[TEST x${nb}] ${sujet}`,
           html: construireCorpsTexte(message),
@@ -644,6 +646,7 @@ export const envoyerMasse = async (entreprise, payload = {}, user = null) => {
     const cc = (fe.emailsTransitaire || []).filter(Boolean);
     try {
       await sendEmail({
+        module: "envoi_cde_fournisseur",
         email: to,
         cc: cc.length ? cc : undefined,
         subject: sujet,

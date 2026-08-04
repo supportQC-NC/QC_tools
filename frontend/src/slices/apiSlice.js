@@ -65,6 +65,12 @@ export const apiSlice = createApi({
     "ResponsableCc",
     "EnvoiCdeHistorique",
     "EnvoiCdeParametre",
+    // ========== TAGS COMMERCIAUX ==========
+    "TopVentes",
+    // ========== TAGS INFOBULLES MENU ==========
+    "MenuHint",
+    "MenuLayout",
+    "SmtpConfig",
   ],
   endpoints: (builder) => ({}),
 });

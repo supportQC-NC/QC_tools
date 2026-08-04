@@ -1,7 +1,11 @@
 import nodemailer from "nodemailer";
+import { resolveSmtp, buildFrom } from "../services/smtpConfigService.js";
 
 /**
  * Envoi d'email via SMTP.
+ *
+ * La config SMTP est résolue dynamiquement : .env (défaut) < surcharge « global »
+ * (base) < surcharge du module (base). Le .env n'est jamais modifié.
  *
  * options:
  *   - email       : destinataire(s) — string ou tableau de strings
@@ -10,17 +14,20 @@ import nodemailer from "nodemailer";
  *   - text        : (optionnel) corps texte
  *   - cc, bcc     : (optionnel) copie / copie cachée
  *   - attachments : (optionnel) tableau de pièces jointes nodemailer
- *                   ex: [{ filename: "rapport.pdf", path: "/chemin/rapport.pdf" }]
- *                       [{ filename: "x.pdf", content: <Buffer>, contentType: "application/pdf" }]
+ *   - module      : (optionnel) clé de module pour une surcharge SMTP dédiée
+ *                   (ex. "envoi_cde_fournisseur", "rapports", "comptes")
+ *   - from        : (optionnel) force l'expéditeur ("Nom" <email>) — sinon résolu
  */
 const sendEmail = async (options) => {
+  const cfg = await resolveSmtp(options.module || null);
+
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: true,
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
+      user: cfg.user,
+      pass: cfg.pass,
     },
   });
 
@@ -30,7 +37,7 @@ const sendEmail = async (options) => {
     : options.email;
 
   const mailOptions = {
-    from: `"${process.env.SMTP_FROM_NAME}" <${process.env.SMTP_USER}>`,
+    from: options.from || buildFrom(cfg),
     to,
     subject: options.subject,
     html: options.html,

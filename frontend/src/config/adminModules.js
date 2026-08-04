@@ -8,6 +8,7 @@
 export const MODULE_GROUPS = {
   gestion: "Gestion",
   donnees: "Données",
+  commerciaux: "Commerciaux",
   analyse: "Analyse",
   administration: "Administration",
 };
@@ -37,6 +38,7 @@ export const PERMISSION_MODULES = [
   { key: "reception_suivi_admin", label: "Suivi Réceptions", group: "donnees" },
   { key: "export_gisements_admin", label: "Export Gisements", group: "donnees" },
   { key: "executables_admin", label: "Exécutables", group: "donnees" },
+  { key: "commerciaux_outils", label: "Outils Commerciaux", group: "commerciaux" },
   { key: "commerciaux_admin", label: "Analyse Commerciaux", group: "analyse" },
   { key: "filiales_admin", label: "Analyse Filiales", group: "analyse" },
   { key: "reappro_local_admin", label: "Reappro Local", group: "analyse" },
@@ -52,6 +54,8 @@ export const PERMISSION_MODULES = [
   { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
   { key: "users_admin", label: "Utilisateurs", group: "administration" },
   { key: "entreprises_admin", label: "Entreprises", group: "administration" },
+  { key: "infobulles_admin", label: "Organisation du menu", group: "administration" },
+  { key: "smtp_admin", label: "Paramètres Email (SMTP)", group: "administration" },
 ];
 
 export const PERMISSION_MODULE_BY_KEY = PERMISSION_MODULES.reduce((acc, m) => {
@@ -64,6 +68,8 @@ export const PATH_MODULE_MAP = [
   // Administration
   { path: "/admin/users", key: "users_admin" },
   { path: "/admin/entreprises", key: "entreprises_admin" },
+  { path: "/admin/infobulles", key: "infobulles_admin" },
+  { path: "/admin/smtp", key: "smtp_admin" },
   { path: "/admin/meilleures-ventes", key: "stock" },
   { path: "/admin", key: "dashboard_admin" }, // exact "/admin" (les /admin/xxx sont plus spécifiques)
   // Données
@@ -92,6 +98,8 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/demandes-bipage", key: "bipage" },
   { path: "/admin/reappros", key: "reapro" },
   { path: "/admin/envoi-cde-fournisseur", key: "envoi_cde_fournisseur" },
+  // Commerciaux (accès global unique)
+  { path: "/admin/top-ventes", key: "commerciaux_outils" },
   // Analyse
   { path: "/admin/commerciaux", key: "commerciaux_admin" },
   { path: "/admin/filiales", key: "filiales_admin" },

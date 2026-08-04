@@ -143,6 +143,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // ══════════ COMMERCIAUX (boîte à outils commerciale — accès global) ══════════
+      commerciaux_outils: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // ══════════ ANALYSE (écrans admin) ══════════
       // Analyse Commerciaux
       commerciaux_admin: {
@@ -213,6 +219,18 @@ const permissionSchema = new mongoose.Schema(
       },
       // Entreprises
       entreprises_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Infobulles menu (édition des textes au survol des onglets)
+      infobulles_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Paramètres Email / SMTP (global + par module)
+      smtp_admin: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },

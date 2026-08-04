@@ -88,6 +88,7 @@ async function runReport({ report, user, entreprise, periode, emailDestination, 
 
   const societe = entreprise.nom || entreprise.nomDossierDBF;
   await sendEmail({
+    module: "rapports",
     email: destinataire,
     subject: `${report.label} — ${societe}`,
     html: `<p>Bonjour ${user.prenom || ""},</p>

@@ -987,6 +987,7 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
   } else {
     try {
       await sendEmail({
+        module: "rapports",
         email: destinataires,
         subject: `Préparation commande — ${refLabel} ${header.numpro} (${header.client})`,
         html: buildEmailHtml(header, stats, preparation),

@@ -629,6 +629,7 @@ export const genererEtEnvoyerRapport = async (
   } else {
     try {
       await sendEmail({
+        module: "rapports",
         email: destinataires,
         subject: `Rapport de réception — Commande ${header.numcde} (${safeTrim(
           reception.commandeInfo?.fournisseurNom,

@@ -303,6 +303,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   try {
     await sendEmail({
+      module: "comptes",
       email: user.email,
       subject: "🔐 Réinitialisation de votre mot de passe",
       html: generateResetEmail({
@@ -440,6 +441,7 @@ const createUser = asyncHandler(async (req, res) => {
 
   try {
     await sendEmail({
+      module: "comptes",
       email: user.email,
       subject: "✦ Votre compte a été créé",
       html: generateWelcomeEmail({

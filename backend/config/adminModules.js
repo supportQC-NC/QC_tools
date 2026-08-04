@@ -9,6 +9,7 @@
 export const MODULE_GROUPS = {
   gestion: "Gestion",
   donnees: "Données",
+  commerciaux: "Commerciaux",
   analyse: "Analyse",
   administration: "Administration",
 };
@@ -39,6 +40,8 @@ export const PERMISSION_MODULES = [
   { key: "fiches_controle_admin", label: "Fiches de contrôle", group: "donnees" },
   { key: "reception_suivi_admin", label: "Suivi Réceptions", group: "donnees" },
   { key: "export_gisements_admin", label: "Export Gisements", group: "donnees" },
+  // ── Commerciaux (boîte à outils commerciale — accès global unique) ─────────
+  { key: "commerciaux_outils", label: "Outils Commerciaux", group: "commerciaux" },
   // ── Analyse (écrans admin) ────────────────────────────────────────────────
   { key: "commerciaux_admin", label: "Analyse Commerciaux", group: "analyse" },
   { key: "filiales_admin", label: "Analyse Filiales", group: "analyse" },
@@ -53,6 +56,8 @@ export const PERMISSION_MODULES = [
   { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
   { key: "users_admin", label: "Utilisateurs", group: "administration" },
   { key: "entreprises_admin", label: "Entreprises", group: "administration" },
+  { key: "infobulles_admin", label: "Organisation du menu", group: "administration" },
+  { key: "smtp_admin", label: "Paramètres Email (SMTP)", group: "administration" },
 ];
 
 export const PERMISSION_MODULE_KEYS = PERMISSION_MODULES.map((m) => m.key);

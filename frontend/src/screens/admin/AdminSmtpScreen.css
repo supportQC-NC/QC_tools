@@ -1,0 +1,159 @@
+/* Écran Paramètres SMTP — styles scopés .smtp-* */
+.smtp-wrap {
+  padding: 18px 28px;
+  max-width: 1100px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.smtp-wrap h1 {
+  font-size: 1.4rem;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.smtp-intro {
+  color: var(--admin-text, #e2e8f0);
+  font-size: 0.9rem;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+.smtp-card {
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 12px;
+  background: var(--admin-card-bg, #111a2e);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.smtp-card.global {
+  border-color: var(--admin-primary, #6366f1);
+}
+.smtp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.smtp-card-head h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  color: var(--admin-text, #f1f5f9);
+}
+.smtp-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.smtp-badge.actif {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+.smtp-badge.defaut {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+.smtp-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.smtp-field {
+  flex: 1;
+  min-width: 200px;
+}
+.smtp-field label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--admin-text-muted, #94a3b8);
+  margin-bottom: 4px;
+}
+.smtp-field input,
+.smtp-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #475569);
+  background: var(--admin-card-bg, #0b1220);
+  color: var(--admin-text, #f8fafc);
+  font-size: 0.88rem;
+}
+.smtp-field input:focus,
+.smtp-field select:focus {
+  outline: none;
+  border-color: var(--admin-primary, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+.smtp-adv-toggle {
+  background: none;
+  border: none;
+  color: var(--admin-primary, #818cf8);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+.smtp-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  border-top: 1px solid var(--admin-border, #334155);
+  padding-top: 12px;
+}
+.smtp-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #334155);
+  background: var(--admin-input-bg, #1e293b);
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.smtp-btn.primary {
+  background: var(--admin-primary, #6366f1);
+  border-color: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+.smtp-btn.danger {
+  color: #f87171;
+}
+.smtp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.smtp-test {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.smtp-test input {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #475569);
+  background: var(--admin-card-bg, #0b1220);
+  color: var(--admin-text, #f8fafc);
+  font-size: 0.85rem;
+  min-width: 210px;
+}
+.smtp-msg {
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+.smtp-msg.ok {
+  color: #4ade80;
+}
+.smtp-msg.err {
+  color: #f87171;
+}
+.smtp-hint {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted, #94a3b8);
+  margin-top: 2px;
+}

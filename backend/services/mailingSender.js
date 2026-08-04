@@ -7,6 +7,7 @@
 
 import nodemailer from "nodemailer";
 import { renderCampaign } from "./mailRenderService.js";
+import { resolveSmtp, buildFrom } from "./smtpConfigService.js";
 import {
   recipientToken,
   unsubToken,
@@ -14,24 +15,30 @@ import {
   injectTracking,
 } from "./mailTracking.js";
 
+// Transport POOLÉ, reconstruit uniquement si la config SMTP « mailing » change.
 let _transport = null;
-const getTransport = () => {
-  if (!_transport) {
+let _sig = "";
+const getTransport = (cfg) => {
+  const sig = `${cfg.host}|${cfg.port}|${cfg.secure}|${cfg.user}|${cfg.pass}`;
+  if (!_transport || sig !== _sig) {
+    try {
+      _transport?.close();
+    } catch {
+      /* ignore */
+    }
     _transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: true,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      auth: { user: cfg.user, pass: cfg.pass },
       pool: true,
       maxConnections: 2,
       maxMessages: 50,
     });
+    _sig = sig;
   }
   return _transport;
 };
-
-const fromHeader = () =>
-  `"${process.env.SMTP_FROM_NAME || "Quincaillerie"}" <${process.env.SMTP_USER}>`;
 
 // Domaine PUBLIC des emails (pixel d'ouverture, liens traçés, désinscription).
 // On N'UTILISE PLUS CLIENT_URL (souvent = http://localhost en dev) : des liens
@@ -60,7 +67,10 @@ export const sendToRecipients = async (campaign, recipients, opts = {}) => {
   const realUnsub = track || opts.unsub === true;
   const base = baseUrl();
   const { html, text } = renderCampaign(campaign.design || {}, { baseUrl: base });
-  const transporter = getTransport();
+  // Config SMTP « mailing » (surcharge base > global > .env). From dédié possible.
+  const cfg = await resolveSmtp("mailing");
+  const transporter = getTransport(cfg);
+  const fromMailing = buildFrom(cfg, "Quincaillerie");
   const subject = campaign.subject || "(sans objet)";
   const subjectB = campaign.abTest?.subjectB || subject;
   const replyTo = campaign.replyTo || undefined;
@@ -92,7 +102,7 @@ export const sendToRecipients = async (campaign, recipients, opts = {}) => {
     try {
       const subj = rec.variant === "B" ? subjectB : subject;
       await transporter.sendMail({
-        from: fromHeader(),
+        from: fromMailing,
         to,
         replyTo,
         subject: applyMerge(subj, rec),
