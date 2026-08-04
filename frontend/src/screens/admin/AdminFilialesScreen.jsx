@@ -323,70 +323,112 @@ const AdminFilialesScreen = () => {
     });
   };
 
-  // --- Export Excel (respecte les filtres/tri de la grille) ---
+  // --- Export Excel : EXACTEMENT ce qui est affiché à l'écran ---
+  // Colonnes = colonnes réellement visibles de la grille (filiales masquées,
+  // colonnes cachées et ordre respectés) ; lignes = après filtres + recherche +
+  // filtreMode + tri ; valeurs = telles qu'affichées (valueFormatter appliqué).
   const handleExport = () => {
     if (!data) return;
-    const headers = [
-      "GISEMENT",
-      `NART ${data.mere}`,
-      `DESIGN ${data.mere}`,
-      "NOM FOUR",
-      `STOCK ${data.mere}`,
-      `PVTE ${data.mere}`,
-      `VTE AN ${data.mere}`,
-      `CA AN ${data.mere}`,
-      "VTE HORS RESEAU",
-      "% RESEAU",
-      "FILTRE RESEAU",
-    ];
-    data.filiales.forEach((f) => {
-      headers.push(
-        `NART ${f.label}`,
-        `STOCK ${f.label}`,
-        `PVTE ${f.label}`,
-        `VTE AN ${f.label}`,
-        `CA AN ${f.label}`,
-      );
-    });
+    const api = gridApiRef.current;
 
-    const aoa = [headers];
-    const pushRow = (r) => {
-      const line = [
-        r.gisement,
-        r.nart,
-        r.design,
-        r.nomFour,
-        r0(r.stock),
-        r0(r.pvte),
-        r0(r.vteAn),
-        r0(r.caAn),
-        r0(r.vteHorsReseau),
-        r.pctReseau === null ? "" : r.pctReseau,
-        r.filtre,
+    let aoa = null;
+
+    if (api && typeof api.getAllDisplayedColumns === "function") {
+      // Uniquement les colonnes-données affichées (on ignore les colonnes vides
+      // sans champ et celles masquées par l'utilisateur).
+      const cols = api
+        .getAllDisplayedColumns()
+        .filter((c) => c.getColDef && c.getColDef()?.field);
+
+      // En-tête : "Groupe Libellé" (ex. "QC NART", "AVB STOCK") si groupé.
+      const headerOf = (c) => {
+        const cd = c.getColDef();
+        const leaf = cd.headerName ?? cd.field;
+        const grp = c.getParent && c.getParent();
+        const grpName =
+          grp && grp.getColGroupDef ? grp.getColGroupDef()?.headerName : "";
+        return grpName ? `${grpName} ${leaf}` : leaf;
+      };
+      // Valeur affichée : on applique le valueFormatter de la colonne si présent.
+      const valueOf = (c, node) => {
+        const cd = c.getColDef();
+        let v = node.data ? node.data[cd.field] : "";
+        if (typeof cd.valueFormatter === "function") {
+          try {
+            v = cd.valueFormatter({
+              value: v,
+              data: node.data,
+              node,
+              colDef: cd,
+              column: c,
+              api,
+            });
+          } catch {
+            /* garde la valeur brute */
+          }
+        }
+        return v === null || v === undefined ? "" : v;
+      };
+
+      aoa = [cols.map(headerOf)];
+      api.forEachNodeAfterFilterAndSort((node) => {
+        aoa.push(cols.map((c) => valueOf(c, node)));
+      });
+    } else {
+      // Repli (grille non initialisée) : export complet.
+      const headers = [
+        "GISEMENT",
+        `NART ${data.mere}`,
+        `DESIGN ${data.mere}`,
+        "NOM FOUR",
+        `STOCK ${data.mere}`,
+        `PVTE ${data.mere}`,
+        `VTE AN ${data.mere}`,
+        `CA AN ${data.mere}`,
+        "VTE HORS RESEAU",
+        "% RESEAU",
+        "FILTRE RESEAU",
       ];
       data.filiales.forEach((f) => {
-        const nartV = r[`${f.code}_nart`];
-        if (nartV) {
-          line.push(
-            nartV,
-            r0(r[`${f.code}_stock`]),
-            r0(r[`${f.code}_pvte`]),
-            r0(r[`${f.code}_vteAn`]),
-            r0(r[`${f.code}_caAn`]),
-          );
-        } else {
-          line.push("", "", "", "", "");
-        }
+        headers.push(
+          `NART ${f.label}`,
+          `STOCK ${f.label}`,
+          `PVTE ${f.label}`,
+          `VTE AN ${f.label}`,
+          `CA AN ${f.label}`,
+        );
       });
-      aoa.push(line);
-    };
-
-    if (gridApiRef.current) {
-      gridApiRef.current.forEachNodeAfterFilterAndSort((node) =>
-        pushRow(node.data),
-      );
-    } else {
-      rowData.forEach(pushRow);
+      aoa = [headers];
+      rowData.forEach((r) => {
+        const line = [
+          r.gisement,
+          r.nart,
+          r.design,
+          r.nomFour,
+          r0(r.stock),
+          r0(r.pvte),
+          r0(r.vteAn),
+          r0(r.caAn),
+          r0(r.vteHorsReseau),
+          r.pctReseau === null ? "" : r.pctReseau,
+          r.filtre,
+        ];
+        data.filiales.forEach((f) => {
+          const nartV = r[`${f.code}_nart`];
+          if (nartV) {
+            line.push(
+              nartV,
+              r0(r[`${f.code}_stock`]),
+              r0(r[`${f.code}_pvte`]),
+              r0(r[`${f.code}_vteAn`]),
+              r0(r[`${f.code}_caAn`]),
+            );
+          } else {
+            line.push("", "", "", "", "");
+          }
+        });
+        aoa.push(line);
+      });
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
