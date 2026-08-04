@@ -25,7 +25,8 @@ import {
   HiChatAlt2,
   HiMail,
   HiSparkles,
-  HiTrendingUp
+  HiTrendingUp,
+  HiUser
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -385,6 +386,7 @@ export const getUserMenus = (userInfo) => {
     items: [
       { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
       { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
+      { label: "Mon profil", path: "/profile", icon: HiUser },
     ],
   });
 
@@ -611,6 +613,7 @@ export const DEFAULT_MENU_HINTS = {
 const PERSONAL_ITEMS = [
   { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
   { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
+  { label: "Mon profil", path: "/profile", icon: HiUser },
 ];
 
 // Aplatit toutes les structures de menu -> liste { path, label, group } unique.
