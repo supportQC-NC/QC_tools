@@ -99,6 +99,15 @@ export const BATEAU_VIDE = "__vide__";
 export const getCommandesPreparees = async (entreprise, options = {}) => {
   const { search = "", fourn, bateau } = options;
 
+  // Libellé d'état depuis la config entreprise (mappingEtatsCommande, Map n° -> libellé).
+  const mapping = entreprise.mappingEtatsCommande;
+  const libelleEtat = (etat) => {
+    const key = String(etat);
+    if (mapping && typeof mapping.get === "function") return mapping.get(key) || "";
+    if (mapping && typeof mapping === "object") return mapping[key] || "";
+    return "";
+  };
+
   // On récupère TOUTES les commandes préparées (tri/filtre bateau global).
   const res = await commandeCacheService.getPaginated(entreprise, {
     page: 1,
@@ -126,6 +135,7 @@ export const getCommandesPreparees = async (entreprise, options = {}) => {
         BATEAU: trim(c.BATEAU),
         OBSERV: trim(c.OBSERV),
         ETAT: c.ETAT,
+        ETAT_LABEL: libelleEtat(c.ETAT),
         COUT_ACHAT_PREV: c.TOTAL_DETAIL || 0,
         NB_LIGNES: c.NB_LIGNES_DETAIL || 0,
       };

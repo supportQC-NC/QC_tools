@@ -8,13 +8,15 @@
 import ExcelJS from "exceljs";
 
 // Colonnes du détail (équivalent de la requête Access rqDetailSelection).
+// PDF en PAYSAGE : DÉSIGNATION et DÉSIGN. FRN élargies pour afficher 50 caractères ;
+// CODE (NART ≤ 6) et GENCODE (≤ 13) réduits en conséquence.
 const COLS = [
-  { key: "NL", label: "N°", w: 26, align: "center" },
-  { key: "NART", label: "CODE", w: 50, align: "left" },
-  { key: "DESIGN", label: "DÉSIGNATION", w: 150, align: "left" },
-  { key: "DESIFRN", label: "DÉSIGN. FRN", w: 120, align: "left" },
+  { key: "NL", label: "N°", w: 24, align: "center" },
+  { key: "NART", label: "CODE", w: 40, align: "left" },
+  { key: "DESIGN", label: "DÉSIGNATION", w: 232, align: "left" },
+  { key: "DESIFRN", label: "DÉSIGN. FRN", w: 232, align: "left" },
   { key: "REFER", label: "RÉFÉRENCE", w: 78, align: "left" },
-  { key: "GENCOD", label: "GENCODE", w: 82, align: "left" },
+  { key: "GENCOD", label: "GENCODE", w: 72, align: "left" },
   { key: "QTE", label: "QTÉ", w: 40, align: "center" },
 ];
 
@@ -68,8 +70,9 @@ export const logoFromEntreprise = (entreprise) => {
   }
 };
 
-// Colonnes Excel — reproduit EXACTEMENT la requête Access rqDetailSelection.
+// Colonnes Excel : NL en premier, sans la date de commande (DATCDE retirée).
 const XL_COLS = [
+  { key: "NL", label: "NL", width: 6 },
   { key: "NUMCDE", label: "NUMCDE", width: 10 },
   { key: "FOURN", label: "FOURN", width: 8 },
   { key: "NOM", label: "NOM", width: 26 },
@@ -79,8 +82,6 @@ const XL_COLS = [
   { key: "REFER", label: "REFER", width: 16 },
   { key: "GENCOD", label: "GENCOD", width: 16 },
   { key: "QTE", label: "QTE", width: 8 },
-  { key: "NL", label: "NL", width: 6 },
-  { key: "DATCDE", label: "DATCDE", width: 12 },
   // PACHAT (prix d'achat article) — TOUJOURS en dernière colonne.
   { key: "PACHAT", label: "PACHAT", width: 12 },
 ];
@@ -111,24 +112,22 @@ export const genererExcelCommande = async (header, lignes) => {
   const numcde = val(header.numcde);
   const fourn = header.fournId ?? header.fourn ?? "";
   const nom = val(header.fournNom || header.nom);
-  const dat = formatDate(header.datcde);
 
-  // Une ligne par article, colonnes NUMCDE/FOURN/NOM/DATCDE répétées (comme Access).
+  // Une ligne par article — NL en premier ; NUMCDE/FOURN/NOM répétés.
   let r = 2;
   lignes.forEach((l) => {
     const row = ws.getRow(r);
-    row.getCell(1).value = numcde;
-    row.getCell(2).value = fourn;
-    row.getCell(3).value = nom;
-    row.getCell(4).value = val(l.NART);
-    row.getCell(5).value = val(l.DESIGN);
-    row.getCell(6).value = val(l.DESIFRN);
-    row.getCell(7).value = val(l.REFER);
-    row.getCell(8).value = val(l.GENCOD);
-    row.getCell(9).value = Number(l.QTE) || 0;
-    row.getCell(10).value = l.NL ?? "";
-    row.getCell(11).value = dat;
-    row.getCell(12).value = Number(l.PACHAT) || 0;
+    row.getCell(1).value = l.NL ?? "";
+    row.getCell(2).value = numcde;
+    row.getCell(3).value = fourn;
+    row.getCell(4).value = nom;
+    row.getCell(5).value = val(l.NART);
+    row.getCell(6).value = val(l.DESIGN);
+    row.getCell(7).value = val(l.DESIFRN);
+    row.getCell(8).value = val(l.REFER);
+    row.getCell(9).value = val(l.GENCOD);
+    row.getCell(10).value = Number(l.QTE) || 0;
+    row.getCell(11).value = Number(l.PACHAT) || 0;
     row.commit();
     r += 1;
   });
@@ -283,7 +282,7 @@ export const genererPdfCommande = async (header, lignes) => {
   const PDFDocument = mod.default;
 
   const margin = 30;
-  const doc = new PDFDocument({ size: "A4", margin });
+  const doc = new PDFDocument({ size: "A4", layout: "landscape", margin });
 
   // Collecte du PDF en mémoire.
   const chunks = [];

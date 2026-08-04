@@ -374,6 +374,7 @@ const CommandesTab = ({ dossier, params }) => {
               <th>Fourn.</th>
               <th>Nom fournisseur</th>
               <th>Date</th>
+              <th>État</th>
               <th>Bateau</th>
               <th className="ecf-right">Lignes</th>
               <th className="ecf-right">Coût achat prév.</th>
@@ -383,13 +384,13 @@ const CommandesTab = ({ dossier, params }) => {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="ecf-empty">
+                <td colSpan={10} className="ecf-empty">
                   Chargement…
                 </td>
               </tr>
             ) : commandes.length === 0 ? (
               <tr>
-                <td colSpan={9} className="ecf-empty">
+                <td colSpan={10} className="ecf-empty">
                   Aucune commande préparée (ETAT = 1).
                 </td>
               </tr>
@@ -410,6 +411,7 @@ const CommandesTab = ({ dossier, params }) => {
                   <td>{c.FOURN}</td>
                   <td className="wrap">{c.NOM}</td>
                   <td>{fmtDate(c.DATCDE)}</td>
+                  <td>{c.ETAT_LABEL || c.ETAT}</td>
                   <td>{renderBateau(c.BATEAU)}</td>
                   <td className="ecf-right">{c.NB_LIGNES}</td>
                   <td className="ecf-right">{fmtMoney(c.COUT_ACHAT_PREV)}</td>
