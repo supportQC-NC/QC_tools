@@ -12,15 +12,14 @@ import {
 } from "../../slices/gencodDoublonsApiSlice";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
+import { roundInt, fmtFranc, fmtQty } from "../../utils/format";
 import "./AdminGencodDoublonsScreen.css";
 
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
-const fQty = (n) => r0(n).toLocaleString("fr-FR");
+// Formatteurs AgGrid : cellule vide si la valeur est absente, sinon format partagé.
 const moneyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fF(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtFranc(p.value);
 const qtyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fQty(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtQty(p.value);
 const num = { type: "rightAligned" };
 
 const AdminGencodDoublonsScreen = () => {
@@ -96,8 +95,8 @@ const AdminGencodDoublonsScreen = () => {
         r.refer,
         r.fourn,
         r.fournNom,
-        r0(r.stock),
-        r0(r.pvte),
+        roundInt(r.stock),
+        roundInt(r.pvte),
       ]),
     );
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -146,15 +145,15 @@ const AdminGencodDoublonsScreen = () => {
           {totaux && (
             <div className="gd-kpis">
               <div className="gd-kpi warn">
-                <span className="v">{fQty(totaux.nbGencodsDoublons)}</span>
+                <span className="v">{fmtQty(totaux.nbGencodsDoublons)}</span>
                 <span className="l">GENCODE en double</span>
               </div>
               <div className="gd-kpi">
-                <span className="v">{fQty(totaux.nbArticlesConcernes)}</span>
+                <span className="v">{fmtQty(totaux.nbArticlesConcernes)}</span>
                 <span className="l">Articles concernés</span>
               </div>
               <div className="gd-kpi">
-                <span className="v">{fQty(totaux.nbArticles)}</span>
+                <span className="v">{fmtQty(totaux.nbArticles)}</span>
                 <span className="l">Articles au total</span>
               </div>
             </div>

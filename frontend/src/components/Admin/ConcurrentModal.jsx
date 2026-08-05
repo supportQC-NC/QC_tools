@@ -1,7 +1,6 @@
 // src/components/Admin/ConcurrentModal.jsx
 import React, { useState, useEffect } from "react";
 import {
-  HiX,
   HiOfficeBuilding,
   HiLocationMarker,
   HiPhone,
@@ -12,6 +11,7 @@ import {
   useCreateConcurrentMutation,
   useUpdateConcurrentMutation,
 } from "../../slices/concurrentApiSLice";
+import Modal from "../ui/Modal/Modal";
 import "./ConcurrentModal.css";
 
 const TYPE_OPTIONS = [
@@ -89,151 +89,141 @@ const ConcurrentModal = ({ concurrent, onClose }) => {
   const isLoading = isCreating || isUpdating;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-content concurrent-modal"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <h2>
-            <HiOfficeBuilding />
-            {isEditing ? "Modifier le concurrent" : "Nouveau concurrent"}
-          </h2>
-          <button className="modal-close" onClick={onClose}>
-            <HiX />
-          </button>
+    <Modal
+      onClose={onClose}
+      contentClassName="modal-content concurrent-modal"
+      title={isEditing ? "Modifier le concurrent" : "Nouveau concurrent"}
+      icon={<HiOfficeBuilding />}
+    >
+      {error && <div className="modal-error">{error}</div>}
+
+      <form onSubmit={handleSubmit} className="concurrent-form">
+        {/* Nom */}
+        <div className="form-group">
+          <label htmlFor="nom">
+            <HiOfficeBuilding /> Nom du concurrent *
+          </label>
+          <input
+            type="text"
+            id="nom"
+            name="nom"
+            value={formData.nom}
+            onChange={handleChange}
+            placeholder="Ex: Carrefour, Leclerc, Amazon..."
+            autoFocus
+          />
         </div>
 
-        {error && <div className="modal-error">{error}</div>}
+        {/* Type */}
+        <div className="form-group">
+          <label htmlFor="type">
+            <HiTag /> Type
+          </label>
+          <select
+            id="type"
+            name="type"
+            value={formData.type}
+            onChange={handleChange}
+          >
+            {TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <form onSubmit={handleSubmit} className="concurrent-form">
-          {/* Nom */}
+        {/* Adresse */}
+        <div className="form-group">
+          <label htmlFor="adresse">
+            <HiLocationMarker /> Adresse
+          </label>
+          <input
+            type="text"
+            id="adresse"
+            name="adresse"
+            value={formData.adresse}
+            onChange={handleChange}
+            placeholder="Numéro et rue"
+          />
+        </div>
+
+        {/* Ville & Code Postal */}
+        <div className="form-row">
           <div className="form-group">
-            <label htmlFor="nom">
-              <HiOfficeBuilding /> Nom du concurrent *
-            </label>
+            <label htmlFor="codePostal">Code Postal</label>
             <input
               type="text"
-              id="nom"
-              name="nom"
-              value={formData.nom}
+              id="codePostal"
+              name="codePostal"
+              value={formData.codePostal}
               onChange={handleChange}
-              placeholder="Ex: Carrefour, Leclerc, Amazon..."
-              autoFocus
+              placeholder="98800"
             />
           </div>
-
-          {/* Type */}
-          <div className="form-group">
-            <label htmlFor="type">
-              <HiTag /> Type
-            </label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-            >
-              {TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Adresse */}
-          <div className="form-group">
-            <label htmlFor="adresse">
-              <HiLocationMarker /> Adresse
-            </label>
+          <div className="form-group flex-2">
+            <label htmlFor="ville">Ville</label>
             <input
               type="text"
-              id="adresse"
-              name="adresse"
-              value={formData.adresse}
+              id="ville"
+              name="ville"
+              value={formData.ville}
               onChange={handleChange}
-              placeholder="Numéro et rue"
+              placeholder="Nouméa"
             />
           </div>
+        </div>
 
-          {/* Ville & Code Postal */}
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="codePostal">Code Postal</label>
-              <input
-                type="text"
-                id="codePostal"
-                name="codePostal"
-                value={formData.codePostal}
-                onChange={handleChange}
-                placeholder="98800"
-              />
-            </div>
-            <div className="form-group flex-2">
-              <label htmlFor="ville">Ville</label>
-              <input
-                type="text"
-                id="ville"
-                name="ville"
-                value={formData.ville}
-                onChange={handleChange}
-                placeholder="Nouméa"
-              />
-            </div>
-          </div>
+        {/* Téléphone */}
+        <div className="form-group">
+          <label htmlFor="telephone">
+            <HiPhone /> Téléphone
+          </label>
+          <input
+            type="tel"
+            id="telephone"
+            name="telephone"
+            value={formData.telephone}
+            onChange={handleChange}
+            placeholder="XX.XX.XX"
+          />
+        </div>
 
-          {/* Téléphone */}
-          <div className="form-group">
-            <label htmlFor="telephone">
-              <HiPhone /> Téléphone
-            </label>
-            <input
-              type="tel"
-              id="telephone"
-              name="telephone"
-              value={formData.telephone}
-              onChange={handleChange}
-              placeholder="XX.XX.XX"
-            />
-          </div>
+        {/* Notes */}
+        <div className="form-group">
+          <label htmlFor="notes">
+            <HiAnnotation /> Notes
+          </label>
+          <textarea
+            id="notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            placeholder="Informations complémentaires..."
+            rows={3}
+          />
+        </div>
 
-          {/* Notes */}
-          <div className="form-group">
-            <label htmlFor="notes">
-              <HiAnnotation /> Notes
-            </label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Informations complémentaires..."
-              rows={3}
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="btn-cancel"
-              onClick={onClose}
-              disabled={isLoading}
-            >
-              Annuler
-            </button>
-            <button type="submit" className="btn-confirm" disabled={isLoading}>
-              {isLoading
-                ? "Enregistrement..."
-                : isEditing
-                  ? "Modifier"
-                  : "Créer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {/* Actions */}
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="btn-cancel"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Annuler
+          </button>
+          <button type="submit" className="btn-confirm" disabled={isLoading}>
+            {isLoading
+              ? "Enregistrement..."
+              : isEditing
+                ? "Modifier"
+                : "Créer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

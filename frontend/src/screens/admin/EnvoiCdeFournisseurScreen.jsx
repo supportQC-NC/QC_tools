@@ -43,6 +43,7 @@ import {
   useGetEnvoiHistoriqueQuery,
 } from "../../slices/envoiCdeApiSlice";
 import { ENVOI_CDE_URL } from "../../constants";
+import Modal from "../../components/ui/Modal/Modal";
 import "./EnvoiCdeFournisseurScreen.css";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -469,61 +470,59 @@ const CommandesTab = ({ dossier, params }) => {
 const DetailModal = ({ dossier, numcde, onClose }) => {
   const { data, isLoading } = useGetCommandeDetailQuery({ nomDossierDBF: dossier, numcde });
   return (
-    <div className="ecf-overlay" onClick={onClose}>
-      <div className="ecf-modal lg" onClick={(e) => e.stopPropagation()}>
-        <h3>
-          <HiDocumentText /> Détail commande {numcde}
-          <button className="ecf-btn ecf-spacer" onClick={onClose}>
-            <HiX />
-          </button>
-        </h3>
-        {isLoading ? (
-          <div className="ecf-empty">Chargement…</div>
-        ) : !data ? (
-          <div className="ecf-empty">Introuvable.</div>
-        ) : (
-          <>
-            <div className="ecf-recip" style={{ marginBottom: 10 }}>
-              <span className="tag">Fournisseur :</span> {data.fourn} — {data.fournNom}
-              {" · "}
-              <span className="tag">Date :</span> {fmtDate(data.datcde)}
-              {" · "}
-              <span className="tag">Lignes :</span> {data.nbLignes}
-              {" · "}
-              <span className="tag">Coût achat prév. :</span> {fmtMoney(data.montantPrev)}
-            </div>
-            <div className="ecf-tablewrap">
-              <table className="ecf-table">
-                <thead>
-                  <tr>
-                    <th>N°</th>
-                    <th>Code</th>
-                    <th>Désignation</th>
-                    <th>Désign. frn</th>
-                    <th>Référence</th>
-                    <th>Gencode</th>
-                    <th className="ecf-right">Qté</th>
+    <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal lg">
+      <h3>
+        <HiDocumentText /> Détail commande {numcde}
+        <button className="ecf-btn ecf-spacer" onClick={onClose}>
+          <HiX />
+        </button>
+      </h3>
+      {isLoading ? (
+        <div className="ecf-empty">Chargement…</div>
+      ) : !data ? (
+        <div className="ecf-empty">Introuvable.</div>
+      ) : (
+        <>
+          <div className="ecf-recip" style={{ marginBottom: 10 }}>
+            <span className="tag">Fournisseur :</span> {data.fourn} — {data.fournNom}
+            {" · "}
+            <span className="tag">Date :</span> {fmtDate(data.datcde)}
+            {" · "}
+            <span className="tag">Lignes :</span> {data.nbLignes}
+            {" · "}
+            <span className="tag">Coût achat prév. :</span> {fmtMoney(data.montantPrev)}
+          </div>
+          <div className="ecf-tablewrap">
+            <table className="ecf-table">
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Code</th>
+                  <th>Désignation</th>
+                  <th>Désign. frn</th>
+                  <th>Référence</th>
+                  <th>Gencode</th>
+                  <th className="ecf-right">Qté</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.lignes.map((l, i) => (
+                  <tr key={i}>
+                    <td>{l.NL}</td>
+                    <td>{l.NART}</td>
+                    <td className="wrap">{l.DESIGN}</td>
+                    <td className="wrap">{l.DESIFRN}</td>
+                    <td>{l.REFER}</td>
+                    <td>{l.GENCOD}</td>
+                    <td className="ecf-right">{l.QTE}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.lignes.map((l, i) => (
-                    <tr key={i}>
-                      <td>{l.NL}</td>
-                      <td>{l.NART}</td>
-                      <td className="wrap">{l.DESIGN}</td>
-                      <td className="wrap">{l.DESIFRN}</td>
-                      <td>{l.REFER}</td>
-                      <td>{l.GENCOD}</td>
-                      <td className="ecf-right">{l.QTE}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 };
 
@@ -534,110 +533,106 @@ const ApercuModal = ({ dossier, numcde, onClose }) => {
     numcde,
   });
   return (
-    <div className="ecf-overlay" onClick={onClose}>
-      <div className="ecf-modal lg" onClick={(e) => e.stopPropagation()}>
-        <h3>
-          <HiEye /> Aperçu de l'email — commande {numcde}
-          <button className="ecf-btn ecf-spacer" onClick={onClose}>
-            <HiX />
-          </button>
-        </h3>
-        {isLoading ? (
-          <div className="ecf-empty">Chargement…</div>
-        ) : error ? (
-          <div className="ecf-msg err">
-            {error?.data?.message || "Impossible de résoudre l'envoi."}
-          </div>
-        ) : (
-          <>
-            {data.envoi?.testMode && (
-              <div className="ecf-testbanner on" style={{ marginBottom: 10 }}>
-                <HiShieldCheck /> Mode test : sera envoyé à {data.envoi.to.join(", ")}
-              </div>
-            )}
-            <div className="ecf-recip" style={{ marginBottom: 8 }}>
-              <div>
-                <span className="tag">Sujet :</span> {data.sujet}
-              </div>
-              <div>
-                <span className="tag">Destinataire(s) réel(s) :</span>{" "}
-                {data.destinatairesReels.join(", ")}
-              </div>
-              <div>
-                <span className="tag">CC réel(s) :</span>{" "}
-                {data.ccReels.length ? data.ccReels.join(", ") : "—"}
-              </div>
-              <div>
-                <span className="tag">Langue :</span> {data.langue} ·{" "}
-                <span className="tag">Lignes :</span> {data.nbLignes} ·{" "}
-                <span className="tag">PJ :</span> Excel + PDF + logo société
-              </div>
+    <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal lg">
+      <h3>
+        <HiEye /> Aperçu de l'email — commande {numcde}
+        <button className="ecf-btn ecf-spacer" onClick={onClose}>
+          <HiX />
+        </button>
+      </h3>
+      {isLoading ? (
+        <div className="ecf-empty">Chargement…</div>
+      ) : error ? (
+        <div className="ecf-msg err">
+          {error?.data?.message || "Impossible de résoudre l'envoi."}
+        </div>
+      ) : (
+        <>
+          {data.envoi?.testMode && (
+            <div className="ecf-testbanner on" style={{ marginBottom: 10 }}>
+              <HiShieldCheck /> Mode test : sera envoyé à {data.envoi.to.join(", ")}
             </div>
-            <div
-              className="ecf-preview"
-              dangerouslySetInnerHTML={{ __html: data.html }}
-            />
-          </>
-        )}
-      </div>
-    </div>
+          )}
+          <div className="ecf-recip" style={{ marginBottom: 8 }}>
+            <div>
+              <span className="tag">Sujet :</span> {data.sujet}
+            </div>
+            <div>
+              <span className="tag">Destinataire(s) réel(s) :</span>{" "}
+              {data.destinatairesReels.join(", ")}
+            </div>
+            <div>
+              <span className="tag">CC réel(s) :</span>{" "}
+              {data.ccReels.length ? data.ccReels.join(", ") : "—"}
+            </div>
+            <div>
+              <span className="tag">Langue :</span> {data.langue} ·{" "}
+              <span className="tag">Lignes :</span> {data.nbLignes} ·{" "}
+              <span className="tag">PJ :</span> Excel + PDF + logo société
+            </div>
+          </div>
+          <div
+            className="ecf-preview"
+            dangerouslySetInnerHTML={{ __html: data.html }}
+          />
+        </>
+      )}
+    </Modal>
   );
 };
 
 // ── Modale confirmation envoi ────────────────────────────────────────────────
 const SendModal = ({ commandes, testInfo, sending, onConfirm, onClose }) => (
-  <div className="ecf-overlay" onClick={onClose}>
-    <div className="ecf-modal" onClick={(e) => e.stopPropagation()}>
-      <h3>
-        <HiPaperAirplane /> Confirmer l'envoi
-      </h3>
-      <div
-        className={`ecf-testbanner ${testInfo?.testMode ? "on" : "off"}`}
-        style={{ marginBottom: 12 }}
-      >
-        <HiShieldCheck />
-        {testInfo?.testMode ? (
-          <span>
-            <b>Mode test :</b> envoi redirigé vers {(testInfo.testEmails || []).join(", ")}.
-          </span>
-        ) : (
-          <span>
-            <b>Mode réel :</b> les {commandes.length} commande(s) partiront aux
-            vrais fournisseurs.
-          </span>
-        )}
-      </div>
-      <p>Vous allez envoyer {commandes.length} commande(s) :</p>
-      <div className="ecf-tablewrap" style={{ maxHeight: 240 }}>
-        <table className="ecf-table">
-          <thead>
-            <tr>
-              <th>N° Cmd</th>
-              <th>Fourn.</th>
-              <th>Nom</th>
-            </tr>
-          </thead>
-          <tbody>
-            {commandes.map((c) => (
-              <tr key={c.NUMCDE}>
-                <td>{c.NUMCDE}</td>
-                <td>{c.FOURN}</td>
-                <td className="wrap">{c.NOM}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="ecf-actions">
-        <button className="ecf-btn" onClick={onClose} disabled={sending}>
-          Annuler
-        </button>
-        <button className="ecf-btn success" onClick={onConfirm} disabled={sending}>
-          <HiPaperAirplane /> {sending ? "Envoi en cours…" : "Confirmer l'envoi"}
-        </button>
-      </div>
+  <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal">
+    <h3>
+      <HiPaperAirplane /> Confirmer l'envoi
+    </h3>
+    <div
+      className={`ecf-testbanner ${testInfo?.testMode ? "on" : "off"}`}
+      style={{ marginBottom: 12 }}
+    >
+      <HiShieldCheck />
+      {testInfo?.testMode ? (
+        <span>
+          <b>Mode test :</b> envoi redirigé vers {(testInfo.testEmails || []).join(", ")}.
+        </span>
+      ) : (
+        <span>
+          <b>Mode réel :</b> les {commandes.length} commande(s) partiront aux
+          vrais fournisseurs.
+        </span>
+      )}
     </div>
-  </div>
+    <p>Vous allez envoyer {commandes.length} commande(s) :</p>
+    <div className="ecf-tablewrap" style={{ maxHeight: 240 }}>
+      <table className="ecf-table">
+        <thead>
+          <tr>
+            <th>N° Cmd</th>
+            <th>Fourn.</th>
+            <th>Nom</th>
+          </tr>
+        </thead>
+        <tbody>
+          {commandes.map((c) => (
+            <tr key={c.NUMCDE}>
+              <td>{c.NUMCDE}</td>
+              <td>{c.FOURN}</td>
+              <td className="wrap">{c.NOM}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <div className="ecf-actions">
+      <button className="ecf-btn" onClick={onClose} disabled={sending}>
+        Annuler
+      </button>
+      <button className="ecf-btn success" onClick={onConfirm} disabled={sending}>
+        <HiPaperAirplane /> {sending ? "Envoi en cours…" : "Confirmer l'envoi"}
+      </button>
+    </div>
+  </Modal>
 );
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -943,42 +938,40 @@ const MasseTab = ({ dossier, params }) => {
       </div>
 
       {confirm && (
-        <div className="ecf-overlay" onClick={() => setConfirm(false)}>
-          <div className="ecf-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>
-              <HiPaperAirplane /> Confirmer l'envoi groupé
-            </h3>
-            <div
-              className={`ecf-testbanner ${params?.testMode ? "on" : "off"}`}
-              style={{ marginBottom: 12 }}
-            >
-              <HiShieldCheck />
-              {params?.testMode ? (
-                <span>
-                  <b>Mode test :</b> rien n'atteint les fournisseurs — un mail de
-                  contrôle par langue part vers {(params.testEmails || []).join(", ")}.
-                </span>
-              ) : (
-                <span>
-                  <b>Mode réel :</b> le message partira à <b>{nbCibles}</b>{" "}
-                  fournisseur(s) réel(s).
-                </span>
-              )}
-            </div>
-            <p>
-              Cible : <b>{nbCibles}</b> fournisseur(s)
-              {cible === "selection" ? ` (${selNbF} FR, ${selNbA} EN)` : ""}.
-            </p>
-            <div className="ecf-actions">
-              <button className="ecf-btn" onClick={() => setConfirm(false)} disabled={sending}>
-                Annuler
-              </button>
-              <button className="ecf-btn success" onClick={doSend} disabled={sending}>
-                <HiPaperAirplane /> {sending ? "Envoi…" : "Confirmer"}
-              </button>
-            </div>
+        <Modal onClose={() => setConfirm(false)} overlayClassName="ecf-overlay" contentClassName="ecf-modal">
+          <h3>
+            <HiPaperAirplane /> Confirmer l'envoi groupé
+          </h3>
+          <div
+            className={`ecf-testbanner ${params?.testMode ? "on" : "off"}`}
+            style={{ marginBottom: 12 }}
+          >
+            <HiShieldCheck />
+            {params?.testMode ? (
+              <span>
+                <b>Mode test :</b> rien n'atteint les fournisseurs — un mail de
+                contrôle par langue part vers {(params.testEmails || []).join(", ")}.
+              </span>
+            ) : (
+              <span>
+                <b>Mode réel :</b> le message partira à <b>{nbCibles}</b>{" "}
+                fournisseur(s) réel(s).
+              </span>
+            )}
           </div>
-        </div>
+          <p>
+            Cible : <b>{nbCibles}</b> fournisseur(s)
+            {cible === "selection" ? ` (${selNbF} FR, ${selNbA} EN)` : ""}.
+          </p>
+          <div className="ecf-actions">
+            <button className="ecf-btn" onClick={() => setConfirm(false)} disabled={sending}>
+              Annuler
+            </button>
+            <button className="ecf-btn success" onClick={doSend} disabled={sending}>
+              <HiPaperAirplane /> {sending ? "Envoi…" : "Confirmer"}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -1322,61 +1315,59 @@ const EmailModal = ({ initial, onSave, onClose }) => {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <div className="ecf-overlay" onClick={onClose}>
-      <div className="ecf-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>
-          <HiUserGroup /> {form._id ? "Modifier" : "Ajouter"} un fournisseur
-        </h3>
-        <div className="ecf-field">
-          <label>Code fournisseur (FOURN)</label>
-          <input
-            type="number"
-            value={form.fournId}
-            disabled={!!form._id}
-            onChange={(e) => set("fournId", e.target.value)}
-          />
-        </div>
-        <div className="ecf-field">
-          <label>Libellé</label>
-          <input value={form.fournLbl} onChange={(e) => set("fournLbl", e.target.value)} />
-        </div>
-        <div className="ecf-field">
-          <label>Langue du message</label>
-          <select value={form.langue} onChange={(e) => set("langue", e.target.value)}>
-            <option value="F">Français (F)</option>
-            <option value="A">Anglais (A)</option>
-          </select>
-        </div>
-        <div className="ecf-field">
-          <label>Emails fournisseur</label>
-          <input value={form.emails} onChange={(e) => set("emails", e.target.value)} />
-          <div className="ecf-hint">Séparez plusieurs adresses par « ; »</div>
-        </div>
-        <div className="ecf-field">
-          <label>Emails transitaire (en copie)</label>
-          <input
-            value={form.emailsTransitaire}
-            onChange={(e) => set("emailsTransitaire", e.target.value)}
-          />
-        </div>
-        <div className="ecf-field">
-          <label>Emails CC supplémentaires</label>
-          <input value={form.emailsCC} onChange={(e) => set("emailsCC", e.target.value)} />
-        </div>
-        <div className="ecf-actions">
-          <button className="ecf-btn" onClick={onClose}>
-            Annuler
-          </button>
-          <button
-            className="ecf-btn primary"
-            onClick={() => onSave(form)}
-            disabled={form.fournId === "" || form.fournId === null}
-          >
-            Enregistrer
-          </button>
-        </div>
+    <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal">
+      <h3>
+        <HiUserGroup /> {form._id ? "Modifier" : "Ajouter"} un fournisseur
+      </h3>
+      <div className="ecf-field">
+        <label>Code fournisseur (FOURN)</label>
+        <input
+          type="number"
+          value={form.fournId}
+          disabled={!!form._id}
+          onChange={(e) => set("fournId", e.target.value)}
+        />
       </div>
-    </div>
+      <div className="ecf-field">
+        <label>Libellé</label>
+        <input value={form.fournLbl} onChange={(e) => set("fournLbl", e.target.value)} />
+      </div>
+      <div className="ecf-field">
+        <label>Langue du message</label>
+        <select value={form.langue} onChange={(e) => set("langue", e.target.value)}>
+          <option value="F">Français (F)</option>
+          <option value="A">Anglais (A)</option>
+        </select>
+      </div>
+      <div className="ecf-field">
+        <label>Emails fournisseur</label>
+        <input value={form.emails} onChange={(e) => set("emails", e.target.value)} />
+        <div className="ecf-hint">Séparez plusieurs adresses par « ; »</div>
+      </div>
+      <div className="ecf-field">
+        <label>Emails transitaire (en copie)</label>
+        <input
+          value={form.emailsTransitaire}
+          onChange={(e) => set("emailsTransitaire", e.target.value)}
+        />
+      </div>
+      <div className="ecf-field">
+        <label>Emails CC supplémentaires</label>
+        <input value={form.emailsCC} onChange={(e) => set("emailsCC", e.target.value)} />
+      </div>
+      <div className="ecf-actions">
+        <button className="ecf-btn" onClick={onClose}>
+          Annuler
+        </button>
+        <button
+          className="ecf-btn primary"
+          onClick={() => onSave(form)}
+          disabled={form.fournId === "" || form.fournId === null}
+        >
+          Enregistrer
+        </button>
+      </div>
+    </Modal>
   );
 };
 

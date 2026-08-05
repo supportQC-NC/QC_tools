@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import Modal from "../../components/ui/Modal/Modal";
 import {
   HiSearch,
   HiRefresh,
@@ -835,182 +836,178 @@ const AdminCommandesScreen = () => {
 
       {/* Modal Aperçu Commande */}
       {selectedCommande && (
-        <div
-          className="commande-modal-overlay"
-          onClick={() => setSelectedCommande(null)}
+        <Modal
+          onClose={() => setSelectedCommande(null)}
+          overlayClassName="commande-modal-overlay"
+          contentClassName="commande-modal"
         >
-          <div
-            className="commande-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div className="modal-title">
-                <HiClipboardList />
-                <div>
-                  <h2>Aperçu commande</h2>
-                  <span className="modal-numcde">
-                    N° {safeTrim(selectedCommande.NUMCDE)}
-                  </span>
-                </div>
-              </div>
-              <div className="modal-header-actions">
-                <Link
-                  to={`/admin/commandes/${selectedEntreprise}/${safeTrim(selectedCommande.NUMCDE)}`}
-                  className="btn-view-full"
-                  title="Voir la fiche complète"
-                >
-                  <HiExternalLink />
-                  <span>Fiche complète</span>
-                </Link>
-                <button
-                  className="btn-close-modal"
-                  onClick={() => setSelectedCommande(null)}
-                >
-                  <HiX />
-                </button>
+          <div className="modal-header">
+            <div className="modal-title">
+              <HiClipboardList />
+              <div>
+                <h2>Aperçu commande</h2>
+                <span className="modal-numcde">
+                  N° {safeTrim(selectedCommande.NUMCDE)}
+                </span>
               </div>
             </div>
-
-            <div className="modal-body">
-              <div className="modal-info-section">
-                {/* État et badges */}
-                <div className="modal-status-row">
-                  <span
-                    className={`etat-badge etat-${getEtatInfo(selectedCommande.ETAT).color} large`}
-                  >
-                    {React.createElement(
-                      getEtatInfo(selectedCommande.ETAT).icon,
-                    )}
-                    {getEtatInfo(selectedCommande.ETAT).label}
-                  </span>
-                  <div className="modal-badges">
-                    {safeTrim(selectedCommande.VERROU).toUpperCase() ===
-                      "O" && (
-                      <span className="modal-badge verrou">
-                        <HiLockClosed /> Verrouillée
-                      </span>
-                    )}
-                    {safeTrim(selectedCommande.GROUPAGE).toUpperCase() ===
-                      "O" && (
-                      <span className="modal-badge groupage">
-                        <HiDocumentDuplicate /> Groupage
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Infos principales */}
-                <div className="info-block">
-                  <h4>📋 Informations générales</h4>
-                  <div className="info-grid">
-                    <div className="info-item">
-                      <label>N° Commande</label>
-                      <span className="value highlight">
-                        {safeTrim(selectedCommande.NUMCDE)}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Fournisseur</label>
-                      <span className="value">
-                        {selectedCommande.FOURN || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Date commande</label>
-                      <span className="value">
-                        {formatDate(selectedCommande.DATCDE)}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Bateau</label>
-                      <span className="value">
-                        {safeTrim(selectedCommande.BATEAU) || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Date arrivée</label>
-                      <span className="value">
-                        {formatDate(selectedCommande.ARRIVEE)}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Nb lignes</label>
-                      <span className="value">
-                        {selectedCommande.COMPTLIG || 0}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Montants */}
-                <div className="info-block">
-                  <h4>💰 Montants</h4>
-                  <div className="montants-grid">
-                    <div className="montant-item main">
-                      <label>Total (QTE × P.Achat)</label>
-                      <span>{formatPrice(selectedCommande.TOTAL_DETAIL)}</span>
-                    </div>
-                    <div className="montant-item">
-                      <label>Total produits (entête)</label>
-                      <span>{formatPrice(selectedCommande.TOTPR)}</span>
-                    </div>
-                    <div className="montant-item">
-                      <label>Taxes</label>
-                      <span>{formatPrice(selectedCommande.TAXES)}</span>
-                    </div>
-                    <div className="montant-item">
-                      <label>Fret</label>
-                      <span>{formatPrice(selectedCommande.FRET)}</span>
-                    </div>
-                    <div className="montant-item">
-                      <label>Fret transit</label>
-                      <span>{formatPrice(selectedCommande.FRTRANSIT)}</span>
-                    </div>
-                    <div className="montant-item">
-                      <label>Devise</label>
-                      <span>
-                        {selectedCommande.DVISE || "-"}{" "}
-                        {safeTrim(selectedCommande.CDVISE) &&
-                          `(${safeTrim(selectedCommande.CDVISE)})`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Facture */}
-                {safeTrim(selectedCommande.NUMFACT) && (
-                  <div className="info-block">
-                    <h4>🧾 Facturation</h4>
-                    <div className="info-grid">
-                      <div className="info-item">
-                        <label>N° Facture</label>
-                        <span className="value mono">
-                          {safeTrim(selectedCommande.NUMFACT)}
-                        </span>
-                      </div>
-                      <div className="info-item">
-                        <label>Date facture</label>
-                        <span className="value">
-                          {formatDate(selectedCommande.DATFACT)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Observations */}
-                {safeTrim(selectedCommande.OBSERV) && (
-                  <div className="info-block observations-block">
-                    <h4>📝 Observations</h4>
-                    <p className="observations-text">
-                      {safeTrim(selectedCommande.OBSERV)}
-                    </p>
-                  </div>
-                )}
-              </div>
+            <div className="modal-header-actions">
+              <Link
+                to={`/admin/commandes/${selectedEntreprise}/${safeTrim(selectedCommande.NUMCDE)}`}
+                className="btn-view-full"
+                title="Voir la fiche complète"
+              >
+                <HiExternalLink />
+                <span>Fiche complète</span>
+              </Link>
+              <button
+                className="btn-close-modal"
+                onClick={() => setSelectedCommande(null)}
+              >
+                <HiX />
+              </button>
             </div>
           </div>
-        </div>
+
+          <div className="modal-body">
+            <div className="modal-info-section">
+              {/* État et badges */}
+              <div className="modal-status-row">
+                <span
+                  className={`etat-badge etat-${getEtatInfo(selectedCommande.ETAT).color} large`}
+                >
+                  {React.createElement(
+                    getEtatInfo(selectedCommande.ETAT).icon,
+                  )}
+                  {getEtatInfo(selectedCommande.ETAT).label}
+                </span>
+                <div className="modal-badges">
+                  {safeTrim(selectedCommande.VERROU).toUpperCase() ===
+                    "O" && (
+                    <span className="modal-badge verrou">
+                      <HiLockClosed /> Verrouillée
+                    </span>
+                  )}
+                  {safeTrim(selectedCommande.GROUPAGE).toUpperCase() ===
+                    "O" && (
+                    <span className="modal-badge groupage">
+                      <HiDocumentDuplicate /> Groupage
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Infos principales */}
+              <div className="info-block">
+                <h4>📋 Informations générales</h4>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>N° Commande</label>
+                    <span className="value highlight">
+                      {safeTrim(selectedCommande.NUMCDE)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Fournisseur</label>
+                    <span className="value">
+                      {selectedCommande.FOURN || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Date commande</label>
+                    <span className="value">
+                      {formatDate(selectedCommande.DATCDE)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Bateau</label>
+                    <span className="value">
+                      {safeTrim(selectedCommande.BATEAU) || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Date arrivée</label>
+                    <span className="value">
+                      {formatDate(selectedCommande.ARRIVEE)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Nb lignes</label>
+                    <span className="value">
+                      {selectedCommande.COMPTLIG || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Montants */}
+              <div className="info-block">
+                <h4>💰 Montants</h4>
+                <div className="montants-grid">
+                  <div className="montant-item main">
+                    <label>Total (QTE × P.Achat)</label>
+                    <span>{formatPrice(selectedCommande.TOTAL_DETAIL)}</span>
+                  </div>
+                  <div className="montant-item">
+                    <label>Total produits (entête)</label>
+                    <span>{formatPrice(selectedCommande.TOTPR)}</span>
+                  </div>
+                  <div className="montant-item">
+                    <label>Taxes</label>
+                    <span>{formatPrice(selectedCommande.TAXES)}</span>
+                  </div>
+                  <div className="montant-item">
+                    <label>Fret</label>
+                    <span>{formatPrice(selectedCommande.FRET)}</span>
+                  </div>
+                  <div className="montant-item">
+                    <label>Fret transit</label>
+                    <span>{formatPrice(selectedCommande.FRTRANSIT)}</span>
+                  </div>
+                  <div className="montant-item">
+                    <label>Devise</label>
+                    <span>
+                      {selectedCommande.DVISE || "-"}{" "}
+                      {safeTrim(selectedCommande.CDVISE) &&
+                        `(${safeTrim(selectedCommande.CDVISE)})`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Facture */}
+              {safeTrim(selectedCommande.NUMFACT) && (
+                <div className="info-block">
+                  <h4>🧾 Facturation</h4>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>N° Facture</label>
+                      <span className="value mono">
+                        {safeTrim(selectedCommande.NUMFACT)}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Date facture</label>
+                      <span className="value">
+                        {formatDate(selectedCommande.DATFACT)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Observations */}
+              {safeTrim(selectedCommande.OBSERV) && (
+                <div className="info-block observations-block">
+                  <h4>📝 Observations</h4>
+                  <p className="observations-text">
+                    {safeTrim(selectedCommande.OBSERV)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
+import Modal from "../../components/ui/Modal/Modal";
 import {
   HiSearch,
   HiRefresh,
@@ -689,143 +690,139 @@ const AdminProformasScreen = () => {
 
       {/* Modal Aperçu Proforma */}
       {selectedProforma && (
-        <div
-          className="proforma-modal-overlay"
-          onClick={() => setSelectedProforma(null)}
+        <Modal
+          onClose={() => setSelectedProforma(null)}
+          overlayClassName="proforma-modal-overlay"
+          contentClassName="proforma-modal"
         >
-          <div
-            className="proforma-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <div className="modal-title">
-                <HiDocumentText />
-                <div>
-                  <h2>Aperçu proforma</h2>
-                  <span className="modal-numfact">
-                    N° {safeTrim(selectedProforma.NUMFACT)}
-                  </span>
-                </div>
-              </div>
-              <div className="modal-header-actions">
-                <Link
-                  to={`/admin/proformas/${selectedEntreprise}/${safeTrim(selectedProforma.NUMFACT)}`}
-                  className="btn-view-full"
-                  title="Voir la fiche complète"
-                >
-                  <HiExternalLink />
-                  <span>Fiche complète</span>
-                </Link>
-                <button
-                  className="btn-close-modal"
-                  onClick={() => setSelectedProforma(null)}
-                >
-                  <HiX />
-                </button>
+          <div className="modal-header">
+            <div className="modal-title">
+              <HiDocumentText />
+              <div>
+                <h2>Aperçu proforma</h2>
+                <span className="modal-numfact">
+                  N° {safeTrim(selectedProforma.NUMFACT)}
+                </span>
               </div>
             </div>
-
-            <div className="modal-body">
-              <div className="modal-info-section">
-                {/* État */}
-                <div className="modal-status-row">
-                  <span
-                    className={`etat-badge etat-${getEtatInfo(selectedProforma.ETAT).color} large`}
-                  >
-                    {React.createElement(
-                      getEtatInfo(selectedProforma.ETAT).icon,
-                    )}
-                    {getEtatInfo(selectedProforma.ETAT).label}
-                  </span>
-                </div>
-
-                {/* Infos principales */}
-                <div className="info-block">
-                  <h4>📋 Informations générales</h4>
-                  <div className="info-grid">
-                    <div className="info-item">
-                      <label>N° Proforma</label>
-                      <span className="value highlight">
-                        {safeTrim(selectedProforma.NUMFACT)}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Code tiers</label>
-                      <span className="value">
-                        {selectedProforma.TIERS || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Nom</label>
-                      <span className="value">
-                        {safeTrim(selectedProforma.NOM) || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Date proforma</label>
-                      <span className="value">
-                        {formatDate(selectedProforma.DATFACT)}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Représentant</label>
-                      <span className="value">
-                        {selectedProforma.REPRES || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Date chantier</label>
-                      <span className="value">
-                        {formatDate(selectedProforma.DATCHANT)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Montant */}
-                <div className="info-block">
-                  <h4>💰 Montant</h4>
-                  <div className="montants-grid">
-                    <div className="montant-item main">
-                      <label>Montant total</label>
-                      <span>{formatPrice(selectedProforma.MONTANT)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Texte / Objet */}
-                {safeTrim(selectedProforma.TEXTE) && (
-                  <div className="info-block observations-block">
-                    <h4>📝 Texte / Objet</h4>
-                    <p className="observations-text">
-                      {safeTrim(selectedProforma.TEXTE)}
-                    </p>
-                  </div>
-                )}
-
-                {/* Adresse mailing */}
-                {(safeTrim(selectedProforma.MAILING1) ||
-                  safeTrim(selectedProforma.MAILING2)) && (
-                  <div className="info-block">
-                    <h4>📮 Adresse</h4>
-                    <div className="mailing-lines">
-                      {[1, 2, 3, 4, 5].map((i) => {
-                        const line = safeTrim(
-                          selectedProforma[`MAILING${i}`],
-                        );
-                        return line ? (
-                          <p key={i} className="mailing-line">
-                            {line}
-                          </p>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+            <div className="modal-header-actions">
+              <Link
+                to={`/admin/proformas/${selectedEntreprise}/${safeTrim(selectedProforma.NUMFACT)}`}
+                className="btn-view-full"
+                title="Voir la fiche complète"
+              >
+                <HiExternalLink />
+                <span>Fiche complète</span>
+              </Link>
+              <button
+                className="btn-close-modal"
+                onClick={() => setSelectedProforma(null)}
+              >
+                <HiX />
+              </button>
             </div>
           </div>
-        </div>
+
+          <div className="modal-body">
+            <div className="modal-info-section">
+              {/* État */}
+              <div className="modal-status-row">
+                <span
+                  className={`etat-badge etat-${getEtatInfo(selectedProforma.ETAT).color} large`}
+                >
+                  {React.createElement(
+                    getEtatInfo(selectedProforma.ETAT).icon,
+                  )}
+                  {getEtatInfo(selectedProforma.ETAT).label}
+                </span>
+              </div>
+
+              {/* Infos principales */}
+              <div className="info-block">
+                <h4>📋 Informations générales</h4>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>N° Proforma</label>
+                    <span className="value highlight">
+                      {safeTrim(selectedProforma.NUMFACT)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Code tiers</label>
+                    <span className="value">
+                      {selectedProforma.TIERS || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Nom</label>
+                    <span className="value">
+                      {safeTrim(selectedProforma.NOM) || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Date proforma</label>
+                    <span className="value">
+                      {formatDate(selectedProforma.DATFACT)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Représentant</label>
+                    <span className="value">
+                      {selectedProforma.REPRES || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Date chantier</label>
+                    <span className="value">
+                      {formatDate(selectedProforma.DATCHANT)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Montant */}
+              <div className="info-block">
+                <h4>💰 Montant</h4>
+                <div className="montants-grid">
+                  <div className="montant-item main">
+                    <label>Montant total</label>
+                    <span>{formatPrice(selectedProforma.MONTANT)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Texte / Objet */}
+              {safeTrim(selectedProforma.TEXTE) && (
+                <div className="info-block observations-block">
+                  <h4>📝 Texte / Objet</h4>
+                  <p className="observations-text">
+                    {safeTrim(selectedProforma.TEXTE)}
+                  </p>
+                </div>
+              )}
+
+              {/* Adresse mailing */}
+              {(safeTrim(selectedProforma.MAILING1) ||
+                safeTrim(selectedProforma.MAILING2)) && (
+                <div className="info-block">
+                  <h4>📮 Adresse</h4>
+                  <div className="mailing-lines">
+                    {[1, 2, 3, 4, 5].map((i) => {
+                      const line = safeTrim(
+                        selectedProforma[`MAILING${i}`],
+                      );
+                      return line ? (
+                        <p key={i} className="mailing-line">
+                          {line}
+                        </p>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

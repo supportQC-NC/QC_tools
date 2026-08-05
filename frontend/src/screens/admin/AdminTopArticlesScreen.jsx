@@ -1,6 +1,7 @@
 // src/screens/admin/AdminTopArticlesScreen.jsx
 import React, { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { roundInt, fmtFranc } from "../../utils/format";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
@@ -34,8 +35,6 @@ const ymd = (d) => {
 const startOfYear = () => ymd(new Date(new Date().getFullYear(), 0, 1));
 const today = () => ymd(new Date());
 
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
 const fNum = (n) => (Number(n) || 0).toLocaleString("fr-FR");
 const fPct = (n) => `${(Number(n) || 0).toFixed(2)} %`;
 const num = { type: "rightAligned" };
@@ -90,13 +89,13 @@ const AdminTopArticlesScreen = () => {
       {
         field: "ca", headerName: "CA HT", ...num, minWidth: 140,
         filter: "agNumberColumnFilter",
-        valueFormatter: (p) => fF(p.value),
+        valueFormatter: (p) => fmtFranc(p.value),
         cellClass: mode === "ca" ? "col-strong" : "",
       },
       {
         field: "prixMoyen", headerName: "Prix moyen HT", ...num, minWidth: 130,
         filter: "agNumberColumnFilter",
-        valueFormatter: (p) => fF(p.value),
+        valueFormatter: (p) => fmtFranc(p.value),
       },
       {
         field: mode === "ca" ? "partCa" : "partQte",
@@ -133,7 +132,7 @@ const AdminTopArticlesScreen = () => {
       "Prix moyen HT (XPF)", "% du CA", "% des qtés", "Nb factures",
     ];
     const ligne = (a) => [
-      a.rang, a.nart, a.design, r0(a.qte), r0(a.ca), r0(a.prixMoyen),
+      a.rang, a.nart, a.design, roundInt(a.qte), roundInt(a.ca), roundInt(a.prixMoyen),
       Number(a.partCa.toFixed(2)), Number(a.partQte.toFixed(2)), a.nbFactures,
     ];
 
@@ -215,7 +214,7 @@ const AdminTopArticlesScreen = () => {
             <div className="ta-kpi">
               <div className="ta-kpi-icon"><HiCurrencyDollar /></div>
               <div>
-                <span className="ta-kpi-value">{fF(totaux.caTotal)}</span>
+                <span className="ta-kpi-value">{fmtFranc(totaux.caTotal)}</span>
                 <span className="ta-kpi-label">CA HT total (F − avoirs)</span>
               </div>
             </div>
@@ -292,7 +291,7 @@ const AdminTopArticlesScreen = () => {
                 />
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
-                  formatter={(v) => (mode === "ca" ? fF(v) : fNum(v))}
+                  formatter={(v) => (mode === "ca" ? fmtFranc(v) : fNum(v))}
                 />
                 <Bar
                   dataKey="valeur"

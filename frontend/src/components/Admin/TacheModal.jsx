@@ -12,6 +12,7 @@ import {
   STATUT_LABELS,
   PRIORITE_LABELS,
 } from "../../config/taskMeta";
+import Modal from "../ui/Modal/Modal";
 import "./UserModal.css";
 
 // Convertit une date ISO en valeur d'input type="date" (yyyy-mm-dd).
@@ -103,151 +104,149 @@ const TacheModal = ({ task, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{isEdit ? "Modifier la tâche" : "Nouvelle tâche"}</h2>
-          <button className="btn-close" onClick={onClose}>
-            <HiX />
-          </button>
+    <Modal onClose={onClose} contentClassName="modal">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier la tâche" : "Nouvelle tâche"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="modal-form">
+        {error && <div className="form-error">{error}</div>}
+
+        <div className="form-group">
+          <label>Titre</label>
+          <input
+            type="text"
+            name="titre"
+            value={form.titre}
+            onChange={handleChange}
+            placeholder="Ex : Ranger la zone 3"
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {error && <div className="form-error">{error}</div>}
+        <div className="form-group">
+          <label>Description (optionnel)</label>
+          <input
+            type="text"
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            placeholder="Détails de la tâche"
+          />
+        </div>
 
+        <div className="form-group">
+          <label>Équipe</label>
+          <select
+            name="equipe"
+            value={form.equipe}
+            onChange={handleChange}
+            disabled={isEdit}
+            required
+          >
+            <option value="">Sélectionner...</option>
+            {(teams || []).map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.nom} ({t.entreprise?.trigramme || "—"})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>
+            Assigné(s) à{" "}
+            {form.assignes.length > 0 && `(${form.assignes.length})`}
+          </label>
+          {!form.equipe ? (
+            <span className="label-hint">
+              Sélectionnez d'abord une équipe.
+            </span>
+          ) : membresDispo.length === 0 ? (
+            <span className="label-hint">Cette équipe n'a aucun membre.</span>
+          ) : (
+            <div className="tache-assignes">
+              {membresDispo.map((m) => {
+                const id = m._id || m;
+                const checked = form.assignes.includes(id);
+                return (
+                  <button
+                    type="button"
+                    key={id}
+                    className={`tache-assigne ${checked ? "on" : ""}`}
+                    onClick={() => toggleAssigne(id)}
+                  >
+                    <span className="tache-assigne-check">
+                      {checked ? "✓" : ""}
+                    </span>
+                    {m.prenom} {m.nom}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="form-row">
           <div className="form-group">
-            <label>Titre</label>
+            <label>Échéance (optionnel)</label>
             <input
-              type="text"
-              name="titre"
-              value={form.titre}
+              type="date"
+              name="deadline"
+              value={form.deadline}
               onChange={handleChange}
-              placeholder="Ex : Ranger la zone 3"
-              required
             />
           </div>
-
           <div className="form-group">
-            <label>Description (optionnel)</label>
-            <input
-              type="text"
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              placeholder="Détails de la tâche"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Équipe</label>
+            <label>Priorité</label>
             <select
-              name="equipe"
-              value={form.equipe}
+              name="priorite"
+              value={form.priorite}
               onChange={handleChange}
-              disabled={isEdit}
-              required
             >
-              <option value="">Sélectionner...</option>
-              {(teams || []).map((t) => (
-                <option key={t._id} value={t._id}>
-                  {t.nom} ({t.entreprise?.trigramme || "—"})
+              {TASK_PRIORITES.map((p) => (
+                <option key={p} value={p}>
+                  {PRIORITE_LABELS[p]}
                 </option>
               ))}
             </select>
           </div>
+        </div>
 
+        {isEdit && (
           <div className="form-group">
-            <label>
-              Assigné(s) à{" "}
-              {form.assignes.length > 0 && `(${form.assignes.length})`}
-            </label>
-            {!form.equipe ? (
-              <span className="label-hint">
-                Sélectionnez d'abord une équipe.
-              </span>
-            ) : membresDispo.length === 0 ? (
-              <span className="label-hint">Cette équipe n'a aucun membre.</span>
-            ) : (
-              <div className="tache-assignes">
-                {membresDispo.map((m) => {
-                  const id = m._id || m;
-                  const checked = form.assignes.includes(id);
-                  return (
-                    <button
-                      type="button"
-                      key={id}
-                      className={`tache-assigne ${checked ? "on" : ""}`}
-                      onClick={() => toggleAssigne(id)}
-                    >
-                      <span className="tache-assigne-check">
-                        {checked ? "✓" : ""}
-                      </span>
-                      {m.prenom} {m.nom}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <label>Statut</label>
+            <select name="statut" value={form.statut} onChange={handleChange}>
+              {TASK_STATUTS.map((s) => (
+                <option key={s} value={s}>
+                  {STATUT_LABELS[s]}
+                </option>
+              ))}
+            </select>
           </div>
+        )}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Échéance (optionnel)</label>
-              <input
-                type="date"
-                name="deadline"
-                value={form.deadline}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="form-group">
-              <label>Priorité</label>
-              <select
-                name="priorite"
-                value={form.priorite}
-                onChange={handleChange}
-              >
-                {TASK_PRIORITES.map((p) => (
-                  <option key={p} value={p}>
-                    {PRIORITE_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {isEdit && (
-            <div className="form-group">
-              <label>Statut</label>
-              <select name="statut" value={form.statut} onChange={handleChange}>
-                {TASK_STATUTS.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUT_LABELS[s]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={isCreating || isUpdating}
-            >
-              {isCreating || isUpdating
-                ? "Enregistrement..."
-                : isEdit
-                  ? "Modifier"
-                  : "Créer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={isCreating || isUpdating}
+          >
+            {isCreating || isUpdating
+              ? "Enregistrement..."
+              : isEdit
+                ? "Modifier"
+                : "Créer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

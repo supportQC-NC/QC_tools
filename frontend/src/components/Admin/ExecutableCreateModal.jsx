@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import { HiX } from "react-icons/hi";
 import { useCreateExecutableMutation } from "../../slices/executableApiSlice";
+import Modal from "../ui/Modal/Modal";
 import "../../screens/admin/AdminExecutablesScreen.css";
 
 const formatSize = (bytes) => {
@@ -68,114 +69,112 @@ const ExecutableCreateModal = ({ onClose, defaultName = "" }) => {
   };
 
   return (
-    <div className="exe-modal-overlay" onClick={onClose}>
-      <div className="exe-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="exe-modal-head">
-          <h2>{defaultName ? `Nouvelle version — ${defaultName}` : "Nouvel exécutable"}</h2>
-          <button className="exe-modal-close" onClick={onClose}>
-            <HiX />
-          </button>
+    <Modal onClose={onClose} overlayClassName="exe-modal-overlay" contentClassName="exe-modal">
+      <div className="exe-modal-head">
+        <h2>{defaultName ? `Nouvelle version — ${defaultName}` : "Nouvel exécutable"}</h2>
+        <button className="exe-modal-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
+
+      <form className="exe-form" onSubmit={handleSubmit}>
+        {error && <div className="exe-form-error">{error}</div>}
+
+        <div className="exe-form-row">
+          <div className="exe-field">
+            <label>Nom *</label>
+            <input
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Ex : Collecteur Douchette"
+              readOnly={!!defaultName}
+              required
+            />
+          </div>
+          <div className="exe-field exe-field-sm">
+            <label>Version *</label>
+            <input
+              name="version"
+              value={form.version}
+              onChange={handleChange}
+              placeholder="Ex : 1.2.0"
+              required
+            />
+          </div>
         </div>
 
-        <form className="exe-form" onSubmit={handleSubmit}>
-          {error && <div className="exe-form-error">{error}</div>}
+        <div className="exe-field">
+          <label>Description courte</label>
+          <input
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            placeholder="À quoi sert cet outil ?"
+          />
+        </div>
 
-          <div className="exe-form-row">
-            <div className="exe-field">
-              <label>Nom *</label>
-              <input
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="Ex : Collecteur Douchette"
-                readOnly={!!defaultName}
-                required
-              />
-            </div>
-            <div className="exe-field exe-field-sm">
-              <label>Version *</label>
-              <input
-                name="version"
-                value={form.version}
-                onChange={handleChange}
-                placeholder="Ex : 1.2.0"
-                required
-              />
-            </div>
-          </div>
+        <div className="exe-field">
+          <label>Lien GitHub</label>
+          <input
+            name="githubLink"
+            value={form.githubLink}
+            onChange={handleChange}
+            placeholder="https://github.com/…"
+          />
+        </div>
 
-          <div className="exe-field">
-            <label>Description courte</label>
-            <input
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              placeholder="À quoi sert cet outil ?"
-            />
-          </div>
+        <div className="exe-field">
+          <label>Fichier exécutable *</label>
+          <input
+            type="file"
+            onChange={(e) => setExeFile(e.target.files?.[0] || null)}
+          />
+          {exeFile && (
+            <span className="exe-file-hint">
+              {exeFile.name} · {formatSize(exeFile.size)}
+            </span>
+          )}
+        </div>
 
-          <div className="exe-field">
-            <label>Lien GitHub</label>
-            <input
-              name="githubLink"
-              value={form.githubLink}
-              onChange={handleChange}
-              placeholder="https://github.com/…"
-            />
-          </div>
+        <div className="exe-field">
+          <label>Documentation (PDF / images — ajoutez-en autant que voulu)</label>
+          <input
+            type="file"
+            multiple
+            accept=".pdf,image/*"
+            onChange={handleAddDocs}
+          />
+          {docFiles.length > 0 && (
+            <ul className="exe-doc-picklist">
+              {docFiles.map((f, i) => (
+                <li key={`${f.name}-${i}`}>
+                  <span className="exe-doc-pick-name">{f.name}</span>
+                  <span className="exe-doc-pick-size">{formatSize(f.size)}</span>
+                  <button
+                    type="button"
+                    className="exe-doc-pick-del"
+                    onClick={() => removeDoc(i)}
+                    title="Retirer"
+                  >
+                    <HiX />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-          <div className="exe-field">
-            <label>Fichier exécutable *</label>
-            <input
-              type="file"
-              onChange={(e) => setExeFile(e.target.files?.[0] || null)}
-            />
-            {exeFile && (
-              <span className="exe-file-hint">
-                {exeFile.name} · {formatSize(exeFile.size)}
-              </span>
-            )}
-          </div>
-
-          <div className="exe-field">
-            <label>Documentation (PDF / images — ajoutez-en autant que voulu)</label>
-            <input
-              type="file"
-              multiple
-              accept=".pdf,image/*"
-              onChange={handleAddDocs}
-            />
-            {docFiles.length > 0 && (
-              <ul className="exe-doc-picklist">
-                {docFiles.map((f, i) => (
-                  <li key={`${f.name}-${i}`}>
-                    <span className="exe-doc-pick-name">{f.name}</span>
-                    <span className="exe-doc-pick-size">{formatSize(f.size)}</span>
-                    <button
-                      type="button"
-                      className="exe-doc-pick-del"
-                      onClick={() => removeDoc(i)}
-                      title="Retirer"
-                    >
-                      <HiX />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="exe-form-actions">
-            <button type="button" className="exe-btn-ghost" onClick={onClose}>
-              Annuler
-            </button>
-            <button type="submit" className="exe-btn-primary" disabled={isLoading}>
-              {isLoading ? "Envoi…" : "Enregistrer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="exe-form-actions">
+          <button type="button" className="exe-btn-ghost" onClick={onClose}>
+            Annuler
+          </button>
+          <button type="submit" className="exe-btn-primary" disabled={isLoading}>
+            {isLoading ? "Envoi…" : "Enregistrer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

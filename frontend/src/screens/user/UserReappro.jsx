@@ -35,6 +35,7 @@ import {
   useDownloadReapproMutation,
   useDeleteReapproMutation,
 } from "../../slices/reapproApiSlice";
+import Modal from "../../components/ui/Modal/Modal";
 import "./UserReappro.css";
 
 const UserReappro = () => {
@@ -846,114 +847,109 @@ const UserReappro = () => {
 
       {/* ========== MODAL EXPORT ========== */}
       {showExportModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowExportModal(false)}
+        <Modal
+          onClose={() => setShowExportModal(false)}
+          contentClassName="modal-content modal-export"
         >
-          <div
-            className="modal-content modal-export"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2>
-              <HiDownload /> Terminer le réappro
-            </h2>
-            <p className="modal-stats">
-              {reappro.totalArticles} articles - {reappro.totalQuantite} unités
-            </p>
+          <h2>
+            <HiDownload /> Terminer le réappro
+          </h2>
+          <p className="modal-stats">
+            {reappro.totalArticles} articles - {reappro.totalQuantite} unités
+          </p>
 
-            <div className="modal-info-row">
-              <label>Nom:</label>
-              <span className="modal-value">{nomReappro}</span>
+          <div className="modal-info-row">
+            <label>Nom:</label>
+            <span className="modal-value">{nomReappro}</span>
+            <button
+              type="button"
+              className="btn-edit-small"
+              onClick={() => {
+                const nom = window.prompt("Nom du réappro:", nomReappro);
+                if (nom !== null && nom.trim()) setNomReappro(nom.trim());
+              }}
+            >
+              <HiPencil />
+            </button>
+          </div>
+
+          <div className="export-mode-selector">
+            <label>Destination:</label>
+            <div className="export-mode-options">
+              <button
+                type="button"
+                className={`export-mode-btn ${exportMode === "server" ? "active" : ""}`}
+                onClick={() => setExportMode("server")}
+              >
+                <HiServer />
+                <span>Serveur</span>
+              </button>
+              <button
+                type="button"
+                className={`export-mode-btn ${exportMode === "download" ? "active" : ""}`}
+                onClick={() => setExportMode("download")}
+              >
+                <HiDesktopComputer />
+                <span>Mon poste</span>
+              </button>
+            </div>
+          </div>
+
+          {exportMode === "server" && (
+            <div className="modal-info-row chemin-row">
+              <label>
+                <HiFolder /> Chemin:
+              </label>
+              <span className="modal-value mono">{cheminServeur}</span>
               <button
                 type="button"
                 className="btn-edit-small"
-                onClick={() => {
-                  const nom = window.prompt("Nom du réappro:", nomReappro);
-                  if (nom !== null && nom.trim()) setNomReappro(nom.trim());
-                }}
+                onClick={handleEditChemin}
               >
                 <HiPencil />
               </button>
             </div>
+          )}
 
-            <div className="export-mode-selector">
-              <label>Destination:</label>
-              <div className="export-mode-options">
-                <button
-                  type="button"
-                  className={`export-mode-btn ${exportMode === "server" ? "active" : ""}`}
-                  onClick={() => setExportMode("server")}
-                >
-                  <HiServer />
-                  <span>Serveur</span>
-                </button>
-                <button
-                  type="button"
-                  className={`export-mode-btn ${exportMode === "download" ? "active" : ""}`}
-                  onClick={() => setExportMode("download")}
-                >
-                  <HiDesktopComputer />
-                  <span>Mon poste</span>
-                </button>
-              </div>
+          {exportMode === "download" && (
+            <div className="export-info">
+              <small>
+                ℹ️ Le fichier sera téléchargé via votre navigateur.
+              </small>
             </div>
+          )}
 
-            {exportMode === "server" && (
-              <div className="modal-info-row chemin-row">
-                <label>
-                  <HiFolder /> Chemin:
-                </label>
-                <span className="modal-value mono">{cheminServeur}</span>
-                <button
-                  type="button"
-                  className="btn-edit-small"
-                  onClick={handleEditChemin}
-                >
-                  <HiPencil />
-                </button>
-              </div>
-            )}
-
-            {exportMode === "download" && (
-              <div className="export-info">
-                <small>
-                  ℹ️ Le fichier sera téléchargé via votre navigateur.
-                </small>
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button
-                className="btn-confirm"
-                onClick={handleExport}
-                disabled={
-                  !nomReappro.trim() ||
-                  (exportMode === "server" && !cheminServeur.trim()) ||
-                  exporting ||
-                  downloading
-                }
-              >
-                {exporting || downloading ? (
-                  "Export..."
-                ) : exportMode === "download" ? (
-                  <>
-                    <HiDownload /> Télécharger
-                  </>
-                ) : (
-                  <>
-                    <HiServer /> Enregistrer
-                  </>
-                )}
-              </button>
-              <button
-                className="btn-cancel"
-                onClick={() => setShowExportModal(false)}
-              >
-                Annuler
-              </button>
-            </div>
+          <div className="modal-actions">
+            <button
+              className="btn-confirm"
+              onClick={handleExport}
+              disabled={
+                !nomReappro.trim() ||
+                (exportMode === "server" && !cheminServeur.trim()) ||
+                exporting ||
+                downloading
+              }
+            >
+              {exporting || downloading ? (
+                "Export..."
+              ) : exportMode === "download" ? (
+                <>
+                  <HiDownload /> Télécharger
+                </>
+              ) : (
+                <>
+                  <HiServer /> Enregistrer
+                </>
+              )}
+            </button>
+            <button
+              className="btn-cancel"
+              onClick={() => setShowExportModal(false)}
+            >
+              Annuler
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

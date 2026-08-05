@@ -7,6 +7,7 @@ import {
 } from "../../slices/collecteurApiSlice";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { useGetUsersQuery } from "../../slices/userApiSlice";
+import Modal from "../ui/Modal/Modal";
 import "./CollecteurModal.css";
 
 export const STATUTS = [
@@ -123,204 +124,202 @@ const CollecteurModal = ({ collecteur, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-collecteur" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{isEdit ? "Modifier le collecteur" : "Nouveau collecteur"}</h2>
-          <button className="btn-close" onClick={onClose}>
-            <HiX />
-          </button>
-        </div>
+    <Modal onClose={onClose} contentClassName="modal modal-collecteur">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier le collecteur" : "Nouveau collecteur"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {error && <div className="form-error">{error}</div>}
+      <form onSubmit={handleSubmit} className="modal-form">
+        {error && <div className="form-error">{error}</div>}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Identifiant *</label>
-              <input
-                type="text"
-                name="identifiant"
-                value={formData.identifiant}
-                onChange={handleChange}
-                placeholder="HMC62Q260301158"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Statut</label>
-              <select name="statut" value={formData.statut} onChange={handleChange}>
-                {STATUTS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Nom du collecteur</label>
-              <input
-                type="text"
-                name="nom"
-                value={formData.nom}
-                onChange={handleChange}
-                placeholder="Ex: Collecteur magasin 1"
-              />
-            </div>
-            <div className="form-group">
-              <label>Version app installée</label>
-              <input
-                type="text"
-                name="versionApp"
-                value={formData.versionApp}
-                onChange={handleChange}
-                placeholder="Ex: 1.0.2"
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Reçu le</label>
-              <input
-                type="date"
-                name="recu"
-                value={formData.recu}
-                onChange={handleChange}
-              />
-            </div>
-            <div className="form-group">
-              <label>Mise en service</label>
-              <input
-                type="date"
-                name="miseEnService"
-                value={formData.miseEnService}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Entreprise</label>
-              <select
-                name="entreprise"
-                value={formData.entreprise}
-                onChange={handleChange}
-              >
-                <option value="">— Aucune —</option>
-                {(entreprises || []).map((e) => (
-                  <option key={e._id} value={e._id}>
-                    {e.trigramme ? `${e.trigramme} - ` : ""}
-                    {e.nomComplet || e.nomDossierDBF}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Agent</label>
-              <select name="agent" value={formData.agent} onChange={handleChange}>
-                <option value="">— Aucun —</option>
-                {(users || []).map((u) => (
-                  <option key={u._id} value={u._id}>
-                    {u.prenom} {u.nom}
-                    {u.email ? ` (${u.email})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Gâchette (poignée-pistolet)</label>
-              <select
-                name="gachette"
-                value={formData.gachette ? "oui" : "non"}
-                onChange={(e) =>
-                  setFormData((p) => ({
-                    ...p,
-                    gachette: e.target.value === "oui",
-                  }))
-                }
-              >
-                <option value="non">Non</option>
-                <option value="oui">Oui</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Emplacement / dépôt</label>
-              <input
-                type="text"
-                name="emplacement"
-                value={formData.emplacement}
-                onChange={handleChange}
-                placeholder="Bureau, dépôt, magasin…"
-              />
-            </div>
-          </div>
-
+        <div className="form-row">
           <div className="form-group">
-            <label>Accessoires</label>
-            <div className="acc-checks">
-              {ACCESSOIRES.map((acc) => (
-                <label key={acc} className="acc-check">
-                  <input
-                    type="checkbox"
-                    checked={formData.accessoires.includes(acc)}
-                    onChange={() => toggleAccessoire(acc)}
-                  />
-                  <span>{acc}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Observations</label>
-            <textarea
-              name="observations"
-              rows={3}
-              value={formData.observations}
+            <label>Identifiant *</label>
+            <input
+              type="text"
+              name="identifiant"
+              value={formData.identifiant}
               onChange={handleChange}
-              placeholder="Remarques, état, historique…"
+              placeholder="HMC62Q260301158"
+              required
             />
           </div>
-
           <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="isActive"
-                checked={formData.isActive}
-                onChange={handleChange}
-              />
-              <span>Actif (décocher pour archiver)</span>
-            </label>
+            <label>Statut</label>
+            <select name="statut" value={formData.statut} onChange={handleChange}>
+              {STATUTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
+        </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={creating || updating}
-            >
-              {creating || updating
-                ? "Enregistrement..."
-                : isEdit
-                  ? "Modifier"
-                  : "Créer"}
-            </button>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Nom du collecteur</label>
+            <input
+              type="text"
+              name="nom"
+              value={formData.nom}
+              onChange={handleChange}
+              placeholder="Ex: Collecteur magasin 1"
+            />
           </div>
-        </form>
-      </div>
-    </div>
+          <div className="form-group">
+            <label>Version app installée</label>
+            <input
+              type="text"
+              name="versionApp"
+              value={formData.versionApp}
+              onChange={handleChange}
+              placeholder="Ex: 1.0.2"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Reçu le</label>
+            <input
+              type="date"
+              name="recu"
+              value={formData.recu}
+              onChange={handleChange}
+            />
+          </div>
+          <div className="form-group">
+            <label>Mise en service</label>
+            <input
+              type="date"
+              name="miseEnService"
+              value={formData.miseEnService}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Entreprise</label>
+            <select
+              name="entreprise"
+              value={formData.entreprise}
+              onChange={handleChange}
+            >
+              <option value="">— Aucune —</option>
+              {(entreprises || []).map((e) => (
+                <option key={e._id} value={e._id}>
+                  {e.trigramme ? `${e.trigramme} - ` : ""}
+                  {e.nomComplet || e.nomDossierDBF}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Agent</label>
+            <select name="agent" value={formData.agent} onChange={handleChange}>
+              <option value="">— Aucun —</option>
+              {(users || []).map((u) => (
+                <option key={u._id} value={u._id}>
+                  {u.prenom} {u.nom}
+                  {u.email ? ` (${u.email})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Gâchette (poignée-pistolet)</label>
+            <select
+              name="gachette"
+              value={formData.gachette ? "oui" : "non"}
+              onChange={(e) =>
+                setFormData((p) => ({
+                  ...p,
+                  gachette: e.target.value === "oui",
+                }))
+              }
+            >
+              <option value="non">Non</option>
+              <option value="oui">Oui</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Emplacement / dépôt</label>
+            <input
+              type="text"
+              name="emplacement"
+              value={formData.emplacement}
+              onChange={handleChange}
+              placeholder="Bureau, dépôt, magasin…"
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Accessoires</label>
+          <div className="acc-checks">
+            {ACCESSOIRES.map((acc) => (
+              <label key={acc} className="acc-check">
+                <input
+                  type="checkbox"
+                  checked={formData.accessoires.includes(acc)}
+                  onChange={() => toggleAccessoire(acc)}
+                />
+                <span>{acc}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Observations</label>
+          <textarea
+            name="observations"
+            rows={3}
+            value={formData.observations}
+            onChange={handleChange}
+            placeholder="Remarques, état, historique…"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              name="isActive"
+              checked={formData.isActive}
+              onChange={handleChange}
+            />
+            <span>Actif (décocher pour archiver)</span>
+          </label>
+        </div>
+
+        <div className="modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={creating || updating}
+          >
+            {creating || updating
+              ? "Enregistrement..."
+              : isEdit
+                ? "Modifier"
+                : "Créer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

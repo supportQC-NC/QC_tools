@@ -13,6 +13,7 @@ import { useSelector } from "react-redux";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
+import { roundInt, fmtFranc, fmtQty } from "../../utils/format";
 import "./AdminDebitComptantScreen.css";
 
 const yesterdayYmd = () => {
@@ -22,13 +23,10 @@ const yesterdayYmd = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
-const fQty = (n) => r0(n).toLocaleString("fr-FR");
 const moneyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fF(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtFranc(p.value);
 const qtyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fQty(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtQty(p.value);
 const pctFmt = (p) =>
   p.value === null || p.value === undefined || p.value === "" ? "" : `${Number(p.value).toFixed(2)} %`;
 const num = { type: "rightAligned" };
@@ -181,14 +179,14 @@ const AdminDebitComptantScreen = () => {
     // 1 - Récap vendeur
     const wsV = [["Vendeur", "Nom", "Nb factures", "Montant total (XPF)", "Remise (XPF)", "Remise % moy."]];
     data.recapVendeur.forEach((r) =>
-      wsV.push([r.repres, r.vendeurNom, r.nbFactures, r0(r.montantTotal), r0(r.remiseValeur), r.remisePctMoy]),
+      wsV.push([r.repres, r.vendeurNom, r.nbFactures, roundInt(r.montantTotal), roundInt(r.remiseValeur), r.remisePctMoy]),
     );
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsV), "Récap vendeur");
 
     // 2 - Récap client
     const wsC = [["N° client", "Nom client", "Nb factures", "Montant total (XPF)", "Remise (XPF)", "Remise % moy."]];
     data.recapClient.forEach((r) =>
-      wsC.push([r.tiers, r.nom, r.nbFactures, r0(r.montantTotal), r0(r.remiseValeur), r.remisePctMoy]),
+      wsC.push([r.tiers, r.nom, r.nbFactures, roundInt(r.montantTotal), roundInt(r.remiseValeur), r.remisePctMoy]),
     );
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsC), "Récap client");
 
@@ -209,12 +207,12 @@ const AdminDebitComptantScreen = () => {
         let sR = 0;
         let sP = 0;
         rows.forEach((r) => {
-          wsDC.push([r.numfact, r.date, r.repres, r.observ, r0(r.montant), r0(r.montantRemise), r.pourcMoy]);
+          wsDC.push([r.numfact, r.date, r.repres, r.observ, roundInt(r.montant), roundInt(r.montantRemise), r.pourcMoy]);
           sM += r.montant;
           sR += r.montantRemise;
           sP += r.pourcMoy;
         });
-        wsDC.push(["Sous-total", "", "", "", r0(sM), r0(sR), rows.length ? Math.round((sP / rows.length) * 100) / 100 : 0]);
+        wsDC.push(["Sous-total", "", "", "", roundInt(sM), roundInt(sR), rows.length ? Math.round((sP / rows.length) * 100) / 100 : 0]);
         wsDC.push([]);
       });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsDC), "Détail par client");
@@ -222,14 +220,14 @@ const AdminDebitComptantScreen = () => {
     // 4 - Détail factures
     const wsD = [["Vendeur", "N° facture", "Date", "N° client", "Nom client", "Observations", "Montant (XPF)", "Remise (XPF)", "Remise % moy."]];
     data.detailFactures.forEach((r) =>
-      wsD.push([r.repres, r.numfact, r.date, r.tiers, r.nom, r.observ, r0(r.montant), r0(r.montantRemise), r.pourcMoy]),
+      wsD.push([r.repres, r.numfact, r.date, r.tiers, r.nom, r.observ, roundInt(r.montant), roundInt(r.montantRemise), r.pourcMoy]),
     );
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsD), "Détail factures");
 
     // 5 - Clients GROUPE
     const wsG = [["N° client", "Nom client", "Catégorie", "Observations", "Nb factures", "Montant total (XPF)"]];
     data.recapGroupe.forEach((r) =>
-      wsG.push([r.tiers, r.nom, r.categorie, r.observ, r.nbFactures, r0(r.montantTotal)]),
+      wsG.push([r.tiers, r.nom, r.categorie, r.observ, r.nbFactures, roundInt(r.montantTotal)]),
     );
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsG), "Clients GROUPE");
 
@@ -313,27 +311,27 @@ const AdminDebitComptantScreen = () => {
           {totaux && (
             <div className="dc-kpis">
               <div className="dc-kpi">
-                <span className="v">{fQty(totaux.nbFactures)}</span>
+                <span className="v">{fmtQty(totaux.nbFactures)}</span>
                 <span className="l">Factures comptant</span>
               </div>
               <div className="dc-kpi">
-                <span className="v">{fF(totaux.montantTotal)}</span>
+                <span className="v">{fmtFranc(totaux.montantTotal)}</span>
                 <span className="l">Montant total</span>
               </div>
               <div className="dc-kpi">
-                <span className="v">{fF(totaux.remiseTotal)}</span>
+                <span className="v">{fmtFranc(totaux.remiseTotal)}</span>
                 <span className="l">Remise totale</span>
               </div>
               <div className="dc-kpi">
-                <span className="v">{fQty(totaux.nbVendeurs)}</span>
+                <span className="v">{fmtQty(totaux.nbVendeurs)}</span>
                 <span className="l">Vendeurs</span>
               </div>
               <div className="dc-kpi">
-                <span className="v">{fQty(totaux.nbClients)}</span>
+                <span className="v">{fmtQty(totaux.nbClients)}</span>
                 <span className="l">Clients</span>
               </div>
               <div className="dc-kpi teal">
-                <span className="v">{fQty(totaux.nbGroupe)}</span>
+                <span className="v">{fmtQty(totaux.nbGroupe)}</span>
                 <span className="l">Clients GROUPE cpt.</span>
               </div>
             </div>

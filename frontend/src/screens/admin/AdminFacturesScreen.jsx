@@ -1,5 +1,6 @@
 // src/screens/admin/AdminFacturesScreen.jsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import Modal from "../../components/ui/Modal/Modal";
 import {
   Link,
   useSearchParams,
@@ -454,65 +455,63 @@ const AdminFacturesScreen = () => {
 
       {/* Modal Aperçu */}
       {selectedFacture && (
-        <div className="facture-modal-overlay" onClick={() => setSelectedFacture(null)}>
-          <div className="facture-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">
-                <HiReceiptTax />
-                <div>
-                  <h2>Aperçu facture</h2>
-                  <span className="modal-numfact">N° {safeTrim(selectedFacture.NUMFACT)}</span>
-                </div>
-              </div>
-              <div className="modal-header-actions">
-                <Link to={`/admin/factures/${selectedEntreprise}/${safeTrim(selectedFacture.NUMFACT)}`} className="btn-view-full" title="Fiche complète">
-                  <HiExternalLink /><span>Fiche complète</span>
-                </Link>
-                <button className="btn-close-modal" onClick={() => setSelectedFacture(null)}><HiX /></button>
+        <Modal onClose={() => setSelectedFacture(null)} overlayClassName="facture-modal-overlay" contentClassName="facture-modal">
+          <div className="modal-header">
+            <div className="modal-title">
+              <HiReceiptTax />
+              <div>
+                <h2>Aperçu facture</h2>
+                <span className="modal-numfact">N° {safeTrim(selectedFacture.NUMFACT)}</span>
               </div>
             </div>
-            <div className="modal-body">
-              <div className="modal-info-section">
-                <div className="modal-status-row">
-                  {(() => {
-                    const typInfo = getTypfactInfo(selectedFacture.TYPFACT);
-                    return (
-                      <span className={`typfact-badge typ-${typInfo.color} large`}>
-                        {React.createElement(typInfo.icon)}
-                        {typInfo.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-                <div className="info-block">
-                  <h4>📋 Informations générales</h4>
-                  <div className="info-grid">
-                    <div className="info-item"><label>N° Facture</label><span className="value highlight">{safeTrim(selectedFacture.NUMFACT)}</span></div>
-                    <div className="info-item"><label>Code tiers</label><span className="value">{selectedFacture.TIERS || "-"}</span></div>
-                    <div className="info-item"><label>Nom</label><span className="value">{safeTrim(selectedFacture.NOM) || "-"}</span></div>
-                    <div className="info-item"><label>Date facture</label><span className="value">{formatDate(selectedFacture.DATFACT)}</span></div>
-                    <div className="info-item"><label>Représentant</label><span className="value">{selectedFacture.REPRES || "-"}</span></div>
-                    <div className="info-item"><label>Bon commande</label><span className="value">{safeTrim(selectedFacture.BONCDE) || "-"}</span></div>
-                    <div className="info-item"><label>État</label><span className="value">{selectedEntrepriseData?.mappingEtatsFacture?.[selectedFacture.ETAT] || (selectedFacture.ETAT != null && selectedFacture.ETAT !== "" ? `État ${selectedFacture.ETAT}` : "-")}</span></div>
-                  </div>
-                </div>
-                <div className="info-block">
-                  <h4>💰 Montants</h4>
-                  <div className="montants-grid">
-                    <div className="montant-item main"><label>Montant</label><span>{formatPrice(selectedFacture.MONTANT)}</span></div>
-                    <div className="montant-item"><label>Taxes</label><span>{formatPrice(selectedFacture.MONTAXES)}</span></div>
-                  </div>
-                </div>
-                {safeTrim(selectedFacture.TEXTE) && (
-                  <div className="info-block observations-block">
-                    <h4>📝 Texte / Objet</h4>
-                    <p className="observations-text">{safeTrim(selectedFacture.TEXTE)}</p>
-                  </div>
-                )}
-              </div>
+            <div className="modal-header-actions">
+              <Link to={`/admin/factures/${selectedEntreprise}/${safeTrim(selectedFacture.NUMFACT)}`} className="btn-view-full" title="Fiche complète">
+                <HiExternalLink /><span>Fiche complète</span>
+              </Link>
+              <button className="btn-close-modal" onClick={() => setSelectedFacture(null)}><HiX /></button>
             </div>
           </div>
-        </div>
+          <div className="modal-body">
+            <div className="modal-info-section">
+              <div className="modal-status-row">
+                {(() => {
+                  const typInfo = getTypfactInfo(selectedFacture.TYPFACT);
+                  return (
+                    <span className={`typfact-badge typ-${typInfo.color} large`}>
+                      {React.createElement(typInfo.icon)}
+                      {typInfo.label}
+                    </span>
+                  );
+                })()}
+              </div>
+              <div className="info-block">
+                <h4>📋 Informations générales</h4>
+                <div className="info-grid">
+                  <div className="info-item"><label>N° Facture</label><span className="value highlight">{safeTrim(selectedFacture.NUMFACT)}</span></div>
+                  <div className="info-item"><label>Code tiers</label><span className="value">{selectedFacture.TIERS || "-"}</span></div>
+                  <div className="info-item"><label>Nom</label><span className="value">{safeTrim(selectedFacture.NOM) || "-"}</span></div>
+                  <div className="info-item"><label>Date facture</label><span className="value">{formatDate(selectedFacture.DATFACT)}</span></div>
+                  <div className="info-item"><label>Représentant</label><span className="value">{selectedFacture.REPRES || "-"}</span></div>
+                  <div className="info-item"><label>Bon commande</label><span className="value">{safeTrim(selectedFacture.BONCDE) || "-"}</span></div>
+                  <div className="info-item"><label>État</label><span className="value">{selectedEntrepriseData?.mappingEtatsFacture?.[selectedFacture.ETAT] || (selectedFacture.ETAT != null && selectedFacture.ETAT !== "" ? `État ${selectedFacture.ETAT}` : "-")}</span></div>
+                </div>
+              </div>
+              <div className="info-block">
+                <h4>💰 Montants</h4>
+                <div className="montants-grid">
+                  <div className="montant-item main"><label>Montant</label><span>{formatPrice(selectedFacture.MONTANT)}</span></div>
+                  <div className="montant-item"><label>Taxes</label><span>{formatPrice(selectedFacture.MONTAXES)}</span></div>
+                </div>
+              </div>
+              {safeTrim(selectedFacture.TEXTE) && (
+                <div className="info-block observations-block">
+                  <h4>📝 Texte / Objet</h4>
+                  <p className="observations-text">{safeTrim(selectedFacture.TEXTE)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

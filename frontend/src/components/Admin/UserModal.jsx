@@ -24,6 +24,7 @@ import {
   actorCanGrantModuleAction,
   isSuperAdminClient,
 } from "../../config/adminModules";
+import Modal from "../ui/Modal/Modal";
 import "./UserModal.css";
 
 // Réseaux de l'analyse Filiales (figés côté backend : DQ, QC, LD).
@@ -388,410 +389,408 @@ const UserModal = ({ user, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}</h2>
-          <button className="btn-close" onClick={onClose}>
-            <HiX />
-          </button>
-        </div>
+    <Modal onClose={onClose} contentClassName="modal modal-large">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {error && <div className="form-error">{error}</div>}
+      <form onSubmit={handleSubmit} className="modal-form">
+        {error && <div className="form-error">{error}</div>}
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Prénom</label>
-              <input
-                type="text"
-                name="prenom"
-                value={formData.prenom}
-                onChange={handleChange}
-                placeholder="Jean"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Nom</label>
-              <input
-                type="text"
-                name="nom"
-                value={formData.nom}
-                onChange={handleChange}
-                placeholder="Dupont"
-                required
-              />
-            </div>
-          </div>
-
+        <div className="form-row">
           <div className="form-group">
-            <label>Email</label>
+            <label>Prénom</label>
             <input
-              type="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              name="prenom"
+              value={formData.prenom}
               onChange={handleChange}
-              placeholder="jean.dupont@entreprise.com"
+              placeholder="Jean"
               required
             />
           </div>
-
           <div className="form-group">
-            <label>
-              {isEdit ? "Nouveau mot de passe" : "Mot de passe"}
-              {isEdit && (
-                <span className="label-hint">
-                  {" "}
-                  (laisser vide pour ne pas changer)
-                </span>
-              )}
-            </label>
+            <label>Nom</label>
             <input
-              type="password"
-              name="password"
-              value={formData.password}
+              type="text"
+              name="nom"
+              value={formData.nom}
               onChange={handleChange}
-              placeholder="••••••••"
-              required={!isEdit}
+              placeholder="Dupont"
+              required
             />
           </div>
+        </div>
 
-          <div className="form-group">
-            <label>Rôle</label>
-            <div className="role-cards">
-              {roleOptions.map((r) => {
-                const Icon = ROLE_META[r]?.Icon || HiUser;
-                const selected = formData.role === r;
-                return (
-                  <button
-                    type="button"
-                    key={r}
-                    className={`role-card ${selected ? "selected" : ""}`}
-                    onClick={() =>
-                      setFormData((prev) => ({ ...prev, role: r }))
-                    }
-                  >
-                    {selected && <HiCheck className="role-card-check" />}
-                    <span className="role-card-icon">
-                      <Icon />
-                    </span>
-                    <span className="role-card-label">
-                      {ROLE_LABELS[r] || r}
-                    </span>
-                    <span className="role-card-desc">{ROLE_META[r]?.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
+        <div className="form-group">
+          <label>Email</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="jean.dupont@entreprise.com"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>
+            {isEdit ? "Nouveau mot de passe" : "Mot de passe"}
+            {isEdit && (
+              <span className="label-hint">
+                {" "}
+                (laisser vide pour ne pas changer)
+              </span>
+            )}
+          </label>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="••••••••"
+            required={!isEdit}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Rôle</label>
+          <div className="role-cards">
+            {roleOptions.map((r) => {
+              const Icon = ROLE_META[r]?.Icon || HiUser;
+              const selected = formData.role === r;
+              return (
+                <button
+                  type="button"
+                  key={r}
+                  className={`role-card ${selected ? "selected" : ""}`}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, role: r }))
+                  }
+                >
+                  {selected && <HiCheck className="role-card-check" />}
+                  <span className="role-card-icon">
+                    <Icon />
+                  </span>
+                  <span className="role-card-label">
+                    {ROLE_LABELS[r] || r}
+                  </span>
+                  <span className="role-card-desc">{ROLE_META[r]?.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              name="isActive"
+              checked={formData.isActive}
+              onChange={handleChange}
+            />
+            <span>Compte actif</span>
+          </label>
+        </div>
+
+        <div className="permissions-section">
+          <h3>Permissions</h3>
+
+          {formData.role === "admin" && (
+            <p className="admin-note">
+              Un administrateur a accès à tous les modules. Son périmètre reste
+              limité aux sociétés sélectionnées ci-dessous.
+            </p>
+          )}
+
+          {formData.role === "responsable" && (
+            <p className="admin-note">
+              Un responsable gère une équipe. Vous ne pouvez lui accorder que
+              des droits et des sociétés que vous possédez vous-même.
+            </p>
+          )}
+
+          <div className="global-permissions">
+            {canGrantAllEntreprises && (
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.permissions.allEntreprises}
+                  onChange={() =>
+                    handleGlobalPermissionChange("allEntreprises")
+                  }
+                />
+                <span>Toutes les entreprises</span>
+              </label>
+            )}
+            {formData.role !== "admin" && canGrantAllModules && (
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.permissions.allModules}
+                  onChange={() => handleGlobalPermissionChange("allModules")}
+                />
+                <span>Tous les modules</span>
+              </label>
+            )}
           </div>
 
-          <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="isActive"
-                checked={formData.isActive}
-                onChange={handleChange}
-              />
-              <span>Compte actif</span>
-            </label>
-          </div>
-
-          <div className="permissions-section">
-            <h3>Permissions</h3>
-
-            {formData.role === "admin" && (
-              <p className="admin-note">
-                Un administrateur a accès à tous les modules. Son périmètre reste
-                limité aux sociétés sélectionnées ci-dessous.
-              </p>
-            )}
-
-            {formData.role === "responsable" && (
-              <p className="admin-note">
-                Un responsable gère une équipe. Vous ne pouvez lui accorder que
-                des droits et des sociétés que vous possédez vous-même.
-              </p>
-            )}
-
-            <div className="global-permissions">
-              {canGrantAllEntreprises && (
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={formData.permissions.allEntreprises}
-                    onChange={() =>
-                      handleGlobalPermissionChange("allEntreprises")
-                    }
-                  />
-                  <span>Toutes les entreprises</span>
-                </label>
-              )}
-              {formData.role !== "admin" && canGrantAllModules && (
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={formData.permissions.allModules}
-                    onChange={() => handleGlobalPermissionChange("allModules")}
-                  />
-                  <span>Tous les modules</span>
-                </label>
-              )}
-            </div>
-
-              {/* Sélection des entreprises — pastilles + recherche */}
-              {!formData.permissions.allEntreprises && (
-                <div className="form-group">
-                  <label>Entreprises accessibles</label>
-                  <div className="ent-picker">
-                    <div className="ent-picker-toolbar">
-                      <div className="ent-search">
-                        <HiSearch />
-                        <input
-                          type="text"
-                          placeholder="Rechercher une société..."
-                          value={entSearch}
-                          onChange={(e) => setEntSearch(e.target.value)}
-                        />
-                      </div>
-                      <div className="ent-toolbar-right">
-                        <button
-                          type="button"
-                          className="btn-select-all"
-                          onClick={handleSelectAllEntreprises}
-                          disabled={grantableEntreprises.length === 0}
-                        >
-                          {allEntSelected ? "Aucun" : "Tout"}
-                        </button>
-                        <span className="selected-count">
-                          {formData.permissions.entreprises.length}/
-                          {grantableEntreprises.length}
-                        </span>
-                      </div>
+            {/* Sélection des entreprises — pastilles + recherche */}
+            {!formData.permissions.allEntreprises && (
+              <div className="form-group">
+                <label>Entreprises accessibles</label>
+                <div className="ent-picker">
+                  <div className="ent-picker-toolbar">
+                    <div className="ent-search">
+                      <HiSearch />
+                      <input
+                        type="text"
+                        placeholder="Rechercher une société..."
+                        value={entSearch}
+                        onChange={(e) => setEntSearch(e.target.value)}
+                      />
                     </div>
-
-                    <div className="ent-pills">
-                      {isLoadingEntreprises ? (
-                        <div className="no-options">Chargement...</div>
-                      ) : filteredEntreprises.length === 0 ? (
-                        <div className="no-options">Aucune société</div>
-                      ) : (
-                        filteredEntreprises.map((entreprise) => {
-                          const selected =
-                            formData.permissions.entreprises.includes(
-                              entreprise._id,
-                            );
-                          return (
-                            <button
-                              type="button"
-                              key={entreprise._id}
-                              className={`ent-pill ${selected ? "selected" : ""}`}
-                              onClick={() =>
-                                handleEntrepriseToggle(entreprise._id)
-                              }
-                              title={entreprise.nomComplet}
-                            >
-                              {selected && <HiCheck />}
-                              <span>{entreprise.trigramme}</span>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Modules groupés (Gestion / Données / Analyse / Administration) */}
-              {/* Table masquée pour un admin (accès à tous les modules). */}
-              {formData.role !== "admin" && !formData.permissions.allModules && (
-                <div className="modules-permissions">
-                  <label>Modules accessibles</label>
-                  <table className="permissions-table">
-                    <thead>
-                      <tr>
-                        <th>Module</th>
-                        {actions.map((action) => (
-                          <th key={action}>{actionLabels[action]}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    {visibleGroups.map((grp) => (
-                      <tbody key={grp.group}>
-                        <tr className="module-group-row">
-                          <td className="module-group-name">{grp.label}</td>
-                          {actions.map((action) => (
-                            <td key={action} className="module-group-toggle">
-                              <label
-                                className="checkbox-label checkbox-label-inline"
-                                title={`Tout ${actionLabels[action]} — ${grp.label}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isGroupActionChecked(
-                                    grp.group,
-                                    action,
-                                  )}
-                                  disabled={
-                                    grantableKeysInGroup(grp.group, action)
-                                      .length === 0
-                                  }
-                                  onChange={() =>
-                                    handleGroupActionToggle(grp.group, action)
-                                  }
-                                />
-                              </label>
-                            </td>
-                          ))}
-                        </tr>
-                        {grp.items.map((mod) => (
-                          <tr key={mod.key}>
-                            <td className="module-name">
-                              {moduleLabel(mod.key)}
-                            </td>
-                            {actions.map((action) => (
-                              <td key={action}>
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    formData.permissions.modules[mod.key]?.[
-                                      action
-                                    ] || false
-                                  }
-                                  disabled={!canGrantModule(mod.key, action)}
-                                  onChange={() =>
-                                    handlePermissionChange(mod.key, action)
-                                  }
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    ))}
-                  </table>
-                </div>
-              )}
-
-              {/* ── Accès aux analyses (super-admin uniquement) ── */}
-              {canEditAnalyse && (
-                <div className="analyse-section">
-                  <label className="analyse-title">Accès aux analyses</label>
-
-                  {/* Filiales : réseaux visibles */}
-                  <div className="analyse-block">
-                    <span className="analyse-block-label">
-                      Filiales — réseaux visibles
-                    </span>
-                    <div className="analyse-reseaux">
-                      {FILIALE_RESEAUX.map((r) => (
-                        <label
-                          key={r}
-                          className="checkbox-label checkbox-label-inline"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={
-                              !!formData.permissions.analyse?.filiales?.[r]
-                            }
-                            onChange={() => toggleFiliale(r)}
-                          />
-                          <span>{r}</span>
-                        </label>
-                      ))}
+                    <div className="ent-toolbar-right">
+                      <button
+                        type="button"
+                        className="btn-select-all"
+                        onClick={handleSelectAllEntreprises}
+                        disabled={grantableEntreprises.length === 0}
+                      >
+                        {allEntSelected ? "Aucun" : "Tout"}
+                      </button>
+                      <span className="selected-count">
+                        {formData.permissions.entreprises.length}/
+                        {grantableEntreprises.length}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Commerciaux : codes autorisés par société */}
-                  <div className="analyse-block">
-                    <span className="analyse-block-label">
-                      Commerciaux — codes autorisés par société
-                    </span>
-                    {commEntreprises.length === 0 ? (
-                      <div className="no-options">
-                        Sélectionnez des sociétés ayant des vendeurs déclarés.
-                      </div>
+                  <div className="ent-pills">
+                    {isLoadingEntreprises ? (
+                      <div className="no-options">Chargement...</div>
+                    ) : filteredEntreprises.length === 0 ? (
+                      <div className="no-options">Aucune société</div>
                     ) : (
-                      commEntreprises.map((e) => {
-                        const codes = (e.vendeurs || [])
-                          .map((v) => v.code)
-                          .filter(Boolean);
+                      filteredEntreprises.map((entreprise) => {
                         const selected =
-                          formData.permissions.commerciauxScope?.[e._id] || [];
-                        const allSel =
-                          codes.length > 0 &&
-                          codes.every((c) => selected.includes(c));
+                          formData.permissions.entreprises.includes(
+                            entreprise._id,
+                          );
                         return (
-                          <div key={e._id} className="comm-ent">
-                            <div className="comm-ent-head">
-                              <span className="comm-ent-trig">
-                                {e.trigramme}
-                              </span>
-                              <button
-                                type="button"
-                                className="btn-select-all"
-                                onClick={() =>
-                                  setAllCommercialCodes(e._id, codes)
-                                }
-                              >
-                                {allSel ? "Aucun" : "Tous"}
-                              </button>
-                            </div>
-                            <div className="ent-pills">
-                              {codes.map((code) => {
-                                const v = e.vendeurs.find(
-                                  (x) => x.code === code,
-                                );
-                                const on = selected.includes(code);
-                                return (
-                                  <button
-                                    type="button"
-                                    key={code}
-                                    className={`ent-pill ${on ? "selected" : ""}`}
-                                    onClick={() =>
-                                      toggleCommercialCode(e._id, code)
-                                    }
-                                    title={
-                                      v
-                                        ? `${v.prenom || ""} ${v.nom || ""}`.trim()
-                                        : code
-                                    }
-                                  >
-                                    {on && <HiCheck />}
-                                    <span>{code}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
+                          <button
+                            type="button"
+                            key={entreprise._id}
+                            className={`ent-pill ${selected ? "selected" : ""}`}
+                            onClick={() =>
+                              handleEntrepriseToggle(entreprise._id)
+                            }
+                            title={entreprise.nomComplet}
+                          >
+                            {selected && <HiCheck />}
+                            <span>{entreprise.trigramme}</span>
+                          </button>
                         );
                       })
                     )}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-          <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={isCreating || isUpdating}
-            >
-              {isCreating || isUpdating
-                ? "Enregistrement..."
-                : isEdit
-                  ? "Modifier"
-                  : "Créer"}
-            </button>
+            {/* Modules groupés (Gestion / Données / Analyse / Administration) */}
+            {/* Table masquée pour un admin (accès à tous les modules). */}
+            {formData.role !== "admin" && !formData.permissions.allModules && (
+              <div className="modules-permissions">
+                <label>Modules accessibles</label>
+                <table className="permissions-table">
+                  <thead>
+                    <tr>
+                      <th>Module</th>
+                      {actions.map((action) => (
+                        <th key={action}>{actionLabels[action]}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  {visibleGroups.map((grp) => (
+                    <tbody key={grp.group}>
+                      <tr className="module-group-row">
+                        <td className="module-group-name">{grp.label}</td>
+                        {actions.map((action) => (
+                          <td key={action} className="module-group-toggle">
+                            <label
+                              className="checkbox-label checkbox-label-inline"
+                              title={`Tout ${actionLabels[action]} — ${grp.label}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isGroupActionChecked(
+                                  grp.group,
+                                  action,
+                                )}
+                                disabled={
+                                  grantableKeysInGroup(grp.group, action)
+                                    .length === 0
+                                }
+                                onChange={() =>
+                                  handleGroupActionToggle(grp.group, action)
+                                }
+                              />
+                            </label>
+                          </td>
+                        ))}
+                      </tr>
+                      {grp.items.map((mod) => (
+                        <tr key={mod.key}>
+                          <td className="module-name">
+                            {moduleLabel(mod.key)}
+                          </td>
+                          {actions.map((action) => (
+                            <td key={action}>
+                              <input
+                                type="checkbox"
+                                checked={
+                                  formData.permissions.modules[mod.key]?.[
+                                    action
+                                  ] || false
+                                }
+                                disabled={!canGrantModule(mod.key, action)}
+                                onChange={() =>
+                                  handlePermissionChange(mod.key, action)
+                                }
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  ))}
+                </table>
+              </div>
+            )}
+
+            {/* ── Accès aux analyses (super-admin uniquement) ── */}
+            {canEditAnalyse && (
+              <div className="analyse-section">
+                <label className="analyse-title">Accès aux analyses</label>
+
+                {/* Filiales : réseaux visibles */}
+                <div className="analyse-block">
+                  <span className="analyse-block-label">
+                    Filiales — réseaux visibles
+                  </span>
+                  <div className="analyse-reseaux">
+                    {FILIALE_RESEAUX.map((r) => (
+                      <label
+                        key={r}
+                        className="checkbox-label checkbox-label-inline"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            !!formData.permissions.analyse?.filiales?.[r]
+                          }
+                          onChange={() => toggleFiliale(r)}
+                        />
+                        <span>{r}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Commerciaux : codes autorisés par société */}
+                <div className="analyse-block">
+                  <span className="analyse-block-label">
+                    Commerciaux — codes autorisés par société
+                  </span>
+                  {commEntreprises.length === 0 ? (
+                    <div className="no-options">
+                      Sélectionnez des sociétés ayant des vendeurs déclarés.
+                    </div>
+                  ) : (
+                    commEntreprises.map((e) => {
+                      const codes = (e.vendeurs || [])
+                        .map((v) => v.code)
+                        .filter(Boolean);
+                      const selected =
+                        formData.permissions.commerciauxScope?.[e._id] || [];
+                      const allSel =
+                        codes.length > 0 &&
+                        codes.every((c) => selected.includes(c));
+                      return (
+                        <div key={e._id} className="comm-ent">
+                          <div className="comm-ent-head">
+                            <span className="comm-ent-trig">
+                              {e.trigramme}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-select-all"
+                              onClick={() =>
+                                setAllCommercialCodes(e._id, codes)
+                              }
+                            >
+                              {allSel ? "Aucun" : "Tous"}
+                            </button>
+                          </div>
+                          <div className="ent-pills">
+                            {codes.map((code) => {
+                              const v = e.vendeurs.find(
+                                (x) => x.code === code,
+                              );
+                              const on = selected.includes(code);
+                              return (
+                                <button
+                                  type="button"
+                                  key={code}
+                                  className={`ent-pill ${on ? "selected" : ""}`}
+                                  onClick={() =>
+                                    toggleCommercialCode(e._id, code)
+                                  }
+                                  title={
+                                    v
+                                      ? `${v.prenom || ""} ${v.nom || ""}`.trim()
+                                      : code
+                                  }
+                                >
+                                  {on && <HiCheck />}
+                                  <span>{code}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        </form>
-      </div>
-    </div>
+
+        <div className="modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={isCreating || isUpdating}
+          >
+            {isCreating || isUpdating
+              ? "Enregistrement..."
+              : isEdit
+                ? "Modifier"
+                : "Créer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

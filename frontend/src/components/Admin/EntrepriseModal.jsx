@@ -19,6 +19,7 @@ import {
   useUpdateEntrepriseMutation,
 } from "../../slices/entrepriseApiSlice";
 import { BASE_URL } from "../../constants";
+import Modal from "../ui/Modal/Modal";
 import "./EntrepriseModal.css";
 
 const DEFAULT_ETATS_COMMANDE = {
@@ -545,915 +546,910 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal modal-entreprise"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <h2>{isEdit ? "Modifier l'entreprise" : "Nouvelle entreprise"}</h2>
-          <button className="btn-close" onClick={onClose}>
-            <HiX />
-          </button>
-        </div>
+    <Modal onClose={onClose} contentClassName="modal modal-entreprise">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier l'entreprise" : "Nouvelle entreprise"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
 
-        {/* Tabs */}
-        <div className="modal-tabs">
-          <button
-            className={`tab-btn ${activeTab === "general" ? "active" : ""}`}
-            onClick={() => setActiveTab("general")}
-          >
-            Général
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "apparence" ? "active" : ""}`}
-            onClick={() => setActiveTab("apparence")}
-          >
-            <HiColorSwatch /> Apparence
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "chemins" ? "active" : ""}`}
-            onClick={() => setActiveTab("chemins")}
-          >
-            <HiFolder /> Chemins
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "entrepots" ? "active" : ""}`}
-            onClick={() => setActiveTab("entrepots")}
-          >
-            <HiDatabase /> Entrepôts
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "etats" ? "active" : ""}`}
-            onClick={() => setActiveTab("etats")}
-          >
-            <HiClipboardList /> États Commande
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "etatsFacture" ? "active" : ""}`}
-            onClick={() => setActiveTab("etatsFacture")}
-          >
-            <HiClipboardList /> États Facture
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "etatsProforma" ? "active" : ""}`}
-            onClick={() => setActiveTab("etatsProforma")}
-          >
-            <HiClipboardList /> États Proforma
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "reception" ? "active" : ""}`}
-            onClick={() => setActiveTab("reception")}
-          >
-            <HiMail /> Réception
-          </button>
-          <button
-            className={`tab-btn ${activeTab === "vendeurs" ? "active" : ""}`}
-            onClick={() => setActiveTab("vendeurs")}
-          >
-            <HiUserGroup /> Vendeurs
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeTab === "analyseCA" ? "active" : ""}`}
-            onClick={() => setActiveTab("analyseCA")}
-          >
-            <HiChartBar /> Analyse CA
-          </button>
-        </div>
+      {/* Tabs */}
+      <div className="modal-tabs">
+        <button
+          className={`tab-btn ${activeTab === "general" ? "active" : ""}`}
+          onClick={() => setActiveTab("general")}
+        >
+          Général
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "apparence" ? "active" : ""}`}
+          onClick={() => setActiveTab("apparence")}
+        >
+          <HiColorSwatch /> Apparence
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "chemins" ? "active" : ""}`}
+          onClick={() => setActiveTab("chemins")}
+        >
+          <HiFolder /> Chemins
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "entrepots" ? "active" : ""}`}
+          onClick={() => setActiveTab("entrepots")}
+        >
+          <HiDatabase /> Entrepôts
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "etats" ? "active" : ""}`}
+          onClick={() => setActiveTab("etats")}
+        >
+          <HiClipboardList /> États Commande
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "etatsFacture" ? "active" : ""}`}
+          onClick={() => setActiveTab("etatsFacture")}
+        >
+          <HiClipboardList /> États Facture
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "etatsProforma" ? "active" : ""}`}
+          onClick={() => setActiveTab("etatsProforma")}
+        >
+          <HiClipboardList /> États Proforma
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "reception" ? "active" : ""}`}
+          onClick={() => setActiveTab("reception")}
+        >
+          <HiMail /> Réception
+        </button>
+        <button
+          className={`tab-btn ${activeTab === "vendeurs" ? "active" : ""}`}
+          onClick={() => setActiveTab("vendeurs")}
+        >
+          <HiUserGroup /> Vendeurs
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${activeTab === "analyseCA" ? "active" : ""}`}
+          onClick={() => setActiveTab("analyseCA")}
+        >
+          <HiChartBar /> Analyse CA
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {error && <div className="form-error">{error}</div>}
+      <form onSubmit={handleSubmit} className="modal-form">
+        {error && <div className="form-error">{error}</div>}
 
-          {/* Tab Général */}
-          {activeTab === "general" && (
-            <>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Trigramme *</label>
-                  <input
-                    type="text"
-                    name="trigramme"
-                    value={formData.trigramme}
-                    onChange={handleChange}
-                    placeholder="QC"
-                    maxLength={5}
-                    required
-                  />
-                  <span className="input-hint">2 à 5 caractères</span>
-                </div>
-                <div className="form-group">
-                  <label>Nom dossier DBF *</label>
-                  <input
-                    type="text"
-                    name="nomDossierDBF"
-                    value={formData.nomDossierDBF}
-                    onChange={handleChange}
-                    placeholder="QC_DISTRIBUTION"
-                    required
-                  />
-                </div>
-              </div>
-
+        {/* Tab Général */}
+        {activeTab === "general" && (
+          <>
+            <div className="form-row">
               <div className="form-group">
-                <label>Nom complet *</label>
+                <label>Trigramme *</label>
                 <input
                   type="text"
-                  name="nomComplet"
-                  value={formData.nomComplet}
+                  name="trigramme"
+                  value={formData.trigramme}
                   onChange={handleChange}
-                  placeholder="QC Distribution"
+                  placeholder="QC"
+                  maxLength={5}
+                  required
+                />
+                <span className="input-hint">2 à 5 caractères</span>
+              </div>
+              <div className="form-group">
+                <label>Nom dossier DBF *</label>
+                <input
+                  type="text"
+                  name="nomDossierDBF"
+                  value={formData.nomDossierDBF}
+                  onChange={handleChange}
+                  placeholder="QC_DISTRIBUTION"
                   required
                 />
               </div>
+            </div>
 
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Description de l'entreprise..."
-                  rows={3}
-                />
-              </div>
+            <div className="form-group">
+              <label>Nom complet *</label>
+              <input
+                type="text"
+                name="nomComplet"
+                value={formData.nomComplet}
+                onChange={handleChange}
+                placeholder="QC Distribution"
+                required
+              />
+            </div>
 
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="isActive"
-                    checked={formData.isActive}
-                    onChange={handleChange}
-                  />
-                  <span>Entreprise active</span>
-                </label>
-              </div>
-            </>
-          )}
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Description de l'entreprise..."
+                rows={3}
+              />
+            </div>
 
-          {/* Tab Apparence */}
-          {activeTab === "apparence" && (
-            <>
-              <p className="tab-description">
-                Couleurs de marque et logo de l'entreprise. Réutilisables sur
-                les rapports PDF et les étiquettes.
-              </p>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>
-                    <HiColorSwatch /> Couleur primaire
-                  </label>
-                  <div className="color-field">
-                    <input
-                      type="color"
-                      value={formData.couleurPrimaire || DEFAULT_PRIMAIRE}
-                      onChange={(e) =>
-                        handleColorChange("couleurPrimaire", e.target.value)
-                      }
-                    />
-                    <input
-                      type="text"
-                      value={formData.couleurPrimaire || ""}
-                      onChange={(e) =>
-                        handleColorChange("couleurPrimaire", e.target.value)
-                      }
-                      placeholder={DEFAULT_PRIMAIRE}
-                      maxLength={7}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    <HiColorSwatch /> Couleur secondaire
-                  </label>
-                  <div className="color-field">
-                    <input
-                      type="color"
-                      value={formData.couleurSecondaire || DEFAULT_SECONDAIRE}
-                      onChange={(e) =>
-                        handleColorChange("couleurSecondaire", e.target.value)
-                      }
-                    />
-                    <input
-                      type="text"
-                      value={formData.couleurSecondaire || ""}
-                      onChange={(e) =>
-                        handleColorChange("couleurSecondaire", e.target.value)
-                      }
-                      placeholder={DEFAULT_SECONDAIRE}
-                      maxLength={7}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <HiPhotograph /> Logo
-                </label>
-                <div className="logo-uploader">
-                  <div className="logo-preview">
-                    {formData.logo ? (
-                      <img src={formData.logo} alt="Logo entreprise" />
-                    ) : (
-                      <span className="logo-empty">Aucun logo</span>
-                    )}
-                  </div>
-                  <div className="logo-actions">
-                    <label className="btn-logo-upload">
-                      <HiPhotograph /> Choisir une image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoFile}
-                        hidden
-                      />
-                    </label>
-                    {formData.logo ? (
-                      <button
-                        type="button"
-                        className="btn-logo-remove"
-                        onClick={removeLogo}
-                      >
-                        <HiTrash /> Retirer
-                      </button>
-                    ) : null}
-                    <span className="input-hint">
-                      PNG/JPG. Redimensionné automatiquement (max {LOGO_MAX_PX}px)
-                      et stocké compressé dans l'entreprise.
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="apparence-preview">
-                <span
-                  className="swatch"
-                  style={{ background: formData.couleurPrimaire || DEFAULT_PRIMAIRE }}
-                  title="Primaire"
-                />
-                <span
-                  className="swatch"
-                  style={{
-                    background: formData.couleurSecondaire || DEFAULT_SECONDAIRE,
-                  }}
-                  title="Secondaire"
-                />
-                <span className="apparence-preview-lbl">
-                  Aperçu des couleurs
-                </span>
-              </div>
-            </>
-          )}
-
-          {/* Tab Chemins */}
-          {activeTab === "chemins" && (
-            <>
-              <div className="form-group">
-                <label>
-                  <HiDatabase /> Chemin de base (DBF)
-                </label>
+            <div className="form-group">
+              <label className="checkbox-label">
                 <input
-                  type="text"
-                  name="cheminBase"
-                  value={formData.cheminBase}
+                  type="checkbox"
+                  name="isActive"
+                  checked={formData.isActive}
                   onChange={handleChange}
-                  placeholder="\\serveur\Bases"
                 />
-                <span className="input-hint">
-                  Chemin complet: {formData.cheminBase}\
-                  {formData.nomDossierDBF || "[dossier]"}
-                </span>
-              </div>
+                <span>Entreprise active</span>
+              </label>
+            </div>
+          </>
+        )}
 
+        {/* Tab Apparence */}
+        {activeTab === "apparence" && (
+          <>
+            <p className="tab-description">
+              Couleurs de marque et logo de l'entreprise. Réutilisables sur
+              les rapports PDF et les étiquettes.
+            </p>
+
+            <div className="form-row">
               <div className="form-group">
                 <label>
-                  <HiPhotograph /> Chemin des photos
+                  <HiColorSwatch /> Couleur primaire
                 </label>
-                <input
-                  type="text"
-                  name="cheminPhotos"
-                  value={formData.cheminPhotos}
-                  onChange={handleChange}
-                  placeholder="\\192.168.0.250\Rcommun\STOCK\photos"
-                />
-                <span className="input-hint">
-                  Dossier contenant les photos des articles (ex: NART.jpg)
-                </span>
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <HiFolder /> Chemin export inventaire
-                </label>
-                <input
-                  type="text"
-                  name="cheminExportInventaire"
-                  value={formData.cheminExportInventaire}
-                  onChange={handleChange}
-                  placeholder="\\192.168.0.250\Rcommun\STOCK\collect_sec"
-                />
-                <span className="input-hint">
-                  Dossier où seront déposés les fichiers .dat d'inventaire
-                </span>
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <HiFolder /> Logo étiquettes (optionnel)
-                </label>
-                <input
-                  type="text"
-                  name="cheminLogoEtiquettes"
-                  value={formData.cheminLogoEtiquettes}
-                  onChange={handleChange}
-                  placeholder="\\192.168.0.250\Rcommun\STOCK\logo.png"
-                />
-                <span className="input-hint">
-                  Chemin complet du fichier image (PNG/JPG) affiché sur les
-                  étiquettes pleine page. Laisser vide pour aucun logo.
-                </span>
-              </div>
-            </>
-          )}
-
-          {/* Tab Entrepôts */}
-          {activeTab === "entrepots" && (
-            <>
-              <p className="tab-description">
-                Personnalisez les noms des champs stock (S1 à S5) pour cette
-                entreprise. Ces noms seront affichés dans la recherche article.
-              </p>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>S1 (généralement Magasin)</label>
+                <div className="color-field">
                   <input
-                    type="text"
-                    value={formData.mappingEntrepots.S1}
-                    onChange={(e) => handleMappingChange("S1", e.target.value)}
-                    placeholder="Magasin"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>S2</label>
-                  <input
-                    type="text"
-                    value={formData.mappingEntrepots.S2}
-                    onChange={(e) => handleMappingChange("S2", e.target.value)}
-                    placeholder="Réserve"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>S3</label>
-                  <input
-                    type="text"
-                    value={formData.mappingEntrepots.S3}
-                    onChange={(e) => handleMappingChange("S3", e.target.value)}
-                    placeholder="Dépôt"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>S4</label>
-                  <input
-                    type="text"
-                    value={formData.mappingEntrepots.S4}
-                    onChange={(e) => handleMappingChange("S4", e.target.value)}
-                    placeholder="Transit"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>S5</label>
-                  <input
-                    type="text"
-                    value={formData.mappingEntrepots.S5}
-                    onChange={(e) => handleMappingChange("S5", e.target.value)}
-                    placeholder="Autre"
-                  />
-                </div>
-                <div className="form-group">
-                  {/* Espace vide pour alignement */}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Tab États Commande */}
-          {activeTab === "etats" && (
-            <>
-              <div className="tab-description-row">
-                <p className="tab-description">
-                  Personnalisez les libellés des états de commande (0 à 9) pour
-                  cette entreprise. Ces libellés seront affichés dans le détail
-                  des commandes.
-                </p>
-                <button
-                  type="button"
-                  className="btn-reset-etats"
-                  onClick={handleResetEtats}
-                  title="Réinitialiser les valeurs par défaut"
-                >
-                  Réinitialiser
-                </button>
-              </div>
-
-              <div className="etats-grid">
-                {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
-                  <div className="form-group etat-field" key={key}>
-                    <label>
-                      <span className="etat-key">État {key}</span>
-                      <span className="etat-default">
-                        (défaut: {DEFAULT_ETATS_COMMANDE[key]})
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.mappingEtatsCommande[key] || ""}
-                      onChange={(e) => handleEtatChange(key, e.target.value)}
-                      placeholder={DEFAULT_ETATS_COMMANDE[key]}
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Tab États Facture */}
-          {activeTab === "etatsFacture" && (
-            <>
-              <p className="tab-description">
-                Définissez les libellés des états de facture (codes 0 à 9) pour
-                cette entreprise. Ces libellés seront affichés dans les écrans
-                Factures. Laissez vide un code non utilisé.
-              </p>
-              <div className="etats-grid">
-                {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
-                  <div className="form-group etat-field" key={key}>
-                    <label>
-                      <span className="etat-key">État {key}</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.mappingEtatsFacture[key] || ""}
-                      onChange={(e) =>
-                        handleEtatFactureChange(key, e.target.value)
-                      }
-                      placeholder={`Libellé état ${key}`}
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Tab États Proforma */}
-          {activeTab === "etatsProforma" && (
-            <>
-              <p className="tab-description">
-                Définissez les libellés des états de proforma (codes 0 à 9) pour
-                cette entreprise. Ces libellés seront affichés dans les écrans
-                Proformas. Laissez vide un code non utilisé.
-              </p>
-              <div className="etats-grid">
-                {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
-                  <div className="form-group etat-field" key={key}>
-                    <label>
-                      <span className="etat-key">État {key}</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.mappingEtatsProforma[key] || ""}
-                      onChange={(e) =>
-                        handleEtatProformaChange(key, e.target.value)
-                      }
-                      placeholder={`Libellé état ${key}`}
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* Tab Réception */}
-          {activeTab === "reception" && (
-            <>
-              <p className="tab-description">
-                Paramètres du rapport de contrôle commande (réception de
-                marchandises) : dossier d'enregistrement du PDF et destinataires
-                de l'email.
-              </p>
-
-              <div className="form-group">
-                <label>
-                  <HiFolder /> Dossier d'enregistrement du rapport
-                </label>
-                <input
-                  type="text"
-                  name="cheminRapportReception"
-                  value={formData.cheminRapportReception}
-                  onChange={handleChange}
-                  placeholder="\\192.168.0.250\Rcommun\STOCK\controle commande"
-                />
-                <span className="input-hint">
-                  Dossier réseau (RCOMMUN) où le PDF du rapport sera déposé.
-                </span>
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <HiMail /> Emails destinataires du rapport
-                </label>
-                <textarea
-                  name="emailsRapportReception"
-                  rows={5}
-                  value={(formData.emailsRapportReception || []).join("\n")}
-                  onChange={handleEmailsChange}
-                  placeholder={"achats@exemple.com\nresponsable@exemple.com"}
-                />
-                <span className="input-hint">
-                  Un email par ligne (les virgules et points-virgules sont aussi
-                  acceptés). Le rapport PDF leur sera envoyé en pièce jointe.
-                </span>
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <HiMail /> Emails destinataires du rapport de préparation
-                </label>
-                <textarea
-                  name="emailsRapportPreparation"
-                  rows={5}
-                  value={(formData.emailsRapportPreparation || []).join("\n")}
-                  onChange={handleEmailsPrepaChange}
-                  placeholder={"preparation@exemple.com\ncommercial@exemple.com"}
-                />
-                <span className="input-hint">
-                  Un email par ligne (virgules / points-virgules acceptés). Le
-                  rapport PDF de préparation de commande leur sera envoyé en
-                  pièce jointe.
-                </span>
-              </div>
-            </>
-          )}
-
-          {/* Tab Vendeurs */}
-          {activeTab === "vendeurs" && (
-            <>
-              <p className="tab-description">
-                Associez chaque code vendeur (champ <strong>REPRES</strong>, 2
-                chiffres) à une identité et un type. « Détecter » récupère les
-                codes réellement présents dans les factures ; vous pouvez aussi
-                en ajouter manuellement.
-              </p>
-
-              <div className="vendeurs-toolbar">
-                <button
-                  type="button"
-                  className="btn-detect-vendeur"
-                  onClick={detecterVendeurs}
-                  disabled={detecting}
-                >
-                  <HiSearch />{" "}
-                  {detecting ? "Détection…" : "Détecter depuis les factures"}
-                </button>
-                <button
-                  type="button"
-                  className="btn-add-vendeur"
-                  onClick={addVendeur}
-                >
-                  <HiPlus /> Ajouter un code
-                </button>
-                {vendeursMsg ? (
-                  <span className="vendeurs-msg">{vendeursMsg}</span>
-                ) : null}
-              </div>
-
-              {formData.vendeurs.length === 0 ? (
-                <div className="vendeurs-empty">
-                  Aucun code vendeur. Cliquez sur « Détecter » ou « Ajouter un
-                  code ».
-                </div>
-              ) : (
-                <table className="vendeurs-table">
-                  <thead>
-                    <tr>
-                      <th>Code</th>
-                      <th>Nom</th>
-                      <th>Prénom</th>
-                      <th>Email</th>
-                      <th>Type</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.vendeurs.map((v, i) => (
-                      <tr key={i}>
-                        <td>
-                          <input
-                            className="vendeur-code-input"
-                            type="text"
-                            inputMode="numeric"
-                            value={v.code}
-                            maxLength={2}
-                            placeholder="00"
-                            onChange={(e) =>
-                              updateVendeur(i, "code", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={v.nom}
-                            placeholder="Nom"
-                            onChange={(e) =>
-                              updateVendeur(i, "nom", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={v.prenom}
-                            placeholder="Prénom"
-                            onChange={(e) =>
-                              updateVendeur(i, "prenom", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="email"
-                            value={v.email}
-                            placeholder="email (optionnel)"
-                            onChange={(e) =>
-                              updateVendeur(i, "email", e.target.value)
-                            }
-                          />
-                        </td>
-                        <td>
-                          <select
-                            value={v.type}
-                            onChange={(e) =>
-                              updateVendeur(i, "type", e.target.value)
-                            }
-                          >
-                            <option value="commercial">Commercial</option>
-                            <option value="vendeur">Vendeur</option>
-                            <option value="autre">Autre</option>
-                          </select>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn-vendeur-remove"
-                            onClick={() => removeVendeur(i)}
-                            title="Supprimer"
-                          >
-                            <HiTrash />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </>
-          )}
-
-          {activeTab === "analyseCA" && (
-            <>
-              <p className="tab-description">
-                Paramètres du module <strong>Analyse CA</strong> pour CETTE
-                entreprise (équivalents du config.py du pipeline). Les valeurs
-                par défaut correspondent à la configuration QC.
-              </p>
-
-              <div className="aca-toolbar">
-                <button
-                  type="button"
-                  className="btn-add-vendeur"
-                  onClick={resetAnalyseCa}
-                >
-                  Réinitialiser (valeurs QC)
-                </button>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Seuil tiers interne</label>
-                  <input
-                    type="number"
-                    value={formData.analyseCA.seuilTiersInterne}
+                    type="color"
+                    value={formData.couleurPrimaire || DEFAULT_PRIMAIRE}
                     onChange={(e) =>
-                      handleAnalyseCaField("seuilTiersInterne", e.target.value)
+                      handleColorChange("couleurPrimaire", e.target.value)
                     }
                   />
-                  <small>TIERS ≥ seuil = compte interne</small>
-                </div>
-                <div className="form-group">
-                  <label>Seuil PVTE aberrante (× catalogue)</label>
                   <input
-                    type="number"
-                    value={formData.analyseCA.seuilPvteAberrante}
+                    type="text"
+                    value={formData.couleurPrimaire || ""}
                     onChange={(e) =>
-                      handleAnalyseCaField("seuilPvteAberrante", e.target.value)
+                      handleColorChange("couleurPrimaire", e.target.value)
                     }
+                    placeholder={DEFAULT_PRIMAIRE}
+                    maxLength={7}
                   />
-                  <small>Ligne exclue si PVTE &gt; catalogue × seuil</small>
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Tiers internes autorisés (analyse interne)</label>
-                <input
-                  type="text"
-                  value={formData.analyseCA.tiersInternesAutorises}
-                  onChange={(e) =>
-                    handleAnalyseCaField("tiersInternesAutorises", e.target.value)
-                  }
-                  placeholder="9994, 9915, 9913…"
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Tiers exclus du CA</label>
+                <label>
+                  <HiColorSwatch /> Couleur secondaire
+                </label>
+                <div className="color-field">
                   <input
-                    type="text"
-                    value={formData.analyseCA.tiersExclusCA}
+                    type="color"
+                    value={formData.couleurSecondaire || DEFAULT_SECONDAIRE}
                     onChange={(e) =>
-                      handleAnalyseCaField("tiersExclusCA", e.target.value)
+                      handleColorChange("couleurSecondaire", e.target.value)
                     }
-                    placeholder="2226 (BON DE CAISSE)"
                   />
-                </div>
-                <div className="form-group">
-                  <label>Tiers forcés en catégorie AUTRE</label>
                   <input
                     type="text"
-                    value={formData.analyseCA.tiersForcerAutre}
+                    value={formData.couleurSecondaire || ""}
                     onChange={(e) =>
-                      handleAnalyseCaField("tiersForcerAutre", e.target.value)
+                      handleColorChange("couleurSecondaire", e.target.value)
                     }
-                    placeholder="vide = aucun"
+                    placeholder={DEFAULT_SECONDAIRE}
+                    maxLength={7}
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Préfixes d'articles exclus</label>
-                  <input
-                    type="text"
-                    value={formData.analyseCA.articlesExclusPrefixes}
-                    onChange={(e) =>
-                      handleAnalyseCaField(
-                        "articlesExclusPrefixes", e.target.value,
-                      )
-                    }
-                    placeholder="08 (ECOPART)"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Codes articles exclus (exacts)</label>
-                  <input
-                    type="text"
-                    value={formData.analyseCA.articlesExclusExacts}
-                    onChange={(e) =>
-                      handleAnalyseCaField("articlesExclusExacts", e.target.value)
-                    }
-                    placeholder="000001 (PROFORMA)"
-                  />
-                </div>
-              </div>
-
-              {[
-                {
-                  liste: "nomsClasses",
-                  titre: "Noms des classes",
-                  aide: "Préfixe article (dizaine) → libellé (onglet Classes)",
-                  cleLabel: "Code",
-                  valLabel: "Libellé",
-                },
-                {
-                  liste: "nomsSousClasses",
-                  titre: "Noms des sous-classes",
-                  aide: "Préfixe article 2 chiffres → libellé (onglet Sous_Classes)",
-                  cleLabel: "Code (2 chiffres)",
-                  valLabel: "Libellé",
-                },
-                {
-                  liste: "nomsLocates",
-                  titre: "Noms des locates",
-                  aide: "Code GROUPE → libellé lisible (onglet Locates)",
-                  cleLabel: "Code groupe",
-                  valLabel: "Libellé",
-                },
-                {
-                  liste: "normalisationCategories",
-                  titre: "Normalisation des catégories clients",
-                  aide: "Variante trouvée en base → catégorie canonique",
-                  cleLabel: "Variante",
-                  valLabel: "Catégorie",
-                },
-              ].map((cfg) => (
-                <div className="aca-section" key={cfg.liste}>
-                  <div className="aca-section-header">
-                    <h4>{cfg.titre}</h4>
-                    <button
-                      type="button"
-                      className="btn-add-vendeur"
-                      onClick={() => addAnalyseCaRow(cfg.liste)}
-                    >
-                      <HiPlus /> Ajouter
-                    </button>
-                  </div>
-                  <small className="aca-aide">{cfg.aide}</small>
-                  {formData.analyseCA[cfg.liste].length === 0 ? (
-                    <div className="aca-empty">Aucune entrée.</div>
+            <div className="form-group">
+              <label>
+                <HiPhotograph /> Logo
+              </label>
+              <div className="logo-uploader">
+                <div className="logo-preview">
+                  {formData.logo ? (
+                    <img src={formData.logo} alt="Logo entreprise" />
                   ) : (
-                    <table className="vendeurs-table aca-table">
-                      <thead>
-                        <tr>
-                          <th>{cfg.cleLabel}</th>
-                          <th>{cfg.valLabel}</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {formData.analyseCA[cfg.liste].map((row, i) => (
-                          <tr key={`${cfg.liste}-${i}`}>
-                            <td>
-                              <input
-                                type="text"
-                                value={row.k}
-                                onChange={(e) =>
-                                  handleAnalyseCaRow(
-                                    cfg.liste, i, "k", e.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={row.v}
-                                onChange={(e) =>
-                                  handleAnalyseCaRow(
-                                    cfg.liste, i, "v", e.target.value,
-                                  )
-                                }
-                              />
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                className="btn-vendeur-remove"
-                                onClick={() => removeAnalyseCaRow(cfg.liste, i)}
-                                title="Supprimer"
-                              >
-                                <HiTrash />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <span className="logo-empty">Aucun logo</span>
                   )}
                 </div>
-              ))}
-            </>
-          )}
+                <div className="logo-actions">
+                  <label className="btn-logo-upload">
+                    <HiPhotograph /> Choisir une image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoFile}
+                      hidden
+                    />
+                  </label>
+                  {formData.logo ? (
+                    <button
+                      type="button"
+                      className="btn-logo-remove"
+                      onClick={removeLogo}
+                    >
+                      <HiTrash /> Retirer
+                    </button>
+                  ) : null}
+                  <span className="input-hint">
+                    PNG/JPG. Redimensionné automatiquement (max {LOGO_MAX_PX}px)
+                    et stocké compressé dans l'entreprise.
+                  </span>
+                </div>
+              </div>
+            </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={isCreating || isUpdating}
-            >
-              {isCreating || isUpdating
-                ? "Enregistrement..."
-                : isEdit
-                  ? "Modifier"
-                  : "Créer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            <div className="apparence-preview">
+              <span
+                className="swatch"
+                style={{ background: formData.couleurPrimaire || DEFAULT_PRIMAIRE }}
+                title="Primaire"
+              />
+              <span
+                className="swatch"
+                style={{
+                  background: formData.couleurSecondaire || DEFAULT_SECONDAIRE,
+                }}
+                title="Secondaire"
+              />
+              <span className="apparence-preview-lbl">
+                Aperçu des couleurs
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Tab Chemins */}
+        {activeTab === "chemins" && (
+          <>
+            <div className="form-group">
+              <label>
+                <HiDatabase /> Chemin de base (DBF)
+              </label>
+              <input
+                type="text"
+                name="cheminBase"
+                value={formData.cheminBase}
+                onChange={handleChange}
+                placeholder="\\serveur\Bases"
+              />
+              <span className="input-hint">
+                Chemin complet: {formData.cheminBase}\
+                {formData.nomDossierDBF || "[dossier]"}
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiPhotograph /> Chemin des photos
+              </label>
+              <input
+                type="text"
+                name="cheminPhotos"
+                value={formData.cheminPhotos}
+                onChange={handleChange}
+                placeholder="\\192.168.0.250\Rcommun\STOCK\photos"
+              />
+              <span className="input-hint">
+                Dossier contenant les photos des articles (ex: NART.jpg)
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiFolder /> Chemin export inventaire
+              </label>
+              <input
+                type="text"
+                name="cheminExportInventaire"
+                value={formData.cheminExportInventaire}
+                onChange={handleChange}
+                placeholder="\\192.168.0.250\Rcommun\STOCK\collect_sec"
+              />
+              <span className="input-hint">
+                Dossier où seront déposés les fichiers .dat d'inventaire
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiFolder /> Logo étiquettes (optionnel)
+              </label>
+              <input
+                type="text"
+                name="cheminLogoEtiquettes"
+                value={formData.cheminLogoEtiquettes}
+                onChange={handleChange}
+                placeholder="\\192.168.0.250\Rcommun\STOCK\logo.png"
+              />
+              <span className="input-hint">
+                Chemin complet du fichier image (PNG/JPG) affiché sur les
+                étiquettes pleine page. Laisser vide pour aucun logo.
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Tab Entrepôts */}
+        {activeTab === "entrepots" && (
+          <>
+            <p className="tab-description">
+              Personnalisez les noms des champs stock (S1 à S5) pour cette
+              entreprise. Ces noms seront affichés dans la recherche article.
+            </p>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>S1 (généralement Magasin)</label>
+                <input
+                  type="text"
+                  value={formData.mappingEntrepots.S1}
+                  onChange={(e) => handleMappingChange("S1", e.target.value)}
+                  placeholder="Magasin"
+                />
+              </div>
+              <div className="form-group">
+                <label>S2</label>
+                <input
+                  type="text"
+                  value={formData.mappingEntrepots.S2}
+                  onChange={(e) => handleMappingChange("S2", e.target.value)}
+                  placeholder="Réserve"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>S3</label>
+                <input
+                  type="text"
+                  value={formData.mappingEntrepots.S3}
+                  onChange={(e) => handleMappingChange("S3", e.target.value)}
+                  placeholder="Dépôt"
+                />
+              </div>
+              <div className="form-group">
+                <label>S4</label>
+                <input
+                  type="text"
+                  value={formData.mappingEntrepots.S4}
+                  onChange={(e) => handleMappingChange("S4", e.target.value)}
+                  placeholder="Transit"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>S5</label>
+                <input
+                  type="text"
+                  value={formData.mappingEntrepots.S5}
+                  onChange={(e) => handleMappingChange("S5", e.target.value)}
+                  placeholder="Autre"
+                />
+              </div>
+              <div className="form-group">
+                {/* Espace vide pour alignement */}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Tab États Commande */}
+        {activeTab === "etats" && (
+          <>
+            <div className="tab-description-row">
+              <p className="tab-description">
+                Personnalisez les libellés des états de commande (0 à 9) pour
+                cette entreprise. Ces libellés seront affichés dans le détail
+                des commandes.
+              </p>
+              <button
+                type="button"
+                className="btn-reset-etats"
+                onClick={handleResetEtats}
+                title="Réinitialiser les valeurs par défaut"
+              >
+                Réinitialiser
+              </button>
+            </div>
+
+            <div className="etats-grid">
+              {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
+                <div className="form-group etat-field" key={key}>
+                  <label>
+                    <span className="etat-key">État {key}</span>
+                    <span className="etat-default">
+                      (défaut: {DEFAULT_ETATS_COMMANDE[key]})
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.mappingEtatsCommande[key] || ""}
+                    onChange={(e) => handleEtatChange(key, e.target.value)}
+                    placeholder={DEFAULT_ETATS_COMMANDE[key]}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Tab États Facture */}
+        {activeTab === "etatsFacture" && (
+          <>
+            <p className="tab-description">
+              Définissez les libellés des états de facture (codes 0 à 9) pour
+              cette entreprise. Ces libellés seront affichés dans les écrans
+              Factures. Laissez vide un code non utilisé.
+            </p>
+            <div className="etats-grid">
+              {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
+                <div className="form-group etat-field" key={key}>
+                  <label>
+                    <span className="etat-key">État {key}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.mappingEtatsFacture[key] || ""}
+                    onChange={(e) =>
+                      handleEtatFactureChange(key, e.target.value)
+                    }
+                    placeholder={`Libellé état ${key}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Tab États Proforma */}
+        {activeTab === "etatsProforma" && (
+          <>
+            <p className="tab-description">
+              Définissez les libellés des états de proforma (codes 0 à 9) pour
+              cette entreprise. Ces libellés seront affichés dans les écrans
+              Proformas. Laissez vide un code non utilisé.
+            </p>
+            <div className="etats-grid">
+              {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
+                <div className="form-group etat-field" key={key}>
+                  <label>
+                    <span className="etat-key">État {key}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.mappingEtatsProforma[key] || ""}
+                    onChange={(e) =>
+                      handleEtatProformaChange(key, e.target.value)
+                    }
+                    placeholder={`Libellé état ${key}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Tab Réception */}
+        {activeTab === "reception" && (
+          <>
+            <p className="tab-description">
+              Paramètres du rapport de contrôle commande (réception de
+              marchandises) : dossier d'enregistrement du PDF et destinataires
+              de l'email.
+            </p>
+
+            <div className="form-group">
+              <label>
+                <HiFolder /> Dossier d'enregistrement du rapport
+              </label>
+              <input
+                type="text"
+                name="cheminRapportReception"
+                value={formData.cheminRapportReception}
+                onChange={handleChange}
+                placeholder="\\192.168.0.250\Rcommun\STOCK\controle commande"
+              />
+              <span className="input-hint">
+                Dossier réseau (RCOMMUN) où le PDF du rapport sera déposé.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiMail /> Emails destinataires du rapport
+              </label>
+              <textarea
+                name="emailsRapportReception"
+                rows={5}
+                value={(formData.emailsRapportReception || []).join("\n")}
+                onChange={handleEmailsChange}
+                placeholder={"achats@exemple.com\nresponsable@exemple.com"}
+              />
+              <span className="input-hint">
+                Un email par ligne (les virgules et points-virgules sont aussi
+                acceptés). Le rapport PDF leur sera envoyé en pièce jointe.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiMail /> Emails destinataires du rapport de préparation
+              </label>
+              <textarea
+                name="emailsRapportPreparation"
+                rows={5}
+                value={(formData.emailsRapportPreparation || []).join("\n")}
+                onChange={handleEmailsPrepaChange}
+                placeholder={"preparation@exemple.com\ncommercial@exemple.com"}
+              />
+              <span className="input-hint">
+                Un email par ligne (virgules / points-virgules acceptés). Le
+                rapport PDF de préparation de commande leur sera envoyé en
+                pièce jointe.
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Tab Vendeurs */}
+        {activeTab === "vendeurs" && (
+          <>
+            <p className="tab-description">
+              Associez chaque code vendeur (champ <strong>REPRES</strong>, 2
+              chiffres) à une identité et un type. « Détecter » récupère les
+              codes réellement présents dans les factures ; vous pouvez aussi
+              en ajouter manuellement.
+            </p>
+
+            <div className="vendeurs-toolbar">
+              <button
+                type="button"
+                className="btn-detect-vendeur"
+                onClick={detecterVendeurs}
+                disabled={detecting}
+              >
+                <HiSearch />{" "}
+                {detecting ? "Détection…" : "Détecter depuis les factures"}
+              </button>
+              <button
+                type="button"
+                className="btn-add-vendeur"
+                onClick={addVendeur}
+              >
+                <HiPlus /> Ajouter un code
+              </button>
+              {vendeursMsg ? (
+                <span className="vendeurs-msg">{vendeursMsg}</span>
+              ) : null}
+            </div>
+
+            {formData.vendeurs.length === 0 ? (
+              <div className="vendeurs-empty">
+                Aucun code vendeur. Cliquez sur « Détecter » ou « Ajouter un
+                code ».
+              </div>
+            ) : (
+              <table className="vendeurs-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Nom</th>
+                    <th>Prénom</th>
+                    <th>Email</th>
+                    <th>Type</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.vendeurs.map((v, i) => (
+                    <tr key={i}>
+                      <td>
+                        <input
+                          className="vendeur-code-input"
+                          type="text"
+                          inputMode="numeric"
+                          value={v.code}
+                          maxLength={2}
+                          placeholder="00"
+                          onChange={(e) =>
+                            updateVendeur(i, "code", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={v.nom}
+                          placeholder="Nom"
+                          onChange={(e) =>
+                            updateVendeur(i, "nom", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={v.prenom}
+                          placeholder="Prénom"
+                          onChange={(e) =>
+                            updateVendeur(i, "prenom", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="email"
+                          value={v.email}
+                          placeholder="email (optionnel)"
+                          onChange={(e) =>
+                            updateVendeur(i, "email", e.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <select
+                          value={v.type}
+                          onChange={(e) =>
+                            updateVendeur(i, "type", e.target.value)
+                          }
+                        >
+                          <option value="commercial">Commercial</option>
+                          <option value="vendeur">Vendeur</option>
+                          <option value="autre">Autre</option>
+                        </select>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-vendeur-remove"
+                          onClick={() => removeVendeur(i)}
+                          title="Supprimer"
+                        >
+                          <HiTrash />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+        {activeTab === "analyseCA" && (
+          <>
+            <p className="tab-description">
+              Paramètres du module <strong>Analyse CA</strong> pour CETTE
+              entreprise (équivalents du config.py du pipeline). Les valeurs
+              par défaut correspondent à la configuration QC.
+            </p>
+
+            <div className="aca-toolbar">
+              <button
+                type="button"
+                className="btn-add-vendeur"
+                onClick={resetAnalyseCa}
+              >
+                Réinitialiser (valeurs QC)
+              </button>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Seuil tiers interne</label>
+                <input
+                  type="number"
+                  value={formData.analyseCA.seuilTiersInterne}
+                  onChange={(e) =>
+                    handleAnalyseCaField("seuilTiersInterne", e.target.value)
+                  }
+                />
+                <small>TIERS ≥ seuil = compte interne</small>
+              </div>
+              <div className="form-group">
+                <label>Seuil PVTE aberrante (× catalogue)</label>
+                <input
+                  type="number"
+                  value={formData.analyseCA.seuilPvteAberrante}
+                  onChange={(e) =>
+                    handleAnalyseCaField("seuilPvteAberrante", e.target.value)
+                  }
+                />
+                <small>Ligne exclue si PVTE &gt; catalogue × seuil</small>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Tiers internes autorisés (analyse interne)</label>
+              <input
+                type="text"
+                value={formData.analyseCA.tiersInternesAutorises}
+                onChange={(e) =>
+                  handleAnalyseCaField("tiersInternesAutorises", e.target.value)
+                }
+                placeholder="9994, 9915, 9913…"
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Tiers exclus du CA</label>
+                <input
+                  type="text"
+                  value={formData.analyseCA.tiersExclusCA}
+                  onChange={(e) =>
+                    handleAnalyseCaField("tiersExclusCA", e.target.value)
+                  }
+                  placeholder="2226 (BON DE CAISSE)"
+                />
+              </div>
+              <div className="form-group">
+                <label>Tiers forcés en catégorie AUTRE</label>
+                <input
+                  type="text"
+                  value={formData.analyseCA.tiersForcerAutre}
+                  onChange={(e) =>
+                    handleAnalyseCaField("tiersForcerAutre", e.target.value)
+                  }
+                  placeholder="vide = aucun"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Préfixes d'articles exclus</label>
+                <input
+                  type="text"
+                  value={formData.analyseCA.articlesExclusPrefixes}
+                  onChange={(e) =>
+                    handleAnalyseCaField(
+                      "articlesExclusPrefixes", e.target.value,
+                    )
+                  }
+                  placeholder="08 (ECOPART)"
+                />
+              </div>
+              <div className="form-group">
+                <label>Codes articles exclus (exacts)</label>
+                <input
+                  type="text"
+                  value={formData.analyseCA.articlesExclusExacts}
+                  onChange={(e) =>
+                    handleAnalyseCaField("articlesExclusExacts", e.target.value)
+                  }
+                  placeholder="000001 (PROFORMA)"
+                />
+              </div>
+            </div>
+
+            {[
+              {
+                liste: "nomsClasses",
+                titre: "Noms des classes",
+                aide: "Préfixe article (dizaine) → libellé (onglet Classes)",
+                cleLabel: "Code",
+                valLabel: "Libellé",
+              },
+              {
+                liste: "nomsSousClasses",
+                titre: "Noms des sous-classes",
+                aide: "Préfixe article 2 chiffres → libellé (onglet Sous_Classes)",
+                cleLabel: "Code (2 chiffres)",
+                valLabel: "Libellé",
+              },
+              {
+                liste: "nomsLocates",
+                titre: "Noms des locates",
+                aide: "Code GROUPE → libellé lisible (onglet Locates)",
+                cleLabel: "Code groupe",
+                valLabel: "Libellé",
+              },
+              {
+                liste: "normalisationCategories",
+                titre: "Normalisation des catégories clients",
+                aide: "Variante trouvée en base → catégorie canonique",
+                cleLabel: "Variante",
+                valLabel: "Catégorie",
+              },
+            ].map((cfg) => (
+              <div className="aca-section" key={cfg.liste}>
+                <div className="aca-section-header">
+                  <h4>{cfg.titre}</h4>
+                  <button
+                    type="button"
+                    className="btn-add-vendeur"
+                    onClick={() => addAnalyseCaRow(cfg.liste)}
+                  >
+                    <HiPlus /> Ajouter
+                  </button>
+                </div>
+                <small className="aca-aide">{cfg.aide}</small>
+                {formData.analyseCA[cfg.liste].length === 0 ? (
+                  <div className="aca-empty">Aucune entrée.</div>
+                ) : (
+                  <table className="vendeurs-table aca-table">
+                    <thead>
+                      <tr>
+                        <th>{cfg.cleLabel}</th>
+                        <th>{cfg.valLabel}</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formData.analyseCA[cfg.liste].map((row, i) => (
+                        <tr key={`${cfg.liste}-${i}`}>
+                          <td>
+                            <input
+                              type="text"
+                              value={row.k}
+                              onChange={(e) =>
+                                handleAnalyseCaRow(
+                                  cfg.liste, i, "k", e.target.value,
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={row.v}
+                              onChange={(e) =>
+                                handleAnalyseCaRow(
+                                  cfg.liste, i, "v", e.target.value,
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn-vendeur-remove"
+                              onClick={() => removeAnalyseCaRow(cfg.liste, i)}
+                              title="Supprimer"
+                            >
+                              <HiTrash />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+
+        <div className="modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={isCreating || isUpdating}
+          >
+            {isCreating || isUpdating
+              ? "Enregistrement..."
+              : isEdit
+                ? "Modifier"
+                : "Créer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

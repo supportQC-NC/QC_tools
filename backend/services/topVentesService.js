@@ -5,10 +5,11 @@
 //
 // Calcule, depuis article.dbf (lu via le cache), les indicateurs de vente par
 // article puis les agrège par FOURNISSEUR ou par RAYON (GISM1) :
-//   vente_annee = ΣV1..V12   (ventes des 12 derniers mois, champ article)
-//   ca_annee    = vente_annee × PVTE
-//   marge_ht    = PVTE / PREV
-//   jour_rupture= ΣRUP1..RUP12
+//   vente_annee  = ΣV1..V12   (ventes des 12 derniers mois, champ article)
+//   ca_annee     = vente_annee × PVTE
+//   taux_marque  = (PVTE − PREV) / PVTE  (en %, taux de marque HT sur prix de vente)
+//                  Articles à coût 0/absent exclus des sommes de marge.
+//   jour_rupture = ΣRUP1..RUP12
 //   stock_total = ΣS1..S5 (mag = S1, dock = S2..S5)
 //
 // Le CA facture précis N/N-1 (tblCA_N) sera un enrichissement ultérieur.
@@ -37,6 +38,11 @@ const metrics = (rec) => {
   const prev = num(rec.PREV);
   const stockMag = num(rec.S1);
   const stockDock = sumFields(rec, "S", 2, 5);
+  // Coût exploitable seulement si le prix de revient ET le prix de vente sont
+  // renseignés (>0) : sinon on ne peut pas calculer de marge fiable. Les articles
+  // à coût 0 sont donc exclus des sommes de marge (numérateur ET dénominateur)
+  // pour ne pas gonfler artificiellement la marque moyenne du groupe.
+  const coutValide = prev > 0 && pvte > 0;
   return {
     venteAnnee,
     venteMoisMoy: round2(venteAnnee / 12),
@@ -44,8 +50,11 @@ const metrics = (rec) => {
     prev,
     pvttc: num(rec.PVTETTC),
     caAnnee: round2(venteAnnee * pvte),
-    coutAnnee: venteAnnee * prev,
-    margeHt: prev > 0 ? round2(pvte / prev) : null,
+    // Sommes réservées au calcul de marge : uniquement les articles à coût connu.
+    caMarge: coutValide ? venteAnnee * pvte : 0,
+    coutMarge: coutValide ? venteAnnee * prev : 0,
+    // Taux de marque HT = (PV - PR) / PV, en %. Null si coût/PV manquant.
+    tauxMarque: coutValide ? round2(((pvte - prev) / pvte) * 100) : null,
     jourRupture: sumFields(rec, "RUP", 1, 12),
     stockMag,
     stockDock,
@@ -97,7 +106,8 @@ export const getSynthese = async (entreprise, options = {}) => {
         nbArticles: 0,
         venteAnnee: 0,
         caAnnee: 0,
-        coutAnnee: 0,
+        caMarge: 0,
+        coutMarge: 0,
         stockTotal: 0,
       });
     }
@@ -105,7 +115,8 @@ export const getSynthese = async (entreprise, options = {}) => {
     g.nbArticles += 1;
     g.venteAnnee += m.venteAnnee;
     g.caAnnee += m.caAnnee;
-    g.coutAnnee += m.coutAnnee;
+    g.caMarge += m.caMarge;
+    g.coutMarge += m.coutMarge;
     g.stockTotal += m.stockTotal;
   }
 
@@ -129,7 +140,10 @@ export const getSynthese = async (entreprise, options = {}) => {
       nbArticles: g.nbArticles,
       venteAnnee: round2(g.venteAnnee),
       caAnnee: round2(g.caAnnee),
-      margeMoy: g.coutAnnee > 0 ? round2(g.caAnnee / g.coutAnnee) : null,
+      // Taux de marque moyen HT pondéré par le CA = (CA - coût) / CA, en %,
+      // calculé sur les seuls articles à coût connu (g.caMarge / g.coutMarge).
+      tauxMarqueMoy:
+        g.caMarge > 0 ? round2(((g.caMarge - g.coutMarge) / g.caMarge) * 100) : null,
     });
   }
 
@@ -156,7 +170,7 @@ export const getSynthese = async (entreprise, options = {}) => {
 const SORT_FIELDS = new Set([
   "caAnnee",
   "venteAnnee",
-  "margeHt",
+  "tauxMarque",
   "jourRupture",
   "stockTotal",
   "pvte",
@@ -204,7 +218,7 @@ export const getDetail = async (entreprise, options = {}) => {
       venteAnnee: round2(m.venteAnnee),
       venteMoisMoy: m.venteMoisMoy,
       caAnnee: m.caAnnee,
-      margeHt: m.margeHt,
+      tauxMarque: m.tauxMarque,
       jourRupture: m.jourRupture,
       pvte: m.pvte,
       prev: m.prev,

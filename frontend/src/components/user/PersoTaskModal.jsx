@@ -33,6 +33,7 @@ import {
 } from "../../config/taskMeta";
 import { triggerDownload, openInNewTab } from "../../utils/executableHelpers";
 import ChatPanel from "../chat/ChatPanel";
+import Modal from "../ui/Modal/Modal";
 
 const toDateInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
@@ -147,230 +148,228 @@ const PersoTaskModal = ({ task, onClose }) => {
     isPerso || (doc.uploadedBy?._id || doc.uploadedBy) === myId;
 
   return (
-    <div className="ptm-overlay" onClick={onClose}>
-      <div className="ptm-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="ptm-head">
-          <h2>
-            {!isEdit
-              ? "Nouvelle tâche personnelle"
-              : editable
-                ? "Modifier ma tâche"
-                : "Détail de la tâche"}
-          </h2>
-          <button className="ptm-close" onClick={onClose}>
-            <HiX />
-          </button>
+    <Modal onClose={onClose} overlayClassName="ptm-overlay" contentClassName="ptm-modal">
+      <div className="ptm-head">
+        <h2>
+          {!isEdit
+            ? "Nouvelle tâche personnelle"
+            : editable
+              ? "Modifier ma tâche"
+              : "Détail de la tâche"}
+        </h2>
+        <button className="ptm-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
+
+      <form className="ptm-form" onSubmit={handleSubmit}>
+        {error && <div className="ptm-error">{error}</div>}
+
+        {/* Bandeau contexte pour une tâche d'équipe (lecture seule) */}
+        {isEdit && !isPerso && (
+          <div className="ptm-context">
+            <span className="ptm-context-tag">Tâche d'équipe</span>
+            {task.equipe?.nom && <span>Équipe : {task.equipe.nom}</span>}
+            <span>Statut : {STATUT_LABELS[task.statut]}</span>
+          </div>
+        )}
+
+        <div className="ptm-field">
+          <label>Titre {editable && "*"}</label>
+          {editable ? (
+            <input
+              name="titre"
+              value={form.titre}
+              onChange={handleChange}
+              placeholder="Ex : Rappeler le fournisseur"
+              autoFocus
+              required
+            />
+          ) : (
+            <p className="ptm-readonly">{task.titre}</p>
+          )}
         </div>
 
-        <form className="ptm-form" onSubmit={handleSubmit}>
-          {error && <div className="ptm-error">{error}</div>}
-
-          {/* Bandeau contexte pour une tâche d'équipe (lecture seule) */}
-          {isEdit && !isPerso && (
-            <div className="ptm-context">
-              <span className="ptm-context-tag">Tâche d'équipe</span>
-              {task.equipe?.nom && <span>Équipe : {task.equipe.nom}</span>}
-              <span>Statut : {STATUT_LABELS[task.statut]}</span>
-            </div>
+        <div className="ptm-field">
+          <label>Description</label>
+          {editable ? (
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              placeholder="Détails (optionnel)"
+              rows={3}
+            />
+          ) : (
+            <p className="ptm-readonly">{task.description || "—"}</p>
           )}
+        </div>
 
+        <div className="ptm-row">
           <div className="ptm-field">
-            <label>Titre {editable && "*"}</label>
+            <label>Échéance</label>
             {editable ? (
               <input
-                name="titre"
-                value={form.titre}
+                type="date"
+                name="deadline"
+                value={form.deadline}
                 onChange={handleChange}
-                placeholder="Ex : Rappeler le fournisseur"
-                autoFocus
-                required
               />
             ) : (
-              <p className="ptm-readonly">{task.titre}</p>
+              <p className="ptm-readonly">
+                {task.deadline
+                  ? new Date(task.deadline).toLocaleDateString("fr-FR")
+                  : "—"}
+              </p>
             )}
           </div>
-
           <div className="ptm-field">
-            <label>Description</label>
+            <label>Priorité</label>
             {editable ? (
-              <textarea
-                name="description"
-                value={form.description}
-                onChange={handleChange}
-                placeholder="Détails (optionnel)"
-                rows={3}
-              />
+              <select name="priorite" value={form.priorite} onChange={handleChange}>
+                {TASK_PRIORITES.map((p) => (
+                  <option key={p} value={p}>
+                    {PRIORITE_LABELS[p]}
+                  </option>
+                ))}
+              </select>
             ) : (
-              <p className="ptm-readonly">{task.description || "—"}</p>
+              <p className="ptm-readonly">{PRIORITE_LABELS[task.priorite]}</p>
             )}
           </div>
+        </div>
 
-          <div className="ptm-row">
-            <div className="ptm-field">
-              <label>Échéance</label>
-              {editable ? (
-                <input
-                  type="date"
-                  name="deadline"
-                  value={form.deadline}
-                  onChange={handleChange}
-                />
-              ) : (
-                <p className="ptm-readonly">
-                  {task.deadline
-                    ? new Date(task.deadline).toLocaleDateString("fr-FR")
-                    : "—"}
-                </p>
-              )}
-            </div>
-            <div className="ptm-field">
-              <label>Priorité</label>
-              {editable ? (
-                <select name="priorite" value={form.priorite} onChange={handleChange}>
-                  {TASK_PRIORITES.map((p) => (
-                    <option key={p} value={p}>
-                      {PRIORITE_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="ptm-readonly">{PRIORITE_LABELS[task.priorite]}</p>
-              )}
-            </div>
+        {/* Documents */}
+        <div className="ptm-field">
+          <div className="ptm-docs-head">
+            <label>
+              <HiPaperClip /> Documents (PDF, Excel, images…)
+            </label>
+            <label className="ptm-adddoc" title="Ajouter des documents">
+              <HiPlus />
+              <span>{uploading ? "Envoi…" : "Ajouter"}</span>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.xls,.xlsx,.csv,image/*"
+                hidden
+                onChange={handleFiles}
+                disabled={uploading}
+              />
+            </label>
           </div>
 
-          {/* Documents */}
-          <div className="ptm-field">
-            <div className="ptm-docs-head">
-              <label>
-                <HiPaperClip /> Documents (PDF, Excel, images…)
-              </label>
-              <label className="ptm-adddoc" title="Ajouter des documents">
-                <HiPlus />
-                <span>{uploading ? "Envoi…" : "Ajouter"}</span>
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.xls,.xlsx,.csv,image/*"
-                  hidden
-                  onChange={handleFiles}
-                  disabled={uploading}
-                />
-              </label>
-            </div>
+          {/* Fichiers en attente (création) */}
+          {!isEdit && pendingDocs.length > 0 && (
+            <ul className="ptm-doclist">
+              {pendingDocs.map((f, i) => (
+                <li key={`${f.name}-${i}`}>
+                  <span className="ptm-doc-name">{f.name}</span>
+                  <button
+                    type="button"
+                    className="ptm-doc-x"
+                    onClick={() => handleRemovePending(i)}
+                  >
+                    <HiX />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
 
-            {/* Fichiers en attente (création) */}
-            {!isEdit && pendingDocs.length > 0 && (
+          {/* Documents existants */}
+          {isEdit && (
+            documents.length === 0 ? (
+              <p className="ptm-docs-none">Aucun document.</p>
+            ) : (
               <ul className="ptm-doclist">
-                {pendingDocs.map((f, i) => (
-                  <li key={`${f.name}-${i}`}>
-                    <span className="ptm-doc-name">{f.name}</span>
+                {documents.map((doc) => (
+                  <li key={doc._id}>
                     <button
                       type="button"
-                      className="ptm-doc-x"
-                      onClick={() => handleRemovePending(i)}
+                      className="ptm-doc-open"
+                      onClick={() => openInNewTab(taskDocumentUrl(task._id, doc._id))}
+                      title={`Voir ${doc.fileName}`}
                     >
-                      <HiX />
+                      {docIcon(doc.kind)}
+                      <span className="ptm-doc-name">{doc.fileName}</span>
+                      <HiExternalLink className="ptm-doc-ext" />
                     </button>
+                    <button
+                      type="button"
+                      className="ptm-doc-dl"
+                      onClick={() =>
+                        triggerDownload(
+                          taskDocumentUrl(task._id, doc._id),
+                          doc.fileName,
+                        )
+                      }
+                      title="Télécharger"
+                    >
+                      <HiDownload />
+                    </button>
+                    {canDeleteDoc(doc) && (
+                      <button
+                        type="button"
+                        className="ptm-doc-x"
+                        onClick={() => handleDeleteDoc(doc)}
+                        title="Supprimer"
+                      >
+                        <HiX />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
-            )}
+            )
+          )}
+        </div>
 
-            {/* Documents existants */}
-            {isEdit && (
-              documents.length === 0 ? (
-                <p className="ptm-docs-none">Aucun document.</p>
-              ) : (
-                <ul className="ptm-doclist">
-                  {documents.map((doc) => (
-                    <li key={doc._id}>
-                      <button
-                        type="button"
-                        className="ptm-doc-open"
-                        onClick={() => openInNewTab(taskDocumentUrl(task._id, doc._id))}
-                        title={`Voir ${doc.fileName}`}
-                      >
-                        {docIcon(doc.kind)}
-                        <span className="ptm-doc-name">{doc.fileName}</span>
-                        <HiExternalLink className="ptm-doc-ext" />
-                      </button>
-                      <button
-                        type="button"
-                        className="ptm-doc-dl"
-                        onClick={() =>
-                          triggerDownload(
-                            taskDocumentUrl(task._id, doc._id),
-                            doc.fileName,
-                          )
-                        }
-                        title="Télécharger"
-                      >
-                        <HiDownload />
-                      </button>
-                      {canDeleteDoc(doc) && (
-                        <button
-                          type="button"
-                          className="ptm-doc-x"
-                          onClick={() => handleDeleteDoc(doc)}
-                          title="Supprimer"
-                        >
-                          <HiX />
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )
-            )}
-          </div>
-
-          <div className="ptm-actions">
-            {isEdit && isPerso && (
+        <div className="ptm-actions">
+          {isEdit && isPerso && (
+            <button
+              type="button"
+              className="ptm-btn-delete"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              <HiTrash />
+              <span>Supprimer</span>
+            </button>
+          )}
+          <div className="ptm-actions-right">
+            <button type="button" className="ptm-btn-ghost" onClick={onClose}>
+              Fermer
+            </button>
+            {editable && (
               <button
-                type="button"
-                className="ptm-btn-delete"
-                onClick={handleDelete}
-                disabled={deleting}
+                type="submit"
+                className="ptm-btn-primary"
+                disabled={creating || updating}
               >
-                <HiTrash />
-                <span>Supprimer</span>
+                {creating || updating
+                  ? "Enregistrement…"
+                  : isEdit
+                    ? "Enregistrer"
+                    : "Créer"}
               </button>
             )}
-            <div className="ptm-actions-right">
-              <button type="button" className="ptm-btn-ghost" onClick={onClose}>
-                Fermer
-              </button>
-              {editable && (
-                <button
-                  type="submit"
-                  className="ptm-btn-primary"
-                  disabled={creating || updating}
-                >
-                  {creating || updating
-                    ? "Enregistrement…"
-                    : isEdit
-                      ? "Enregistrer"
-                      : "Créer"}
-                </button>
-              )}
-            </div>
           </div>
-        </form>
+        </div>
+      </form>
 
-        {/* Chat de la tâche (manager ↔ assigné) — hors du <form> pour ne pas
-            imbriquer deux formulaires. Uniquement pour les tâches d'équipe. */}
-        {isEdit && !isPerso && (
-          <div className="ptm-chat">
-            <ChatPanel
-              room={`task:${task._id}`}
-              title="Discussion sur la tâche"
-              compact
-            />
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Chat de la tâche (manager ↔ assigné) — hors du <form> pour ne pas
+          imbriquer deux formulaires. Uniquement pour les tâches d'équipe. */}
+      {isEdit && !isPerso && (
+        <div className="ptm-chat">
+          <ChatPanel
+            room={`task:${task._id}`}
+            title="Discussion sur la tâche"
+            compact
+          />
+        </div>
+      )}
+    </Modal>
   );
 };
 

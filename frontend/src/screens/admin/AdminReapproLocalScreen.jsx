@@ -13,15 +13,12 @@ import { useSelector } from "react-redux";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
+import { roundInt, fmtFranc, fmtQty } from "../../utils/format";
 import "./AdminReapproLocalScreen.css";
-
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
-const fQty = (n) => r0(n).toLocaleString("fr-FR");
 const moneyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fF(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtFranc(p.value);
 const qtyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fQty(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtQty(p.value);
 const num = { type: "rightAligned" };
 
 const AdminReapproLocalScreen = () => {
@@ -191,25 +188,25 @@ const AdminReapproLocalScreen = () => {
         const line = [
           r.nart,
           r.design,
-          r0(r.pvte),
+          roundInt(r.pvte),
           r.groupeArt,
           r.codtar,
           r.vteMoyMois,
-          r0(r.venteAnnuelle),
-          r0(r.caMois),
-          r0(r.caJour),
-          r0(r.stock),
-          r0(r.encde),
+          roundInt(r.venteAnnuelle),
+          roundInt(r.caMois),
+          roundInt(r.caJour),
+          roundInt(r.stock),
+          roundInt(r.encde),
           r.fourLocal,
         ];
         if (withFour)
           line.push(
             r.nartFour,
-            r.stockFour === "" ? "" : r0(r.stockFour),
-            r.encdeFour === "" ? "" : r0(r.encdeFour),
+            r.stockFour === "" ? "" : roundInt(r.stockFour),
+            r.encdeFour === "" ? "" : roundInt(r.encdeFour),
             r.stopFour,
           );
-        line.push(r0(r.reappro), r0(r.caPerdu), r0(r.aCommander));
+        line.push(roundInt(r.reappro), roundInt(r.caPerdu), roundInt(r.aCommander));
         aoa.push(line);
       });
       return XLSX.utils.aoa_to_sheet(aoa);
@@ -308,23 +305,23 @@ const AdminReapproLocalScreen = () => {
           {totaux && (
             <div className="rl-kpis">
               <div className="rl-kpi">
-                <span className="v">{fQty(totaux.aCommanderGroupe)}</span>
+                <span className="v">{fmtQty(totaux.aCommanderGroupe)}</span>
                 <span className="l">À commander (groupe)</span>
               </div>
               <div className="rl-kpi">
-                <span className="v">{fF(totaux.caPerduGroupe)}</span>
+                <span className="v">{fmtFranc(totaux.caPerduGroupe)}</span>
                 <span className="l">CA perdu (groupe)</span>
               </div>
               <div className="rl-kpi">
-                <span className="v">{fQty(totaux.nbGroupe)}</span>
+                <span className="v">{fmtQty(totaux.nbGroupe)}</span>
                 <span className="l">Articles GROUPE</span>
               </div>
               <div className="rl-kpi">
-                <span className="v">{fQty(totaux.nbAutres)}</span>
+                <span className="v">{fmtQty(totaux.nbAutres)}</span>
                 <span className="l">Articles AUTRES</span>
               </div>
               <div className="rl-kpi warn">
-                <span className="v">{fQty(totaux.nbCorrections)}</span>
+                <span className="v">{fmtQty(totaux.nbCorrections)}</span>
                 <span className="l">Corrections BDD</span>
               </div>
             </div>

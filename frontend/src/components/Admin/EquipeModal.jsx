@@ -12,6 +12,7 @@ import {
   useGetAssignableUsersQuery,
 } from "../../slices/userApiSlice";
 import { actorGrantableEntrepriseIds } from "../../config/adminModules";
+import Modal from "../ui/Modal/Modal";
 import "./UserModal.css";
 
 const EquipeModal = ({ team, onClose }) => {
@@ -116,137 +117,135 @@ const EquipeModal = ({ team, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{isEdit ? "Modifier l'équipe" : "Nouvelle équipe"}</h2>
-          <button className="btn-close" onClick={onClose}>
-            <HiX />
-          </button>
+    <Modal onClose={onClose} contentClassName="modal">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier l'équipe" : "Nouvelle équipe"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="modal-form">
+        {error && <div className="form-error">{error}</div>}
+
+        <div className="form-group">
+          <label>Nom de l'équipe</label>
+          <input
+            type="text"
+            name="nom"
+            value={form.nom}
+            onChange={handleChange}
+            placeholder="Ex : Réception matin"
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {error && <div className="form-error">{error}</div>}
+        <div className="form-group">
+          <label>Entreprise</label>
+          <select
+            name="entreprise"
+            value={form.entreprise}
+            onChange={handleChange}
+            disabled={isEdit}
+            required
+          >
+            <option value="">Sélectionner...</option>
+            {entreprisesDispo.map((e) => (
+              <option key={e._id} value={e._id}>
+                {e.trigramme} — {e.nomComplet}
+              </option>
+            ))}
+          </select>
+        </div>
 
+        {/* Le responsable n'est désignable que par un admin. Un responsable
+            crée toujours des équipes qu'il dirige lui-même. */}
+        {!isResponsable && (
           <div className="form-group">
-            <label>Nom de l'équipe</label>
-            <input
-              type="text"
-              name="nom"
-              value={form.nom}
-              onChange={handleChange}
-              placeholder="Ex : Réception matin"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Entreprise</label>
+            <label>Responsable (optionnel)</label>
             <select
-              name="entreprise"
-              value={form.entreprise}
+              name="responsable"
+              value={form.responsable}
               onChange={handleChange}
-              disabled={isEdit}
-              required
             >
-              <option value="">Sélectionner...</option>
-              {entreprisesDispo.map((e) => (
-                <option key={e._id} value={e._id}>
-                  {e.trigramme} — {e.nomComplet}
+              <option value="">Moi-même (par défaut)</option>
+              {responsablesDispo.map((u) => (
+                <option key={u._id} value={u._id}>
+                  {u.prenom} {u.nom} ({u.email})
                 </option>
               ))}
             </select>
+            <span className="label-hint">
+              Laissez vide pour devenir vous-même responsable de l'équipe.
+            </span>
           </div>
+        )}
 
-          {/* Le responsable n'est désignable que par un admin. Un responsable
-              crée toujours des équipes qu'il dirige lui-même. */}
-          {!isResponsable && (
-            <div className="form-group">
-              <label>Responsable (optionnel)</label>
-              <select
-                name="responsable"
-                value={form.responsable}
-                onChange={handleChange}
-              >
-                <option value="">Moi-même (par défaut)</option>
-                {responsablesDispo.map((u) => (
-                  <option key={u._id} value={u._id}>
-                    {u.prenom} {u.nom} ({u.email})
-                  </option>
-                ))}
-              </select>
-              <span className="label-hint">
-                Laissez vide pour devenir vous-même responsable de l'équipe.
-              </span>
-            </div>
-          )}
-
-          {/* Membres : sélection à la création. En édition, on gère les membres
-              depuis l'écran détail de l'équipe. */}
-          {!isEdit && (
-            <div className="form-group">
-              <label>Membres (optionnel)</label>
-              {membresDispo.length === 0 ? (
-                <span className="label-hint">
-                  Aucun utilisateur disponible dans vos sociétés.
-                </span>
-              ) : (
-                <div className="eq-members-picker">
-                  {membresDispo.map((u) => (
-                    <label key={u._id} className="eq-member-check">
-                      <input
-                        type="checkbox"
-                        checked={membres.includes(u._id)}
-                        onChange={() => toggleMembre(u._id)}
-                      />
-                      <span>
-                        {u.prenom} {u.nom} ({u.email})
-                        {u.entreprises?.length
-                          ? ` — ${u.entreprises.join(", ")}`
-                          : ""}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              {membres.length > 0 && (
-                <span className="label-hint">
-                  {membres.length} membre(s) sélectionné(s).
-                </span>
-              )}
-            </div>
-          )}
-
+        {/* Membres : sélection à la création. En édition, on gère les membres
+            depuis l'écran détail de l'équipe. */}
+        {!isEdit && (
           <div className="form-group">
-            <label>Description (optionnel)</label>
-            <input
-              type="text"
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              placeholder="Rôle de l'équipe"
-            />
+            <label>Membres (optionnel)</label>
+            {membresDispo.length === 0 ? (
+              <span className="label-hint">
+                Aucun utilisateur disponible dans vos sociétés.
+              </span>
+            ) : (
+              <div className="eq-members-picker">
+                {membresDispo.map((u) => (
+                  <label key={u._id} className="eq-member-check">
+                    <input
+                      type="checkbox"
+                      checked={membres.includes(u._id)}
+                      onChange={() => toggleMembre(u._id)}
+                    />
+                    <span>
+                      {u.prenom} {u.nom} ({u.email})
+                      {u.entreprises?.length
+                        ? ` — ${u.entreprises.join(", ")}`
+                        : ""}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {membres.length > 0 && (
+              <span className="label-hint">
+                {membres.length} membre(s) sélectionné(s).
+              </span>
+            )}
           </div>
+        )}
 
-          <div className="modal-footer">
-            <button type="button" className="btn-cancel" onClick={onClose}>
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn-submit"
-              disabled={isCreating || isUpdating}
-            >
-              {isCreating || isUpdating
-                ? "Enregistrement..."
-                : isEdit
-                  ? "Modifier"
-                  : "Créer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="form-group">
+          <label>Description (optionnel)</label>
+          <input
+            type="text"
+            name="description"
+            value={form.description}
+            onChange={handleChange}
+            placeholder="Rôle de l'équipe"
+          />
+        </div>
+
+        <div className="modal-footer">
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={isCreating || isUpdating}
+          >
+            {isCreating || isUpdating
+              ? "Enregistrement..."
+              : isEdit
+                ? "Modifier"
+                : "Créer"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

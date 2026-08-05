@@ -12,19 +12,16 @@ import {
 } from "../../slices/filialesApiSlice";
 import Loader from "../../components/Shared/Loader/Loader";
 import { BASE_URL } from "../../constants";
+import { roundInt, fmtFranc, fmtQty } from "../../utils/format";
 import "./AdminFilialesScreen.css";
 
 const STORAGE_KEY = "filiales_reseau";
 
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
-const fQty = (n) => r0(n).toLocaleString("fr-FR");
-
 // Formatters AG Grid
 const moneyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fF(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtFranc(p.value);
 const qtyFmt = (p) =>
-  p.value === null || p.value === undefined || p.value === "" ? "" : fQty(p.value);
+  p.value === null || p.value === undefined || p.value === "" ? "" : fmtQty(p.value);
 const pctFmt = (p) =>
   p.value === null || p.value === undefined || p.value === "" ? "" : `${p.value}%`;
 
@@ -405,11 +402,11 @@ const AdminFilialesScreen = () => {
           r.nart,
           r.design,
           r.nomFour,
-          r0(r.stock),
-          r0(r.pvte),
-          r0(r.vteAn),
-          r0(r.caAn),
-          r0(r.vteHorsReseau),
+          roundInt(r.stock),
+          roundInt(r.pvte),
+          roundInt(r.vteAn),
+          roundInt(r.caAn),
+          roundInt(r.vteHorsReseau),
           r.pctReseau === null ? "" : r.pctReseau,
           r.filtre,
         ];
@@ -418,10 +415,10 @@ const AdminFilialesScreen = () => {
           if (nartV) {
             line.push(
               nartV,
-              r0(r[`${f.code}_stock`]),
-              r0(r[`${f.code}_pvte`]),
-              r0(r[`${f.code}_vteAn`]),
-              r0(r[`${f.code}_caAn`]),
+              roundInt(r[`${f.code}_stock`]),
+              roundInt(r[`${f.code}_pvte`]),
+              roundInt(r[`${f.code}_vteAn`]),
+              roundInt(r[`${f.code}_caAn`]),
             );
           } else {
             line.push("", "", "", "", "");
@@ -529,19 +526,19 @@ const AdminFilialesScreen = () => {
           {totaux && (
             <div className="af-kpis">
               <div className="af-kpi">
-                <span className="v">{fQty(totaux.nbArticles)}</span>
+                <span className="v">{fmtQty(totaux.nbArticles)}</span>
                 <span className="l">Articles {data.mere}</span>
               </div>
               <div className="af-kpi">
-                <span className="v">{fQty(totaux.nbDansReseau)}</span>
+                <span className="v">{fmtQty(totaux.nbDansReseau)}</span>
                 <span className="l">Dans le réseau (O)</span>
               </div>
               <div className="af-kpi">
-                <span className="v">{fF(totaux.caMere)}</span>
+                <span className="v">{fmtFranc(totaux.caMere)}</span>
                 <span className="l">CA HT {data.mere}</span>
               </div>
               <div className="af-kpi">
-                <span className="v">{fQty(totaux.vteHorsReseau)}</span>
+                <span className="v">{fmtQty(totaux.vteHorsReseau)}</span>
                 <span className="l">Ventes hors réseau</span>
               </div>
             </div>

@@ -43,6 +43,7 @@ import {
 } from "../../slices/articleApiSlice";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
+import Modal from "../../components/ui/Modal/Modal";
 import "./AdminArticlesScreen.css";
 
 // Debounce hook pour éviter trop de requêtes
@@ -1041,360 +1042,359 @@ const AdminArticlesScreen = () => {
 
       {/* Modal Détails Article */}
       {selectedArticle && (
-        <div
-          className="article-modal-overlay"
-          onClick={() => setSelectedArticle(null)}
+        <Modal
+          onClose={() => setSelectedArticle(null)}
+          overlayClassName="article-modal-overlay"
+          contentClassName="article-modal"
         >
-          <div className="article-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">
-                <HiCube />
-                <div>
-                  <h2>Détails de l'article</h2>
-                  <span className="modal-nart">
-                    {safeTrim(selectedArticle.NART)}
-                  </span>
-                </div>
-              </div>
-              <div className="modal-header-actions">
-                <button
-                  className="btn-view-full btn-fiche-pdf"
-                  title="Télécharger la fiche article PDF"
-                  disabled={fichePdfLoading}
-                  onClick={() => downloadFichePdf(selectedArticle.NART)}
-                >
-                  <HiDownload />
-                  <span>{fichePdfLoading ? "Génération…" : "Fiche PDF"}</span>
-                </button>
-                <Link
-                  to={`/admin/articles/${selectedEntreprise}/${safeTrim(selectedArticle.NART)}`}
-                  className="btn-view-full"
-                  title="Voir la fiche complète"
-                >
-                  <HiExternalLink />
-                  <span>Fiche complète</span>
-                </Link>
-                <button
-                  className="btn-close-modal"
-                  onClick={() => setSelectedArticle(null)}
-                >
-                  <HiX />
-                </button>
+          <div className="modal-header">
+            <div className="modal-title">
+              <HiCube />
+              <div>
+                <h2>Détails de l'article</h2>
+                <span className="modal-nart">
+                  {safeTrim(selectedArticle.NART)}
+                </span>
               </div>
             </div>
+            <div className="modal-header-actions">
+              <button
+                className="btn-view-full btn-fiche-pdf"
+                title="Télécharger la fiche article PDF"
+                disabled={fichePdfLoading}
+                onClick={() => downloadFichePdf(selectedArticle.NART)}
+              >
+                <HiDownload />
+                <span>{fichePdfLoading ? "Génération…" : "Fiche PDF"}</span>
+              </button>
+              <Link
+                to={`/admin/articles/${selectedEntreprise}/${safeTrim(selectedArticle.NART)}`}
+                className="btn-view-full"
+                title="Voir la fiche complète"
+              >
+                <HiExternalLink />
+                <span>Fiche complète</span>
+              </Link>
+              <button
+                className="btn-close-modal"
+                onClick={() => setSelectedArticle(null)}
+              >
+                <HiX />
+              </button>
+            </div>
+          </div>
 
-            <div className="modal-body">
-              <div className="modal-grid">
-                {/* Photo */}
-                {hasPhotosConfigured && (
-                  <div className="modal-photo-section">
-                    {!photoError ? (
-                      <div
-                        className={`photo-wrapper ${photoLoaded ? "loaded" : ""}`}
-                      >
-                        <img
-                          src={getPhotoUrl(
-                            selectedEntrepriseData?.trigramme,
-                            selectedArticle.NART,
-                          )}
-                          alt={safeTrim(selectedArticle.DESIGN)}
-                          onError={() => setPhotoError(true)}
-                          onLoad={() => setPhotoLoaded(true)}
-                        />
-                        {!photoLoaded && (
-                          <div className="photo-loading">
-                            <div className="loading-spinner small"></div>
-                          </div>
+          <div className="modal-body">
+            <div className="modal-grid">
+              {/* Photo */}
+              {hasPhotosConfigured && (
+                <div className="modal-photo-section">
+                  {!photoError ? (
+                    <div
+                      className={`photo-wrapper ${photoLoaded ? "loaded" : ""}`}
+                    >
+                      <img
+                        src={getPhotoUrl(
+                          selectedEntrepriseData?.trigramme,
+                          selectedArticle.NART,
                         )}
-                      </div>
-                    ) : (
-                      <div className="no-photo">
-                        <HiPhotograph />
-                        <span>Photo non disponible</span>
+                        alt={safeTrim(selectedArticle.DESIGN)}
+                        onError={() => setPhotoError(true)}
+                        onLoad={() => setPhotoLoaded(true)}
+                      />
+                      {!photoLoaded && (
+                        <div className="photo-loading">
+                          <div className="loading-spinner small"></div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="no-photo">
+                      <HiPhotograph />
+                      <span>Photo non disponible</span>
+                    </div>
+                  )}
+
+                  {/* Badges */}
+                  <div className="modal-badges">
+                    {isPromoActive(selectedArticle) && (
+                      <span className="modal-badge promo">
+                        <HiTag /> PROMO
+                      </span>
+                    )}
+                    {(parseFloat(selectedArticle.DEPREC) || 0) > 0 && (
+                      <span className="modal-badge deprec">
+                        <HiExclamation /> DÉPRÉCIÉ {selectedArticle.DEPREC}%
+                      </span>
+                    )}
+                    {selectedArticle.WEB?.toString().toUpperCase().trim() ===
+                      "O" && (
+                      <span className="modal-badge web">
+                        <HiGlobe /> WEB
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Infos */}
+              <div className="modal-info-section">
+                {/* Désignation */}
+                <div className="info-block designation-block">
+                  <h3>{safeTrim(selectedArticle.DESIGN)}</h3>
+                  {safeTrim(selectedArticle.DESIGN2) && (
+                    <p>{safeTrim(selectedArticle.DESIGN2)}</p>
+                  )}
+                </div>
+
+                {/* Codes */}
+                <div className="info-grid codes-grid">
+                  <div className="info-item">
+                    <label>Code NART</label>
+                    <span className="value highlight">
+                      {safeTrim(selectedArticle.NART)}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Code barre</label>
+                    <span className="value mono">
+                      {safeTrim(selectedArticle.GENCOD) || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Réf. fournisseur</label>
+                    <span className="value">
+                      {safeTrim(selectedArticle.REFER) || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Fournisseur</label>
+                    <span className="value">
+                      {selectedArticle.FOURN || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Groupe</label>
+                    <span className="value tag">
+                      {safeTrim(selectedArticle.GROUPE) || "-"}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Unité</label>
+                    <span className="value">
+                      {safeTrim(selectedArticle.UNITE) || "-"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Prix */}
+                <div className="info-block price-block">
+                  <h4>💰 Prix</h4>
+                  <div className="price-grid">
+                    <div className="price-item main">
+                      <label>PV TTC</label>
+                      <span
+                        className={
+                          isPromoActive(selectedArticle)
+                            ? "strikethrough"
+                            : ""
+                        }
+                      >
+                        {formatPrice(selectedArticle.PVTETTC)}
+                      </span>
+                    </div>
+                    {isPromoActive(selectedArticle) && (
+                      <div className="price-item promo">
+                        <label>Prix PROMO</label>
+                        <span>{formatPrice(selectedArticle.PVPROMO)}</span>
                       </div>
                     )}
+                    <div className="price-item">
+                      <label>PV HT</label>
+                      <span>{formatPrice(selectedArticle.PVTE)}</span>
+                    </div>
+                    <div className="price-item">
+                      <label>Prix achat</label>
+                      <span>{formatPrice(selectedArticle.PACHAT)}</span>
+                    </div>
+                    <div className="price-item">
+                      <label>Prix revient</label>
+                      <span>{formatPrice(selectedArticle.PREV)}</span>
+                    </div>
+                    <div className="price-item">
+                      <label>TGC</label>
+                      <span>{selectedArticle.TAXES || 0}%</span>
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Badges */}
-                    <div className="modal-badges">
-                      {isPromoActive(selectedArticle) && (
-                        <span className="modal-badge promo">
-                          <HiTag /> PROMO
-                        </span>
+                {/* Stocks */}
+                <div className="info-block stock-block">
+                  <h4>📦 Stocks par emplacement</h4>
+                  <div className="stock-grid">
+                    <div className="stock-item total">
+                      <label>Stock Total</label>
+                      <span
+                        className={
+                          calculateStockTotal(selectedArticle) > 0
+                            ? "positive"
+                            : "zero"
+                        }
+                      >
+                        {formatStock(calculateStockTotal(selectedArticle))}
+                      </span>
+                    </div>
+                    <div className="stock-item">
+                      <label>{mappingEntrepots.S1}</label>
+                      <span
+                        className={
+                          parseFloat(selectedArticle.S1) > 0
+                            ? "positive"
+                            : "zero"
+                        }
+                      >
+                        {formatStock(selectedArticle.S1)}
+                      </span>
+                    </div>
+                    <div className="stock-item">
+                      <label>{mappingEntrepots.S2}</label>
+                      <span>{formatStock(selectedArticle.S2)}</span>
+                    </div>
+                    <div className="stock-item">
+                      <label>{mappingEntrepots.S3}</label>
+                      <span>{formatStock(selectedArticle.S3)}</span>
+                    </div>
+                    <div className="stock-item">
+                      <label>{mappingEntrepots.S4}</label>
+                      <span>{formatStock(selectedArticle.S4)}</span>
+                    </div>
+                    <div className="stock-item">
+                      <label>{mappingEntrepots.S5}</label>
+                      <span>{formatStock(selectedArticle.S5)}</span>
+                    </div>
+                    <div className="stock-item">
+                      <label>Réservé</label>
+                      <span className="reserved">
+                        {formatStock(selectedArticle.RESERV)}
+                      </span>
+                    </div>
+                    <div className="stock-item">
+                      <label>Mini</label>
+                      <span>{formatStock(selectedArticle.SMINI)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gisements */}
+                {(selectedArticle.GISM1 ||
+                  selectedArticle.GISM2 ||
+                  selectedArticle.GISM3 ||
+                  selectedArticle.GISM4 ||
+                  selectedArticle.GISM5 ||
+                  selectedArticle.PLACE) && (
+                  <div className="info-block gisement-block">
+                    <h4>📍 Emplacements / Gisements</h4>
+                    <div className="gisement-grid">
+                      {selectedArticle.PLACE && (
+                        <div className="gisement-item main">
+                          <label>Place</label>
+                          <span>{safeTrim(selectedArticle.PLACE)}</span>
+                        </div>
                       )}
-                      {(parseFloat(selectedArticle.DEPREC) || 0) > 0 && (
-                        <span className="modal-badge deprec">
-                          <HiExclamation /> DÉPRÉCIÉ {selectedArticle.DEPREC}%
-                        </span>
+                      {selectedArticle.GISM1 && (
+                        <div className="gisement-item">
+                          <label>Gisement 1</label>
+                          <span>{safeTrim(selectedArticle.GISM1)}</span>
+                        </div>
                       )}
-                      {selectedArticle.WEB?.toString().toUpperCase().trim() ===
-                        "O" && (
-                        <span className="modal-badge web">
-                          <HiGlobe /> WEB
-                        </span>
+                      {selectedArticle.GISM2 && (
+                        <div className="gisement-item">
+                          <label>Gisement 2</label>
+                          <span>{safeTrim(selectedArticle.GISM2)}</span>
+                        </div>
+                      )}
+                      {selectedArticle.GISM3 && (
+                        <div className="gisement-item">
+                          <label>Gisement 3</label>
+                          <span>{safeTrim(selectedArticle.GISM3)}</span>
+                        </div>
+                      )}
+                      {selectedArticle.GISM4 && (
+                        <div className="gisement-item">
+                          <label>Gisement 4</label>
+                          <span>{safeTrim(selectedArticle.GISM4)}</span>
+                        </div>
+                      )}
+                      {selectedArticle.GISM5 && (
+                        <div className="gisement-item">
+                          <label>Gisement 5</label>
+                          <span>{safeTrim(selectedArticle.GISM5)}</span>
+                        </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* Infos */}
-                <div className="modal-info-section">
-                  {/* Désignation */}
-                  <div className="info-block designation-block">
-                    <h3>{safeTrim(selectedArticle.DESIGN)}</h3>
-                    {safeTrim(selectedArticle.DESIGN2) && (
-                      <p>{safeTrim(selectedArticle.DESIGN2)}</p>
+                {/* Dates et autres infos */}
+                <div className="info-block dates-block">
+                  <h4>📅 Informations complémentaires</h4>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Date création</label>
+                      <span className="value">
+                        {formatDate(selectedArticle.CREATION)}
+                      </span>
+                    </div>
+                    <div className="info-item">
+                      <label>Date inventaire</label>
+                      <span className="value">
+                        {formatDate(selectedArticle.DATINV)}
+                      </span>
+                    </div>
+                    {selectedArticle.DPROMOD && (
+                      <div className="info-item">
+                        <label>Début promo</label>
+                        <span className="value">
+                          {formatDate(selectedArticle.DPROMOD)}
+                        </span>
+                      </div>
                     )}
-                  </div>
-
-                  {/* Codes */}
-                  <div className="info-grid codes-grid">
+                    {selectedArticle.DPROMOF && (
+                      <div className="info-item">
+                        <label>Fin promo</label>
+                        <span className="value">
+                          {formatDate(selectedArticle.DPROMOF)}
+                        </span>
+                      </div>
+                    )}
                     <div className="info-item">
-                      <label>Code NART</label>
-                      <span className="value highlight">
-                        {safeTrim(selectedArticle.NART)}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Code barre</label>
-                      <span className="value mono">
-                        {safeTrim(selectedArticle.GENCOD) || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Réf. fournisseur</label>
+                      <label>Code douane</label>
                       <span className="value">
-                        {safeTrim(selectedArticle.REFER) || "-"}
+                        {safeTrim(selectedArticle.DOUANE) || "-"}
                       </span>
                     </div>
                     <div className="info-item">
-                      <label>Fournisseur</label>
+                      <label>Volume</label>
                       <span className="value">
-                        {selectedArticle.FOURN || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Groupe</label>
-                      <span className="value tag">
-                        {safeTrim(selectedArticle.GROUPE) || "-"}
-                      </span>
-                    </div>
-                    <div className="info-item">
-                      <label>Unité</label>
-                      <span className="value">
-                        {safeTrim(selectedArticle.UNITE) || "-"}
+                        {selectedArticle.VOL || "-"}
                       </span>
                     </div>
                   </div>
-
-                  {/* Prix */}
-                  <div className="info-block price-block">
-                    <h4>💰 Prix</h4>
-                    <div className="price-grid">
-                      <div className="price-item main">
-                        <label>PV TTC</label>
-                        <span
-                          className={
-                            isPromoActive(selectedArticle)
-                              ? "strikethrough"
-                              : ""
-                          }
-                        >
-                          {formatPrice(selectedArticle.PVTETTC)}
-                        </span>
-                      </div>
-                      {isPromoActive(selectedArticle) && (
-                        <div className="price-item promo">
-                          <label>Prix PROMO</label>
-                          <span>{formatPrice(selectedArticle.PVPROMO)}</span>
-                        </div>
-                      )}
-                      <div className="price-item">
-                        <label>PV HT</label>
-                        <span>{formatPrice(selectedArticle.PVTE)}</span>
-                      </div>
-                      <div className="price-item">
-                        <label>Prix achat</label>
-                        <span>{formatPrice(selectedArticle.PACHAT)}</span>
-                      </div>
-                      <div className="price-item">
-                        <label>Prix revient</label>
-                        <span>{formatPrice(selectedArticle.PREV)}</span>
-                      </div>
-                      <div className="price-item">
-                        <label>TGC</label>
-                        <span>{selectedArticle.TAXES || 0}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stocks */}
-                  <div className="info-block stock-block">
-                    <h4>📦 Stocks par emplacement</h4>
-                    <div className="stock-grid">
-                      <div className="stock-item total">
-                        <label>Stock Total</label>
-                        <span
-                          className={
-                            calculateStockTotal(selectedArticle) > 0
-                              ? "positive"
-                              : "zero"
-                          }
-                        >
-                          {formatStock(calculateStockTotal(selectedArticle))}
-                        </span>
-                      </div>
-                      <div className="stock-item">
-                        <label>{mappingEntrepots.S1}</label>
-                        <span
-                          className={
-                            parseFloat(selectedArticle.S1) > 0
-                              ? "positive"
-                              : "zero"
-                          }
-                        >
-                          {formatStock(selectedArticle.S1)}
-                        </span>
-                      </div>
-                      <div className="stock-item">
-                        <label>{mappingEntrepots.S2}</label>
-                        <span>{formatStock(selectedArticle.S2)}</span>
-                      </div>
-                      <div className="stock-item">
-                        <label>{mappingEntrepots.S3}</label>
-                        <span>{formatStock(selectedArticle.S3)}</span>
-                      </div>
-                      <div className="stock-item">
-                        <label>{mappingEntrepots.S4}</label>
-                        <span>{formatStock(selectedArticle.S4)}</span>
-                      </div>
-                      <div className="stock-item">
-                        <label>{mappingEntrepots.S5}</label>
-                        <span>{formatStock(selectedArticle.S5)}</span>
-                      </div>
-                      <div className="stock-item">
-                        <label>Réservé</label>
-                        <span className="reserved">
-                          {formatStock(selectedArticle.RESERV)}
-                        </span>
-                      </div>
-                      <div className="stock-item">
-                        <label>Mini</label>
-                        <span>{formatStock(selectedArticle.SMINI)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gisements */}
-                  {(selectedArticle.GISM1 ||
-                    selectedArticle.GISM2 ||
-                    selectedArticle.GISM3 ||
-                    selectedArticle.GISM4 ||
-                    selectedArticle.GISM5 ||
-                    selectedArticle.PLACE) && (
-                    <div className="info-block gisement-block">
-                      <h4>📍 Emplacements / Gisements</h4>
-                      <div className="gisement-grid">
-                        {selectedArticle.PLACE && (
-                          <div className="gisement-item main">
-                            <label>Place</label>
-                            <span>{safeTrim(selectedArticle.PLACE)}</span>
-                          </div>
-                        )}
-                        {selectedArticle.GISM1 && (
-                          <div className="gisement-item">
-                            <label>Gisement 1</label>
-                            <span>{safeTrim(selectedArticle.GISM1)}</span>
-                          </div>
-                        )}
-                        {selectedArticle.GISM2 && (
-                          <div className="gisement-item">
-                            <label>Gisement 2</label>
-                            <span>{safeTrim(selectedArticle.GISM2)}</span>
-                          </div>
-                        )}
-                        {selectedArticle.GISM3 && (
-                          <div className="gisement-item">
-                            <label>Gisement 3</label>
-                            <span>{safeTrim(selectedArticle.GISM3)}</span>
-                          </div>
-                        )}
-                        {selectedArticle.GISM4 && (
-                          <div className="gisement-item">
-                            <label>Gisement 4</label>
-                            <span>{safeTrim(selectedArticle.GISM4)}</span>
-                          </div>
-                        )}
-                        {selectedArticle.GISM5 && (
-                          <div className="gisement-item">
-                            <label>Gisement 5</label>
-                            <span>{safeTrim(selectedArticle.GISM5)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dates et autres infos */}
-                  <div className="info-block dates-block">
-                    <h4>📅 Informations complémentaires</h4>
-                    <div className="info-grid">
-                      <div className="info-item">
-                        <label>Date création</label>
-                        <span className="value">
-                          {formatDate(selectedArticle.CREATION)}
-                        </span>
-                      </div>
-                      <div className="info-item">
-                        <label>Date inventaire</label>
-                        <span className="value">
-                          {formatDate(selectedArticle.DATINV)}
-                        </span>
-                      </div>
-                      {selectedArticle.DPROMOD && (
-                        <div className="info-item">
-                          <label>Début promo</label>
-                          <span className="value">
-                            {formatDate(selectedArticle.DPROMOD)}
-                          </span>
-                        </div>
-                      )}
-                      {selectedArticle.DPROMOF && (
-                        <div className="info-item">
-                          <label>Fin promo</label>
-                          <span className="value">
-                            {formatDate(selectedArticle.DPROMOF)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="info-item">
-                        <label>Code douane</label>
-                        <span className="value">
-                          {safeTrim(selectedArticle.DOUANE) || "-"}
-                        </span>
-                      </div>
-                      <div className="info-item">
-                        <label>Volume</label>
-                        <span className="value">
-                          {selectedArticle.VOL || "-"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Observations */}
-                  {safeTrim(selectedArticle.OBSERV) && (
-                    <div className="info-block observations-block">
-                      <h4>📝 Observations</h4>
-                      <p className="observations-text">
-                        {safeTrim(selectedArticle.OBSERV)}
-                      </p>
-                    </div>
-                  )}
                 </div>
+
+                {/* Observations */}
+                {safeTrim(selectedArticle.OBSERV) && (
+                  <div className="info-block observations-block">
+                    <h4>📝 Observations</h4>
+                    <p className="observations-text">
+                      {safeTrim(selectedArticle.OBSERV)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import * as XLSX from "xlsx";
+import { roundInt, fmtFranc } from "../../utils/format";
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
@@ -39,8 +40,6 @@ const ymd = (d) => {
 const startOfYear = () => ymd(new Date(new Date().getFullYear(), 0, 1));
 const today = () => ymd(new Date());
 
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
 const fNum = (n) => (Number(n) || 0).toLocaleString("fr-FR");
 const fPct = (n) => `${(Number(n) || 0).toFixed(1)} %`;
 const num = { type: "rightAligned" };
@@ -105,7 +104,7 @@ const AdminFactureAnalyseScreen = () => {
       },
       {
         field: "montant", headerName: "Montant facturé", ...num, minWidth: 150,
-        filter: "agNumberColumnFilter", valueFormatter: (p) => fF(p.value),
+        filter: "agNumberColumnFilter", valueFormatter: (p) => fmtFranc(p.value),
       },
       {
         field: "partMontant", headerName: "Part", ...num, minWidth: 90,
@@ -114,7 +113,7 @@ const AdminFactureAnalyseScreen = () => {
       {
         field: "montantMoyenParFacture", headerName: "Montant moy./fact.", ...num,
         minWidth: 150, filter: "agNumberColumnFilter",
-        valueFormatter: (p) => fF(p.value),
+        valueFormatter: (p) => fmtFranc(p.value),
       },
       {
         field: "moyenneArticlesParFacture", headerName: "Articles/fact. (moy.)",
@@ -155,16 +154,16 @@ const AdminFactureAnalyseScreen = () => {
       ["Du", data.dateDebut, "au", data.dateFin],
       [],
       ["Nombre de factures", totaux.nbFactures],
-      ["Montant total facturé (XPF)", r0(totaux.montantTotal)],
-      ["Montant moyen / facture (XPF)", r0(totaux.montantMoyenParFacture)],
+      ["Montant total facturé (XPF)", roundInt(totaux.montantTotal)],
+      ["Montant moyen / facture (XPF)", roundInt(totaux.montantMoyenParFacture)],
       ["Moyenne d'articles / facture (Σ QTE)", Number(totaux.moyenneArticlesParFacture.toFixed(2))],
-      ["Articles vendus (Σ QTE)", r0(totaux.totalArticles)],
+      ["Articles vendus (Σ QTE)", roundInt(totaux.totalArticles)],
       ["Moyenne de lignes / facture", Number((totaux.moyenneLignesParFacture ?? 0).toFixed(2))],
       ["Factures à 0", totaux.nbFacturesZero],
       ["% factures à 0", Number((totaux.pctFacturesZero ?? 0).toFixed(1))],
       [],
       ["Mois", "Nb factures", "Montant (XPF)"],
-      ...parMois.map((m) => [m.mois, m.nbFactures, r0(m.montant)]),
+      ...parMois.map((m) => [m.mois, m.nbFactures, roundInt(m.montant)]),
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsK), "Synthèse");
 
@@ -176,11 +175,11 @@ const AdminFactureAnalyseScreen = () => {
     ]];
     vendeurs.forEach((v) =>
       wsV.push([
-        v.code, v.nom, v.nbFactures, r0(v.montant),
+        v.code, v.nom, v.nbFactures, roundInt(v.montant),
         Number(v.partMontant.toFixed(1)),
-        r0(v.montantMoyenParFacture),
+        roundInt(v.montantMoyenParFacture),
         Number(v.moyenneArticlesParFacture.toFixed(2)),
-        r0(v.totalArticles),
+        roundInt(v.totalArticles),
         Number((v.moyenneLignesParFacture ?? 0).toFixed(2)),
         v.nbFacturesZero,
         Number((v.pctFacturesZero ?? 0).toFixed(1)),
@@ -260,10 +259,10 @@ const AdminFactureAnalyseScreen = () => {
             <div className="fa-kpi">
               <div className="fa-kpi-icon"><HiCurrencyDollar /></div>
               <div>
-                <span className="fa-kpi-value">{fF(totaux.montantTotal)}</span>
+                <span className="fa-kpi-value">{fmtFranc(totaux.montantTotal)}</span>
                 <span className="fa-kpi-label">Montant total facturé</span>
                 <span className="fa-kpi-mini">
-                  {fF(totaux.montantMoyenParFacture)} / facture
+                  {fmtFranc(totaux.montantMoyenParFacture)} / facture
                 </span>
               </div>
             </div>
@@ -328,7 +327,7 @@ const AdminFactureAnalyseScreen = () => {
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
                     formatter={(v, name) =>
-                      name === "Montant" ? fF(v) : fNum(v)
+                      name === "Montant" ? fmtFranc(v) : fNum(v)
                     }
                   />
                   <Legend />
@@ -371,7 +370,7 @@ const AdminFactureAnalyseScreen = () => {
                         <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fF(v)} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmtFranc(v)} />
                     <Legend
                       layout="vertical"
                       align="right"
@@ -470,10 +469,10 @@ const AdminFactureAnalyseScreen = () => {
                   <div className="fa-kpi">
                     <div className="fa-kpi-icon"><HiCurrencyDollar /></div>
                     <div>
-                      <span className="fa-kpi-value">{fF(vendeur.montant)}</span>
+                      <span className="fa-kpi-value">{fmtFranc(vendeur.montant)}</span>
                       <span className="fa-kpi-label">Montant facturé</span>
                       <span className="fa-kpi-mini">
-                        {fF(vendeur.montantMoyenParFacture)} / facture
+                        {fmtFranc(vendeur.montantMoyenParFacture)} / facture
                       </span>
                     </div>
                   </div>
@@ -523,7 +522,7 @@ const AdminFactureAnalyseScreen = () => {
                       <Tooltip
                         contentStyle={TOOLTIP_STYLE}
                         formatter={(v, name) =>
-                          name === "Montant" ? fF(v) : fNum(v)
+                          name === "Montant" ? fmtFranc(v) : fNum(v)
                         }
                       />
                       <Legend />

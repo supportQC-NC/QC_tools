@@ -1,5 +1,6 @@
 // src/screens/admin/AdminClientsScreen.jsx
 import React, { useState, useEffect, useMemo } from "react";
+import Modal from "../../components/ui/Modal/Modal";
 import {
   Link,
   useSearchParams,
@@ -466,82 +467,80 @@ const AdminClientsScreen = () => {
 
       {/* Modal aperçu */}
       {selectedClient && (
-        <div className="client-modal-overlay" onClick={() => setSelectedClient(null)}>
-          <div className="client-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">
-                <HiUser />
-                <div>
-                  <h2>{safeTrim(selectedClient.NOM) || "Client"}</h2>
-                  <span className="modal-tiers">Tiers {selectedClient.TIERS}</span>
-                </div>
-              </div>
-              <div className="modal-header-actions">
-                <Link to={`/admin/clients/${selectedEntreprise}/${selectedClient.TIERS}`} className="btn-view-full" title="Fiche complète">
-                  <HiExternalLink /><span>Fiche complète</span>
-                </Link>
-                <button className="btn-close-modal" onClick={() => setSelectedClient(null)}><HiX /></button>
+        <Modal onClose={() => setSelectedClient(null)} overlayClassName="client-modal-overlay" contentClassName="client-modal">
+          <div className="modal-header">
+            <div className="modal-title">
+              <HiUser />
+              <div>
+                <h2>{safeTrim(selectedClient.NOM) || "Client"}</h2>
+                <span className="modal-tiers">Tiers {selectedClient.TIERS}</span>
               </div>
             </div>
-            <div className="modal-body">
-              <div className="info-block">
-                <h4>📋 Identification</h4>
-                <div className="info-grid">
-                  <div className="info-item"><label>Code tiers</label><span className="value highlight">{selectedClient.TIERS}</span></div>
-                  <div className="info-item"><label>Nom</label><span className="value">{safeTrim(selectedClient.NOM)}</span></div>
-                  <div className="info-item"><label>RIDET</label><span className="value">{selectedClient._ridet || "-"}</span></div>
-                  <div className="info-item"><label>Cat. client</label><span className="value">{safeTrim(selectedClient.CATCLI) || "-"}</span></div>
-                  <div className="info-item"><label>Type</label><span className="value">{safeTrim(selectedClient.TYPE) || "-"}</span></div>
-                  <div className="info-item"><label>Catégorie</label><span className="value">{safeTrim(selectedClient.CATEGORIE) || "-"}</span></div>
-                  <div className="info-item"><label>Groupe</label><span className="value">{safeTrim(selectedClient.GROUPE) || "-"}</span></div>
-                  <div className="info-item"><label>Compte(s)</label><span className="value">{selectedClient._comptes && selectedClient._comptes.length > 0 ? selectedClient._comptes.join(", ") : "-"}</span></div>
-                </div>
-              </div>
-              <div className="info-block">
-                <h4><HiLocationMarker /> Adresse</h4>
-                <div className="address-lines">
-                  {[1, 2, 3, 4].map((i) => {
-                    const line = safeTrim(selectedClient[`AD${i}`]);
-                    return line ? <p key={i}>{line}</p> : null;
-                  })}
-                </div>
-              </div>
-              <div className="info-block">
-                <h4><HiPhone /> Contact</h4>
-                <div className="info-grid">
-                  <div className="info-item"><label>Téléphone</label><span className="value">{safeTrim(selectedClient.TEL) || "-"}</span></div>
-                  <div className="info-item"><label>Fax</label><span className="value">{safeTrim(selectedClient.FAX) || "-"}</span></div>
-                  <div className="info-item"><label>Email</label><span className="value">{safeTrim(selectedClient.ADMAIL) || "-"}</span></div>
-                  <div className="info-item"><label>Interlocuteur</label><span className="value">{safeTrim(selectedClient.INTERLOC) || "-"}</span></div>
-                </div>
-              </div>
-              <div className="info-block">
-                <h4><HiCurrencyDollar /> Financier</h4>
-                <div className="montants-grid">
-                  <div className="montant-item"><label>Débit</label><span>{formatPrice(selectedClient.DEBIT)}</span></div>
-                  <div className="montant-item"><label>Crédit</label><span>{formatPrice(selectedClient.CREDIT)}</span></div>
-                  <div className="montant-item"><label>Solde</label><span>{formatPrice((selectedClient.DEBIT || 0) - (selectedClient.CREDIT || 0))}</span></div>
-                  <div className="montant-item"><label>Débit max</label><span>{formatPrice(selectedClient.DEBIMAX)}</span></div>
-                </div>
-              </div>
-              {selectedClient._tiersInfo && selectedClient._tiersInfo.length > 0 && (
-                <div className="info-block">
-                  <h4>💰 Comptes tiers (comptabilité)</h4>
-                  <div className="tiers-compta-list">
-                    {selectedClient._tiersInfo.map((t, idx) => (
-                      <div key={idx} className="tiers-compta-row">
-                        <span className="tiers-compta-compte">{t.COMPTE}</span>
-                        <span className="tiers-compta-nom">{t.NOM}</span>
-                        <span className="tiers-compta-debit">D: {formatPrice(t.DEBIT)}</span>
-                        <span className="tiers-compta-credit">C: {formatPrice(t.CREDIT)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="modal-header-actions">
+              <Link to={`/admin/clients/${selectedEntreprise}/${selectedClient.TIERS}`} className="btn-view-full" title="Fiche complète">
+                <HiExternalLink /><span>Fiche complète</span>
+              </Link>
+              <button className="btn-close-modal" onClick={() => setSelectedClient(null)}><HiX /></button>
             </div>
           </div>
-        </div>
+          <div className="modal-body">
+            <div className="info-block">
+              <h4>📋 Identification</h4>
+              <div className="info-grid">
+                <div className="info-item"><label>Code tiers</label><span className="value highlight">{selectedClient.TIERS}</span></div>
+                <div className="info-item"><label>Nom</label><span className="value">{safeTrim(selectedClient.NOM)}</span></div>
+                <div className="info-item"><label>RIDET</label><span className="value">{selectedClient._ridet || "-"}</span></div>
+                <div className="info-item"><label>Cat. client</label><span className="value">{safeTrim(selectedClient.CATCLI) || "-"}</span></div>
+                <div className="info-item"><label>Type</label><span className="value">{safeTrim(selectedClient.TYPE) || "-"}</span></div>
+                <div className="info-item"><label>Catégorie</label><span className="value">{safeTrim(selectedClient.CATEGORIE) || "-"}</span></div>
+                <div className="info-item"><label>Groupe</label><span className="value">{safeTrim(selectedClient.GROUPE) || "-"}</span></div>
+                <div className="info-item"><label>Compte(s)</label><span className="value">{selectedClient._comptes && selectedClient._comptes.length > 0 ? selectedClient._comptes.join(", ") : "-"}</span></div>
+              </div>
+            </div>
+            <div className="info-block">
+              <h4><HiLocationMarker /> Adresse</h4>
+              <div className="address-lines">
+                {[1, 2, 3, 4].map((i) => {
+                  const line = safeTrim(selectedClient[`AD${i}`]);
+                  return line ? <p key={i}>{line}</p> : null;
+                })}
+              </div>
+            </div>
+            <div className="info-block">
+              <h4><HiPhone /> Contact</h4>
+              <div className="info-grid">
+                <div className="info-item"><label>Téléphone</label><span className="value">{safeTrim(selectedClient.TEL) || "-"}</span></div>
+                <div className="info-item"><label>Fax</label><span className="value">{safeTrim(selectedClient.FAX) || "-"}</span></div>
+                <div className="info-item"><label>Email</label><span className="value">{safeTrim(selectedClient.ADMAIL) || "-"}</span></div>
+                <div className="info-item"><label>Interlocuteur</label><span className="value">{safeTrim(selectedClient.INTERLOC) || "-"}</span></div>
+              </div>
+            </div>
+            <div className="info-block">
+              <h4><HiCurrencyDollar /> Financier</h4>
+              <div className="montants-grid">
+                <div className="montant-item"><label>Débit</label><span>{formatPrice(selectedClient.DEBIT)}</span></div>
+                <div className="montant-item"><label>Crédit</label><span>{formatPrice(selectedClient.CREDIT)}</span></div>
+                <div className="montant-item"><label>Solde</label><span>{formatPrice((selectedClient.DEBIT || 0) - (selectedClient.CREDIT || 0))}</span></div>
+                <div className="montant-item"><label>Débit max</label><span>{formatPrice(selectedClient.DEBIMAX)}</span></div>
+              </div>
+            </div>
+            {selectedClient._tiersInfo && selectedClient._tiersInfo.length > 0 && (
+              <div className="info-block">
+                <h4>💰 Comptes tiers (comptabilité)</h4>
+                <div className="tiers-compta-list">
+                  {selectedClient._tiersInfo.map((t, idx) => (
+                    <div key={idx} className="tiers-compta-row">
+                      <span className="tiers-compta-compte">{t.COMPTE}</span>
+                      <span className="tiers-compta-nom">{t.NOM}</span>
+                      <span className="tiers-compta-debit">D: {formatPrice(t.DEBIT)}</span>
+                      <span className="tiers-compta-credit">C: {formatPrice(t.CREDIT)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

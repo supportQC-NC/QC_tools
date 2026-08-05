@@ -1,6 +1,7 @@
 // src/screens/admin/AdminJournalCaisseScreen.jsx
 import React, { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+import { roundInt, fmtFranc } from "../../utils/format";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -54,8 +55,6 @@ const dateLongueFr = (dateStr) => {
   return `${JOURS_FR[dt.getDay()]} ${dt.getDate()} ${MOIS_FR[dt.getMonth()]} ${dt.getFullYear()}`;
 };
 
-const r0 = (n) => Math.round(Number(n) || 0);
-const fF = (n) => `${r0(n).toLocaleString("fr-FR")} F`;
 const fNum = (n) => (Number(n) || 0).toLocaleString("fr-FR");
 
 const COLORS = [
@@ -91,7 +90,7 @@ const FacturesTable = ({ factures, avecMoyen = false }) => (
               <span className="jc-client-tiers">({f.tiers})</span>
             </td>
             <td className={`right mono ${f.montant < 0 ? "neg" : ""}`}>
-              {fF(f.montant)}
+              {fmtFranc(f.montant)}
             </td>
             <td className="mono">{f.numCheque || "—"}</td>
             {avecMoyen && <td>{f.moyen}</td>}
@@ -179,7 +178,7 @@ const AdminJournalCaisseScreen = () => {
       "TIERS", "NOM", "moyen_payment",
     ];
     const ligne = (f) => [
-      "☐", f.numfact, f.date, r0(f.montant), r0(f.montaxes),
+      "☐", f.numfact, f.date, roundInt(f.montant), roundInt(f.montaxes),
       f.tiers, f.nom, f.moyen,
     ];
 
@@ -280,7 +279,7 @@ const AdminJournalCaisseScreen = () => {
       }
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.text(`${totalLabel} : ${fF(total)}`, 40, y);
+      doc.text(`${totalLabel} : ${fmtFranc(total)}`, 40, y);
       y += 28;
     };
 
@@ -293,7 +292,7 @@ const AdminJournalCaisseScreen = () => {
           f.numfact,
           f.heure || "",
           f.tiers,
-          fF(f.montant),
+          fmtFranc(f.montant),
           f.moyen,
           f.numCheque || "",
           f.nom,
@@ -311,7 +310,7 @@ const AdminJournalCaisseScreen = () => {
         f.numfact,
         f.heure || "",
         f.tiers,
-        fF(f.montant),
+        fmtFranc(f.montant),
         f.numCheque || "",
         f.nom,
       ]),
@@ -406,7 +405,7 @@ const AdminJournalCaisseScreen = () => {
             <div className="jc-kpi">
               <div className="jc-kpi-icon"><HiCurrencyDollar /></div>
               <div>
-                <span className="jc-kpi-value">{fF(totaux.montantTotal)}</span>
+                <span className="jc-kpi-value">{fmtFranc(totaux.montantTotal)}</span>
                 <span className="jc-kpi-label">Montant facturé (F)</span>
               </div>
             </div>
@@ -415,13 +414,13 @@ const AdminJournalCaisseScreen = () => {
               <div>
                 <span className="jc-kpi-value">{fNum(totaux.nbAvoirs)}</span>
                 <span className="jc-kpi-label">Avoirs (A)</span>
-                <span className="jc-kpi-mini">{fF(totaux.montantAvoirs)}</span>
+                <span className="jc-kpi-mini">{fmtFranc(totaux.montantAvoirs)}</span>
               </div>
             </div>
             <div className="jc-kpi">
               <div className="jc-kpi-icon net"><HiCurrencyDollar /></div>
               <div>
-                <span className="jc-kpi-value">{fF(totaux.montantNet)}</span>
+                <span className="jc-kpi-value">{fmtFranc(totaux.montantNet)}</span>
                 <span className="jc-kpi-label">Net (F + avoirs)</span>
               </div>
             </div>
@@ -470,7 +469,7 @@ const AdminJournalCaisseScreen = () => {
                           </Pie>
                           <Tooltip
                             contentStyle={TOOLTIP_STYLE}
-                            formatter={(v) => fF(v)}
+                            formatter={(v) => fmtFranc(v)}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -482,7 +481,7 @@ const AdminJournalCaisseScreen = () => {
                           <span className="lg-name" title={d.name}>
                             {d.name}
                           </span>
-                          <span className="lg-val">{fF(d.value)}</span>
+                          <span className="lg-val">{fmtFranc(d.value)}</span>
                           <span className="lg-pct">
                             {donutTotal
                               ? `${((d.value / donutTotal) * 100).toFixed(1)} %`
@@ -503,7 +502,7 @@ const AdminJournalCaisseScreen = () => {
                       <h3>{g.moyen}</h3>
                       <div className="jc-card-total">
                         {fNum(g.nb)} facture{g.nb > 1 ? "s" : ""} ·{" "}
-                        <strong>{fF(g.total)}</strong>
+                        <strong>{fmtFranc(g.total)}</strong>
                       </div>
                     </div>
                     <FacturesTable factures={g.factures} />
@@ -517,7 +516,7 @@ const AdminJournalCaisseScreen = () => {
                   <h3>Avoirs</h3>
                   <div className="jc-card-total">
                     {fNum(avoirs.length)} avoir{avoirs.length > 1 ? "s" : ""} ·{" "}
-                    <strong>{fF(data.totalAvoirs)}</strong>
+                    <strong>{fmtFranc(data.totalAvoirs)}</strong>
                   </div>
                 </div>
                 {avoirs.length === 0 ? (

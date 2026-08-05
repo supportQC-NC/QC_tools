@@ -58,6 +58,7 @@ import {
   getPhotoUrl,
 } from "../../slices/articleApiSlice";
 import { useGetArticleFilialeDataQuery } from "../../slices/fillialeApiSlice";
+import Modal from "../../components/ui/Modal/Modal";
 import "./AdminArticleInfosScreen.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,35 +204,34 @@ const MediaCard = ({
 
       {/* ── Modale PDF (iframe) ───────────────────────────────────────────── */}
       {pdfModalOpen && (
-        <div
-          className="pdf-modal-overlay"
-          onClick={(e) => { if (e.target === e.currentTarget) setPdfModalOpen(false); }}
+        <Modal
+          onClose={() => setPdfModalOpen(false)}
+          overlayClassName="pdf-modal-overlay"
+          contentClassName="pdf-modal"
         >
-          <div className="pdf-modal">
-            <div className="pdf-modal-header">
-              <h3><HiDocumentText /> Fiche technique — {articleDesign}</h3>
-              <div className="pdf-modal-actions">
-                <a href={pdfUrl} download className="btn-pdf btn-pdf--download small" title="Télécharger">
-                  <HiDownload /><span>Télécharger</span>
-                </a>
-                <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="btn-pdf btn-pdf--view small" title="Ouvrir dans un nouvel onglet">
-                  <HiExternalLink /><span>Nouvel onglet</span>
-                </a>
-                <button className="pdf-modal-close" onClick={() => setPdfModalOpen(false)} title="Fermer">
-                  <HiXCircle />
-                </button>
-              </div>
-            </div>
-            <div className="pdf-modal-body">
-              <iframe
-                src={`${pdfUrl}#toolbar=1&navpanes=0`}
-                title="Fiche technique"
-                width="100%"
-                height="100%"
-              />
+          <div className="pdf-modal-header">
+            <h3><HiDocumentText /> Fiche technique — {articleDesign}</h3>
+            <div className="pdf-modal-actions">
+              <a href={pdfUrl} download className="btn-pdf btn-pdf--download small" title="Télécharger">
+                <HiDownload /><span>Télécharger</span>
+              </a>
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="btn-pdf btn-pdf--view small" title="Ouvrir dans un nouvel onglet">
+                <HiExternalLink /><span>Nouvel onglet</span>
+              </a>
+              <button className="pdf-modal-close" onClick={() => setPdfModalOpen(false)} title="Fermer">
+                <HiXCircle />
+              </button>
             </div>
           </div>
-        </div>
+          <div className="pdf-modal-body">
+            <iframe
+              src={`${pdfUrl}#toolbar=1&navpanes=0`}
+              title="Fiche technique"
+              width="100%"
+              height="100%"
+            />
+          </div>
+        </Modal>
       )}
     </>
   );
