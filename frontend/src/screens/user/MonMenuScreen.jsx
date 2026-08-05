@@ -6,7 +6,7 @@
 //   - la source/persistance perso (useGetMyMenuLayout / useSaveMyMenuLayout / reset)
 //   - le point de départ « copie du menu par défaut » à la première ouverture
 // Pas d'édition d'infobulle ici (elle reste globale, gérée par l'admin).
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { HiViewGrid } from "react-icons/hi";
 import {
@@ -36,14 +36,39 @@ const MonMenuScreen = () => {
     [userInfo],
   );
 
-  // Menu par défaut effectif = config admin en base, sinon structure du code.
-  // Sert de point de départ (copie) ET de cible après « Revenir au défaut ».
-  const baseDefault =
-    defaultLayout && (defaultLayout.chapitres || []).length
-      ? defaultLayout
-      : getDefaultLayout();
+  // Élague un layout aux seuls onglets AUTORISÉS : on filtre les items de chaque
+  // chapitre au catalogue accessible, puis on SUPPRIME les chapitres devenus vides.
+  // -> l'utilisateur ne voit jamais la coquille des sections auxquelles il n'a pas
+  //    accès (ex. « Administration », « Analyse »…), seulement ses propres onglets.
+  const pruneToCatalog = useCallback(
+    (layout) => {
+      const allowed = new Set(catalog.map((c) => c.path));
+      return {
+        chapitres: (layout.chapitres || [])
+          .map((ch) => ({
+            ...ch,
+            items: (ch.items || []).filter((p) => allowed.has(p)),
+          }))
+          .filter((ch) => ch.items.length > 0),
+        masques: (layout.masques || []).filter((p) => allowed.has(p)),
+      };
+    },
+    [catalog],
+  );
 
-  // Layout de départ : ma config perso si elle existe, sinon copie du défaut.
+  // Menu par défaut effectif = config admin en base, sinon structure du code,
+  // ÉLAGUÉ aux accès de l'utilisateur. Sert de point de départ (copie) ET de
+  // cible après « Revenir au défaut ».
+  const baseDefault = useMemo(() => {
+    const src =
+      defaultLayout && (defaultLayout.chapitres || []).length
+        ? defaultLayout
+        : getDefaultLayout();
+    return pruneToCatalog(src);
+  }, [defaultLayout, pruneToCatalog]);
+
+  // Layout de départ : ma config perso si elle existe (déjà curée par l'user),
+  // sinon copie ÉLAGUÉE du défaut.
   // `undefined` tant que l'une des requêtes charge -> MenuBoard patiente.
   const initialLayout =
     myLayout === undefined || defaultLayout === undefined
