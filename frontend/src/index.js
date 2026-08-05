@@ -90,6 +90,7 @@ import AdminEquipeDetailScreen from "./screens/admin/AdminEquipeDetailScreen";
 import AdminTachesScreen from "./screens/admin/AdminTachesScreen";
 import MesTachesScreen from "./screens/user/MesTachesScreen";
 import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
+import MonMenuScreen from "./screens/user/MonMenuScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -117,6 +118,7 @@ const router = createBrowserRouter(
         <Route path="/edition-promo" element={<AdminEditionPromoScreen />} />
         <Route path="/mes-taches" element={<MesTachesScreen />} />
         <Route path="/espace-equipe" element={<EspaceEquipeScreen />} />
+        <Route path="/mon-menu" element={<MonMenuScreen />} />
       </Route>
 
       {/* ======= Écrans admin : garde par module (admin OU utilisateur

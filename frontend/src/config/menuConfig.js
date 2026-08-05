@@ -387,6 +387,7 @@ export const getUserMenus = (userInfo) => {
       { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
       { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
       { label: "Mon profil", path: "/profile", icon: HiUser },
+      { label: "Organiser mon menu", path: "/mon-menu", icon: HiViewGrid },
     ],
   });
 
@@ -614,6 +615,7 @@ const PERSONAL_ITEMS = [
   { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
   { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
   { label: "Mon profil", path: "/profile", icon: HiUser },
+  { label: "Organiser mon menu", path: "/mon-menu", icon: HiViewGrid },
 ];
 
 // Aplatit toutes les structures de menu -> liste { path, label, group } unique.

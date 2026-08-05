@@ -7,7 +7,11 @@ import { HiHome, HiX, HiChevronDown, HiChevronUp } from "react-icons/hi";
 import { useSidebar } from "../../../contexte/SidebarContext";
 import { useGetNotificationCountsQuery } from "../../../slices/notificationApiSlice";
 import { useGetMenuHintsQuery } from "../../../slices/menuHintsApiSlice";
-import { useGetMenuLayoutQuery } from "../../../slices/menuLayoutApiSlice";
+import {
+  useGetMenuLayoutQuery,
+  useGetMyMenuLayoutQuery,
+  useSetMyMenuModeMutation,
+} from "../../../slices/menuLayoutApiSlice";
 import "./Sidebar.css";
 
 const Sidebar = () => {
@@ -17,8 +21,22 @@ const Sidebar = () => {
   const { data: menuHints } = useGetMenuHintsQuery(undefined, { skip: !userInfo });
   const { data: menuLayout } = useGetMenuLayoutQuery(undefined, { skip: !userInfo });
 
-  // Menus = chapitres définis en base (ou défaut code), filtrés par permissions.
-  const menus = buildSidebar(userInfo, menuLayout, menuHints);
+  // Personnalisation utilisateur : organisation perso + switch « Défaut / Perso ».
+  const { data: myLayout } = useGetMyMenuLayoutQuery(undefined, { skip: !userInfo });
+  const [setMyMenuMode] = useSetMyMenuModeMutation();
+  const useCustom = !!myLayout?.useCustom;
+
+  // Layout actif : perso si le switch est sur « Perso », sinon la config admin.
+  // (Une config perso vide retombe automatiquement sur le défaut dans buildSidebar.)
+  const activeLayout = useCustom ? myLayout : menuLayout;
+
+  // Menus = chapitres du layout actif (ou défaut code), filtrés par permissions.
+  const menus = buildSidebar(userInfo, activeLayout, menuHints);
+
+  const switchMode = (custom) => {
+    if (custom === useCustom) return;
+    setMyMenuMode({ useCustom: custom });
+  };
 
   // Infobulle flottante (position fixe -> jamais coupée par le scroll de la sidebar).
   const [tip, setTip] = useState({ text: "", top: 0, left: 0, visible: false });
@@ -200,6 +218,26 @@ const Sidebar = () => {
         )}
 
         <nav className="sidebar-nav">
+          {/* Switch d'organisation : config admin par défaut ou config perso. */}
+          <div className="sidebar-mode-switch" role="group" aria-label="Organisation du menu">
+            <button
+              type="button"
+              className={`sidebar-mode-btn ${!useCustom ? "active" : ""}`}
+              onClick={() => switchMode(false)}
+              title="Menu par défaut (défini par l'administrateur)"
+            >
+              Défaut
+            </button>
+            <button
+              type="button"
+              className={`sidebar-mode-btn ${useCustom ? "active" : ""}`}
+              onClick={() => switchMode(true)}
+              title="Ma configuration personnelle"
+            >
+              Perso
+            </button>
+          </div>
+
           {menus.map((section, index) => renderSection(section, index))}
         </nav>
 

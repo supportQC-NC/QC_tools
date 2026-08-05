@@ -783,3 +783,40 @@
   from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
   to   { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
+
+/* =============================================
+   SWITCH ORGANISATION (Défaut / Perso)
+   ============================================= */
+.sidebar-mode-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin: 0 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.sidebar-mode-btn {
+  flex: 1;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--sidebar-transition), color var(--sidebar-transition);
+}
+.sidebar-mode-btn:hover {
+  color: var(--text-secondary);
+}
+.sidebar-mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+/* Repliée : on masque le switch (pas de place pour le texte). */
+.sidebar.collapsed .sidebar-mode-switch {
+  display: none;
+}

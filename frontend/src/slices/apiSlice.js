@@ -70,6 +70,7 @@ export const apiSlice = createApi({
     // ========== TAGS INFOBULLES MENU ==========
     "MenuHint",
     "MenuLayout",
+    "MyMenuLayout",
     "SmtpConfig",
   ],
   endpoints: (builder) => ({}),
