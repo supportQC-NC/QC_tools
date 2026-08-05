@@ -239,6 +239,12 @@ export const moduleMenuStructure = [
         icon: HiTag,
       },
       {
+        moduleKey: "changement_prix",
+        label: "Changement de prix",
+        path: "/changement-prix",
+        icon: HiCurrencyDollar,
+      },
+      {
         moduleKey: "edition_promo",
         label: "Édition Promo",
         path: "/edition-promo",
@@ -605,6 +611,8 @@ export const DEFAULT_MENU_HINTS = {
   // Modules (gestion utilisateur)
   "/releve": "Relevé de prix terrain.",
   "/etiquettes": "Générateur d'étiquettes.",
+  "/changement-prix":
+    "Changements de prix de vente (rapport Excel + étiquettes).",
   "/edition-promo": "Édition des promotions.",
   "/mailing": "Emailing clients (campagnes).",
   "/assistant-ia": "Assistant IA branché sur les données société.",

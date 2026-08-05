@@ -473,6 +473,11 @@ const AdminArticleInfosScreen = () => {
   const articleOriginal = articleData?.articleOriginal;
   const nombreRenvois = articleData?.nombreRenvois || 0;
   const hasActivePromo = article ? isPromoActive(article) : false;
+  // PVPROMO est stocké HORS TAXE : on l'affiche en TTC via le taux TGC (ATVA),
+  // même calcul que le générateur d'étiquettes : trunc(PVPROMO * (1 + ATVA/100)).
+  const pvPromoTtc = article
+    ? Math.trunc((parseFloat(article.PVPROMO) || 0) * (1 + (parseFloat(article.ATVA) || 0) / 100))
+    : 0;
   const hasPhotosConfigured = !!selectedEntrepriseData?.cheminPhotos;
 
   // ── URLs médias ──────────────────────────────────────────────────────────
@@ -545,7 +550,7 @@ const AdminArticleInfosScreen = () => {
             <span className="article-nart-badge">{nart}</span>
           </div>
           {hasActivePromo && (
-            <div className="promo-indicator-header"><HiFire /><div className="promo-text"><span className="promo-label">Promo</span><span className="promo-discount">-{calculateDiscount(article.PVTETTC, article.PVPROMO)}%</span></div></div>
+            <div className="promo-indicator-header"><HiFire /><div className="promo-text"><span className="promo-label">Promo</span><span className="promo-discount">-{calculateDiscount(article.PVTETTC, pvPromoTtc)}%</span></div></div>
           )}
         </div>
 
@@ -589,8 +594,8 @@ const AdminArticleInfosScreen = () => {
               </div>
               <div className="promo-mega-prices">
                 <span className="promo-old-price">{formatPrice(article.PVTETTC)}</span>
-                <span className="promo-new-price">{formatPrice(article.PVPROMO)}</span>
-                <div className="promo-discount-badge">-{calculateDiscount(article.PVTETTC, article.PVPROMO)}%</div>
+                <span className="promo-new-price">{formatPrice(pvPromoTtc)}</span>
+                <div className="promo-discount-badge">-{calculateDiscount(article.PVTETTC, pvPromoTtc)}%</div>
               </div>
             </div>
           )}
@@ -641,12 +646,12 @@ const AdminArticleInfosScreen = () => {
                 hasPhotosConfigured={hasPhotosConfigured}
                 articleDesign={safeTrim(article.DESIGN)}
                 hasActivePromo={hasActivePromo}
-                promoDiscount={calculateDiscount(article.PVTETTC, article.PVPROMO)}
+                promoDiscount={calculateDiscount(article.PVTETTC, pvPromoTtc)}
               />
 
               {/* Quick Badges */}
               <div className="quick-badges">
-                {hasActivePromo && <div className="quick-badge promo"><HiFire /> PROMO -{calculateDiscount(article.PVTETTC, article.PVPROMO)}%</div>}
+                {hasActivePromo && <div className="quick-badge promo"><HiFire /> PROMO -{calculateDiscount(article.PVTETTC, pvPromoTtc)}%</div>}
                 {safeTrim(article.WEB) === "O" && <div className="quick-badge web"><HiGlobe /> Visible Web</div>}
                 {safeTrim(article.FOTO) === "F" && <div className="quick-badge photo"><HiPhotograph /> Photo dispo</div>}
                 {safeTrim(article.SAV) === "O" && <div className="quick-badge sav"><HiShieldCheck /> SAV</div>}
@@ -796,7 +801,7 @@ const AdminArticleInfosScreen = () => {
                       <h3><HiCurrencyDollar /> Prix de vente</h3>
                       <div className="price-cards">
                         <div className={`price-card main ${hasActivePromo ? "has-promo" : ""}`}><span className="price-label">Prix TTC</span><span className={`price-value ${hasActivePromo ? "strikethrough" : ""}`}>{formatPrice(article.PVTETTC)}</span></div>
-                        {hasActivePromo && (<div className="price-card promo"><span className="price-label">Prix PROMO</span><span className="price-value">{formatPrice(article.PVPROMO)}</span><span className="discount-badge">-{calculateDiscount(article.PVTETTC, article.PVPROMO)}%</span></div>)}
+                        {hasActivePromo && (<div className="price-card promo"><span className="price-label">Prix PROMO</span><span className="price-value">{formatPrice(pvPromoTtc)}</span><span className="discount-badge">-{calculateDiscount(article.PVTETTC, pvPromoTtc)}%</span></div>)}
                         <div className="price-card"><span className="price-label">Prix HT</span><span className="price-value">{formatPrice(article.PVTE)}</span></div>
                         <div className="price-card"><span className="price-label">Prix détail</span><span className="price-value">{formatPrice(article.PDETAIL)}</span></div>
                       </div>
@@ -857,7 +862,7 @@ const AdminArticleInfosScreen = () => {
                         <div className="info-grid cols-3">
                           <div className="info-item"><label>Date début promo</label><span className="value">{formatDate(article.DPROMOD)}</span></div>
                           <div className="info-item"><label>Date fin promo</label><span className="value">{formatDate(article.DPROMOF)}</span></div>
-                          <div className="info-item"><label>Prix promo</label><span className="value promo">{formatPrice(article.PVPROMO)}</span></div>
+                          <div className="info-item"><label>Prix promo</label><span className="value promo">{formatPrice(pvPromoTtc)}</span></div>
                         </div>
                       </div>
                     )}

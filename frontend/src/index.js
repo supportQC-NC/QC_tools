@@ -34,6 +34,7 @@ import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
 import AdminDemandesBipageScreen from "./screens/admin/AdminDemandesBipageScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
+import ChangementPrixScreen from "./screens/admin/ChangementPrixScreen";
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
 import AssistantIAScreen from "./screens/user/AssistantIAScreen";
@@ -137,6 +138,11 @@ const router = createBrowserRouter(
       {/* Communication · Assistant IA -> module "assistant_ia" (strictement gaté) */}
       <Route element={<ModuleRoute module="assistant_ia" />}>
         <Route path="/assistant-ia" element={<AssistantIAScreen />} />
+      </Route>
+
+      {/* Gestion · Changement de prix de vente -> module "changement_prix" */}
+      <Route element={<ModuleRoute module="changement_prix" />}>
+        <Route path="/changement-prix" element={<ChangementPrixScreen />} />
       </Route>
 
       {/* Administration · Utilisateurs -> module "users_admin" (ou responsable,

@@ -56,6 +56,8 @@ export const apiSlice = createApi({
     "MailTemplate",
     // ========== TAGS ÉTIQUETTES ==========
     "EtiquetteTemplate",
+    // ========== TAGS CHANGEMENT DE PRIX ==========
+    "ChangementPrix",
     // ========== TAGS ASSISTANT IA ==========
     "AiConversation",
     // ========== TAGS ENVOI CDE FOURNISSEUR ==========

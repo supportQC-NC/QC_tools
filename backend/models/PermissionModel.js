@@ -82,6 +82,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Changement de prix de vente (verif.dbf : rapport + étiquettes)
+      changement_prix: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Édition Promo
       edition_promo: {
         read: { type: Boolean, default: false },
