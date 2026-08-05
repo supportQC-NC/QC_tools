@@ -733,7 +733,7 @@ export const getDefaultLayout = () => {
 const RESP_PATHS = ["/admin/users", "/admin/equipes", "/admin/taches"];
 
 // Un utilisateur voit-il un onglet du catalogue ? (mêmes règles que canSeeAdminItem)
-const catalogItemVisible = (userInfo, cat) => {
+export const catalogItemVisible = (userInfo, cat) => {
   if (!userInfo) return false;
   if (userInfo.role === "responsable" && RESP_PATHS.includes(cat.path)) return true;
   if (cat.permKey) return hasModulePermission(userInfo, cat.permKey, "read");

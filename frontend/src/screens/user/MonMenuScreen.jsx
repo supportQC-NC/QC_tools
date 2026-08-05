@@ -6,6 +6,7 @@
 // infobulles (qui restent globales, gérées par l'admin).
 // À la première ouverture, la config perso démarre en COPIE du menu par défaut.
 import React, { useState, useEffect, useMemo } from "react";
+import { useSelector } from "react-redux";
 import {
   HiViewGrid,
   HiPlus,
@@ -36,6 +37,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   getMenuCatalog,
   getDefaultLayout,
+  catalogItemVisible,
   CHAPTER_ICONS,
   chapterIcon,
 } from "../../config/menuConfig";
@@ -88,7 +90,14 @@ const MonMenuScreen = () => {
   const [saveMine, { isLoading: saving }] = useSaveMyMenuLayoutMutation();
   const [resetMine, { isLoading: resetting }] = useResetMyMenuLayoutMutation();
 
-  const catalog = useMemo(() => getMenuCatalog(), []);
+  const { userInfo } = useSelector((state) => state.auth);
+
+  // Catalogue restreint aux onglets AUTORISÉS pour cet utilisateur (mêmes règles
+  // que la sidebar). Il ne peut donc organiser que ce à quoi il a accès.
+  const catalog = useMemo(
+    () => getMenuCatalog().filter((c) => catalogItemVisible(userInfo, c)),
+    [userInfo],
+  );
   const byPath = useMemo(() => new Map(catalog.map((c) => [c.path, c])), [catalog]);
 
   const [chapMeta, setChapMeta] = useState([]); // [{key,label,icon}]
