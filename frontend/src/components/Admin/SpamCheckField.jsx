@@ -10,8 +10,13 @@ import "./SpamCheckField.css";
 
 // Découpe le texte en segments (surlignés ou non) selon les plages.
 const segments = (text, ranges) => {
+
   const segs = [];
   let pos = 0;
+
+
+
+
   for (const r of ranges) {
     if (r.start > pos) segs.push({ text: text.slice(pos, r.start), hl: false });
     segs.push({ text: text.slice(r.start, r.end), hl: true });

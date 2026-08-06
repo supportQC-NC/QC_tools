@@ -7,7 +7,7 @@
 // socket unique) via applyPresenceState/applyPresenceUpdate/resetPresence.
 //
 // Modèle : une Map userId(string) -> statut. Présent dans la Map = EN LIGNE ;
-// absent de la Map = hors ligne.
+// absent de la Map = hors ligne. dsklfdskfkljsdfj
 import { useSyncExternalStore } from "react";
 
 let statusMap = new Map(); // id -> "actif" | "absent" | "occupe"
