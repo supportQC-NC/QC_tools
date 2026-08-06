@@ -1,0 +1,338 @@
+[
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "ABR",
+        "LBL_LISTE":  "ABRIS DE JARDIN",
+        "FORMAT":  "B",
+        "CODEJPG":  "999382"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "ALU",
+        "LBL_LISTE":  "PROFILS ALUMINIUM",
+        "FORMAT":  "A",
+        "CODEJPG":  "999381"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "ALU1",
+        "LBL_LISTE":  "PROFILS ALUMINIUM - TUBE ROND ET CARRE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999411"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "ALU2",
+        "LBL_LISTE":  "PROFILS ALUMINIUM - CORNIERE ET TUBE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999412"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "BAC",
+        "LBL_LISTE":  "BACHES",
+        "FORMAT":  "B",
+        "CODEJPG":  "999384"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "BAR",
+        "LBL_LISTE":  "BARRE A MINE",
+        "FORMAT":  "B",
+        "CODEJPG":  "999415"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "BOIS",
+        "LBL_LISTE":  "BOIS",
+        "FORMAT":  "B",
+        "CODEJPG":  "999410"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "BTE",
+        "LBL_LISTE":  "BOITE A LETTRE ET COFFRE FORT",
+        "FORMAT":  "B",
+        "CODEJPG":  "999393"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "CAN",
+        "LBL_LISTE":  "CANTINE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999394"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "CRE",
+        "LBL_LISTE":  "CREMAILLERES",
+        "FORMAT":  "B",
+        "CODEJPG":  "999391"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "EPI",
+        "LBL_LISTE":  "VETEMENT / EPI",
+        "FORMAT":  "C",
+        "CODEJPG":  "999887"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "ESC",
+        "LBL_LISTE":  "ECHELLES ET ESCABEAUX",
+        "FORMAT":  "B",
+        "CODEJPG":  "999392"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "GAL",
+        "LBL_LISTE":  "PROFILES GALVA",
+        "FORMAT":  "A",
+        "CODEJPG":  "999423"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "GRI",
+        "LBL_LISTE":  "GRILLAGE",
+        "FORMAT":  "B",
+        "CODEJPG":  "999398"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "LAM",
+        "LBL_LISTE":  "LAMES DE SCIE CIRCULAIRE",
+        "FORMAT":  "C",
+        "CODEJPG":  "999383"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "MAN",
+        "LBL_LISTE":  "RAILS GALVA MANTION",
+        "FORMAT":  "A",
+        "CODEJPG":  "999405"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "MON",
+        "LBL_LISTE":  "MONTURES LOUVRE ET NACO",
+        "FORMAT":  "B",
+        "CODEJPG":  "999386"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "MOU",
+        "LBL_LISTE":  "MOUSTIQUAIRE ET TOILE OMBRIERE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999385"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "MTAP",
+        "LBL_LISTE":  "TAPIS AU METRE",
+        "FORMAT":  "B",
+        "CODEJPG":  "999416"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "PAN",
+        "LBL_LISTE":  "PANNEAUX ALU ET NEMA",
+        "FORMAT":  "B",
+        "CODEJPG":  "999396"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "PIN",
+        "LBL_LISTE":  "PINCE A TALON",
+        "FORMAT":  "B",
+        "CODEJPG":  "999413"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "PIQ",
+        "LBL_LISTE":  "PIQUETS CLOTURE",
+        "FORMAT":  "B",
+        "CODEJPG":  "999402"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "POL",
+        "LBL_LISTE":  "POLYANE ET MEMBRANE BATIMENT",
+        "FORMAT":  "B",
+        "CODEJPG":  "999409"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "POU",
+        "LBL_LISTE":  "POUBELLE",
+        "FORMAT":  "B",
+        "CODEJPG":  "999414"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "PRO",
+        "LBL_LISTE":  "PROFILS POIGNEE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999418"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "PVC",
+        "LBL_LISTE":  "PVC",
+        "FORMAT":  "B",
+        "CODEJPG":  "999422"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "RAI",
+        "LBL_LISTE":  "RAILS ET PROFILS",
+        "FORMAT":  "A",
+        "CODEJPG":  "999380"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "REG",
+        "LBL_LISTE":  "REGLES ALUMINIUM",
+        "FORMAT":  "B",
+        "CODEJPG":  "999387"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "REM",
+        "LBL_LISTE":  "REMORQUES",
+        "FORMAT":  "B",
+        "CODEJPG":  "999399"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "RLX",
+        "LBL_LISTE":  "FIL DE FER EN ROULEAU",
+        "FORMAT":  "B",
+        "CODEJPG":  "999397"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "ROU",
+        "LBL_LISTE":  "ROUE DE SECOURS ET PNEUS REMORQUE",
+        "FORMAT":  "B",
+        "CODEJPG":  "999388"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "SAB",
+        "LBL_LISTE":  "SABRES",
+        "FORMAT":  "B",
+        "CODEJPG":  "999404"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "SRJ",
+        "LBL_LISTE":  "SERRES JOINTS",
+        "FORMAT":  "C",
+        "CODEJPG":  "999400"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "SRM",
+        "LBL_LISTE":  "SERRES JOINTS MACON",
+        "FORMAT":  "B",
+        "CODEJPG":  "999401"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TAP",
+        "LBL_LISTE":  "TAPIS ET PAILLASSON",
+        "FORMAT":  "B",
+        "CODEJPG":  "999417"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TIG",
+        "LBL_LISTE":  "TIGES FILETEES",
+        "FORMAT":  "A",
+        "CODEJPG":  "999390"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TIG1",
+        "LBL_LISTE":  "TIGES FILETEES ZINGUEES  - 1M",
+        "FORMAT":  "A",
+        "CODEJPG":  "999390"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TIG2",
+        "LBL_LISTE":  "TIGES FILETEES - 2M ET 3M",
+        "FORMAT":  "A",
+        "CODEJPG":  "999420"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TIG3",
+        "LBL_LISTE":  "TIGES FILETEES INOX, NYLON ET GALVA",
+        "FORMAT":  "A",
+        "CODEJPG":  "999421"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TL1",
+        "LBL_LISTE":  "TIGES CREMONE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999973"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TOI",
+        "LBL_LISTE":  "TOILE OMBRIERE",
+        "FORMAT":  "A",
+        "CODEJPG":  "999379"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TOL",
+        "LBL_LISTE":  "TOLES ET PLEXIGLAS",
+        "FORMAT":  "B",
+        "CODEJPG":  "999395"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TOU",
+        "LBL_LISTE":  "TOURILLONS",
+        "FORMAT":  "B",
+        "CODEJPG":  "999389"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TUY",
+        "LBL_LISTE":  "TUYAUX PVC ET POLY",
+        "FORMAT":  "A",
+        "CODEJPG":  "999801"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "TUYJDN",
+        "LBL_LISTE":  "TUYAUX JARDIN",
+        "FORMAT":  "A",
+        "CODEJPG":  "999424"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "VITR1",
+        "LBL_LISTE":  "FRAISE VITRINE 1",
+        "FORMAT":  "C",
+        "CODEJPG":  "999406"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "VITR2",
+        "LBL_LISTE":  "FRAISE VITRINE 2",
+        "FORMAT":  "C",
+        "CODEJPG":  "999407"
+    },
+    {
+        "Societe":  "QC",
+        "CODE_LISTE":  "VITR3",
+        "LBL_LISTE":  "FRAISE VITRINE 3",
+        "FORMAT":  "C",
+        "CODEJPG":  "999408"
+    }
+]

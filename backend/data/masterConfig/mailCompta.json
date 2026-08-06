@@ -1,0 +1,331 @@
+[
+    {
+        "idSociete":  "LD",
+        "idClient":  2,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "LD",
+        "idClient":  26,
+        "nomClient":  "HOME DEPOT",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "LD",
+        "idClient":  24,
+        "nomClient":  "SGI SARL ALL WOODS",
+        "mailCompta":  "compta@allwoods.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "LD",
+        "idClient":  31,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "LD",
+        "idClient":  6289,
+        "nomClient":  "MEARE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "LD",
+        "idClient":  8652,
+        "nomClient":  "SITEC",
+        "mailCompta":  "comptabilite@sitec.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "HD",
+        "idClient":  13,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "HD",
+        "idClient":  5,
+        "nomClient":  "LD SARL",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "HD",
+        "idClient":  17,
+        "nomClient":  "ALL WOODS",
+        "mailCompta":  "compta@allwoods.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "HD",
+        "idClient":  2,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "HD",
+        "idClient":  70,
+        "nomClient":  "MEARE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AW",
+        "idClient":  1304,
+        "nomClient":  "MEARE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AW",
+        "idClient":  183,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "AW",
+        "idClient":  1920,
+        "nomClient":  "LD",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AW",
+        "idClient":  1894,
+        "nomClient":  "HOME DEPOT",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AW",
+        "idClient":  1349,
+        "nomClient":  "SITEC SAS",
+        "mailCompta":  "comptabilite@sitec.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "AVB",
+        "idClient":  7,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "AVB",
+        "idClient":  8,
+        "nomClient":  "HOME DEPOT",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AVB",
+        "idClient":  5,
+        "nomClient":  "LD SARL",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AVB",
+        "idClient":  2,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "AVB",
+        "idClient":  9,
+        "nomClient":  "MEARE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "FMB",
+        "idClient":  43,
+        "nomClient":  "SITEC",
+        "mailCompta":  "comptabilite@sitec.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "FMB",
+        "idClient":  101,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "FMB",
+        "idClient":  778,
+        "nomClient":  "ALL WOODS",
+        "mailCompta":  "compta@allwoods.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "FMB",
+        "idClient":  308,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "MEARE",
+        "idClient":  934,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "MEARE",
+        "idClient":  269,
+        "nomClient":  "LD SARL",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "MEARE",
+        "idClient":  701,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "MEARE",
+        "idClient":  499,
+        "nomClient":  "ALL WOODS - SGI",
+        "mailCompta":  "compta@allwoods.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "KONE",
+        "idClient":  207,
+        "nomClient":  "MEARE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "KONE",
+        "idClient":  197,
+        "nomClient":  "QUINCAILLERIE CALEDONIENNE",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "KONE",
+        "idClient":  196,
+        "nomClient":  "LD SARL",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "KONE",
+        "idClient":  220,
+        "nomClient":  "HOME DEPOT (NOUMEA)",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "SITEC",
+        "idClient":  5315,
+        "nomClient":  "QUINCAL -  CESSION",
+        "mailCompta":  "comptabilite@quincaillerie.nc",
+        "nomCompta":  "YAEL"
+    },
+    {
+        "idSociete":  "SITEC",
+        "idClient":  215,
+        "nomClient":  "ALLWOODS",
+        "mailCompta":  "compta@allwoods.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "SITEC",
+        "idClient":  5096,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "SITEC",
+        "idClient":  58,
+        "nomClient":  "MEARE QUINCAILLERIE SARL",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "SITEC",
+        "idClient":  73,
+        "nomClient":  "LD CESSION",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "SITEC",
+        "idClient":  110,
+        "nomClient":  "LD CESSION",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  8652,
+        "nomClient":  "SITEC",
+        "mailCompta":  "comptabilite@sitec.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  8643,
+        "nomClient":  "ALLWOODS",
+        "mailCompta":  "compta@allwoods.nc",
+        "nomCompta":  "LEATITIA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  31,
+        "nomClient":  "KONE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  7878,
+        "nomClient":  "MEARE QUINCAILLERIE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  26,
+        "nomClient":  "HOME DEPOT",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  5517,
+        "nomClient":  "LD SARL   GROUPE",
+        "mailCompta":  "compta.brousse@quincaillerie.nc",
+        "nomCompta":  "EVA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  19,
+        "nomClient":  "FMB SARL",
+        "mailCompta":  "compta.groupe@canl.nc",
+        "nomCompta":  "LAETITIA"
+    },
+    {
+        "idSociete":  "QC",
+        "idClient":  643,
+        "nomClient":  "AVB IMPORT",
+        "mailCompta":  "compta.groupe@canl.nc",
+        "nomCompta":  "LAETITIA"
+    }
+]

@@ -1,0 +1,403 @@
+/* ResaEntreesScreen.css — accent orange #ea580c. Thème admin (--admin-*). .re-* */
+
+.re-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+/* ── Header ── */
+.re-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.re-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.re-header-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--admin-radius);
+  background: linear-gradient(135deg, #c2410c, #ea580c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+}
+.re-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.re-header-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+}
+.re-entreprise-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.re-entreprise-badge svg {
+  color: #ea580c;
+  font-size: 1.05rem;
+}
+
+/* ── Toolbar / stats ── */
+.re-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 1rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.re-toolbar-left {
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.re-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.re-field label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+}
+.re-field input[type="date"] {
+  padding: 0.55rem 0.75rem;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  outline: none;
+  color-scheme: dark;
+  transition: var(--admin-transition);
+}
+.re-field input[type="date"]:focus {
+  border-color: #ea580c;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.18);
+}
+.re-stats {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+}
+.re-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.re-stat-value {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.re-stat-primary .re-stat-value {
+  color: #ea580c;
+}
+.re-stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted);
+}
+
+/* ── Actions ── */
+.re-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.re-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid transparent;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+.re-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.re-btn-ghost {
+  background: var(--admin-bg-tertiary);
+  border-color: var(--admin-border);
+  color: var(--admin-text);
+}
+.re-btn-ghost:not(:disabled):hover {
+  background: var(--admin-bg-hover);
+  border-color: #ea580c;
+  color: #ea580c;
+}
+.re-btn-excel {
+  background: linear-gradient(135deg, #c2410c, #ea580c);
+  color: #fff;
+}
+.re-btn-excel:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.3);
+}
+.re-spin {
+  animation: re-spin 0.8s linear infinite;
+}
+@keyframes re-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Alertes ── */
+.re-alert {
+  margin: 1rem 1.5rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+}
+.re-alert-err {
+  background: var(--admin-warning-light);
+  color: var(--admin-danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* ── État vide ── */
+.re-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 5rem 2rem;
+  text-align: center;
+}
+.re-empty-icon {
+  font-size: 3rem;
+  color: var(--admin-warning);
+  opacity: 0.6;
+  margin-bottom: 0.5rem;
+}
+.re-empty h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.re-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--admin-text-muted);
+}
+
+/* ── Table ── */
+.re-table-wrap {
+  margin: 1.25rem 1.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+.re-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: fixed;
+}
+.re-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--admin-bg-tertiary);
+  border-bottom: 2px solid var(--admin-border);
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+  z-index: 1;
+}
+/* Largeurs de colonnes fixes (alignées, pas de décalage) */
+.re-table th:nth-child(1) { width: 8%; }
+.re-table th:nth-child(2) { width: 22%; }
+.re-table th:nth-child(3) { width: 12%; }
+.re-table th:nth-child(4) { width: 7%; }
+.re-table th:nth-child(5) { width: 8%; }
+.re-table th:nth-child(6) { width: 15%; }
+.re-table th:nth-child(7) { width: 7%; }
+.re-table th:nth-child(8) { width: 12%; }
+.re-table th:nth-child(9) { width: 9%; }
+.re-table th:nth-child(10) { width: 10%; }
+
+.re-table tbody tr {
+  border-bottom: 1px solid var(--admin-border);
+  transition: var(--admin-transition);
+}
+.re-table tbody tr:last-child {
+  border-bottom: none;
+}
+.re-table tbody tr:hover {
+  background: var(--admin-bg-hover);
+}
+.re-table td {
+  padding: 0.6rem 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.re-num {
+  text-align: right;
+}
+.re-mono {
+  font-family: "Monaco", "Consolas", monospace;
+}
+.re-muted {
+  color: var(--admin-text-muted);
+}
+.re-ell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.re-design {
+  white-space: normal;
+}
+.re-note {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--admin-text-muted);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.re-vendeur {
+  white-space: nowrap;
+}
+.re-badge-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 0.1rem 0.4rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  font-family: "Monaco", "Consolas", monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.re-vendeur-nom {
+  margin-left: 0.4rem;
+  font-size: 0.82rem;
+}
+.re-td-info {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--admin-text-muted);
+  font-style: italic;
+}
+.re-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-right: 0.5rem;
+  border: 2px solid var(--admin-border);
+  border-top-color: #ea580c;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: re-spin 0.8s linear infinite;
+}
+
+/* ── Lien NART ── */
+.re-nart-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #ea580c;
+  font-weight: 700;
+  text-decoration: none;
+  transition: var(--admin-transition);
+}
+.re-nart-link:hover {
+  color: #fb923c;
+  text-decoration: underline;
+}
+.re-nart-ext {
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: var(--admin-transition);
+}
+.re-nart-link:hover .re-nart-ext {
+  opacity: 0.9;
+}
+
+/* ── Puces état ── */
+.re-chip {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.re-chip-special {
+  background: var(--admin-warning-light);
+  color: var(--admin-warning);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.re-chip-stock {
+  background: var(--admin-info-light);
+  color: var(--admin-info);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+.re-chip-other {
+  background: rgba(128, 128, 128, 0.16);
+  color: var(--admin-text-secondary);
+  border-color: var(--admin-border);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .re-header,
+  .re-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .re-actions .re-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,47 @@
+[
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  "L"
+    }
+]

@@ -100,6 +100,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Communication client (catalogue nouveautés envoyé aux abonnés newsletter)
+      communication_client: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Assistant IA (chat métier branché sur les données DBF/Mongo)
       assistant_ia: {
         read: { type: Boolean, default: false },
@@ -145,6 +151,18 @@ const permissionSchema = new mongoose.Schema(
       },
       // Fiches de contrôle
       fiches_controle_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Suivi des entrées (entrees.dbf : marchandises reçues du jour)
+      suivi_entrees: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Entrées sur réservation (articles réservés qui entrent en stock)
+      resa_entrees: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
@@ -200,6 +218,18 @@ const permissionSchema = new mongoose.Schema(
       },
       // Collecteurs
       collecteurs_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Rapports TGC mensuels (déclaration fiscale depuis facture/detail.dbf)
+      rapport_tgc: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Balances / clients à bloquer (encours depuis balances.dbf)
+      balances_clients: {
         read: { type: Boolean, default: false },
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },

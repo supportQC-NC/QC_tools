@@ -1,0 +1,20 @@
+[
+    {
+        "N°":  1,
+        "Societe":  "QC",
+        "id_client":  "8643",
+        "Client":  "ALL WOODS",
+        "Mail":  "direction@allwoods.nc;compta@allwoods.nc",
+        "MailCC":  "n.leroux@quincaillerie.nc",
+        "mailMaintenance":  "support@quincaillerie.nc"
+    },
+    {
+        "N°":  2,
+        "Societe":  "LD",
+        "id_client":  "33",
+        "Client":  "ALL WOODS",
+        "Mail":  "direction@allwoods.nc;compta@allwoods.nc",
+        "MailCC":  "n.leroux@quincaillerie.nc",
+        "mailMaintenance":  "support@quincaillerie.nc"
+    }
+]

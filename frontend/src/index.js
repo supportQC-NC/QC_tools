@@ -23,6 +23,7 @@ import InstallAppScreen from "./screens/InstallAppScreen";
 import ProfileScreen from "./screens/ProfileScreen/ProfileScreen";
 import AdminUsers from "./screens/admin/AdminUsersScreen";
 import AdminEntreprises from "./screens/admin/AdminEntreprisesScreen";
+import AdminEntrepriseConfigScreen from "./screens/admin/AdminEntrepriseConfigScreen";
 import AdminArticles from "./screens/admin/AdminArticlesScreen";
 import AdminConcurrents from "./screens/admin/AdminConcurrentsScreen";
 import AdminRelevesScreen from "./screens/admin/AdminRelevesScreen";
@@ -35,6 +36,11 @@ import AdminDemandesBipageScreen from "./screens/admin/AdminDemandesBipageScreen
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
 import ChangementPrixScreen from "./screens/admin/ChangementPrixScreen";
+import SuiviEntreesScreen from "./screens/admin/SuiviEntreesScreen";
+import ResaEntreesScreen from "./screens/admin/ResaEntreesScreen";
+import RapportTgcScreen from "./screens/admin/RapportTgcScreen";
+import BalancesClientsScreen from "./screens/admin/BalancesClientsScreen";
+import CommunicationClientScreen from "./screens/admin/CommunicationClientScreen";
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
 import AssistantIAScreen from "./screens/user/AssistantIAScreen";
@@ -140,9 +146,34 @@ const router = createBrowserRouter(
         <Route path="/assistant-ia" element={<AssistantIAScreen />} />
       </Route>
 
+      {/* Communication · Catalogue nouveautés -> module "communication_client" */}
+      <Route element={<ModuleRoute module="communication_client" />}>
+        <Route path="/communication-client" element={<CommunicationClientScreen />} />
+      </Route>
+
       {/* Gestion · Changement de prix de vente -> module "changement_prix" */}
       <Route element={<ModuleRoute module="changement_prix" />}>
         <Route path="/changement-prix" element={<ChangementPrixScreen />} />
+      </Route>
+
+      {/* Données · Suivi des entrées -> module "suivi_entrees" */}
+      <Route element={<ModuleRoute module="suivi_entrees" />}>
+        <Route path="/admin/suivi-entrees" element={<SuiviEntreesScreen />} />
+      </Route>
+
+      {/* Données · Entrées sur réservation -> module "resa_entrees" */}
+      <Route element={<ModuleRoute module="resa_entrees" />}>
+        <Route path="/admin/resa-entrees" element={<ResaEntreesScreen />} />
+      </Route>
+
+      {/* Analyse · Rapports TGC -> module "rapport_tgc" */}
+      <Route element={<ModuleRoute module="rapport_tgc" />}>
+        <Route path="/admin/rapport-tgc" element={<RapportTgcScreen />} />
+      </Route>
+
+      {/* Analyse · Balances / clients à bloquer -> module "balances_clients" */}
+      <Route element={<ModuleRoute module="balances_clients" />}>
+        <Route path="/admin/balances-clients" element={<BalancesClientsScreen />} />
       </Route>
 
       {/* Administration · Utilisateurs -> module "users_admin" (ou responsable,
@@ -161,6 +192,10 @@ const router = createBrowserRouter(
       {/* Administration · Entreprises -> module "entreprises_admin" */}
       <Route element={<ModuleRoute module="entreprises_admin" />}>
         <Route path="/admin/entreprises" element={<AdminEntreprises />} />
+        <Route
+          path="/admin/entreprises/:id"
+          element={<AdminEntrepriseConfigScreen />}
+        />
       </Route>
 
       {/* Administration · Infobulles menu -> module "infobulles_admin" */}

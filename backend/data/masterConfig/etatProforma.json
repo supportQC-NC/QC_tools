@@ -1,0 +1,18 @@
+[
+    {
+        "ETAT":  1,
+        "Description":  "DEVIS"
+    },
+    {
+        "ETAT":  2,
+        "Description":  "CDE A PREPARER"
+    },
+    {
+        "ETAT":  3,
+        "Description":  "CDE PRETE"
+    },
+    {
+        "ETAT":  4,
+        "Description":  "CDE A FACT"
+    }
+]

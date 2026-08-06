@@ -1,0 +1,26 @@
+[
+    {
+        "idAlerte":  "1",
+        "typeAlerte":  "Alerte confirmation"
+    },
+    {
+        "idAlerte":  "2",
+        "typeAlerte":  "Alerte livraison"
+    },
+    {
+        "idAlerte":  "3",
+        "typeAlerte":  "Alerte embarquement"
+    },
+    {
+        "idAlerte":  "4",
+        "typeAlerte":  "Alerte absence facture"
+    },
+    {
+        "idAlerte":  "5",
+        "typeAlerte":  "Alerte entree stock"
+    },
+    {
+        "idAlerte":  "99",
+        "typeAlerte":  "Commande ok"
+    }
+]

@@ -656,3 +656,108 @@
     white-space: nowrap;
   }
 }
+
+/* ===================================================================
+   Mode PAGE (asPage) — vraie page : en-tête sticky + nav verticale
+   gauche + panneau de contenu à droite (thème admin, pas de carte modale)
+   =================================================================== */
+.entreprise-config-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+.ecp-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.ecp-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+.ecp-header-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.ecp-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100vh - 66px);
+}
+.ecp-nav {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--admin-bg-secondary);
+  border-right: 1px solid var(--admin-border);
+  padding: 0.75rem 0;
+  overflow-y: auto;
+}
+.ecp-nav-group {
+  margin-bottom: 0.75rem;
+}
+.ecp-nav-group-label {
+  padding: 0.4rem 1rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted);
+}
+.ecp-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 1rem 0.5rem 1.25rem;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  color: var(--admin-text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+.ecp-nav-item:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+.ecp-nav-item.active {
+  background: var(--admin-bg-hover);
+  border-left-color: #6366f1;
+  color: #a5b4fc;
+  font-weight: 700;
+}
+.ecp-content {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  min-width: 0;
+}
+/* Le formulaire réutilisé ne doit plus ressembler à une carte modale
+   centrée : pleine largeur, sans fond/ombre/max-width. */
+.ecp-content .modal-form {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  max-height: none;
+  overflow: visible;
+}
+.ecp-content .modal-footer {
+  position: static;
+  background: transparent;
+  border-top: 1px solid var(--admin-border);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}

@@ -30,6 +30,7 @@ export const PERMISSION_MODULES = [
   { key: "changement_prix", label: "Changement de prix de vente", group: "gestion" },
   { key: "edition_promo", label: "Édition Promo", group: "gestion" },
   { key: "mailing", label: "Mailing clients", group: "gestion" },
+  { key: "communication_client", label: "Communication client", group: "gestion" },
   { key: "assistant_ia", label: "Assistant IA", group: "gestion" },
   // ── Données (écrans admin) ────────────────────────────────────────────────
   { key: "client", label: "Clients", group: "donnees" },
@@ -40,6 +41,8 @@ export const PERMISSION_MODULES = [
   { key: "inventaire_proforma_admin", label: "Inventaire Proforma", group: "donnees" },
   { key: "fiches_controle_admin", label: "Fiches de contrôle", group: "donnees" },
   { key: "reception_suivi_admin", label: "Suivi Réceptions", group: "donnees" },
+  { key: "suivi_entrees", label: "Suivi des entrées", group: "donnees" },
+  { key: "resa_entrees", label: "Entrées sur réservation", group: "donnees" },
   { key: "export_gisements_admin", label: "Export Gisements", group: "donnees" },
   // ── Commerciaux (boîte à outils commerciale — accès global unique) ─────────
   { key: "commerciaux_outils", label: "Outils Commerciaux", group: "commerciaux" },
@@ -53,6 +56,8 @@ export const PERMISSION_MODULES = [
   { key: "performance_dock_admin", label: "Performance Dock", group: "analyse" },
   { key: "analyse_reappro_admin", label: "Analyse Réappro", group: "analyse" },
   { key: "collecteurs_admin", label: "Collecteurs", group: "analyse" },
+  { key: "rapport_tgc", label: "Rapports TGC", group: "analyse" },
+  { key: "balances_clients", label: "Balances / clients à bloquer", group: "analyse" },
   // ── Administration ────────────────────────────────────────────────────────
   { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
   { key: "users_admin", label: "Utilisateurs", group: "administration" },

@@ -26,7 +26,8 @@ import {
   HiMail,
   HiSparkles,
   HiTrendingUp,
-  HiUser
+  HiUser,
+  HiCog
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
 
@@ -75,6 +76,8 @@ export const adminMenuStructure = [
       { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
       { label: "Bipages", path: "/admin/demandes-bipage", icon: HiClipboardList },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
+      { label: "Suivi des entrées", path: "/admin/suivi-entrees", icon: HiTruck },
+      { label: "Entrées sur réservation", path: "/admin/resa-entrees", icon: HiClipboardCheck },
       { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
       { label: "Dictionnaire des rayons", path: "/admin/dictionnaire-rayons", icon: HiTag },
       { label: "Exécutables", path: "/admin/executables", icon: HiDownload },
@@ -100,6 +103,8 @@ export const adminMenuStructure = [
       { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
       { label: "Analyse Facturation", path: "/admin/facture-analyse", icon: HiDocumentReport },
       { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
+      { label: "Rapports TGC", path: "/admin/rapport-tgc", icon: HiCurrencyDollar },
+      { label: "Balances clients", path: "/admin/balances-clients", icon: HiCurrencyDollar },
       { label: "Top Articles", path: "/admin/top-articles", icon: HiChartBar },
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
       { label: "Analyse Réappro", path: "/admin/analyse-reappro", icon: HiRefresh },
@@ -262,6 +267,12 @@ export const moduleMenuStructure = [
         moduleKey: "mailing",
         label: "Mailing clients",
         path: "/mailing",
+        icon: HiMail,
+      },
+      {
+        moduleKey: "communication_client",
+        label: "Nouveautés clients",
+        path: "/communication-client",
         icon: HiMail,
       },
       {
@@ -583,6 +594,10 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/demandes-bipage": "Demandes d'articles à biper (collecteur).",
   "/admin/bipages": "Détail des bipages remontés.",
   "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
+  "/admin/suivi-entrees":
+    "Marchandises entrées du jour (entrees.dbf) enrichies + contrôle TGC.",
+  "/admin/resa-entrees":
+    "Articles réservés / commande spéciale qui entrent en stock (client + vendeur).",
   "/admin/export-gisements": "Export Excel des gisements et groupes.",
   "/admin/dictionnaire-rayons": "Dictionnaire des rayons (libellés, métrage).",
   "/admin/executables": "Téléchargements et exécutables.",
@@ -600,6 +615,10 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/analyse-ca": "Analyse du chiffre d'affaires.",
   "/admin/facture-analyse": "Analyse de la facturation.",
   "/admin/journal-caisse": "Journal de caisse.",
+  "/admin/rapport-tgc":
+    "Déclaration TGC mensuelle (base HT & TGC par taux) + alertes.",
+  "/admin/balances-clients":
+    "Encours clients par ancienneté + clients à bloquer (dette ≥ 2 mois).",
   "/admin/top-articles": "Meilleures ventes par article (facture).",
   "/admin/reappro-local": "Réapprovisionnement local.",
   "/admin/analyse-reappro": "Analyse des réapprovisionnements.",
@@ -616,6 +635,8 @@ export const DEFAULT_MENU_HINTS = {
   "/edition-promo": "Édition des promotions.",
   "/mailing": "Emailing clients (campagnes).",
   "/assistant-ia": "Assistant IA branché sur les données société.",
+  "/communication-client":
+    "Catalogue des nouveautés en stock, envoyé aux clients abonnés.",
 };
 
 // Onglets de l'espace personnel (section fixe, non gérée par le constructeur).

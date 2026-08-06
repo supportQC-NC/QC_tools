@@ -1,0 +1,464 @@
+[
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  "L",
+        "Societe":  "SITEC"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  "L",
+        "Societe":  "FMB"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  "L",
+        "Societe":  "HD"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "AERIEN",
+        "descriptionCourt":  null,
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  null,
+        "Societe":  "LD"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCALE",
+        "descriptionCourt":  null,
+        "Societe":  "AVB"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "KONE"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "KONE"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "KONE"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "CDE BATEAU",
+        "descriptionCourt":  null,
+        "Societe":  "KONE"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "KONE"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "CDE LOCALE",
+        "descriptionCourt":  null,
+        "Societe":  "KONE"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE LOCALE",
+        "descriptionCourt":  null,
+        "Societe":  "MEARE"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  "L",
+        "Societe":  "QC"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  2,
+        "descriptionEtat":  "PROFORMA",
+        "descriptionCourt":  null,
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  3,
+        "descriptionEtat":  "RELIQUAT",
+        "descriptionCourt":  null,
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  4,
+        "descriptionEtat":  "ENVOYEE",
+        "descriptionCourt":  "E",
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  5,
+        "descriptionEtat":  "CONFIRMEE",
+        "descriptionCourt":  "C",
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  6,
+        "descriptionEtat":  "TRANSIT",
+        "descriptionCourt":  "T",
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  7,
+        "descriptionEtat":  "BATEAU",
+        "descriptionCourt":  "B",
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  8,
+        "descriptionEtat":  "CDE AVION",
+        "descriptionCourt":  null,
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  9,
+        "descriptionEtat":  "CDE LOCAL",
+        "descriptionCourt":  "L",
+        "Societe":  "AW"
+    },
+    {
+        "id_Etat":  1,
+        "descriptionEtat":  "PREPAR",
+        "descriptionCourt":  null,
+        "Societe":  "MEARE"
+    }
+]

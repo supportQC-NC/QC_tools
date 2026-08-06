@@ -1,0 +1,56 @@
+/* Page de configuration d'une entreprise (édition plein écran).
+   Les classes .entreprise-config-page* sont rendues par EntrepriseModal en mode
+   `asPage` ; on les style ici (CSS global). */
+
+.entreprise-config-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  padding-bottom: 2rem;
+}
+
+.entreprise-config-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.entreprise-config-page-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.entreprise-config-page-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 0;
+}
+
+/* En page, le formulaire s'étend (pas de scroll interne façon modale). */
+.entreprise-config-page .modal-form {
+  max-height: none;
+  overflow: visible;
+}
+.entreprise-config-page .modal-tabs {
+  flex-wrap: wrap;
+}
+
+/* États loading / introuvable */
+.entreprise-config-state {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}

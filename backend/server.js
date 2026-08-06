@@ -32,6 +32,12 @@ import receptionRoutes from "./routes/receptionRoutes.js";
 import preparationRoutes from "./routes/preparationRoutes.js";
 import etiquetteRoutes from "./routes/etiquetteRoutes.js";
 import changementPrixRoutes from "./routes/changementPrixRoutes.js";
+import suiviEntreesRoutes from "./routes/suiviEntreesRoutes.js";
+import rapportTgcRoutes from "./routes/rapportTgcRoutes.js";
+import balancesRoutes from "./routes/balancesRoutes.js";
+import configRapportsRoutes from "./routes/configRapportsRoutes.js";
+import communicationClientRoutes from "./routes/communicationClientRoutes.js";
+import resaEntreesRoutes from "./routes/resaEntreesRoutes.js";
 import editionPromoRoutes from "./routes/editionPromoRoutes.js";
 // ========== ROUTES ZONES (INVENTAIRE) ==========
 import zoneRoutes from "./routes/zoneRoutes.js";
@@ -189,6 +195,12 @@ app.use("/api/proformas", proformaRoutes);
 app.use("/api/inventaire-proforma", inventaireProformaRoutes);
 app.use("/api/etiquettes", etiquetteRoutes);
 app.use("/api/changement-prix", changementPrixRoutes);
+app.use("/api/suivi-entrees", suiviEntreesRoutes);
+app.use("/api/rapport-tgc", rapportTgcRoutes);
+app.use("/api/balances-clients", balancesRoutes);
+app.use("/api/config-rapports", configRapportsRoutes);
+app.use("/api/communication-client", communicationClientRoutes);
+app.use("/api/resa-entrees", resaEntreesRoutes);
 app.use("/api/edition-promo", editionPromoRoutes);
 // ========== ROUTES FOURNISSEURS ==========
 app.use("/api/fournisseurs", fournissRoutes);

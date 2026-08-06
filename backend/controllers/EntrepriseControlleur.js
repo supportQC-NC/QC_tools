@@ -257,10 +257,16 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     mappingEtatsFacture,
     analyseCA,
     mappingEtatsProforma,
+    mappingEtatsReservation,
     isActive,
     cheminRapportReception,
     emailsRapportReception,
     emailsRapportPreparation,
+    emailsChgtPrixVente,
+    emailsPropoReappro,
+    mailCompta,
+    nomCompta,
+    userCompta,
     cheminLogoEtiquettes,
     couleurPrimaire,
     couleurSecondaire,
@@ -328,6 +334,11 @@ const updateEntreprise = asyncHandler(async (req, res) => {
       Object.entries(mappingEtatsProforma),
     );
   }
+  if (mappingEtatsReservation) {
+    entreprise.mappingEtatsReservation = new Map(
+      Object.entries(mappingEtatsReservation),
+    );
+  }
 
   entreprise.isActive = isActive !== undefined ? isActive : entreprise.isActive;
 
@@ -344,6 +355,27 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     entreprise.emailsRapportPreparation = emailsRapportPreparation
       .map((e) => String(e || "").trim())
       .filter(Boolean);
+  }
+  // Emails de rapports « master report »
+  if (Array.isArray(emailsChgtPrixVente)) {
+    entreprise.emailsChgtPrixVente = emailsChgtPrixVente
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  if (Array.isArray(emailsPropoReappro)) {
+    entreprise.emailsPropoReappro = emailsPropoReappro
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  // Contact compta société (+ lien user optionnel)
+  if (Array.isArray(mailCompta)) {
+    entreprise.mailCompta = mailCompta
+      .map((e) => String(e || "").trim())
+      .filter(Boolean);
+  }
+  if (nomCompta !== undefined) entreprise.nomCompta = nomCompta;
+  if (userCompta !== undefined) {
+    entreprise.userCompta = userCompta || null;
   }
   if (cheminLogoEtiquettes !== undefined) {
     entreprise.cheminLogoEtiquettes = cheminLogoEtiquettes;

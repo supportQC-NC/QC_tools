@@ -58,6 +58,18 @@ export const apiSlice = createApi({
     "EtiquetteTemplate",
     // ========== TAGS CHANGEMENT DE PRIX ==========
     "ChangementPrix",
+    // ========== TAGS SUIVI DES ENTREES ==========
+    "SuiviEntrees",
+    // ========== TAGS ENTREES SUR RESERVATION ==========
+    "ResaEntrees",
+    // ========== TAGS RAPPORT TGC ==========
+    "RapportTgc",
+    // ========== TAGS BALANCES CLIENTS ==========
+    "Balances",
+    // ========== TAGS COMMUNICATION CLIENT (nouveautés) ==========
+    "Nouveautes",
+    // ========== TAGS CONFIG RAPPORTS (master report) ==========
+    "ConfigRapports",
     // ========== TAGS ASSISTANT IA ==========
     "AiConversation",
     // ========== TAGS ENVOI CDE FOURNISSEUR ==========

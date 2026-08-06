@@ -1,0 +1,162 @@
+[
+    {
+        "GROUPE":  "18V",
+        "Description":  "Bosch 18V"
+    },
+    {
+        "GROUPE":  "20V",
+        "Description":  "Ingco 20V"
+    },
+    {
+        "GROUPE":  "ARRO",
+        "Description":  "Arrosage"
+    },
+    {
+        "GROUPE":  "ASPI",
+        "Description":  "Aspirateur"
+    },
+    {
+        "GROUPE":  "BATI",
+        "Description":  "Peinture"
+    },
+    {
+        "GROUPE":  "BFT",
+        "Description":  "BFT"
+    },
+    {
+        "GROUPE":  "BOSC",
+        "Description":  "Bosch filaire"
+    },
+    {
+        "GROUPE":  "BRAS",
+        "Description":  "Brasseur"
+    },
+    {
+        "GROUPE":  "BROY",
+        "Description":  "Broyeur"
+    },
+    {
+        "GROUPE":  "CLOU",
+        "Description":  "Clouage"
+    },
+    {
+        "GROUPE":  "COMP",
+        "Description":  "Compresseur"
+    },
+    {
+        "GROUPE":  "DEB",
+        "Description":  "Débroussailleuse"
+    },
+    {
+        "GROUPE":  "DIVE",
+        "Description":  "Divers"
+    },
+    {
+        "GROUPE":  "DREM",
+        "Description":  "Outil Dremel"
+    },
+    {
+        "GROUPE":  "ELEC",
+        "Description":  "Electricité"
+    },
+    {
+        "GROUPE":  "FEST",
+        "Description":  "Festool"
+    },
+    {
+        "GROUPE":  "FIL",
+        "Description":  "Electro filaire"
+    },
+    {
+        "GROUPE":  "GROS",
+        "Description":  "Gros matériel"
+    },
+    {
+        "GROUPE":  "GROU",
+        "Description":  "Groupe Elect"
+    },
+    {
+        "GROUPE":  "INV",
+        "Description":  "Divers"
+    },
+    {
+        "GROUPE":  "JARD",
+        "Description":  "Jardin"
+    },
+    {
+        "GROUPE":  "LEVA",
+        "Description":  "Levage"
+    },
+    {
+        "GROUPE":  "LUM",
+        "Description":  "Luminaire"
+    },
+    {
+        "GROUPE":  "MACH",
+        "Description":  "Machine bois"
+    },
+    {
+        "GROUPE":  "MECA",
+        "Description":  "Mécanique"
+    },
+    {
+        "GROUPE":  "MESU",
+        "Description":  "Outil Mesure"
+    },
+    {
+        "GROUPE":  "MEUL",
+        "Description":  "Meulage"
+    },
+    {
+        "GROUPE":  "NETT",
+        "Description":  "Nettoyeur"
+    },
+    {
+        "GROUPE":  "NIVE",
+        "Description":  "Niveau laser"
+    },
+    {
+        "GROUPE":  "PNEU",
+        "Description":  "Pneumatique"
+    },
+    {
+        "GROUPE":  "PORT",
+        "Description":  "Portatif Batterie"
+    },
+    {
+        "GROUPE":  "SOUD",
+        "Description":  "Soudure"
+    },
+    {
+        "GROUPE":  "SOUF",
+        "Description":  "Souffleur"
+    },
+    {
+        "GROUPE":  "STAT",
+        "Description":  "Stationnaire"
+    },
+    {
+        "GROUPE":  "STOP",
+        "Description":  "Stop Article"
+    },
+    {
+        "GROUPE":  "TOND",
+        "Description":  "Tondeuse"
+    },
+    {
+        "GROUPE":  "TOUR",
+        "Description":  "Touret"
+    },
+    {
+        "GROUPE":  "TRON",
+        "Description":  "Tronconneuse"
+    },
+    {
+        "GROUPE":  "TRONC",
+        "Description":  "Tronconneuse"
+    },
+    {
+        "GROUPE":  "VENT",
+        "Description":  "Ventilation"
+    }
+]

@@ -1,5 +1,6 @@
 // src/screens/admin/AdminEntreprises.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   HiPlus,
   HiPencil,
@@ -9,16 +10,19 @@ import {
   HiX,
   HiRefresh,
   HiOfficeBuilding,
+  HiDownload,
 } from "react-icons/hi";
 import {
   useGetEntreprisesQuery,
   useDeleteEntrepriseMutation,
   useToggleEntrepriseActiveMutation,
 } from "../../slices/entrepriseApiSlice";
+import { useSeedConfigRapportsMutation } from "../../slices/configRapportsApiSlice";
 import EntrepriseModal from "../../components/Admin/EntrepriseModal";
 import "./AdminEntreprisesScreen.css";
 
 const AdminEntreprises = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedEntreprise, setSelectedEntreprise] = useState(null);
@@ -33,6 +37,27 @@ const AdminEntreprises = () => {
     useDeleteEntrepriseMutation();
   const [toggleActive, { isLoading: isToggling }] =
     useToggleEntrepriseActiveMutation();
+  const [seedConfig, { isLoading: seeding }] = useSeedConfigRapportsMutation();
+  const [seedMsg, setSeedMsg] = useState(null); // { type, text }
+
+  const runSeed = async () => {
+    if (
+      !window.confirm(
+        "Importer la config initiale des rapports depuis les données Access ?\n\nNon-destructif : n'ajoute que ce qui manque, ne modifie rien d'existant.",
+      )
+    )
+      return;
+    setSeedMsg(null);
+    try {
+      const r = await seedConfig().unwrap();
+      setSeedMsg({
+        type: "ok",
+        text: `Import OK — abonnements +${r.abonnements}, groupes prio +${r.groupesPrioritaires}, groupes spé +${r.groupesSpeciaux}, mails compta +${r.mailsCompta}, factures auto +${r.facturesAuto}, entreprises MAJ ${r.entreprisesMaj}${r.ignores?.length ? ` — ignorées : ${r.ignores.join(", ")}` : ""}`,
+      });
+    } catch (e) {
+      setSeedMsg({ type: "err", text: e?.data?.message || "Import impossible." });
+    }
+  };
 
   // Filtrer les entreprises
   const filteredEntreprises = entreprises?.filter((entreprise) => {
@@ -49,9 +74,9 @@ const AdminEntreprises = () => {
     setModalOpen(true);
   };
 
+  // Édition -> page de configuration plein écran (beaucoup d'infos par société).
   const handleEdit = (entreprise) => {
-    setSelectedEntreprise(entreprise);
-    setModalOpen(true);
+    navigate(`/admin/entreprises/${entreprise._id}`);
   };
 
   const handleDelete = async (entreprise) => {
@@ -102,12 +127,44 @@ const AdminEntreprises = () => {
           <button className="btn-icon" onClick={refetch} title="Rafraîchir">
             <HiRefresh />
           </button>
+          <button
+            className="btn-secondary"
+            onClick={runSeed}
+            disabled={seeding}
+            title="Importer la config initiale des rapports (non-destructif)"
+          >
+            <HiDownload />
+            <span>{seeding ? "Import…" : "Importer config rapports"}</span>
+          </button>
           <button className="btn-primary" onClick={handleCreate}>
             <HiPlus />
             <span>Nouvelle entreprise</span>
           </button>
         </div>
       </div>
+
+      {seedMsg && (
+        <div
+          className={`admin-seed-msg ${seedMsg.type === "err" ? "err" : "ok"}`}
+          style={{
+            margin: "0 0 1rem",
+            padding: "0.6rem 1rem",
+            borderRadius: 8,
+            fontSize: "0.85rem",
+            background:
+              seedMsg.type === "err"
+                ? "rgba(239,68,68,0.12)"
+                : "rgba(16,185,129,0.12)",
+            color: seedMsg.type === "err" ? "#dc2626" : "#059669",
+            border:
+              seedMsg.type === "err"
+                ? "1px solid rgba(239,68,68,0.35)"
+                : "1px solid rgba(16,185,129,0.35)",
+          }}
+        >
+          {seedMsg.text}
+        </div>
+      )}
 
       <div className="admin-entreprises-stats">
         <div className="stat-card">

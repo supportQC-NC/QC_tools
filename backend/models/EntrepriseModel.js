@@ -262,6 +262,32 @@ const entrepriseSchema = new mongoose.Schema(
       of: String,
       default: () => new Map(),
     },
+    // Mapping des états de RÉSERVATION (portage master report tblEtatReservation).
+    mappingEtatsReservation: {
+      type: Map,
+      of: String,
+      default: () => new Map(),
+    },
+    // ---- Destinataires d'emails de rapports (master report) ----
+    // Alerte « changement de prix de vente » (tblParametres.mailChgtPrixVente).
+    emailsChgtPrixVente: {
+      type: [String],
+      default: [],
+    },
+    // Proposition de réappro (tblParametres.mailPropoReappro).
+    emailsPropoReappro: {
+      type: [String],
+      default: [],
+    },
+    // Contact COMPTA de la société (tblParametres.mailCompta/nomCompta).
+    // `userCompta` : rattachement OPTIONNEL à un utilisateur existant.
+    mailCompta: { type: [String], default: [] },
+    nomCompta: { type: String, default: "" },
+    userCompta: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

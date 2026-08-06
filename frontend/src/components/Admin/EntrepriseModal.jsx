@@ -18,9 +18,118 @@ import {
   useCreateEntrepriseMutation,
   useUpdateEntrepriseMutation,
 } from "../../slices/entrepriseApiSlice";
+import { useGetUsersQuery } from "../../slices/userApiSlice";
 import { BASE_URL } from "../../constants";
 import Modal from "../ui/Modal/Modal";
+import ConfigResourceTable from "./ConfigResourceTable";
 import "./EntrepriseModal.css";
+
+// Onglets « Rapports (par client) » — CRUD embarqué (scopé à l'entreprise).
+const REPORT_TABS = [
+  {
+    key: "rapAbonnements",
+    label: "Abonnements clients",
+    resource: "abonnements",
+    scoped: true,
+    fields: [
+      { name: "tiers", label: "Tiers", type: "number", required: true },
+      { name: "email", label: "Email", type: "text", required: true },
+      { name: "newsletter", label: "Newsletter", type: "bool" },
+      { name: "facturePdf", label: "Facture PDF", type: "bool" },
+      { name: "rapportTgc", label: "Rapport TGC", type: "bool" },
+      { name: "xlsExterne", label: "XLS externe", type: "bool" },
+      { name: "xlsInterne", label: "XLS interne", type: "bool" },
+      { name: "baseCollecteur", label: "Base collecteur", type: "text" },
+      { name: "bloquer", label: "Bloquer", type: "bool" },
+      { name: "user", label: "Utilisateur (option.)", type: "user" },
+    ],
+  },
+  {
+    key: "rapMailsCompta",
+    label: "Mails compta",
+    resource: "mails-compta",
+    scoped: true,
+    fields: [
+      { name: "idClient", label: "ID client", type: "number", required: true },
+      { name: "nomClient", label: "Nom client", type: "text" },
+      { name: "mailCompta", label: "Mails compta", type: "mails" },
+      { name: "nomCompta", label: "Nom compta", type: "text" },
+      { name: "user", label: "Utilisateur (option.)", type: "user" },
+    ],
+  },
+  {
+    key: "rapFacturesAuto",
+    label: "Factures auto",
+    resource: "factures-auto",
+    scoped: true,
+    fields: [
+      { name: "idClient", label: "ID client", type: "text" },
+      { name: "client", label: "Client", type: "text" },
+      { name: "mails", label: "Mails", type: "mails" },
+      { name: "mailsCC", label: "Mails CC", type: "mails" },
+      { name: "mailsMaintenance", label: "Mails maintenance", type: "mails" },
+      { name: "user", label: "Utilisateur (option.)", type: "user" },
+    ],
+  },
+  {
+    key: "rapGroupesSpeciaux",
+    label: "Groupes spéciaux",
+    resource: "groupes-speciaux",
+    scoped: true,
+    fields: [
+      { name: "codeListe", label: "Code liste", type: "text", required: true },
+      { name: "lblListe", label: "Libellé", type: "text" },
+      { name: "format", label: "Format", type: "text" },
+      { name: "codeJpg", label: "Code JPG", type: "text" },
+    ],
+  },
+  {
+    key: "rapGroupesPrioritaires",
+    label: "Groupes prioritaires (communs)",
+    resource: "groupes-prioritaires",
+    scoped: false,
+    fields: [
+      { name: "groupe", label: "Groupe", type: "text", required: true },
+      { name: "description", label: "Description", type: "text" },
+    ],
+  },
+];
+
+// Groupes de la nav verticale (mode page). Le groupe « Rapports » n'apparaît
+// qu'en édition (entreprise déjà enregistrée).
+const NAV_GROUPS = [
+  {
+    label: "Général",
+    items: [
+      { key: "general", label: "Général" },
+      { key: "apparence", label: "Apparence" },
+      { key: "chemins", label: "Chemins" },
+      { key: "entrepots", label: "Entrepôts" },
+    ],
+  },
+  {
+    label: "États",
+    items: [
+      { key: "etats", label: "États Commande" },
+      { key: "etatsFacture", label: "États Facture" },
+      { key: "etatsProforma", label: "États Proforma" },
+      { key: "etatsReservation", label: "États Réservation" },
+    ],
+  },
+  { label: "Réception & emails", items: [{ key: "reception", label: "Réception" }] },
+  {
+    label: "Commercial",
+    items: [
+      { key: "vendeurs", label: "Vendeurs" },
+      { key: "analyseCA", label: "Analyse CA" },
+    ],
+  },
+  {
+    label: "Rapports (par client)",
+    report: true,
+    items: REPORT_TABS.map((t) => ({ key: t.key, label: t.label })),
+  },
+];
 
 const DEFAULT_ETATS_COMMANDE = {
   0: "Brouillon",
@@ -115,7 +224,7 @@ const analyseCaToForm = (a) => {
   };
 };
 
-const EntrepriseModal = ({ entreprise, onClose }) => {
+const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
   const isEdit = !!entreprise;
 
   const [formData, setFormData] = useState({
@@ -136,10 +245,16 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     mappingEtatsCommande: { ...DEFAULT_ETATS_COMMANDE },
     mappingEtatsFacture: {},
     mappingEtatsProforma: {},
+    mappingEtatsReservation: {},
     cheminRapportReception:
       "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
     emailsRapportReception: [],
     emailsRapportPreparation: [],
+    emailsChgtPrixVente: [],
+    emailsPropoReappro: [],
+    mailCompta: [],
+    nomCompta: "",
+    userCompta: "",
     cheminLogoEtiquettes: "",
     couleurPrimaire: DEFAULT_PRIMAIRE,
     couleurSecondaire: DEFAULT_SECONDAIRE,
@@ -158,6 +273,12 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     useCreateEntrepriseMutation();
   const [updateEntreprise, { isLoading: isUpdating }] =
     useUpdateEntrepriseMutation();
+
+  // Utilisateurs (pour le rattachement OPTIONNEL du contact compta).
+  const { data: usersData } = useGetUsersQuery();
+  const usersList = Array.isArray(usersData)
+    ? usersData
+    : usersData?.users || [];
 
   useEffect(() => {
     if (entreprise) {
@@ -183,6 +304,12 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           proformaFromEnt[k] = v;
         });
       }
+      const reservationFromEnt = {};
+      if (entreprise.mappingEtatsReservation) {
+        Object.entries(entreprise.mappingEtatsReservation).forEach(([k, v]) => {
+          reservationFromEnt[k] = v;
+        });
+      }
 
       setFormData({
         nomDossierDBF: entreprise.nomDossierDBF || "",
@@ -204,6 +331,7 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
         mappingEtatsCommande: etatsFromEntreprise,
         mappingEtatsFacture: factureFromEnt,
         mappingEtatsProforma: proformaFromEnt,
+        mappingEtatsReservation: reservationFromEnt,
         cheminRapportReception:
           entreprise.cheminRapportReception ||
           "\\\\192.168.0.250\\Rcommun\\STOCK\\controle commande",
@@ -217,6 +345,17 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
         )
           ? entreprise.emailsRapportPreparation
           : [],
+        emailsChgtPrixVente: Array.isArray(entreprise.emailsChgtPrixVente)
+          ? entreprise.emailsChgtPrixVente
+          : [],
+        emailsPropoReappro: Array.isArray(entreprise.emailsPropoReappro)
+          ? entreprise.emailsPropoReappro
+          : [],
+        mailCompta: Array.isArray(entreprise.mailCompta)
+          ? entreprise.mailCompta
+          : [],
+        nomCompta: entreprise.nomCompta || "",
+        userCompta: entreprise.userCompta?._id || entreprise.userCompta || "",
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
         couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
         couleurSecondaire: entreprise.couleurSecondaire || DEFAULT_SECONDAIRE,
@@ -288,6 +427,13 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     }));
   };
 
+  const handleEtatReservationChange = (key, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      mappingEtatsReservation: { ...prev.mappingEtatsReservation, [key]: value },
+    }));
+  };
+
   const handleResetEtats = () => {
     setFormData((prev) => ({
       ...prev,
@@ -308,6 +454,30 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     setFormData((prev) => ({
       ...prev,
       emailsRapportPreparation: e.target.value.split("\n"),
+    }));
+  };
+
+  // Emails alerte « changement de prix de vente » (master report).
+  const handleEmailsChgtPrixChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      emailsChgtPrixVente: e.target.value.split("\n"),
+    }));
+  };
+
+  // Emails compta (plusieurs possibles) — 1 par ligne.
+  const handleMailComptaChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      mailCompta: e.target.value.split("\n"),
+    }));
+  };
+
+  // Emails « proposition de réappro » (master report).
+  const handleEmailsPropoReapproChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      emailsPropoReappro: e.target.value.split("\n"),
     }));
   };
 
@@ -492,6 +662,18 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       .flatMap((l) => String(l).split(/[,;]+/))
       .map((s) => s.trim())
       .filter(Boolean);
+    const emailsChgtPrix = (formData.emailsChgtPrixVente || [])
+      .flatMap((l) => String(l).split(/[,;]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const emailsReappro = (formData.emailsPropoReappro || [])
+      .flatMap((l) => String(l).split(/[,;]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const mailsCompta = (formData.mailCompta || [])
+      .flatMap((l) => String(l).split(/[,;]+/))
+      .map((s) => s.trim())
+      .filter(Boolean);
     // ANALYSE CA : formulaire -> structure API (listes/nombres/maps)
     const aca = formData.analyseCA;
     const listeNombres = (txt) =>
@@ -530,6 +712,10 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
       ...formData,
       emailsRapportReception: emails,
       emailsRapportPreparation: emailsPrepa,
+      emailsChgtPrixVente: emailsChgtPrix,
+      emailsPropoReappro: emailsReappro,
+      mailCompta: mailsCompta,
+      userCompta: formData.userCompta || null,
       analyseCA: analyseCAPayload,
     };
 
@@ -545,16 +731,7 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
     }
   };
 
-  return (
-    <Modal onClose={onClose} contentClassName="modal modal-entreprise">
-      <div className="modal-header">
-        <h2>{isEdit ? "Modifier l'entreprise" : "Nouvelle entreprise"}</h2>
-        <button className="btn-close" onClick={onClose}>
-          <HiX />
-        </button>
-      </div>
-
-      {/* Tabs */}
+  const tabsBar = (
       <div className="modal-tabs">
         <button
           className={`tab-btn ${activeTab === "general" ? "active" : ""}`}
@@ -599,6 +776,12 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           <HiClipboardList /> États Proforma
         </button>
         <button
+          className={`tab-btn ${activeTab === "etatsReservation" ? "active" : ""}`}
+          onClick={() => setActiveTab("etatsReservation")}
+        >
+          <HiClipboardList /> États Réservation
+        </button>
+        <button
           className={`tab-btn ${activeTab === "reception" ? "active" : ""}`}
           onClick={() => setActiveTab("reception")}
         >
@@ -618,7 +801,9 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           <HiChartBar /> Analyse CA
         </button>
       </div>
+  );
 
+  const formEl = (
       <form onSubmit={handleSubmit} className="modal-form">
         {error && <div className="form-error">{error}</div>}
 
@@ -1040,6 +1225,33 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           </>
         )}
 
+        {/* Tab États Réservation */}
+        {activeTab === "etatsReservation" && (
+          <>
+            <p className="tab-description">
+              Définissez les libellés des états de réservation (codes 0 à 9) pour
+              cette entreprise. Laissez vide un code non utilisé.
+            </p>
+            <div className="etats-grid">
+              {Object.keys(DEFAULT_ETATS_COMMANDE).map((key) => (
+                <div className="form-group etat-field" key={key}>
+                  <label>
+                    <span className="etat-key">État {key}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.mappingEtatsReservation[key] || ""}
+                    onChange={(e) =>
+                      handleEtatReservationChange(key, e.target.value)
+                    }
+                    placeholder={`Libellé état ${key}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* Tab Réception */}
         {activeTab === "reception" && (
           <>
@@ -1098,6 +1310,89 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
                 rapport PDF de préparation de commande leur sera envoyé en
                 pièce jointe.
               </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiMail /> Emails alerte « changement de prix de vente »
+              </label>
+              <textarea
+                name="emailsChgtPrixVente"
+                rows={4}
+                value={(formData.emailsChgtPrixVente || []).join("\n")}
+                onChange={handleEmailsChgtPrixChange}
+                placeholder={"achat@exemple.com\nn.leroux@exemple.com"}
+              />
+              <span className="input-hint">
+                Un email par ligne (virgules / points-virgules acceptés).
+                Destinataires du rapport de changement de prix de vente.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiMail /> Emails « proposition de réappro »
+              </label>
+              <textarea
+                name="emailsPropoReappro"
+                rows={4}
+                value={(formData.emailsPropoReappro || []).join("\n")}
+                onChange={handleEmailsPropoReapproChange}
+                placeholder={"magasin@exemple.com\nachat@exemple.com"}
+              />
+              <span className="input-hint">
+                Un email par ligne (virgules / points-virgules acceptés).
+                Destinataires des propositions de réapprovisionnement.
+              </span>
+            </div>
+
+            <p className="tab-description">
+              Contact <strong>comptabilité</strong> de la société (rapports
+              TGC / facturation). Vous pouvez rattacher un utilisateur existant
+              (optionnel).
+            </p>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Emails compta</label>
+                <textarea
+                  name="mailCompta"
+                  rows={3}
+                  value={(formData.mailCompta || []).join("\n")}
+                  onChange={handleMailComptaChange}
+                  placeholder={"comptabilite@exemple.com\ncompta2@exemple.com"}
+                />
+                <span className="input-hint">
+                  Un email par ligne (virgules / points-virgules acceptés).
+                </span>
+              </div>
+              <div className="form-group">
+                <label>Nom compta</label>
+                <input
+                  type="text"
+                  name="nomCompta"
+                  value={formData.nomCompta}
+                  onChange={handleChange}
+                  placeholder="Nom du contact"
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>
+                <HiUserGroup /> Utilisateur rattaché (optionnel)
+              </label>
+              <select
+                name="userCompta"
+                value={formData.userCompta || ""}
+                onChange={handleChange}
+              >
+                <option value="">— aucun —</option>
+                {usersList.map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {`${u.prenom || ""} ${u.nom || ""}`.trim() || u.email}
+                    {u.email ? ` (${u.email})` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
           </>
         )}
@@ -1449,6 +1744,89 @@ const EntrepriseModal = ({ entreprise, onClose }) => {
           </button>
         </div>
       </form>
+  );
+
+  const body = (
+    <>
+      {tabsBar}
+      {formEl}
+    </>
+  );
+
+  // Mode PAGE plein écran (édition depuis /admin/entreprises/:id)
+  // Layout : en-tête sticky + nav verticale à gauche + panneau à droite.
+  if (asPage) {
+    const activeReport = REPORT_TABS.find((t) => t.key === activeTab);
+    const hasId = !!entreprise?._id;
+    return (
+      <div className="entreprise-config-page">
+        <div className="ecp-header">
+          <h2>Configuration — {entreprise?.nomComplet || "Entreprise"}</h2>
+          <div className="ecp-header-actions">
+            <button type="button" className="btn-cancel" onClick={onClose}>
+              ← Retour à la liste
+            </button>
+            <button
+              type="button"
+              className="btn-submit"
+              disabled={isCreating || isUpdating}
+              onClick={() => handleSubmit({ preventDefault: () => {} })}
+            >
+              {isUpdating ? "Enregistrement..." : "Enregistrer"}
+            </button>
+          </div>
+        </div>
+
+        <div className="ecp-layout">
+          <nav className="ecp-nav">
+            {NAV_GROUPS.map((g) => {
+              if (g.report && !hasId) return null;
+              return (
+                <div key={g.label} className="ecp-nav-group">
+                  <div className="ecp-nav-group-label">{g.label}</div>
+                  {g.items.map((it) => (
+                    <button
+                      key={it.key}
+                      type="button"
+                      className={`ecp-nav-item ${activeTab === it.key ? "active" : ""}`}
+                      onClick={() => setActiveTab(it.key)}
+                    >
+                      {it.label}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </nav>
+
+          <div className="ecp-content">
+            {activeReport ? (
+              <ConfigResourceTable
+                resource={activeReport.resource}
+                fields={activeReport.fields}
+                scoped={activeReport.scoped}
+                entrepriseId={entreprise?._id}
+                label={activeReport.label}
+              />
+            ) : (
+              formEl
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mode MODALE (création d'une nouvelle entreprise)
+  return (
+    <Modal onClose={onClose} contentClassName="modal modal-entreprise">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier l'entreprise" : "Nouvelle entreprise"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
+      {body}
     </Modal>
   );
 };

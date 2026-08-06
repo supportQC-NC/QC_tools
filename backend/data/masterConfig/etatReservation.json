@@ -1,0 +1,14 @@
+[
+    {
+        "idEtatReservation":  0,
+        "description":  "Inconnu"
+    },
+    {
+        "idEtatReservation":  1,
+        "description":  "Réservation Stock"
+    },
+    {
+        "idEtatReservation":  2,
+        "description":  "Commande Spéciale"
+    }
+]
