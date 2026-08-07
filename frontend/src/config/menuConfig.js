@@ -250,6 +250,12 @@ export const moduleMenuStructure = [
         icon: HiCurrencyDollar,
       },
       {
+        moduleKey: "historique_pachat",
+        label: "Historique prix d'achat",
+        path: "/historique-pachat",
+        icon: HiTrendingUp,
+      },
+      {
         moduleKey: "edition_promo",
         label: "Édition Promo",
         path: "/edition-promo",
@@ -632,6 +638,8 @@ export const DEFAULT_MENU_HINTS = {
   "/etiquettes": "Générateur d'étiquettes.",
   "/changement-prix":
     "Changements de prix de vente (rapport Excel + étiquettes).",
+  "/historique-pachat":
+    "Évolution du prix d'achat (PACHAT) d'un article, par fournisseur.",
   "/edition-promo": "Édition des promotions.",
   "/mailing": "Emailing clients (campagnes).",
   "/assistant-ia": "Assistant IA branché sur les données société.",

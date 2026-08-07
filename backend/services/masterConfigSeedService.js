@@ -26,6 +26,27 @@ const DATA = path.join(__dirname, "..", "data", "masterConfig");
 const load = (file) =>
   JSON.parse(fs.readFileSync(path.join(DATA, file), "utf-8"));
 
+// Les Access « master report » identifient chaque société par un CODE interne
+// (colonne Societe / ET / idSociete) qui NE correspond PAS toujours au
+// `trigramme` de l'Entreprise en base. Cette table traduit code Access ->
+// trigramme. Sans elle, KONE/MEARE/SITEC et les magasins Broussard seraient
+// « ignorés » au seed. Un code absent de la table retombe sur lui-même
+// (AVB/AW/FMB/HD/LD/QC matchent déjà tels quels).
+const TRIGRAMME_BY_CODE = {
+  HD: "WEL", // HOME DEPOT : trigramme réel en base = WEL (nomDossierDBF=homedepot)
+  KONE: "KQ",
+  MEARE: "MQ",
+  SITEC: "SIT",
+  LEBROUSSARD: "LB",
+  PAITABRICOLAGE: "PB",
+  QUINCAILLERIEKOUMAC: "QK",
+  QUINCAILLERIEVKP: "VKP",
+};
+const codeToTrig = (code) => {
+  const up = String(code || "").toUpperCase();
+  return TRIGRAMME_BY_CODE[up] || up;
+};
+
 const splitMails = (str) =>
   str
     ? String(str)
@@ -55,7 +76,7 @@ export const runMasterConfigSeed = async () => {
   const ignores = new Set();
   const touched = new Set();
   const resolveDoc = (code) => {
-    const d = entByTrig.get(String(code || "").toUpperCase());
+    const d = entByTrig.get(codeToTrig(code));
     if (!d) ignores.add(String(code || ""));
     return d;
   };
@@ -161,13 +182,23 @@ export const runMasterConfigSeed = async () => {
   }
 
   // ─── États + emails → Entreprise (uniquement si le champ est VIDE) ─────────
+  // États commande : par société (colonne Societe), clé = trigramme.
   const ecBySoc = {};
   for (const r of load("etatCommandeGroupe.json")) {
-    const soc = String(r.Societe || "").toUpperCase();
-    (ecBySoc[soc] ||= {})[String(r.id_Etat)] = r.descriptionEtat || "";
+    const trig = codeToTrig(r.Societe);
+    (ecBySoc[trig] ||= {})[String(r.id_Etat)] = r.descriptionEtat || "";
   }
+  // États proforma : jeu GLOBAL par défaut (etatProforma.json) + surcharges
+  // PAR SOCIÉTÉ (etatProformaGroupe.json). Les libellés diffèrent réellement
+  // selon la config ERP : DEVIS/CDE… (AVB/AW/HD/QC/LD/SITEC) vs PROPOSE/ACCEPTE
+  // (FMB/KONE/MEARE + magasins Broussard).
   const epMap = {};
   for (const r of load("etatProforma.json")) epMap[String(r.ETAT)] = r.Description || "";
+  const epBySoc = {};
+  for (const r of load("etatProformaGroupe.json")) {
+    const trig = codeToTrig(r.Societe);
+    (epBySoc[trig] ||= {})[String(r.ETAT)] = r.Description || "";
+  }
   const erMap = {};
   for (const r of load("etatReservation.json"))
     erMap[String(r.idEtatReservation)] = r.description || "";
@@ -177,8 +208,10 @@ export const runMasterConfigSeed = async () => {
       doc.mappingEtatsCommande = new Map(Object.entries(ecBySoc[trig]));
       touched.add(doc);
     }
-    if (Object.keys(epMap).length && isEmptyMap(doc.mappingEtatsProforma)) {
-      doc.mappingEtatsProforma = new Map(Object.entries(epMap));
+    // surcharge société si dispo, sinon jeu global
+    const proforma = epBySoc[trig] || epMap;
+    if (Object.keys(proforma).length && isEmptyMap(doc.mappingEtatsProforma)) {
+      doc.mappingEtatsProforma = new Map(Object.entries(proforma));
       touched.add(doc);
     }
     if (Object.keys(erMap).length && isEmptyMap(doc.mappingEtatsReservation)) {

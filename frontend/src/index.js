@@ -36,6 +36,7 @@ import AdminDemandesBipageScreen from "./screens/admin/AdminDemandesBipageScreen
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
 import ChangementPrixScreen from "./screens/admin/ChangementPrixScreen";
+import HistoriquePachatScreen from "./screens/admin/HistoriquePachatScreen";
 import SuiviEntreesScreen from "./screens/admin/SuiviEntreesScreen";
 import ResaEntreesScreen from "./screens/admin/ResaEntreesScreen";
 import RapportTgcScreen from "./screens/admin/RapportTgcScreen";
@@ -154,6 +155,11 @@ const router = createBrowserRouter(
       {/* Gestion · Changement de prix de vente -> module "changement_prix" */}
       <Route element={<ModuleRoute module="changement_prix" />}>
         <Route path="/changement-prix" element={<ChangementPrixScreen />} />
+      </Route>
+
+      {/* Gestion · Historique prix d'achat -> module "historique_pachat" */}
+      <Route element={<ModuleRoute module="historique_pachat" />}>
+        <Route path="/historique-pachat" element={<HistoriquePachatScreen />} />
       </Route>
 
       {/* Données · Suivi des entrées -> module "suivi_entrees" */}

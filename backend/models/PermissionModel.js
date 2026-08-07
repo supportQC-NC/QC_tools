@@ -88,6 +88,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Historique prix d'achat (évolution du PACHAT par article, source commandes)
+      historique_pachat: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Édition Promo
       edition_promo: {
         read: { type: Boolean, default: false },

@@ -58,6 +58,8 @@ export const apiSlice = createApi({
     "EtiquetteTemplate",
     // ========== TAGS CHANGEMENT DE PRIX ==========
     "ChangementPrix",
+    // ========== TAGS HISTORIQUE PRIX D'ACHAT ==========
+    "PachatHistorique",
     // ========== TAGS SUIVI DES ENTREES ==========
     "SuiviEntrees",
     // ========== TAGS ENTREES SUR RESERVATION ==========

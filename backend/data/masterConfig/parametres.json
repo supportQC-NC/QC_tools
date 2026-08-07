@@ -115,5 +115,57 @@
         "mailCompta":  "comptabilite@sitec.nc",
         "nomCompta":  "LEATITIA",
         "mailPropoReappro":  "magasin@sitec.nc;responsable@sitec.nc"
+    },
+    {
+        "Societe":  "LEBROUSSARD",
+        "Path":  "C:\\CODEVE\\ACCESS\\GLOBAL\\image_stock\\lebroussard\\",
+        "Active":  false,
+        "mailChgtPrixVente":  "support@quincaillerie.nc",
+        "pathPhotos":  null,
+        "pathLogos":  null,
+        "societeName":  "LE BROUSSARD",
+        "pathPiedFact":  null,
+        "mailCompta":  null,
+        "nomCompta":  null,
+        "mailPropoReappro":  null
+    },
+    {
+        "Societe":  "PAITABRICOLAGE",
+        "Path":  "C:\\CODEVE\\ACCESS\\GLOBAL\\image_stock\\paitabricolage\\",
+        "Active":  false,
+        "mailChgtPrixVente":  "support@quincaillerie.nc",
+        "pathPhotos":  null,
+        "pathLogos":  null,
+        "societeName":  "PAITA BRICOLAGE",
+        "pathPiedFact":  null,
+        "mailCompta":  null,
+        "nomCompta":  null,
+        "mailPropoReappro":  null
+    },
+    {
+        "Societe":  "QUINCAILLERIEKOUMAC",
+        "Path":  "C:\\CODEVE\\ACCESS\\GLOBAL\\image_stock\\quincailleriekoumac\\",
+        "Active":  false,
+        "mailChgtPrixVente":  "support@quincaillerie.nc",
+        "pathPhotos":  null,
+        "pathLogos":  null,
+        "societeName":  "QUINCAILLERIE KOUMAC",
+        "pathPiedFact":  null,
+        "mailCompta":  null,
+        "nomCompta":  null,
+        "mailPropoReappro":  null
+    },
+    {
+        "Societe":  "QUINCAILLERIEVKP",
+        "Path":  "C:\\CODEVE\\ACCESS\\GLOBAL\\image_stock\\quincaillerievkp\\",
+        "Active":  false,
+        "mailChgtPrixVente":  "support@quincaillerie.nc",
+        "pathPhotos":  null,
+        "pathLogos":  null,
+        "societeName":  "QUINCAILLERIE VKP",
+        "pathPiedFact":  null,
+        "mailCompta":  null,
+        "nomCompta":  null,
+        "mailPropoReappro":  null
     }
 ]

@@ -28,6 +28,7 @@ export const PERMISSION_MODULES = [
   { key: "releve", label: "Relevé de prix", group: "gestion" },
   { key: "etiquettes", label: "Générateur d'étiquettes", group: "gestion" },
   { key: "changement_prix", label: "Changement de prix de vente", group: "gestion" },
+  { key: "historique_pachat", label: "Historique prix d'achat", group: "gestion" },
   { key: "edition_promo", label: "Édition Promo", group: "gestion" },
   { key: "mailing", label: "Mailing clients", group: "gestion" },
   { key: "communication_client", label: "Communication client", group: "gestion" },
