@@ -18,6 +18,7 @@ import {
   HiExternalLink,
   HiArrowNarrowRight,
   HiX,
+  HiDatabase,
 } from "react-icons/hi";
 import {
   selectGlobalDossier,
@@ -27,6 +28,7 @@ import {
   useGetPachatHistoriqueQuery,
   useGetPachatFournisseursQuery,
   useGetPachatEvolutionsQuery,
+  useHistoriserPachatMutation,
 } from "../../slices/pachatHistoriqueApiSlice";
 import "./HistoriquePachatScreen.css";
 
@@ -66,6 +68,23 @@ const ChartTooltip = ({ active, payload }) => {
 const HistoriquePachatScreen = () => {
   const nomDossierDBF = useSelector(selectGlobalDossier);
   const entreprise = useSelector(selectGlobalEntreprise);
+  const { userInfo } = useSelector((state) => state.auth);
+  const isAdmin = userInfo?.role === "admin";
+
+  const [historiser, { isLoading: histoLoading }] =
+    useHistoriserPachatMutation();
+  const [histoMsg, setHistoMsg] = useState("");
+  const runHisto = async () => {
+    setHistoMsg("");
+    try {
+      const r = await historiser().unwrap();
+      setHistoMsg(
+        `✅ ${r.nbSocietes} société(s) — +${r.totalInsere} ligne(s) historisée(s), ${r.totalMaj} mise(s) à jour.`,
+      );
+    } catch (e) {
+      setHistoMsg(`❌ ${e?.data?.message || "Échec de l'historisation."}`);
+    }
+  };
 
   // Classement
   const [fourn, setFourn] = useState("");
@@ -145,6 +164,29 @@ const HistoriquePachatScreen = () => {
           </div>
         )}
       </header>
+
+      {/* ── Barre admin : historisation globale (toutes sociétés) ── */}
+      {isAdmin && (
+        <div className="hp-adminbar">
+          <button
+            type="button"
+            className="hp-btn hp-btn-histo"
+            onClick={runHisto}
+            disabled={histoLoading}
+          >
+            <HiDatabase />
+            {histoLoading
+              ? "Historisation en cours… (peut prendre 1-2 min)"
+              : "Historiser maintenant (toutes les sociétés)"}
+          </button>
+          <span className="hp-adminbar-hint">
+            Persiste les prix d'achat de l'année en cours dans l'historique
+            pluriannuel. À lancer périodiquement (idéalement avant l'archivage
+            annuel des commandes).
+          </span>
+          {histoMsg && <span className="hp-adminbar-msg">{histoMsg}</span>}
+        </div>
+      )}
 
       {!nomDossierDBF ? (
         <div className="hp-empty">
@@ -498,10 +540,24 @@ const HistoriquePachatScreen = () => {
                             )}
                           </td>
                           <td className="hp-num hp-mono hp-muted">
-                            {fmtPrix(it.premier, "")}
+                            <div className="hp-cell-price">
+                              <span>{fmtPrix(it.premier, "")}</span>
+                              {it.datePremier && (
+                                <span className="hp-cell-date">
+                                  {it.datePremier}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="hp-num hp-mono">
-                            {fmtPrix(it.dernier, it.devise)}
+                            <div className="hp-cell-price">
+                              <span>{fmtPrix(it.dernier, it.devise)}</span>
+                              {it.dateDernier && (
+                                <span className="hp-cell-date">
+                                  {it.dateDernier}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td
                             className={`hp-num hp-mono hp-var ${

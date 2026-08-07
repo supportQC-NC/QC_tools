@@ -1,20 +1,24 @@
 // backend/services/pachatHistoriqueService.js
 //
-// Module « Historique prix d'achat » — évolution du PACHAT d'un article dans le
-// temps, dérivée des COMMANDES (aucun job, aucun état Mongo, rétroactif).
+// Module « Historique prix d'achat » — évolution du PACHAT d'un article par
+// fournisseur, dans le temps.
 //
-// Source : cmdetail.dbf (une ligne par article commandé, champ PACHAT) jointe à
-// cmdref.dbf (date DATCDE, fournisseur FOURN, devise CDVISE, arrivée ARRIVEE).
-// Les deux fichiers sont déjà chargés/indexés par commandeCacheService
-// (indexByNart O(1)). On enrichit avec la fiche article (PACHAT courant) et le
-// nom du fournisseur.
+// DEUX sources fusionnées :
+//   1. DBF commandes (cmdetail + cmdref) — année EN COURS uniquement (l'ERP
+//      archive/réinitialise les commandes chaque année). Lecture immédiate,
+//      rétroactive sur l'année, via commandeCacheService (indexByNart O(1)).
+//   2. Collection Mongo HistoriquePachat — historique PLURIANNUEL persisté par
+//      historiserPachatCommandes() (à lancer périodiquement). Sans elle, on ne
+//      voit que l'année courante ; avec elle, l'évolution s'étale sur les ans.
+// La fusion dé-doublonne par (numcde, nl, date) — le DBF (frais) prime.
 //
-// ⚠️ Devise : le PACHAT d'une commande peut être exprimé en devise étrangère
+// ⚠️ Devise : le PACHAT d'une commande peut être en devise étrangère
 // (cmdref.CDVISE) pour les fournisseurs import. On renvoie la valeur BRUTE + la
 // devise sans conversion (décision produit) ; l'écran sépare visuellement.
 import commandeCacheService from "./commandeService.js";
 import articleCacheService from "./articleService.js";
 import fournissCacheService from "./fournissCacheService.js";
+import HistoriquePachat from "../models/HistoriquePachatModel.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const digitsOnly = (v) => (v == null ? "" : String(v)).replace(/\D/g, "");
@@ -34,6 +38,15 @@ const toYmd = (v) => {
     return `${y}${m}${d}`;
   }
   return digitsOnly(v).slice(0, 8);
+};
+// "YYYYMMDD" -> Date (UTC midi pour éviter les décalages de fuseau). null sinon.
+const ymdToDate = (ymd) => {
+  const s = digitsOnly(ymd).slice(0, 8);
+  if (s.length !== 8) return null;
+  const d = new Date(
+    `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T12:00:00Z`,
+  );
+  return Number.isNaN(d.getTime()) ? null : d;
 };
 const ymdToFr = (ymd) =>
   ymd && ymd.length === 8
@@ -121,6 +134,7 @@ export const getPachatHistorique = async (entreprise, nartRaw) => {
 
     points.push({
       numcde,
+      nl: num(line.NL),
       dateYmd,
       date: ymdToFr(dateYmd),
       fournCode: num(fournCode),
@@ -135,6 +149,43 @@ export const getPachatHistorique = async (entreprise, nartRaw) => {
       numfact: safeTrim(ref?.NUMFACT),
       arrivee: ymdToFr(toYmd(ref?.ARRIVEE)),
     });
+  }
+
+  // ── Fusion avec l'historique Mongo (années précédentes) ──
+  // Dé-doublonnage par (numcde, nl, date) ; le DBF (année en cours) prime.
+  const seen = new Set(
+    points.map((p) => `${p.numcde}|${p.nl ?? ""}|${p.dateYmd}`),
+  );
+  try {
+    const docs = await HistoriquePachat.find({
+      entreprise: entreprise._id,
+      nart: nartKey,
+    }).lean();
+    for (const d of docs) {
+      const dateYmd = toYmd(d.dateCommande);
+      const key = `${safeTrim(d.numcde)}|${d.nl ?? ""}|${dateYmd}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      points.push({
+        numcde: safeTrim(d.numcde),
+        nl: d.nl ?? null,
+        dateYmd,
+        date: ymdToFr(dateYmd),
+        fournCode: d.fournCode ?? null,
+        fournisseur: d.fournisseur || (await getFournNom(d.fournCode)),
+        devise: d.devise || "XPF",
+        prix: d.prix,
+        source: d.source || "commande",
+        pachatRendu: d.source === "rendu" ? d.prix : 0,
+        montant: d.source === "commande" ? d.prix : null,
+        qte: d.qte ?? null,
+        etat: d.etat ?? null,
+        numfact: d.numfact || "",
+        arrivee: ymdToFr(toYmd(d.arrivee)),
+      });
+    }
+  } catch {
+    /* Mongo indisponible : on reste sur les données DBF. */
   }
 
   // Tri chronologique (les lignes sans date passent à la fin).
@@ -206,7 +257,8 @@ export const getPachatHistorique = async (entreprise, nartRaw) => {
   };
 };
 
-// Construit une Map NUMCDE(maj) -> { dateYmd, fournCode, devise } depuis cmdref.
+// Construit une Map NUMCDE(maj) -> entête (date, fournisseur, devise, arrivée…)
+// depuis cmdref.
 const buildRefMap = async (entreprise) => {
   const refCache = await commandeCacheService.getCmdRef(entreprise);
   const map = new Map();
@@ -217,6 +269,9 @@ const buildRefMap = async (entreprise) => {
       dateYmd: toYmd(rec.DATCDE),
       fournCode: num(rec.FOURN),
       devise: safeTrim(rec.CDVISE) || "XPF",
+      arriveeYmd: toYmd(rec.ARRIVEE),
+      numfact: safeTrim(rec.NUMFACT),
+      etat: num(rec.ETAT),
     });
   }
   return map;
@@ -281,22 +336,53 @@ export const getPachatEvolutions = async (
   const detailCache = await commandeCacheService.getCmdDetail(entreprise);
 
   // Regroupe les lignes par NART (points { dateYmd, prix, fournCode, devise }).
+  // 1) DBF (année en cours).
   const byNart = new Map();
+  const seen = new Set(); // `${nart}|${numcde}|${nl}|${dateYmd}` (dé-doublonnage)
   for (const line of detailCache.records) {
     const nart = safeTrim(line.NART).toUpperCase();
     if (!nart || nart.includes("!")) continue; // exclut les lignes non-article
     const prix = ligneToPrix(line);
     if (prix == null) continue;
-    const ref = refByNumcde.get(safeTrim(line.NUMCDE).toUpperCase());
+    const numcde = safeTrim(line.NUMCDE).toUpperCase();
+    const ref = refByNumcde.get(numcde);
     const lineFourn = ref?.fournCode ?? null;
     if (fournFilter != null && lineFourn !== fournFilter) continue;
+    const dateYmd = ref?.dateYmd || "";
     if (!byNart.has(nart)) byNart.set(nart, []);
     byNart.get(nart).push({
-      dateYmd: ref?.dateYmd || "",
+      dateYmd,
       prix,
       fournCode: lineFourn,
       devise: ref?.devise || "XPF",
     });
+    seen.add(`${nart}|${numcde}|${num(line.NL) ?? ""}|${dateYmd}`);
+  }
+
+  // 2) Historique Mongo (années précédentes), dé-doublonné vs DBF.
+  try {
+    const q = { entreprise: entreprise._id };
+    if (fournFilter != null) q.fournCode = fournFilter;
+    const docs = await HistoriquePachat.find(q)
+      .select("nart numcde nl dateCommande prix fournCode devise")
+      .lean();
+    for (const d of docs) {
+      const nart = safeTrim(d.nart).toUpperCase();
+      if (!nart) continue;
+      const dateYmd = toYmd(d.dateCommande);
+      const key = `${nart}|${safeTrim(d.numcde).toUpperCase()}|${d.nl ?? ""}|${dateYmd}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!byNart.has(nart)) byNart.set(nart, []);
+      byNart.get(nart).push({
+        dateYmd,
+        prix: d.prix,
+        fournCode: d.fournCode ?? null,
+        devise: d.devise || "XPF",
+      });
+    }
+  } catch {
+    /* Mongo indisponible : classement sur la seule année en cours (DBF). */
   }
 
   // Évolution par article.
@@ -345,6 +431,7 @@ export const getPachatEvolutions = async (
       max,
       devise: last.devise,
       fournCode: last.fournCode,
+      datePremier: ymdToFr(pts[0].dateYmd),
       dateDernier: ymdToFr(last.dateYmd),
     });
   }
@@ -394,8 +481,88 @@ export const getPachatEvolutions = async (
   return { items: top, total, fournCode: fournFilter };
 };
 
+/**
+ * Historise dans Mongo (HistoriquePachat) toutes les lignes de commande
+ * courantes d'une société. Idempotent : upsert par (numcde, nl, nart, date) ;
+ * un 2e passage n'ajoute que le nouveau et met à jour le prix d'une ligne
+ * re-lue (ex. PACHAT valorisé après réception). À lancer périodiquement AVANT
+ * l'archivage annuel de l'ERP pour conserver l'historique pluriannuel.
+ * @returns {Promise<{ scanned:number, inserted:number, updated:number }>}
+ */
+export const historiserPachatCommandes = async (entreprise) => {
+  const refByNumcde = await buildRefMap(entreprise);
+  const detailCache = await commandeCacheService.getCmdDetail(entreprise);
+
+  const fournNomByCode = new Map();
+  const getFournNom = async (code) => {
+    if (code == null) return "";
+    if (fournNomByCode.has(code)) return fournNomByCode.get(code);
+    let nom = "";
+    try {
+      const f = await fournissCacheService.findByFourn(entreprise, code);
+      nom = safeTrim(f?.NOM);
+    } catch {
+      nom = "";
+    }
+    fournNomByCode.set(code, nom);
+    return nom;
+  };
+
+  const ops = [];
+  let scanned = 0;
+  for (const line of detailCache.records) {
+    const nart = safeTrim(line.NART).toUpperCase();
+    if (!nart || nart.includes("!")) continue;
+    const prix = ligneToPrix(line);
+    if (prix == null) continue;
+    const numcde = safeTrim(line.NUMCDE).toUpperCase();
+    const ref = refByNumcde.get(numcde);
+    const dateCommande = ymdToDate(ref?.dateYmd);
+    const nl = num(line.NL) ?? 0;
+    const fournCode = ref?.fournCode ?? null;
+    const pachatRendu = num(line.PACHAT);
+    const valorise = pachatRendu != null && pachatRendu !== 0;
+    const fournisseur = await getFournNom(fournCode);
+    ops.push({
+      updateOne: {
+        filter: { entreprise: entreprise._id, nart, numcde, nl, dateCommande },
+        update: {
+          $set: {
+            prix,
+            source: valorise ? "rendu" : "commande",
+            fournCode,
+            fournisseur,
+            devise: ref?.devise || "XPF",
+            qte: num(line.QTE),
+            design: safeTrim(line.DESIGN),
+            numfact: ref?.numfact || "",
+            arrivee: ymdToDate(ref?.arriveeYmd),
+            etat: ref?.etat ?? null,
+          },
+        },
+        upsert: true,
+      },
+    });
+    scanned += 1;
+  }
+
+  // bulkWrite par lots (les cmdetail prod peuvent être volumineux).
+  let inserted = 0;
+  let updated = 0;
+  const CHUNK = 1000;
+  for (let i = 0; i < ops.length; i += CHUNK) {
+    const res = await HistoriquePachat.bulkWrite(ops.slice(i, i + CHUNK), {
+      ordered: false,
+    });
+    inserted += res.upsertedCount || 0;
+    updated += res.modifiedCount || 0;
+  }
+  return { scanned, inserted, updated };
+};
+
 export default {
   getPachatHistorique,
   getFournisseursCommandes,
   getPachatEvolutions,
+  historiserPachatCommandes,
 };

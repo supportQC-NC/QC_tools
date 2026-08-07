@@ -3,10 +3,12 @@
 // Module « Historique prix d'achat ». Société injectée par checkEntrepriseAccess
 // (:nomDossierDBF -> req.entreprise).
 import asyncHandler from "../middleware/asyncHandler.js";
+import Entreprise from "../models/EntrepriseModel.js";
 import {
   getPachatHistorique,
   getFournisseursCommandes,
   getPachatEvolutions,
+  historiserPachatCommandes,
 } from "../services/pachatHistoriqueService.js";
 
 /**
@@ -47,4 +49,33 @@ const getEvolutions = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-export { getHistorique, getFournisseurs, getEvolutions };
+/**
+ * @desc   Historise les prix d'achat de TOUTES les sociétés dans Mongo
+ *         (persistance pluriannuelle). Opération lourde, réservée admin.
+ * @route  POST /api/historique-pachat/historiser
+ * @access Private/Admin
+ */
+const historiserTout = asyncHandler(async (req, res) => {
+  const ents = await Entreprise.find({});
+  const societes = [];
+  let totalInsere = 0;
+  let totalMaj = 0;
+  for (const e of ents) {
+    try {
+      const r = await historiserPachatCommandes(e);
+      totalInsere += r.inserted;
+      totalMaj += r.updated;
+      societes.push({ societe: e.nomDossierDBF, ...r });
+    } catch (err) {
+      societes.push({ societe: e.nomDossierDBF, error: err.message });
+    }
+  }
+  res.json({
+    nbSocietes: ents.length,
+    totalInsere,
+    totalMaj,
+    societes,
+  });
+});
+
+export { getHistorique, getFournisseurs, getEvolutions, historiserTout };

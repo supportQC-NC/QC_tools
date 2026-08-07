@@ -381,6 +381,38 @@
   transform: rotate(45deg);
 }
 
+/* ========== BARRE ADMIN (historisation) ========== */
+.hp-adminbar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin: 1rem 1.5rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+.hp-btn-histo {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border-color: transparent;
+  color: #fff;
+  white-space: nowrap;
+}
+.hp-btn-histo:disabled {
+  opacity: 0.7;
+}
+.hp-adminbar-hint {
+  font-size: 0.76rem;
+  color: var(--admin-text-muted);
+  max-width: 52ch;
+}
+.hp-adminbar-msg {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 /* ========== TOOLBAR (fournisseur + sens + recherche) ========== */
 .hp-toolbar {
   display: flex;
@@ -491,6 +523,17 @@
   margin: 0.5rem 0.25rem 0;
   font-size: 0.78rem;
   color: var(--admin-text-muted);
+}
+.hp-cell-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+.hp-cell-date {
+  font-size: 0.68rem;
+  color: var(--admin-text-muted);
+  font-weight: 400;
 }
 
 /* ========== SPINNER ========== */

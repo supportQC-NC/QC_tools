@@ -25,7 +25,8 @@
     "data:import:envoi-cde": "node backend/seedEnvoiCdeFournisseur.js",
     "data:destroy:envoi-cde": "node backend/seedEnvoiCdeFournisseur.js -d",
     "masterconfig:import": "node backend/seedMasterConfig.js",
-    "masterconfig:destroy": "node backend/seedMasterConfig.js -d"
+    "masterconfig:destroy": "node backend/seedMasterConfig.js -d",
+    "pachat:historiser": "node backend/historiserPachat.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

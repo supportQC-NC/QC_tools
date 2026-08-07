@@ -34,6 +34,15 @@ export const pachatHistoriqueApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: ["PachatHistorique"],
     }),
+
+    // Historisation globale (toutes sociétés) — admin. Rafraîchit les vues.
+    historiserPachat: builder.mutation({
+      query: () => ({
+        url: `${URL}/historiser`,
+        method: "POST",
+      }),
+      invalidatesTags: ["PachatHistorique"],
+    }),
   }),
 });
 
@@ -42,4 +51,5 @@ export const {
   useLazyGetPachatHistoriqueQuery,
   useGetPachatFournisseursQuery,
   useGetPachatEvolutionsQuery,
+  useHistoriserPachatMutation,
 } = pachatHistoriqueApiSlice;
