@@ -2,6 +2,11 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import fournissCacheService from "../services/fournissCacheService.js";
 import articleCacheService from "../services/articleService.js"; // Pour chercher les articles liés
+import {
+  buildArticlesFournisseurWorkbook,
+  normaliserDeprecation,
+  normaliserStock,
+} from "../services/fournisseurArticlesExcelService.js";
 import path from "path";
 import fs from "fs";
 
@@ -103,6 +108,7 @@ const getFournisseurByCode = asyncHandler(async (req, res) => {
 /**
  * @desc    Obtenir les articles liés à un fournisseur
  * @route   GET /api/fournisseurs/:nomDossierDBF/code/:fourn/articles
+ *          ?deprecation=tout|deprecies|non-deprecies
  * @access  Private
  */
 const getArticlesByFournisseur = asyncHandler(async (req, res) => {
@@ -120,13 +126,35 @@ const getArticlesByFournisseur = asyncHandler(async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
+    const deprecation = normaliserDeprecation(req.query.deprecation);
+    const stockFilter = normaliserStock(req.query.stock);
 
-    // Utiliser le service Article avec le filtre fournisseur
-    const result = await articleCacheService.getPaginated(entreprise, {
-      page,
-      limit,
-      fourn: fourn, // Appliquer le filtre FOURN
-    });
+    // Un seul passage de filtrage : les totaux de ventes portent donc
+    // exactement sur les lignes listées (toutes pages confondues).
+    const { articles: filtres } = await articleCacheService.getPaginated(
+      entreprise,
+      {
+        page: 1,
+        limit: Number.MAX_SAFE_INTEGER,
+        fourn, // Appliquer le filtre FOURN
+        fournExact: true, // Égalité stricte : 3 ne doit pas remonter 30/130/300
+        deprecation, // "tout" => aucun filtrage
+        stockFilter, // "tout" => aucun filtrage
+      },
+    );
+
+    const totalRecords = filtres.length;
+    const totalPages = Math.ceil(totalRecords / limit) || 1;
+    const start = (page - 1) * limit;
+
+    // Les enregistrements du cache ne doivent jamais être mutés : on renvoie
+    // des copies enrichies des champs calculés.
+    const articles = filtres.slice(start, start + limit).map((a) => ({
+      ...a,
+      _stockTotal: articleCacheService.calculateStockTotal(a),
+      _deprecie: articleCacheService.isArticleDeprecie(a),
+      _ventes: articleCacheService.calculerVentesArticle(a),
+    }));
 
     res.json({
       fournisseur: {
@@ -134,22 +162,67 @@ const getArticlesByFournisseur = asyncHandler(async (req, res) => {
         NOM: fournisseur.NOM ? fournisseur.NOM.trim() : "",
         AD1: fournisseur.AD1 ? fournisseur.AD1.trim() : "",
       },
+      deprecation,
+      stock: stockFilter,
+      // Ventes cumulées du fournisseur sur les articles filtrés
+      ventes: articleCacheService.agregerVentes(filtres),
       pagination: {
-        page: result.page,
-        limit: result.limit,
-        totalRecords: result.totalRecords,
-        totalPages: result.totalPages,
-        hasNextPage: result.hasNextPage,
-        hasPrevPage: result.hasPrevPage,
+        page,
+        limit,
+        totalRecords,
+        totalPages,
+        hasNextPage: start + limit < totalRecords,
+        hasPrevPage: page > 1,
       },
       _queryTime: `${Date.now() - startTime}ms`,
-      articles: result.articles,
+      articles,
     });
   } catch (error) {
     console.error("Erreur récupération articles fournisseur:", error);
     res.status(500);
     throw new Error(`Erreur: ${error.message}`);
   }
+});
+
+/**
+ * @desc    Exporter en Excel les articles d'un fournisseur.
+ *          Le filtre de dépréciation actif à l'écran est repris tel quel :
+ *          l'export contient exactement les lignes affichées (toutes pages).
+ * @route   GET /api/fournisseurs/:nomDossierDBF/code/:fourn/articles/export
+ *          ?deprecation=tout|deprecies|non-deprecies
+ * @access  Private
+ */
+const exportArticlesByFournisseur = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const { fourn } = req.params;
+
+  const fournisseur = await fournissCacheService.findByFourn(entreprise, fourn);
+  if (!fournisseur) {
+    res.status(404);
+    throw new Error(`Fournisseur ${fourn} non trouvé`);
+  }
+
+  const deprecation = normaliserDeprecation(req.query.deprecation);
+  const stockFilter = normaliserStock(req.query.stock);
+
+  const { workbook, filename, count } =
+    await buildArticlesFournisseurWorkbook({
+      entreprise,
+      fournisseur,
+      deprecation,
+      stockFilter,
+    });
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Access-Control-Expose-Headers", "X-Lignes");
+  res.setHeader("X-Lignes", String(count));
+
+  await workbook.xlsx.write(res);
+  res.end();
 });
 
 /**
@@ -213,6 +286,7 @@ export {
   getFournisseurs,
   getFournisseurByCode,
   getArticlesByFournisseur,
+  exportArticlesByFournisseur,
   searchFournisseurs,
   getFournisseursStructure, // AJOUTÉ ICI
   invalidateCache,

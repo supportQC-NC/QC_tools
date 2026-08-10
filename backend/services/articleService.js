@@ -121,6 +121,61 @@ class ArticleCacheService {
   }
 
   /**
+   * Article "déprécié" : stock total nul ET DEPREC > 1.
+   * (à ne pas confondre avec le filtre `hasDeprec`, qui teste DEPREC > 0)
+   */
+  isArticleDeprecie(record) {
+    const deprec = parseFloat(record.DEPREC) || 0;
+    return this.calculateStockTotal(record) === 0 && deprec > 1;
+  }
+
+  /**
+   * Ventes d'un article à partir de V1..V12 (V1 = mois courant, V2 = mois
+   * précédent, …) et de PVTE (prix de vente HT unitaire).
+   * Les valeurs négatives (retours) sont conservées telles quelles.
+   */
+  calculerVentesArticle(record) {
+    const v = (i) => parseFloat(record[`V${i}`]) || 0;
+    const pvte = parseFloat(record.PVTE) || 0;
+
+    const qteMois = v(1);
+    const qte3Mois = v(1) + v(2) + v(3);
+    let qte12Mois = 0;
+    for (let i = 1; i <= 12; i++) qte12Mois += v(i);
+
+    return {
+      qteMois,
+      qte3Mois,
+      qte12Mois,
+      caMois: qteMois * pvte,
+      ca3Mois: qte3Mois * pvte,
+      ca12Mois: qte12Mois * pvte,
+    };
+  }
+
+  /**
+   * Agrège les ventes d'un ensemble d'articles (total fournisseur).
+   */
+  agregerVentes(records) {
+    const total = {
+      qteMois: 0, qte3Mois: 0, qte12Mois: 0,
+      caMois: 0, ca3Mois: 0, ca12Mois: 0,
+    };
+    for (const r of records) {
+      const v = this.calculerVentesArticle(r);
+      total.qteMois += v.qteMois;
+      total.qte3Mois += v.qte3Mois;
+      total.qte12Mois += v.qte12Mois;
+      total.caMois += v.caMois;
+      total.ca3Mois += v.ca3Mois;
+      total.ca12Mois += v.ca12Mois;
+    }
+    // Arrondi final contre les dérives de flottants
+    for (const k of Object.keys(total)) total[k] = Math.round(total[k]);
+    return total;
+  }
+
+  /**
    * Vérifie si une promo est active pour un article
    */
   isPromoActive(record) {
@@ -454,7 +509,14 @@ class ArticleCacheService {
       nart,
       groupe,
       fourn,
+      // true => FOURN doit être STRICTEMENT égal (fiche fournisseur).
+      // false/absent => correspondance partielle (filtre libre écran Articles).
+      fournExact = false,
       gisement,
+      // "deprecies" | "non-deprecies" (stock nul + DEPREC > 1). Autre => pas de filtre.
+      deprecation,
+      // "positif" (stock > 0) | "zero" (stock <= 0). Autre => pas de filtre.
+      stockFilter,
       // Filtres booléens
       enStock,
       hasGencod,
@@ -516,7 +578,10 @@ class ArticleCacheService {
       const fournLower = fourn.toString().toLowerCase();
       filteredRecords = filteredRecords.filter((record) => {
         const fournVal = this.safeTrim(record.FOURN).toLowerCase();
-        return fournVal.includes(fournLower);
+        // Exact : sinon le fournisseur 3 remonterait aussi 30, 130, 300…
+        return fournExact
+          ? fournVal === fournLower
+          : fournVal.includes(fournLower);
       });
     }
 
@@ -571,6 +636,23 @@ class ArticleCacheService {
         const deprec = parseFloat(record.DEPREC) || 0;
         return deprec > 0;
       });
+    }
+
+    // Filtre: Dépréciation (stock total nul + DEPREC > 1)
+    if (deprecation === "deprecies" || deprecation === "non-deprecies") {
+      const veutDeprecies = deprecation === "deprecies";
+      filteredRecords = filteredRecords.filter(
+        (record) => this.isArticleDeprecie(record) === veutDeprecies,
+      );
+    }
+
+    // Filtre: Niveau de stock. Les deux valeurs sont complémentaires
+    // (stock négatif — rare — est compté avec le stock nul).
+    if (stockFilter === "positif" || stockFilter === "zero") {
+      const veutPositif = stockFilter === "positif";
+      filteredRecords = filteredRecords.filter(
+        (record) => (this.calculateStockTotal(record) > 0) === veutPositif,
+      );
     }
 
     // Filtre: Visible sur le web (WEB === "O")
@@ -823,7 +905,6 @@ class ArticleCacheService {
     
     // On transforme le code cherché en string nettoyée
     const targetCode = String(fournCode).trim().toLowerCase();
-    const stockKeys = ['S1', 'S2', 'S3', 'S4', 'S5'];
 
     let total = 0;
     let deprecatedCount = 0;
@@ -831,22 +912,15 @@ class ArticleCacheService {
     // On scanne TOUS les records pour trouver ceux de ce fournisseur
     // C'est plus lent que l'index (O(n)) mais garanti 100% de cohérence avec l'affichage
     cache.records.forEach(record => {
-      // 1. Filtre Fournisseur (même logique que getPaginated)
+      // 1. Filtre Fournisseur : égalité stricte, comme la liste d'articles
+      //    de la fiche fournisseur (getPaginated + fournExact).
       const recordCode = this.safeTrim(record.FOURN).toLowerCase();
-      
-      if (recordCode.includes(targetCode)) {
+
+      if (recordCode === targetCode) {
         total++;
 
-        // 2. Calcul Dépréciation
-        const design = (record.DESIGN || "").trim();
-        const hasDeprecatedMark = design.includes("**");
-        
-        let stockTotal = 0;
-        stockKeys.forEach(k => {
-          stockTotal += (parseFloat(record[k]) || 0);
-        });
-
-        if (hasDeprecatedMark && stockTotal === 0) {
+        // 2. Calcul Dépréciation ("**" + stock nul)
+        if (this.isArticleDeprecie(record)) {
           deprecatedCount++;
         }
       }

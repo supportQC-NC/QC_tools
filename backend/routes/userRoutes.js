@@ -47,8 +47,11 @@ router.post("/login", authUser);
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 
+// Public — la déconnexion doit rester possible avec un token expiré/absent,
+// sinon l'utilisateur reste bloqué (401) sans pouvoir nettoyer sa session.
+router.post("/logout", logoutUser);
+
 // Private (utilisateur connecté) — self-service, jamais gaté par module
-router.post("/logout", protect, logoutUser);
 router.get("/profile", protect, getUserProfile);
 // Token pour l'authentification Socket.IO (app mobile).
 router.post("/socket-token", protect, getSocketToken);

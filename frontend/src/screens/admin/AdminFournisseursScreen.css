@@ -1,12 +1,15 @@
-/* src/screens/admin/AdminInventaireProformaScreen.css */
-.admin-invproforma {
+/* src/screens/admin/AdminFournisseursScreen.css */
+
+.admin-fourn-page {
   display: flex;
   flex-direction: column;
   gap: 16px;
   height: 100%;
+  min-height: 0;
 }
 
-.admin-invproforma-header {
+/* ===== En-tête ===== */
+.admin-fourn-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -14,581 +17,510 @@
   gap: 12px;
 }
 
-.admin-invproforma-header h1 {
+.admin-fourn-header .header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
+  gap: 12px;
 }
 
-.admin-invproforma-header h1 svg {
-  color: #8b5cf6;
-}
-
-.admin-invproforma-actions {
+.admin-fourn-header .header-icon {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.select-with-icon {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.select-with-icon svg {
-  color: var(--text-muted);
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 22px;
   flex-shrink: 0;
 }
 
-.select-with-icon select,
-.select-with-icon input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text-primary);
-  font-size: 13px;
-  min-width: 220px;
-  cursor: pointer;
-}
-
-.select-with-icon input {
-  cursor: text;
-}
-
-.select-with-icon select:disabled,
-.select-with-icon input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.client-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  background: #8b5cf6;
-  color: #fff;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #7c4ef0;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-icon:hover:not(:disabled) {
+.admin-fourn-header .fourn-icon {
+  background: rgba(139, 92, 246, 0.14);
   color: #8b5cf6;
-  border-color: #8b5cf6;
 }
 
-.btn-icon:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.admin-fourn-header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
-.admin-invproforma-placeholder {
+.admin-fourn-header .header-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ===== État vide (aucune société) ===== */
+.fourn-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 60px 20px;
-  color: var(--text-muted);
+  gap: 10px;
+  padding: 70px 20px;
+  text-align: center;
   background: var(--bg-secondary);
   border: 1px dashed var(--border);
   border-radius: 10px;
-  text-align: center;
 }
 
-.admin-invproforma-placeholder svg {
-  font-size: 40px;
+.fourn-empty-state .empty-icon {
+  font-size: 42px;
   color: #8b5cf6;
   opacity: 0.6;
 }
 
-.admin-loading {
-  padding: 30px;
-  text-align: center;
+.fourn-empty-state h2 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.fourn-empty-state p {
+  margin: 0;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
-.admin-invproforma-summary {
+/* ===== Contenu ===== */
+.admin-fourn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ===== Barre d'outils : recherche + stats ===== */
+.fourn-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 10px 14px;
-  font-size: 13px;
-  color: var(--text-secondary);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.admin-invproforma-summary strong {
-  color: #8b5cf6;
-}
-
-/* Liste scrollable des groupes */
-.admin-invproforma-list {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.proforma-group {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.proforma-group-bar {
-  display: flex;
-  align-items: stretch;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border);
-}
-
-.proforma-group-header {
+.fourn-search {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 1;
-  min-width: 0;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-  font: inherit;
+  min-width: 260px;
+  max-width: 460px;
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
-.btn-fiche {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 0 14px;
-  background: transparent;
-  border: none;
-  border-left: 1px solid var(--border);
-  color: #8b5cf6;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn-fiche:hover:not(:disabled) {
-  background: rgba(139, 92, 246, 0.12);
-}
-
-.btn-fiche:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.proforma-group-header:hover {
-  background: rgba(139, 92, 246, 0.1);
-}
-
-.proforma-group-header svg {
-  color: #8b5cf6;
+.fourn-search > svg {
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
-.proforma-numfact {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-/* Observation (proforma.TEXTE) affichée dans l'entête */
-.proforma-obs {
+.fourn-search input {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
 }
 
-.proforma-nb {
-  margin-left: auto;
-  font-size: 12px;
+.btn-clear-search {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
   color: var(--text-muted);
-  white-space: nowrap;
+  cursor: pointer;
+  padding: 0;
 }
 
-.proforma-total-ecart {
-  margin-left: auto;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+.btn-clear-search:hover {
+  color: #ef4444;
 }
 
-.proforma-total-ecart + .proforma-nb {
-  margin-left: 14px;
+.fourn-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
-.col-nl {
-  width: 70px;
+.fourn-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
 }
 
-.col-qte,
-.col-stock,
-.col-ecart {
-  width: 100px;
-  text-align: center;
-}
-
-.col-ecartval {
-  width: 130px;
-  text-align: center;
-}
-
-.num-cell {
-  text-align: center;
+.fourn-stats .stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
-/* Écart compté − théorique */
-.ecart-pos {
-  color: #10b981;
-  font-weight: 600;
+.fourn-stats .stat-item.primary .stat-value {
+  color: #8b5cf6;
 }
 
-.ecart-neg {
-  color: #ef4444;
-  font-weight: 600;
-}
-
-.ecart-zero {
+.fourn-stats .stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
   color: var(--text-muted);
 }
 
-.admin-table {
+.btn-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon-action:hover:not(:disabled) {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.btn-icon-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: fourn-spin 0.8s linear infinite;
+}
+
+@keyframes fourn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== Tableau ===== */
+.fourn-table-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.fourn-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.admin-table thead th {
-  background: var(--bg-secondary);
+.fourn-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-tertiary, var(--bg-secondary));
   color: var(--text-secondary);
   text-align: left;
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
-.admin-table tbody td {
-  padding: 7px 12px;
+.fourn-table tbody td {
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
   vertical-align: middle;
 }
 
-.admin-table tbody tr:last-child td {
+.fourn-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.admin-table tbody tr:hover {
-  background: rgba(139, 92, 246, 0.06);
+.fourn-row {
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-.col-nart {
-  width: 120px;
+.fourn-row:hover {
+  background: rgba(139, 92, 246, 0.08);
 }
 
-.mono {
-  font-family: "Courier New", monospace;
+.col-code {
+  width: 80px;
+}
+
+.fourn-code {
+  display: inline-block;
+  min-width: 38px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  font-weight: 700;
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-nom {
+  min-width: 200px;
+  max-width: 260px;
+}
+
+.nom-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.col-adresse {
+  max-width: 320px;
+}
+
+.ad-text,
+.tel-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.ad-text svg,
+.tel-text svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.col-tel,
+.col-fax {
+  width: 140px;
   white-space: nowrap;
 }
 
-.desig-cell {
-  color: var(--text-primary);
+.col-delai,
+.col-local {
+  width: 110px;
+  text-align: center;
 }
 
-/* Lignes commentaire (NART vide ou « ! ») */
-.row-comment td {
+.delai-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.local-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.local-badge.is-local {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.local-badge.is-import {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+.no-data-cell {
   color: var(--text-muted);
-  font-style: italic;
-  background: rgba(139, 92, 246, 0.03);
 }
 
-@media (max-width: 720px) {
-  .select-with-icon select {
-    min-width: 0;
-  }
+.col-actions {
+  width: 60px;
+  text-align: center;
 }
 
-/* Barre de filtre de date */
-.invproforma-datebar {
-  display: flex;
+.fourn-table .btn-detail {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.invproforma-datebar > svg {
-  color: var(--text-muted);
-}
-
-.invproforma-datebar label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.invproforma-datebar input[type="date"] {
-  padding: 6px 8px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   background: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.invproforma-datebar input[type="date"]:disabled {
-  opacity: 0.5;
-}
-
-.btn-clear-date {
-  margin-left: auto;
-  padding: 6px 12px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btn-clear-date:hover:not(:disabled) {
   color: #8b5cf6;
+  transition: all 0.2s;
+}
+
+.fourn-table .btn-detail:hover {
+  background: #8b5cf6;
+  color: #fff;
   border-color: #8b5cf6;
 }
 
-.btn-clear-date:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Barre du document d'inventaire (regroupement + seuil + impression) */
-.invproforma-docbar {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.invproforma-docbar label {
+/* ===== États du tableau ===== */
+.table-loading,
+.table-error,
+.table-empty {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.invproforma-docbar select,
-.invproforma-docbar input[type="number"] {
-  padding: 7px 9px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.invproforma-docbar input[type="number"] {
-  width: 140px;
-}
-
-.invproforma-docbar .btn-primary {
-  white-space: nowrap;
-}
-
-/* Bouton export Excel */
-.btn-excel {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: #1d6f42;
+  justify-content: center;
+  gap: 10px;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.table-error svg,
+.table-empty svg {
+  font-size: 36px;
+  opacity: 0.6;
+}
+
+.table-error svg {
+  color: #ef4444;
+}
+
+.table-empty svg {
+  color: #8b5cf6;
+}
+
+.table-empty h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.table-error button {
+  padding: 7px 16px;
+  background: #8b5cf6;
   border: none;
   border-radius: 6px;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
 }
 
-.btn-excel:hover:not(:disabled) {
-  background: #19613a;
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: fourn-spin 0.8s linear infinite;
 }
 
-.btn-excel:disabled {
-  opacity: 0.6;
+/* ===== Pagination ===== */
+.fourn-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.fourn-pagination-bar .pagination-info {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fourn-pagination-bar .pagination-info strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.fourn-pagination-bar .pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fourn-pagination-bar .btn-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fourn-pagination-bar .btn-page:hover:not(:disabled) {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.fourn-pagination-bar .btn-page:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* Badge "bipé sur N proformas" (détail au survol) */
-.bip-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: rgba(139, 92, 246, 0.15);
-  color: #8b5cf6;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: help;
-  white-space: nowrap;
-}
-
-/* Case à cocher d'inclusion de proforma */
-.proforma-check {
-  flex-shrink: 0;
-  margin-left: 12px;
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: #8b5cf6;
-}
-
-.proforma-group.excluded {
-  opacity: 0.5;
-}
-
-.proforma-group.excluded .proforma-numfact {
-  text-decoration: line-through;
-}
-
-/* Compteurs d'anomalies par proforma (XX / D) */
-.proforma-flags {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.proforma-flags + .proforma-nb {
-  margin-left: 14px;
-}
-
-.flag-xx,
-.flag-d {
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.flag-xx {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-.flag-d {
-  background: rgba(245, 158, 11, 0.18);
-  color: #d97706;
-}
-
-/* Total des écarts à côté des boutons */
-.docbar-total {
-  margin-left: auto;
+.fourn-pagination-bar .page-indicator {
   font-size: 13px;
-  color: var(--text-secondary);
-  white-space: nowrap;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.docbar-total strong {
-  font-size: 14px;
-}
-
-/* Colonne ATT + surlignage des lignes XX / D dans le tableau */
-.col-att-screen {
-  width: 56px;
-  text-align: center;
-}
-
-.att-cell {
-  text-align: center;
+.fourn-pagination-bar .current-page {
+  color: #8b5cf6;
   font-weight: 700;
-  font-size: 11px;
-  white-space: nowrap;
 }
 
-.att-xx {
-  color: #ef4444;
-}
+@media (max-width: 900px) {
+  .fourn-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 
-.att-d {
-  color: #d97706;
-}
+  .fourn-search {
+    max-width: none;
+  }
 
-.admin-table tr.row-xx td {
-  background: rgba(239, 68, 68, 0.13);
-}
+  .fourn-stats {
+    justify-content: space-between;
+  }
 
-.admin-table tr.row-d td {
-  background: rgba(245, 158, 11, 0.13);
+  .col-fax,
+  .col-delai {
+    display: none;
+  }
 }

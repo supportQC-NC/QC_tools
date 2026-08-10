@@ -87,10 +87,14 @@ const authUser = asyncHandler(async (req, res) => {
 
 // @desc    Logout user / clear cookie
 // @route   POST /api/users/logout
-// @access  Private
+// @access  Public (doit fonctionner même avec un token expiré)
 const logoutUser = asyncHandler(async (req, res) => {
+  // Mêmes options qu'à la pose (generateToken.js), sinon le navigateur
+  // n'écrase pas le cookie existant.
   res.cookie("token", "", {
     httpOnly: true,
+    secure: process.env.NODE_ENV !== "development",
+    sameSite: "strict",
     expires: new Date(0),
   });
 

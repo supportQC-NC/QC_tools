@@ -30,10 +30,17 @@ export const fournissApiSlice = apiSlice.injectEndpoints({
     }),
 
     // Articles liés à un fournisseur
+    // deprecation : "tout" | "deprecies" | "non-deprecies"
+    // stock       : "tout" | "positif" | "zero"
     getArticlesByFournisseur: builder.query({
-      query: ({ nomDossierDBF, fourn, page, limit }) => ({
+      query: ({ nomDossierDBF, fourn, page, limit, deprecation, stock }) => ({
         url: `${FOURNISSEURS_URL}/${nomDossierDBF}/code/${fourn}/articles`,
-        params: { page, limit },
+        params: {
+          page,
+          limit,
+          ...(deprecation && deprecation !== "tout" ? { deprecation } : {}),
+          ...(stock && stock !== "tout" ? { stock } : {}),
+        },
       }),
       providesTags: (result, error, arg) => [
         { type: "Article", id: `LIST_FOURN_${arg.fourn}` },

@@ -4,14 +4,32 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   HiArrowLeft, HiOfficeBuilding, HiPhone, HiLocationMarker, HiDocumentText,
   HiCube, HiChevronLeft, HiChevronRight, HiRefresh, HiExternalLink, HiExclamation,
-  HiChip, HiCalculator, HiCalendar, HiMail, HiAnnotation
+  HiChip, HiCalculator, HiCalendar, HiMail, HiAnnotation, HiFilter, HiTable,
+  HiTrendingUp, HiArchive
 } from "react-icons/hi";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetFournisseurByCodeQuery,
   useGetArticlesByFournisseurQuery,
 } from "../../slices/fournissApiSlice";
+import { BASE_URL } from "../../constants";
 import "./AdminFournisseurInfosScreen.css";
+
+// Filtre de dépréciation (stock total nul ET DEPREC > 1) — valeurs alignées
+// sur celles attendues par l'API.
+const DEPRECATION_OPTIONS = [
+  { value: "tout", label: "Tous les articles" },
+  { value: "non-deprecies", label: "Non dépréciés" },
+  { value: "deprecies", label: "Dépréciés" },
+];
+
+// Filtre sur le stock total S1..S5. Les deux valeurs sont complémentaires :
+// le stock négatif (rare) est compté avec le stock nul.
+const STOCK_OPTIONS = [
+  { value: "tout", label: "Tous stocks" },
+  { value: "positif", label: "Stock positif" },
+  { value: "zero", label: "Stock nul" },
+];
 
 const AdminFournisseurInfosScreen = () => {
   const { nomDossierDBF, fournId } = useParams();
@@ -20,6 +38,9 @@ const AdminFournisseurInfosScreen = () => {
   const [selectedEntreprise, setSelectedEntreprise] = useState(nomDossierDBF || "");
   const [articlePage, setArticlePage] = useState(1);
   const [articleLimit] = useState(25);
+  const [deprecation, setDeprecation] = useState("tout");
+  const [stockFilter, setStockFilter] = useState("tout");
+  const [exporting, setExporting] = useState(false);
 
   // Queries
   const { data: entreprises } = useGetEntreprisesQuery();
@@ -29,9 +50,9 @@ const AdminFournisseurInfosScreen = () => {
     useGetFournisseurByCodeQuery({ nomDossierDBF: selectedEntreprise, fourn: fournId }, { skip: !selectedEntreprise || !fournId });
   
   // Query Articles liés
-  const { data: articlesData, isLoading: loadingArticles, isFetching: fetchingArticles } = 
+  const { data: articlesData, isLoading: loadingArticles, isFetching: fetchingArticles } =
     useGetArticlesByFournisseurQuery(
-      { nomDossierDBF: selectedEntreprise, fourn: fournId, page: articlePage, limit: articleLimit }, 
+      { nomDossierDBF: selectedEntreprise, fourn: fournId, page: articlePage, limit: articleLimit, deprecation, stock: stockFilter },
       { skip: !selectedEntreprise || !fournId }
     );
 
@@ -46,20 +67,68 @@ const AdminFournisseurInfosScreen = () => {
     setArticlePage(1);
   }, [fournId]);
 
+  // Changer de filtre remet la pagination à la première page.
+  useEffect(() => {
+    setArticlePage(1);
+  }, [deprecation, stockFilter]);
+
+  // Export Excel : reprend les filtres actifs, toutes pages confondues.
+  const exporterArticles = async () => {
+    if (!selectedEntreprise || !fournId) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (deprecation !== "tout") params.set("deprecation", deprecation);
+      if (stockFilter !== "tout") params.set("stock", stockFilter);
+      const qs = params.toString();
+      const url = `${BASE_URL}/api/fournisseurs/${selectedEntreprise}/code/${fournId}/articles/export${qs ? `?${qs}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        let msg = `Export échoué (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = j.message;
+        } catch {
+          /* réponse non-JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      const suffixe =
+        (deprecation === "tout" ? "" : `_${deprecation}`) +
+        (stockFilter === "tout" ? "" : `_stock-${stockFilter}`);
+      a.download = `articles_fournisseur_${fournId}${suffixe}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (e) {
+      alert(e.message || "Impossible de générer l'export Excel");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const safeTrim = (val) => (val === null || val === undefined ? "" : String(val).trim());
 
   const formatPrice = (p) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XPF" }).format(p || 0);
 
-  const calculateStockTotal = (art) => {
-    if (!art) return 0;
-    return (parseFloat(art.S1) || 0) + (parseFloat(art.S2) || 0) + (parseFloat(art.S3) || 0) + (parseFloat(art.S4) || 0) + (parseFloat(art.S5) || 0);
-  };
+  const formatNombre = (n) =>
+    new Intl.NumberFormat("fr-FR").format(Math.round(n || 0));
 
-  const isDepreciated = (art) => {
-    const design = safeTrim(art.DESIGN);
-    const stock = calculateStockTotal(art);
-    return design.includes("**") && stock === 0;
-  };
+  // Stock total, dépréciation et ventes sont calculés côté serveur
+  // (_stockTotal, _deprecie, _ventes) : une seule règle métier fait foi.
+  const calculateStockTotal = (art) =>
+    art?._stockTotal ??
+    (parseFloat(art?.S1) || 0) + (parseFloat(art?.S2) || 0) + (parseFloat(art?.S3) || 0) +
+    (parseFloat(art?.S4) || 0) + (parseFloat(art?.S5) || 0);
+
+  const isDepreciated = (art) => !!art?._deprecie;
+
+  const ventes = articlesData?.ventes;
 
   // Helper pour afficher un champ s'il existe
   const InfoItem = ({ label, value, icon }) => (
@@ -120,7 +189,7 @@ const AdminFournisseurInfosScreen = () => {
                   <div className="progress-fill" style={{ width: `${depStats.rate}%` }}></div>
                 </div>
                 {parseFloat(depStats.rate) > 60 && (
-                  <p className="dep-warning-a">⚠️ Attention : Ce fournisseur a un fort taux d'articles dépréciés (contenant "**" et stock nul).</p>
+                  <p className="dep-warning-a">⚠️ Attention : Ce fournisseur a un fort taux d'articles dépréciés (stock nul et DEPREC &gt; 1).</p>
                 )}
               </div>
             )}
@@ -181,25 +250,106 @@ const AdminFournisseurInfosScreen = () => {
             <div className="fourn-card articles-section">
               <div className="section-header">
                 <h3><HiCube /> Articles fournis</h3>
-                <span className="badge">{articlesData?.pagination?.totalRecords || 0} références</span>
+                <span className="badge">
+                  {articlesData?.pagination?.totalRecords || 0} référence
+                  {(articlesData?.pagination?.totalRecords || 0) > 1 ? "s" : ""}
+                  {deprecation !== "tout" || stockFilter !== "tout" ? " (filtrées)" : ""}
+                </span>
               </div>
 
-              {loadingArticles ? (
+              {/* Filtres + export Excel (l'export reprend les filtres actifs) */}
+              <div className="articles-toolbar">
+                <label className="deprec-filter">
+                  <HiFilter />
+                  <select
+                    value={deprecation}
+                    onChange={(e) => setDeprecation(e.target.value)}
+                  >
+                    {DEPRECATION_OPTIONS.map((o) => {
+                      const total = depStats ? parseInt(depStats.total, 10) : null;
+                      const deprecies = depStats ? parseInt(depStats.deprecated, 10) : null;
+                      let compte = null;
+                      if (total !== null && deprecies !== null) {
+                        if (o.value === "tout") compte = total;
+                        else if (o.value === "deprecies") compte = deprecies;
+                        else compte = total - deprecies;
+                      }
+                      return (
+                        <option key={o.value} value={o.value}>
+                          {o.label}{compte !== null ? ` (${compte})` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+
+                <label className="deprec-filter">
+                  <HiArchive />
+                  <select
+                    value={stockFilter}
+                    onChange={(e) => setStockFilter(e.target.value)}
+                  >
+                    {STOCK_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  type="button"
+                  className="btn-export-excel"
+                  onClick={exporterArticles}
+                  disabled={exporting || fetchingArticles}
+                  title="Exporter en Excel les articles affichés (filtres inclus)"
+                >
+                  <HiTable /> {exporting ? "Export…" : "Exporter Excel"}
+                </button>
+              </div>
+
+              {/* Ventes cumulées du fournisseur sur les articles filtrés
+                  (V1 = mois courant, CA HT = quantité × PVTE) */}
+              {ventes && (
+                <div className="ventes-fourn">
+                  <h4><HiTrendingUp /> Ventes du fournisseur</h4>
+                  <div className="ventes-grid">
+                    {[
+                      { cle: "Mois courant", qte: ventes.qteMois, ca: ventes.caMois },
+                      { cle: "3 derniers mois", qte: ventes.qte3Mois, ca: ventes.ca3Mois },
+                      { cle: "12 derniers mois", qte: ventes.qte12Mois, ca: ventes.ca12Mois },
+                    ].map((p) => (
+                      <div className="vente-periode" key={p.cle}>
+                        <span className="vente-label">{p.cle}</span>
+                        <span className="vente-ca">{formatPrice(p.ca)}</span>
+                        <span className="vente-qte">{formatNombre(p.qte)} u.</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* fetchingArticles inclus : au changement de filtre on n'affiche
+                  jamais les lignes du filtre précédent */}
+              {loadingArticles || fetchingArticles ? (
                 <div className="loading-inline"><div className="loading-spinner small"></div></div>
               ) : articlesData?.articles?.length > 0 ? (
-                <>
+                <div className="articles-table-scroll">
                   <table className="linked-articles-table">
                     <thead>
                       <tr>
                         <th>Code</th>
                         <th>Désignation</th>
                         <th className="text-right">Stock</th>
-                        <th className="text-right">PV TTC</th>
+                        <th className="text-right">PV HT</th>
+                        <th className="text-right" title="Quantité vendue le mois courant (V1)">Qté mois</th>
+                        <th className="text-right" title="Quantité vendue sur 3 mois (V1+V2+V3)">Qté 3 m.</th>
+                        <th className="text-right" title="Quantité vendue sur 12 mois (V1..V12)">Qté 12 m.</th>
+                        <th className="text-right" title="Chiffre d'affaires HT sur 12 mois (quantité × PVTE)">CA HT 12 m.</th>
                       </tr>
                     </thead>
                     <tbody>
                       {articlesData.articles.map((art) => {
                         const deprecated = isDepreciated(art);
+                        const v = art._ventes || {};
                         return (
                           <tr key={art.NART} className={deprecated ? "row-deprecated" : ""}>
                             <td>
@@ -211,8 +361,12 @@ const AdminFournisseurInfosScreen = () => {
                               {safeTrim(art.DESIGN)}
                               {deprecated && <span className="deprecated-badge"><HiExclamation /> Déprécié</span>}
                             </td>
-                            <td className="text-right">{calculateStockTotal(art)}</td>
-                            <td className="text-right">{formatPrice(art.PVTETTC)}</td>
+                            <td className="text-right">{formatNombre(calculateStockTotal(art))}</td>
+                            <td className="text-right">{formatPrice(art.PVTE)}</td>
+                            <td className="text-right">{formatNombre(v.qteMois)}</td>
+                            <td className="text-right">{formatNombre(v.qte3Mois)}</td>
+                            <td className="text-right">{formatNombre(v.qte12Mois)}</td>
+                            <td className="text-right">{formatPrice(v.ca12Mois)}</td>
                           </tr>
                         );
                       })}
@@ -237,10 +391,19 @@ const AdminFournisseurInfosScreen = () => {
                       </button>
                     </div>
                   )}
-                </>
+                </div>
               ) : (
                 <div className="empty-state-mini">
-                  <p>Aucun article trouvé pour ce fournisseur.</p>
+                  <p>
+                    Aucun article pour ce fournisseur avec ces filtres
+                    {deprecation !== "tout" || stockFilter !== "tout"
+                      ? ` (${[
+                          DEPRECATION_OPTIONS.find((o) => o.value === deprecation)?.label,
+                          STOCK_OPTIONS.find((o) => o.value === stockFilter)?.label,
+                        ].filter(Boolean).join(" · ")})`
+                      : ""}
+                    .
+                  </p>
                 </div>
               )}
             </div>

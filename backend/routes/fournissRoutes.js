@@ -4,6 +4,7 @@ import {
   getFournisseurs,
   getFournisseurByCode,
   getArticlesByFournisseur,
+  exportArticlesByFournisseur,
   searchFournisseurs,
   getFournisseursStructure,
   invalidateCache,
@@ -59,6 +60,15 @@ router.get(
   checkEntrepriseAccess,
   checkModuleAccess("stock", "read"),
   getArticlesByFournisseur
+);
+
+// Export Excel des articles de ce fournisseur (respecte ?deprecation=)
+router.get(
+  "/:nomDossierDBF/code/:fourn/articles/export",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("stock", "read"),
+  exportArticlesByFournisseur
 );
 
 // Invalider cache
