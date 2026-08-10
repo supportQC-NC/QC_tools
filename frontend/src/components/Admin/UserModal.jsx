@@ -14,6 +14,7 @@ import {
   useUpdateUserMutation,
 } from "../../slices/userApiSlice";
 import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import ChampsDbfSection from "./ChampsDbfSection";
 import {
   PERMISSION_MODULES,
   MODULE_GROUPS,
@@ -66,9 +67,18 @@ const getDefaultModulePermissions = () => {
   return permissions;
 };
 
-const UserModal = ({ user, onClose }) => {
+// Sections de la configuration utilisateur (mode PAGE). Même principe que la
+// config entreprise : nav verticale à gauche, panneau à droite.
+const SECTIONS = [
+  { key: "identite", label: "Identité & rôle" },
+  { key: "permissions", label: "Permissions" },
+  { key: "champsDbf", label: "Champs DBF", editionSeule: true },
+];
+
+const UserModal = ({ user, onClose, asPage = false }) => {
   const isEdit = !!user;
   const [entSearch, setEntSearch] = useState("");
+  const [section, setSection] = useState("identite");
 
   // Acteur courant (celui qui édite) — sert à borner ce qu'il peut accorder.
   const { userInfo: actor } = useSelector((state) => state.auth);
@@ -388,18 +398,15 @@ const UserModal = ({ user, onClose }) => {
     }
   };
 
-  return (
-    <Modal onClose={onClose} contentClassName="modal modal-large">
-      <div className="modal-header">
-        <h2>{isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}</h2>
-        <button className="btn-close" onClick={onClose}>
-          <HiX />
-        </button>
-      </div>
+  // Sections visibles : « Champs DBF » n'a de sens que sur un compte existant.
+  const sectionsVisibles = SECTIONS.filter((s) => !s.editionSeule || isEdit);
 
+  const corps = (
       <form onSubmit={handleSubmit} className="modal-form">
         {error && <div className="form-error">{error}</div>}
 
+        {(!asPage || section === "identite") && (
+        <>
         <div className="form-row">
           <div className="form-group">
             <label>Prénom</label>
@@ -497,7 +504,10 @@ const UserModal = ({ user, onClose }) => {
             <span>Compte actif</span>
           </label>
         </div>
+        </>
+        )}
 
+        {(!asPage || section === "permissions") && (
         <div className="permissions-section">
           <h3>Permissions</h3>
 
@@ -772,10 +782,15 @@ const UserModal = ({ user, onClose }) => {
               </div>
             )}
           </div>
+        )}
+
+        {asPage && section === "champsDbf" && (
+          <ChampsDbfSection userId={user?._id} />
+        )}
 
         <div className="modal-footer">
           <button type="button" className="btn-cancel" onClick={onClose}>
-            Annuler
+            {asPage ? "← Retour à la liste" : "Annuler"}
           </button>
           <button
             type="submit"
@@ -790,6 +805,54 @@ const UserModal = ({ user, onClose }) => {
           </button>
         </div>
       </form>
+  );
+
+  // Mode PAGE plein écran (édition depuis /admin/users/:id) — même structure
+  // que la configuration entreprise : en-tête + nav verticale + panneau.
+  if (asPage) {
+    return (
+      <div className="user-config-page">
+        <div className="ucp-header">
+          <h2>
+            {isEdit
+              ? `Configuration — ${user.prenom || ""} ${user.nom || ""}`.trim()
+              : "Nouvel utilisateur"}
+          </h2>
+          <button type="button" className="btn-cancel" onClick={onClose}>
+            ← Retour à la liste
+          </button>
+        </div>
+
+        <div className="ucp-body">
+          <nav className="ucp-nav">
+            {sectionsVisibles.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={`ucp-nav-item ${section === s.key ? "active" : ""}`}
+                onClick={() => setSection(s.key)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="ucp-content">{corps}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mode MODALE (création rapide depuis la liste)
+  return (
+    <Modal onClose={onClose} contentClassName="modal modal-large">
+      <div className="modal-header">
+        <h2>{isEdit ? "Modifier l'utilisateur" : "Nouvel utilisateur"}</h2>
+        <button className="btn-close" onClick={onClose}>
+          <HiX />
+        </button>
+      </div>
+      {corps}
     </Modal>
   );
 };

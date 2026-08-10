@@ -22,6 +22,9 @@ import filialeRoutes from "./routes/fillialeRoutes.js";
 import concurrentRoutes from "./routes/concurrentRoutes.js";
 import releveRoutes from "./routes/releveRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import dashboardLayoutRoutes from "./routes/dashboardLayoutRoutes.js";
+import { installerMasqueDbf } from "./middleware/masquerChampsDbf.js";
+import champsDbfRoutes from "./routes/champsDbfRoutes.js";
 // ========== ROUTES COMMANDES ==========
 import commandeRoutes from "./routes/commandeRoutes.js";
 // ========== ROUTES CONTRÔLE COMMANDES ==========
@@ -160,8 +163,14 @@ app.get("/", (req, res, next) => {
 // ==========================================
 // ROUTES API
 // ==========================================
+// Masquage des champs DBF interdits : enveloppe res.json pour TOUTES les routes
+// de l'API. Doit rester AVANT les routeurs. Le masque lui-même est posé par
+// `protect` (voir middleware/masquerChampsDbf.js).
+app.use("/api", installerMasqueDbf);
+
 // Utilisateurs & Authentification
 app.use("/api/users", userRoutes);
+app.use("/api/champs-dbf", champsDbfRoutes);
 app.use("/api/entreprises", entrepriseRoutes);
 app.use("/api/articles", articleRoutes);
 app.use("/api/inventaires", inventaireRoutes);
@@ -209,6 +218,7 @@ app.use("/api/fournisseurs", fournissRoutes);
 app.use("/api/envoi-cde-fournisseur", envoiCdeFournisseurRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/dashboard-layout", dashboardLayoutRoutes);
 app.use("/api/commerciaux", commerciauxRoutes);
 app.use("/api/top-ventes", topVentesRoutes);
 app.use("/api/menu-hints", menuHintRoutes);

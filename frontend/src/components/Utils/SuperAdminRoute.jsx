@@ -11,14 +11,14 @@ export const isSuperAdmin = (userInfo) =>
 /**
  * Réserve une route aux super-admins (gestion Utilisateurs / Entreprises,
  * Analyse Filiales). Un admin « scopé » (limité à certaines entreprises) est
- * redirigé vers son tableau de bord admin.
+ * renvoyé sur le tableau de bord — qui est unique, donc "/".
  */
 const SuperAdminRoute = () => {
   const { userInfo } = useSelector((state) => state.auth);
 
   if (!userInfo) return <Navigate to="/login" replace />;
   if (userInfo.role !== "admin") return <Navigate to="/" replace />;
-  if (!isSuperAdmin(userInfo)) return <Navigate to="/admin" replace />;
+  if (!isSuperAdmin(userInfo)) return <Navigate to="/" replace />;
 
   return <Outlet />;
 };

@@ -4,6 +4,7 @@ import proformaCacheService from "../services/proformaCacheService.js";
 import articleCacheService from "../services/articleService.js";
 import fournissCacheService from "../services/fournissCacheService.js";
 import { ecrirePDF } from "../services/ficheControleService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import path from "path";
 import os from "os";
 import fs from "fs";
@@ -1161,16 +1162,13 @@ const genererInventaireDoc = asyncHandler(async (req, res) => {
     gtc.value = grandTotal;
     gtc.numFmt = numFmt;
 
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    // Droits « champ par champ » appliqués avant l'envoi.
+    await envoyerClasseur(
+      req,
+      res,
+      wb,
+      `inventaire_proforma_${tiers}.xlsx`,
     );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="inventaire_proforma_${tiers}.xlsx"`,
-    );
-    await wb.xlsx.write(res);
-    res.end();
     return;
   }
 
@@ -1554,16 +1552,8 @@ const exportGisement = asyncHandler(async (req, res) => {
     }
   }
 
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  );
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="export_gisement_${tiers}.xlsx"`,
-  );
-  await wb.xlsx.write(res);
-  res.end();
+  // Droits « champ par champ » appliqués avant l'envoi.
+  await envoyerClasseur(req, res, wb, `export_gisement_${tiers}.xlsx`);
 });
 
 export {

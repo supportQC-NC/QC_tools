@@ -337,8 +337,11 @@ export const getMyDashboard = asyncHandler(async (req, res) => {
   const since7 = new Date(now);
   since7.setDate(now.getDate() - 7);
 
-  // --- Mes tâches (assignées à moi OU créées par moi) ---
-  const mine = { $or: [{ assignes: me }, { creePar: me }] };
+  // --- Mes tâches : UNIQUEMENT celles qui me sont assignées.
+  // (avant : « assignées à moi OU créées par moi », ce qui comptait aussi les
+  // tâches confiées à d'autres — l'écran annonce « Mes tâches », il ne doit
+  // porter que sur les miennes.)
+  const mine = { assignes: me };
   const actives = { ...mine, archive: { $ne: true } };
   const [aFaire, enCoursT, bloque, enRetard, termine7j] = await Promise.all([
     Task.countDocuments({ ...actives, statut: "a_faire" }),
@@ -352,20 +355,25 @@ export const getMyDashboard = asyncHandler(async (req, res) => {
     Task.countDocuments({ ...mine, statut: "termine", completedAt: { $gte: since7 } }),
   ]);
 
-  // --- Sessions en cours dans mes sociétés ---
+  // --- MES sessions en cours : celles que J'AI ouvertes, dans mes sociétés.
+  // (avant : toutes les sessions de mes sociétés, donc celles des collègues.)
+  const miennes = { ...entFilter, user: me };
   const [invEnCours, relEnCours, reaEnCours, recEnCours] = await Promise.all([
-    Inventaire.countDocuments({ ...entFilter, status: "en_cours" }),
-    Releve.countDocuments({ ...entFilter, status: "en_cours" }),
-    Reappro.countDocuments({ ...entFilter, status: "en_cours" }),
-    Reception.countDocuments({ ...entFilter, status: { $ne: "termine" } }),
+    Inventaire.countDocuments({ ...miennes, status: "en_cours" }),
+    Releve.countDocuments({ ...miennes, status: "en_cours" }),
+    Reappro.countDocuments({ ...miennes, status: "en_cours" }),
+    Reception.countDocuments({ ...miennes, status: { $ne: "termine" } }),
   ]);
 
-  // --- Mon activité (14 jours) : inventaires / relevés / réceptions créés ---
+  // --- Mon activité (14 jours) : MES inventaires / relevés / réceptions ---
   const NB = 14;
   const since = startOfDay(Date.now());
   since.setDate(since.getDate() - (NB - 1));
   const fetchDates = (Model) =>
-    Model.find({ ...entFilter, createdAt: { $gte: since } }, { createdAt: 1 }).lean();
+    Model.find(
+      { ...miennes, createdAt: { $gte: since } },
+      { createdAt: 1 },
+    ).lean();
   const [iDates, lDates, rDates] = await Promise.all([
     fetchDates(Inventaire),
     fetchDates(Releve),

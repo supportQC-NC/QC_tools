@@ -78,7 +78,10 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/infobulles", key: "infobulles_admin" },
   { path: "/admin/smtp", key: "smtp_admin" },
   { path: "/admin/meilleures-ventes", key: "stock" },
-  { path: "/admin", key: "dashboard_admin" }, // exact "/admin" (les /admin/xxx sont plus spécifiques)
+  // "/admin" n'est plus un écran : il redirige vers le tableau de bord unique
+  // ("/"), accessible à tout utilisateur connecté. Le module dashboard_admin
+  // sert désormais à gater les WIDGETS globaux du catalogue (cf.
+  // backend/config/dashboardCatalogue.js).
   // Données
   { path: "/admin/articles", key: "stock" },
   { path: "/admin/fournisseurs", key: "stock" },

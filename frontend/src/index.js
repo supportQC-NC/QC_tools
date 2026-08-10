@@ -5,6 +5,7 @@ import {
   createRoutesFromElements,
   Route,
   RouterProvider,
+  Navigate,
 } from "react-router-dom";
 import { Provider } from "react-redux";
 import store from "./store";
@@ -24,6 +25,7 @@ import ProfileScreen from "./screens/ProfileScreen/ProfileScreen";
 import AdminUsers from "./screens/admin/AdminUsersScreen";
 import AdminEntreprises from "./screens/admin/AdminEntreprisesScreen";
 import AdminEntrepriseConfigScreen from "./screens/admin/AdminEntrepriseConfigScreen";
+import AdminUserConfigScreen from "./screens/admin/AdminUserConfigScreen";
 import AdminArticles from "./screens/admin/AdminArticlesScreen";
 import AdminConcurrents from "./screens/admin/AdminConcurrentsScreen";
 import AdminRelevesScreen from "./screens/admin/AdminRelevesScreen";
@@ -60,7 +62,6 @@ import InventaireScreen from "./screens/user/UserInventaire";
 import UserReappro from "./screens/user/UserReappro";
 import ReleveScreen from "./screens/user/RelevesScreen";
 import UserControleCommande from "./screens/user/UserControleCommande";
-import AdminDashboard from "./screens/admin/AdminDashboardScreen";
 import AdminMeilleursVentesScreen from "./screens/admin/AdminMeilleursVentesScreen";
 import UserPreparationCommande from "./screens/user/UserPreparationCommande";
 import AdminProformasScreen from "./screens/admin/AdminProformasScreen";
@@ -99,6 +100,7 @@ import AdminTachesScreen from "./screens/admin/AdminTachesScreen";
 import MesTachesScreen from "./screens/user/MesTachesScreen";
 import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 import MonMenuScreen from "./screens/user/MonMenuScreen";
+import MonDashboardScreen from "./screens/user/MonDashboardScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -127,15 +129,13 @@ const router = createBrowserRouter(
         <Route path="/mes-taches" element={<MesTachesScreen />} />
         <Route path="/espace-equipe" element={<EspaceEquipeScreen />} />
         <Route path="/mon-menu" element={<MonMenuScreen />} />
+        <Route path="/mon-dashboard" element={<MonDashboardScreen />} />
+        {/* Tableau de bord unique : l'ancienne route admin y renvoie. */}
+        <Route path="/admin" element={<Navigate to="/" replace />} />
       </Route>
 
       {/* ======= Écrans admin : garde par module (admin OU utilisateur
           autorisé ; données filtrées par société côté API) ======= */}
-
-      {/* Administration · Tableau de bord -> module "dashboard_admin" */}
-      <Route element={<ModuleRoute module="dashboard_admin" />}>
-        <Route path="/admin" element={<AdminDashboard />} />
-      </Route>
 
       {/* Communication · Mailing -> module "mailing" (strictement gaté) */}
       <Route element={<ModuleRoute module="mailing" />}>
@@ -186,6 +186,10 @@ const router = createBrowserRouter(
           données scopées à son équipe côté API) */}
       <Route element={<ModuleRoute module="users_admin" roles={["responsable"]} />}>
         <Route path="/admin/users" element={<AdminUsers />} />
+        <Route
+          path="/admin/users/:id"
+          element={<AdminUserConfigScreen />}
+        />
       </Route>
 
       {/* Administration · Équipes & Tâches -> admins + responsables */}

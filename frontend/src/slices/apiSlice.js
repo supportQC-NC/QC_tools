@@ -88,6 +88,10 @@ export const apiSlice = createApi({
     "MenuLayout",
     "MyMenuLayout",
     "SmtpConfig",
+    // ========== TAGS TABLEAU DE BORD PERSONNEL ==========
+    "DashboardLayout",
+    // ========== TAGS DROITS CHAMP PAR CHAMP (DBF) ==========
+    "ChampsDbf",
   ],
   endpoints: (builder) => ({}),
 });

@@ -518,3 +518,395 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =====================================================================
+   Tableau de bord unique : grille de blocs (widgets + tuiles KPI).
+   La largeur de chaque bloc vient de sa taille (tiers / moitie / pleine).
+   ===================================================================== */
+
+.db-grille {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.db-bloc {
+  min-width: 0;
+  display: flex;
+}
+
+.db-bloc > * {
+  width: 100%;
+}
+
+.db-w-third {
+  flex: 1 1 300px;
+  max-width: calc(33.333% - 0.67rem);
+}
+
+.db-w-half {
+  flex: 1 1 420px;
+  max-width: calc(50% - 0.5rem);
+}
+
+.db-w-full {
+  flex: 1 1 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .db-w-third,
+  .db-w-half {
+    max-width: 100%;
+  }
+}
+
+/* ── Carte commune ── */
+.db-carte {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.db-carte-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.db-carte-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.db-carte-body {
+  padding: 0.9rem;
+  flex: 1;
+}
+
+.db-vide {
+  margin: 0;
+  padding: 1.2rem 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ── Rangée de compteurs personnels ── */
+.db-kpi-rangee {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.db-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+
+.db-kpi:hover {
+  border-color: #8b5cf6;
+}
+
+.db-kpi-icone,
+.db-tuile-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  font-size: 1.15rem;
+}
+
+.db-kpi-corps,
+.db-tuile-corps {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.db-kpi-valeur,
+.db-tuile-valeur {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.db-kpi-label,
+.db-tuile-titre {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-kpi-sous,
+.db-tuile-sous {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-kpi-alerte {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* ── Tuile KPI sur mesure ── */
+.db-tuile {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.9rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-top: 3px solid #6366f1;
+  border-radius: 10px;
+  height: 100%;
+}
+
+/* ── Listes et chiffres ── */
+.db-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.db-liste li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.db-liste li:last-child {
+  border-bottom: none;
+}
+
+.db-liste-serree li {
+  padding: 0.25rem 0;
+}
+
+.db-liste-cle {
+  font-family: "Courier New", monospace;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.db-liste-sec {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-liste-val {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.db-chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.db-chiffres > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.db-chiffre {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.db-chiffre-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+/* ── Statuts de tâches ── */
+.db-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.db-stat b {
+  margin-left: auto;
+  color: var(--text-primary);
+}
+
+.db-pastille {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.db-bleu { background: #3b82f6; }
+.db-ambre { background: #f59e0b; }
+.db-gris { background: #6b7280; }
+.db-retard { color: #ef4444; }
+.db-fait { color: #10b981; }
+
+.db-lien {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #8b5cf6;
+  text-decoration: none;
+}
+
+/* ── Raccourcis ── */
+.db-raccourcis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.5rem;
+}
+
+.db-raccourci {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.db-raccourci:hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+.db-raccourci span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── États d'écran ── */
+.db-chargement {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.db-vide-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.db-vide-total svg {
+  font-size: 2.4rem;
+  color: #8b5cf6;
+  opacity: 0.65;
+}
+
+.db-vide-total h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+}
+
+.db-vide-total p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.db-bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ud-config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ud-config-link:hover {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* Sous-titre d'entête de carte (nb de lignes / groupes d'un graphique) */
+.db-carte-sous {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

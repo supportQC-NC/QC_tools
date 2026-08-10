@@ -62,6 +62,10 @@ export const buildArticlesFournisseurWorkbook = async ({
   fournisseur,
   deprecation = "tout",
   stockFilter = "tout",
+  // Champs DBF interdits à l'utilisateur (req.masqueDbf). L'export ne passe pas
+  // par res.json : il doit filtrer lui-même, sinon masquer un champ à l'écran
+  // ne protégerait rien.
+  masqueDbf = null,
 }) => {
   const filtre = normaliserDeprecation(deprecation);
   const filtreStock = normaliserStock(stockFilter);
@@ -98,42 +102,43 @@ export const buildArticlesFournisseurWorkbook = async ({
     `CA HT 12 mois : ${ventes.ca12Mois.toLocaleString("fr-FR")} XPF`;
   ws.getCell("A2").font = { italic: true, color: { argb: "FF666666" } };
 
-  ws.getRow(3).values = [
-    "NART",
-    "Désignation",
-    "GENCOD",
-    "Référence fourn.",
-    "Groupe",
-    "Stock total",
-    "DEPREC",
-    "Déprécié",
-    "PV HT (PVTE)",
-    "Qté mois courant",
-    "Qté 3 mois",
-    "Qté 12 mois",
-    "CA HT 12 mois",
+  // Colonnes déclarées avec leur champ DBF source (`dbf`) : celles dont le
+  // champ est masqué pour l'utilisateur sont retirées du classeur.
+  // `dbf: null` = colonne calculée, sans champ source direct.
+  const COLONNES = [
+    { key: "nart", entete: "NART", largeur: 14, dbf: "NART" },
+    { key: "design", entete: "Désignation", largeur: 42, dbf: "DESIGN" },
+    { key: "gencod", entete: "GENCOD", largeur: 16, dbf: "GENCOD" },
+    { key: "refer", entete: "Référence fourn.", largeur: 18, dbf: "REFER" },
+    { key: "groupe", entete: "Groupe", largeur: 10, dbf: "GROUPE" },
+    { key: "stock", entete: "Stock total", largeur: 12, dbf: "STOCK" },
+    { key: "deprec", entete: "DEPREC", largeur: 10, dbf: "DEPREC" },
+    { key: "deprecie", entete: "Déprécié", largeur: 11, dbf: "DEPREC" },
+    { key: "pvte", entete: "PV HT (PVTE)", largeur: 13, dbf: "PVTE" },
+    { key: "qteMois", entete: "Qté mois courant", largeur: 17, dbf: "V1" },
+    { key: "qte3Mois", entete: "Qté 3 mois", largeur: 12, dbf: "V1" },
+    { key: "qte12Mois", entete: "Qté 12 mois", largeur: 13, dbf: "V1" },
+    { key: "ca12Mois", entete: "CA HT 12 mois", largeur: 16, dbf: "PVTE" },
   ];
-  ws.columns = [
-    { key: "nart", width: 14 },
-    { key: "design", width: 42 },
-    { key: "gencod", width: 16 },
-    { key: "refer", width: 18 },
-    { key: "groupe", width: 10 },
-    { key: "stock", width: 12 },
-    { key: "deprec", width: 10 },
-    { key: "deprecie", width: 11 },
-    { key: "pvte", width: 13 },
-    { key: "qteMois", width: 17 },
-    { key: "qte3Mois", width: 12 },
-    { key: "qte12Mois", width: 13 },
-    { key: "ca12Mois", width: 16 },
-  ];
+
+  const visibles = masqueDbf
+    ? COLONNES.filter((c) => !c.dbf || !masqueDbf.has(c.dbf.toUpperCase()))
+    : COLONNES;
+
+  ws.getRow(3).values = visibles.map((c) => c.entete);
+  ws.columns = visibles.map((c) => ({ key: c.key, width: c.largeur }));
   styleHeader(ws.getRow(3));
   ws.views = [{ state: "frozen", ySplit: 3 }];
 
+  const clesVisibles = new Set(visibles.map((c) => c.key));
+  const nettoyer = (ligne) =>
+    Object.fromEntries(
+      Object.entries(ligne).filter(([k]) => clesVisibles.has(k)),
+    );
+
   for (const a of articles) {
     const v = articleCacheService.calculerVentesArticle(a);
-    ws.addRow({
+    ws.addRow(nettoyer({
       nart: safeTrim(a.NART),
       design: safeTrim(a.DESIGN),
       gencod: safeTrim(a.GENCOD),
@@ -147,25 +152,26 @@ export const buildArticlesFournisseurWorkbook = async ({
       qte3Mois: v.qte3Mois,
       qte12Mois: v.qte12Mois,
       ca12Mois: Math.round(v.ca12Mois),
-    });
+    }));
   }
 
   // Ligne de totaux fournisseur (sur les lignes filtrées).
-  const ligneTotal = ws.addRow({
+  const ligneTotal = ws.addRow(nettoyer({
     nart: "TOTAL",
     design: `${articles.length} référence${articles.length > 1 ? "s" : ""}`,
     qteMois: ventes.qteMois,
     qte3Mois: ventes.qte3Mois,
     qte12Mois: ventes.qte12Mois,
     ca12Mois: ventes.ca12Mois,
-  });
+  }));
   ligneTotal.font = { bold: true };
   ligneTotal.border = { top: { style: "double" } };
 
   for (const key of ["stock", "pvte", "qteMois", "qte3Mois", "qte12Mois", "ca12Mois"]) {
-    ws.getColumn(key).numFmt = "#,##0";
+    if (clesVisibles.has(key)) ws.getColumn(key).numFmt = "#,##0";
   }
-  ws.autoFilter = { from: "A3", to: "M3" };
+  const derniere = String.fromCharCode(64 + visibles.length);
+  ws.autoFilter = { from: "A3", to: `${derniere}3` };
 
   const trig =
     safeTrim(entreprise?.trigramme) ||

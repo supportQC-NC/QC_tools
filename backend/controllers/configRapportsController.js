@@ -13,6 +13,7 @@ import {
   buildResourceWorkbook,
   parseResourceWorkbook,
 } from "../services/configResourceExcelService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import Entreprise from "../models/EntrepriseModel.js";
 
 import AbonnementRapportClient from "../models/masterConfig/AbonnementRapportClientModel.js";
@@ -277,16 +278,9 @@ const exportResource = asyncHandler(async (req, res) => {
     entreprise,
   });
 
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  );
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.setHeader("Access-Control-Expose-Headers", "X-Lignes");
-  res.setHeader("X-Lignes", String(count));
-
-  await workbook.xlsx.write(res);
-  res.end();
+  // envoyerClasseur applique les droits « champ par champ » avant l'envoi :
+  // un export ne doit pas contourner ce qui est masqué à l'écran.
+  await envoyerClasseur(req, res, workbook, filename, { "X-Lignes": count });
 });
 
 // POST /:resource/import  (multipart : file + entrepriseId)

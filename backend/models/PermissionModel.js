@@ -302,6 +302,21 @@ const permissionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: () => ({}),
     },
+    // ══════════ CHAMPS DBF VISIBLES — par table de l'ERP ══════════
+    // Objet table(string) -> { mode: "tous" | "liste", champs: [String] }.
+    //   "tous"  : aucune restriction (défaut, comportement historique)
+    //   "liste" : SEULS les champs listés sont renvoyés à cet utilisateur
+    // Tables déclarées dans config/dbfTables.js.
+    //
+    // ATTENTION : le masquage s'applique PAR NOM DE CHAMP sur toutes les
+    // réponses de l'API (voir middleware/masquerChampsDbf.js). Un champ retiré
+    // sur une table est donc masqué partout où ce nom apparaît — le filtrage
+    // est volontairement plus strict que fin, pour ne jamais laisser fuir une
+    // donnée par un écran oublié.
+    champsDbf: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
   },
   {
     timestamps: true,

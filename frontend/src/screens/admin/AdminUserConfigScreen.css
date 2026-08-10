@@ -1,0 +1,118 @@
+/* src/screens/admin/AdminUserConfigScreen.css
+   Les classes .user-config-page / .ucp-* sont posées par UserModal en mode
+   `asPage` ; on les style ici (CSS global), comme pour la config entreprise. */
+
+.ucp-chargement {
+  padding: 2rem;
+  color: var(--admin-text-muted, var(--text-muted));
+}
+
+.user-config-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.ucp-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--admin-bg-secondary, var(--bg-secondary));
+  border-bottom: 1px solid var(--admin-border, var(--border));
+}
+
+.ucp-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--admin-text, var(--text-primary));
+}
+
+.ucp-body {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.ucp-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem 0.6rem;
+  border-right: 1px solid var(--admin-border, var(--border));
+}
+
+.ucp-nav-item {
+  padding: 0.55rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--admin-text-secondary, var(--text-secondary));
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ucp-nav-item:hover {
+  background: var(--admin-bg-tertiary, var(--bg-secondary));
+}
+
+.ucp-nav-item.active {
+  background: rgba(139, 92, 246, 0.14);
+  color: #a78bfa;
+  font-weight: 700;
+}
+
+.ucp-content {
+  padding: 1.25rem 1.5rem;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+/* En mode page, le formulaire n'est plus contraint par la modale. */
+.user-config-page .modal-form {
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+.user-config-page .modal-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  padding: 0.85rem 0;
+  background: var(--admin-bg, var(--bg-primary));
+  border-top: 1px solid var(--admin-border, var(--border));
+}
+
+/* Les boutons ne doivent pas s'étirer sur toute la largeur en mode page. */
+.user-config-page .modal-footer .btn-cancel,
+.user-config-page .modal-footer .btn-submit,
+.user-config-page .ucp-header .btn-cancel {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 8rem;
+}
+
+@media (max-width: 900px) {
+  .ucp-body {
+    grid-template-columns: 1fr;
+  }
+  .ucp-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--admin-border, var(--border));
+  }
+}

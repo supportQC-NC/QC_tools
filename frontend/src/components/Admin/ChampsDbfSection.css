@@ -1,0 +1,325 @@
+/* src/components/Admin/ChampsDbfSection.css */
+
+.cdbf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.cdbf-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.cdbf-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--admin-text, var(--text-primary));
+}
+
+.cdbf-sous {
+  margin: 0.35rem 0 0;
+  max-width: 62ch;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--admin-text-muted, var(--text-muted));
+}
+
+.cdbf-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.cdbf-societe {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--admin-text-muted, var(--text-muted));
+}
+
+.cdbf-societe select,
+.cdbf-recherche input {
+  padding: 0.35rem 0.5rem;
+  background: var(--admin-bg, var(--bg-primary));
+  border: 1px solid var(--admin-border, var(--border));
+  border-radius: 6px;
+  color: var(--admin-text, var(--text-primary));
+  font-size: 0.8rem;
+}
+
+.cdbf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cdbf-primaire {
+  background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+  color: #fff;
+}
+
+.cdbf-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cdbf-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.55rem;
+  background: var(--admin-bg-tertiary, var(--bg-secondary));
+  border: 1px solid var(--admin-border, var(--border));
+  border-radius: 6px;
+  color: var(--admin-text-secondary, var(--text-secondary));
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.cdbf-mini:hover {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* Messages */
+.cdbf-message {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 0.82rem;
+}
+.cdbf-message.ok {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+}
+.cdbf-message.ko {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+.cdbf-message.avertir {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+}
+.cdbf-message.info {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.08);
+  color: #a78bfa;
+}
+
+.cdbf-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted, var(--text-muted));
+}
+
+.cdbf-alerte {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.82rem;
+  color: #f59e0b;
+}
+
+/* Corps : tables à gauche, champs à droite */
+.cdbf-corps {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.cdbf-tables {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.cdbf-table {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--admin-text-secondary, var(--text-secondary));
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cdbf-table:hover {
+  background: var(--admin-bg-tertiary, var(--bg-secondary));
+}
+
+.cdbf-table.actif {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: #8b5cf6;
+  color: var(--admin-text, var(--text-primary));
+  font-weight: 600;
+}
+
+.cdbf-table-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cdbf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--admin-text-muted, var(--text-muted));
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.cdbf-badge.restreint {
+  background: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+}
+
+.cdbf-panneau {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.cdbf-modes {
+  display: flex;
+  gap: 1.2rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--admin-border, var(--border));
+}
+
+.cdbf-modes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary, var(--text-secondary));
+  cursor: pointer;
+}
+
+.cdbf-barre {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cdbf-recherche {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--admin-text-muted, var(--text-muted));
+}
+
+.cdbf-compte {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.cdbf-champs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.35rem;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.cdbf-champ {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--admin-bg, var(--bg-primary));
+  border: 1px solid var(--admin-border, var(--border));
+  border-radius: 6px;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.cdbf-champ.coche {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.cdbf-champ-nom {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Courier New", monospace;
+  color: var(--admin-text, var(--text-primary));
+}
+
+.cdbf-champ-type {
+  flex-shrink: 0;
+  color: var(--admin-text-muted, var(--text-muted));
+  font-size: 0.68rem;
+}
+
+@media (max-width: 900px) {
+  .cdbf-corps {
+    grid-template-columns: 1fr;
+  }
+  .cdbf-tables {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-height: none;
+  }
+}
+
+/* Nom réel du fichier DBF + son rôle en sous-titre */
+.cdbf-table-texte {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cdbf-table-label {
+  font-family: "Courier New", monospace;
+}
+
+.cdbf-table-desc {
+  font-size: 0.68rem;
+  color: var(--admin-text-muted, var(--text-muted));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

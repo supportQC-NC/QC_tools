@@ -7,6 +7,7 @@ import {
   normaliserDeprecation,
   normaliserStock,
 } from "../services/fournisseurArticlesExcelService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import path from "path";
 import fs from "fs";
 
@@ -211,18 +212,14 @@ const exportArticlesByFournisseur = asyncHandler(async (req, res) => {
       fournisseur,
       deprecation,
       stockFilter,
+      // L'export ne passe pas par res.json : on transmet le masque des champs
+      // DBF pour qu'il filtre lui-même ses colonnes.
+      masqueDbf: req.masqueDbf,
     });
 
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  );
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.setHeader("Access-Control-Expose-Headers", "X-Lignes");
-  res.setHeader("X-Lignes", String(count));
-
-  await workbook.xlsx.write(res);
-  res.end();
+  // Les colonnes ont déjà été filtrées à la construction (elles déclarent leur
+  // champ DBF source) ; envoyerClasseur sert de filet et pose le compteur.
+  await envoyerClasseur(req, res, workbook, filename, { "X-Lignes": count });
 });
 
 /**

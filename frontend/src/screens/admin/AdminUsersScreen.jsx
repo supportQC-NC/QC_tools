@@ -1,5 +1,6 @@
 // src/screens/admin/AdminUsers.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   HiPlus,
@@ -26,6 +27,7 @@ const ROLE_FILTERS = [
 ];
 
 const AdminUsers = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("tous");
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,10 +63,10 @@ const AdminUsers = () => {
     setModalOpen(true);
   };
 
-  const handleEdit = (user) => {
-    setSelectedUser(user);
-    setModalOpen(true);
-  };
+  // L'édition ouvre la PAGE de configuration : il y a désormais trop de
+  // réglages par utilisateur (permissions, sociétés, analyse, champs DBF)
+  // pour tenir dans une modale. Celle-ci reste pour la création rapide.
+  const handleEdit = (user) => navigate(`/admin/users/${user._id}`);
 
   const handleDelete = async (user) => {
     if (window.confirm(`Supprimer ${user.prenom} ${user.nom} ?`)) {

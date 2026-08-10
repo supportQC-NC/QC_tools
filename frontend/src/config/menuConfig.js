@@ -35,15 +35,10 @@ import { moduleForPath } from "./adminModules";
 // CONFIGURATION DES MENUS AVEC SOUS-GROUPES
 // =============================================
 
-// Structure des menus ADMIN avec sous-groupes
+// Structure des menus ADMIN avec sous-groupes.
+// NB : le tableau de bord n'est plus ici — il est UNIQUE (route "/") et vit
+// dans « Mon espace », voir PERSONAL_ITEMS.
 export const adminMenuStructure = [
-  {
-    type: "item",
-    label: "Tableau de bord",
-    path: "/admin",
-    icon: HiViewGrid,
-    exact: true,
-  },
   {
     type: "subgroup",
     label: "Gestion",
@@ -407,10 +402,16 @@ export const getUserMenus = (userInfo) => {
     label: "Mon espace",
     collapsible: true,
     items: [
+      { label: "Tableau de bord", path: "/", icon: HiViewGrid, exact: true },
       { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
       { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
       { label: "Mon profil", path: "/profile", icon: HiUser },
       { label: "Organiser mon menu", path: "/mon-menu", icon: HiViewGrid },
+      {
+        label: "Organiser mon tableau de bord",
+        path: "/mon-dashboard",
+        icon: HiViewGrid,
+      },
     ],
   });
 
@@ -574,7 +575,8 @@ export const getAccessibleEntreprises = (userInfo, allEntreprises = []) => {
 // Texte court affiché au survol de chaque onglet. Peut être surchargé par
 // l'administrateur (stocké en base, clé = path). Voir Sidebar + AdminInfobulles.
 export const DEFAULT_MENU_HINTS = {
-  "/admin": "Vue d'ensemble et indicateurs clés.",
+  "/": "Mon tableau de bord : widgets et indicateurs que j'ai choisis.",
+  "/mon-dashboard": "Composer mon tableau de bord (widgets et tuiles chiffrées).",
   "/mes-taches": "Vos tâches personnelles à traiter.",
   "/espace-equipe": "Messagerie et espace de travail de vos équipes.",
   // Gestion
@@ -649,10 +651,16 @@ export const DEFAULT_MENU_HINTS = {
 
 // Onglets de l'espace personnel (section fixe, non gérée par le constructeur).
 const PERSONAL_ITEMS = [
+  { label: "Tableau de bord", path: "/", icon: HiViewGrid, exact: true },
   { label: "Mes tâches", path: "/mes-taches", icon: HiClipboardCheck },
   { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
   { label: "Mon profil", path: "/profile", icon: HiUser },
   { label: "Organiser mon menu", path: "/mon-menu", icon: HiViewGrid },
+  {
+    label: "Organiser mon tableau de bord",
+    path: "/mon-dashboard",
+    icon: HiViewGrid,
+  },
 ];
 
 // Aplatit toutes les structures de menu -> liste { path, label, group } unique.

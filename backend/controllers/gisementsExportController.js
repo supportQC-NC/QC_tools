@@ -7,6 +7,7 @@ import {
   EXPORT_MODES,
 } from "../services/gisementsExportService.js";
 import { generateGisementLabelsPDF } from "../services/gisementLabelService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import articleCacheService from "../services/articleService.js";
 import { getGisements } from "../services/gisementsService.js";
 import {
@@ -73,17 +74,12 @@ export const exportGisements = asyncHandler(async (req, res) => {
     libelleMap,
   });
 
-  res.setHeader(
-    "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  );
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.setHeader("Access-Control-Expose-Headers", "X-Lignes, X-Articles-Total");
-  res.setHeader("X-Lignes", String(count));
-  res.setHeader("X-Articles-Total", String(total));
-
-  await workbook.xlsx.write(res);
-  res.end();
+  // Droits « champ par champ » appliqués avant l'envoi (les entêtes de cet
+  // export sont des noms DBF : NART, DESIGN, GENCOD, GISM1…).
+  await envoyerClasseur(req, res, workbook, filename, {
+    "X-Lignes": count,
+    "X-Articles-Total": total,
+  });
 });
 
 // @desc    Étiquettes (A8, Code128/QR) de gisement ou de groupe, au format PDF
