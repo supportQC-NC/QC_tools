@@ -359,3 +359,69 @@
     gap: 0.25rem;
   }
 }
+
+/* ── Actions d'entête : « Ajouter » + actions spécifiques à la ressource ── */
+.cr-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Bouton « Compléter depuis les articles » (scan de article.dbf) */
+.cr-btn-scan {
+  background: var(--admin-bg-tertiary);
+  border-color: var(--admin-border);
+  color: var(--admin-text);
+}
+.cr-btn-scan:hover:not(:disabled) {
+  border-color: #8b5cf6;
+  color: #a78bfa;
+}
+
+.cr-spin {
+  animation: cr-spin-anim 0.8s linear infinite;
+}
+@keyframes cr-spin-anim {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Retour du scan, à côté des boutons */
+.cr-scan-msg {
+  font-size: 0.8rem;
+  max-width: 22rem;
+}
+.cr-scan-msg.ok {
+  color: #10b981;
+}
+.cr-scan-msg.ko {
+  color: #ef4444;
+}
+
+/* Retour de l'aller-retour Excel (export / import) */
+.cr-excel-msg {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+  border: 1px solid;
+}
+.cr-excel-msg.ok {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+}
+.cr-excel-msg.ko {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+.cr-excel-msg ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  opacity: 0.9;
+}

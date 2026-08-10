@@ -116,14 +116,19 @@ export const runMasterConfigSeed = async () => {
   }
 
   // ─── Groupes prioritaires ──────────────────────────────────────────────────
+  // Liste par société : le JSON Access n'en porte pas, on sème donc la même
+  // base de départ dans CHAQUE société (elle sera ensuite complétée depuis
+  // article.dbf via le bouton « Compléter depuis les articles »).
   for (const r of load("groupePrioritaire.json")) {
     if (!r.GROUPE) continue;
-    const out = await GroupePrioritaire.updateOne(
-      { groupe: String(r.GROUPE).toUpperCase() },
-      { $setOnInsert: { description: r.Description || "" } },
-      { upsert: true },
-    );
-    if (out.upsertedCount) res.groupesPrioritaires += 1;
+    for (const ent of ents) {
+      const out = await GroupePrioritaire.updateOne(
+        { entreprise: ent._id, groupe: String(r.GROUPE).toUpperCase() },
+        { $setOnInsert: { description: r.Description || "" } },
+        { upsert: true },
+      );
+      if (out.upsertedCount) res.groupesPrioritaires += 1;
+    }
   }
 
   // ─── Groupes spéciaux ──────────────────────────────────────────────────────

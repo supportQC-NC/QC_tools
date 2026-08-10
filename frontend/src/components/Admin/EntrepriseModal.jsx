@@ -13,12 +13,14 @@ import {
   HiSearch,
   HiColorSwatch,
   HiChartBar,
+  HiRefresh,
 } from "react-icons/hi";
 import {
   useCreateEntrepriseMutation,
   useUpdateEntrepriseMutation,
 } from "../../slices/entrepriseApiSlice";
 import { useGetUsersQuery } from "../../slices/userApiSlice";
+import { useSyncGroupesPrioritairesMutation } from "../../slices/configRapportsApiSlice";
 import { BASE_URL } from "../../constants";
 import Modal from "../ui/Modal/Modal";
 import ConfigResourceTable from "./ConfigResourceTable";
@@ -76,6 +78,7 @@ const REPORT_TABS = [
     label: "Groupes spéciaux",
     resource: "groupes-speciaux",
     scoped: true,
+    excel: true,
     fields: [
       { name: "codeListe", label: "Code liste", type: "text", required: true },
       { name: "lblListe", label: "Libellé", type: "text" },
@@ -85,15 +88,63 @@ const REPORT_TABS = [
   },
   {
     key: "rapGroupesPrioritaires",
-    label: "Groupes prioritaires (communs)",
+    label: "Groupes prioritaires",
     resource: "groupes-prioritaires",
-    scoped: false,
+    scoped: true,
+    excel: true,
     fields: [
       { name: "groupe", label: "Groupe", type: "text", required: true },
-      { name: "description", label: "Description", type: "text" },
+      // Champ Mongo `description`, affiché « Libellé » partout dans l'UI.
+      { name: "description", label: "Libellé", type: "text" },
+      // Lecture seule : nb d'articles relevé sur article.dbf de la société
+      // lors du dernier scan.
+      { name: "nbArticles", label: "Articles", type: "readonly-number" },
+      { name: "scanneLe", label: "Dernier scan", type: "readonly-date" },
     ],
   },
 ];
+
+// Bouton « Compléter depuis les articles » de l'onglet Groupes prioritaires :
+// scanne article.dbf de la société et ajoute les codes GROUPE manquants.
+const SyncGroupesButton = ({ entrepriseId }) => {
+  const [sync, { isLoading }] = useSyncGroupesPrioritairesMutation();
+  const [resultat, setResultat] = useState(null);
+
+  const lancer = async () => {
+    setResultat(null);
+    try {
+      const r = await sync({ entrepriseId }).unwrap();
+      setResultat({ ok: true, message: r.message });
+    } catch (e) {
+      setResultat({
+        ok: false,
+        message: e?.data?.message || "Scan impossible.",
+      });
+    }
+  };
+
+  if (!entrepriseId) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="cr-btn cr-btn-scan"
+        onClick={lancer}
+        disabled={isLoading}
+        title="Scanner article.dbf de cette société et ajouter les groupes absents"
+      >
+        <HiRefresh className={isLoading ? "cr-spin" : ""} />{" "}
+        {isLoading ? "Scan en cours…" : "Compléter depuis les articles"}
+      </button>
+      {resultat && (
+        <span className={`cr-scan-msg ${resultat.ok ? "ok" : "ko"}`}>
+          {resultat.message}
+        </span>
+      )}
+    </>
+  );
+};
 
 // Groupes de la nav verticale (mode page). Le groupe « Rapports » n'apparaît
 // qu'en édition (entreprise déjà enregistrée).
@@ -1807,6 +1858,12 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
                 scoped={activeReport.scoped}
                 entrepriseId={entreprise?._id}
                 label={activeReport.label}
+                excel={!!activeReport.excel}
+                extraActions={
+                  activeReport.resource === "groupes-prioritaires" ? (
+                    <SyncGroupesButton entrepriseId={entreprise?._id} />
+                  ) : null
+                }
               />
             ) : (
               formEl

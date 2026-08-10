@@ -55,10 +55,36 @@ export const configRapportsApiSlice = apiSlice.injectEndpoints({
         { type: "ConfigRapports", id: "factures-auto" },
       ],
     }),
+    // Complète les groupes prioritaires depuis article.dbf d'une société
+    // (non destructif : n'ajoute que les codes GROUPE manquants).
+    syncGroupesPrioritaires: builder.mutation({
+      query: ({ entrepriseId }) => ({
+        url: `${URL}/groupes-prioritaires/sync-articles`,
+        method: "POST",
+        body: { entrepriseId },
+      }),
+      invalidatesTags: [{ type: "ConfigRapports", id: "groupes-prioritaires" }],
+    }),
+
+    // Import Excel d'une ressource (complète les libellés / ajoute en masse).
+    // `file` est un File ; fetchBaseQuery envoie le FormData tel quel.
+    importConfigResource: builder.mutation({
+      query: ({ resource, file, entrepriseId }) => {
+        const form = new FormData();
+        form.append("file", file);
+        if (entrepriseId) form.append("entrepriseId", entrepriseId);
+        return { url: `${URL}/${resource}/import`, method: "POST", body: form };
+      },
+      invalidatesTags: (result, error, arg) => [
+        { type: "ConfigRapports", id: arg.resource },
+      ],
+    }),
   }),
 });
 
 export const {
+  useSyncGroupesPrioritairesMutation,
+  useImportConfigResourceMutation,
   useGetConfigResourceQuery,
   useCreateConfigResourceMutation,
   useUpdateConfigResourceMutation,
