@@ -26,6 +26,10 @@
     "data:destroy:envoi-cde": "node backend/seedEnvoiCdeFournisseur.js -d",
     "masterconfig:import": "node backend/seedMasterConfig.js",
     "masterconfig:destroy": "node backend/seedMasterConfig.js -d",
+    "apikey:create": "node backend/scripts/apiKeys.js create",
+    "apikey:list": "node backend/scripts/apiKeys.js list",
+    "apikey:revoke": "node backend/scripts/apiKeys.js revoke",
+    "apikey:activate": "node backend/scripts/apiKeys.js activate",
     "pachat:historiser": "node backend/historiserPachat.js",
     "migrate:groupes-prioritaires": "node backend/migrations/groupesPrioritairesParEntreprise.js"
   },

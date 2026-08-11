@@ -281,6 +281,12 @@ export const TRI_KEYS = TRIS.map((t) => t.key);
 export const LIMITE_MIN = 3;
 export const LIMITE_MAX = 30;
 
+// ─── Visuel tableau ──────────────────────────────────────────────────────────
+// Un tableau affiche des LIGNES, pas des agrégats : ses bornes sont plus larges.
+export const LIGNES_MIN = 5;
+export const LIGNES_MAX = 200;
+export const COLONNES_MAX = 12;
+
 export default {
   DASHBOARD_WIDGETS,
   WIDGET_BY_KEY,
@@ -296,4 +302,7 @@ export default {
   TRI_KEYS,
   LIMITE_MIN,
   LIMITE_MAX,
+  LIGNES_MIN,
+  LIGNES_MAX,
+  COLONNES_MAX,
 };

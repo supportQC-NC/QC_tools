@@ -19,7 +19,7 @@ export const dashboardLayoutApiSlice = apiSlice.injectEndpoints({
     }),
 
     setMonDashboard: builder.mutation({
-      query: (blocs) => ({ url: `${URL}/me`, method: "PUT", body: { blocs } }),
+      query: (pages) => ({ url: `${URL}/me`, method: "PUT", body: { pages } }),
       invalidatesTags: [{ type: "DashboardLayout", id: "ME" }],
     }),
 

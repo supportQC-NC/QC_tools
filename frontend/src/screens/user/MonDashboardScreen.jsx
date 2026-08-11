@@ -36,6 +36,8 @@ import {
   HiChartBar,
   HiChartPie,
   HiPresentationChartLine,
+  HiViewList,
+  HiDuplicate,
   HiViewGrid,
   HiX,
   HiEye,
@@ -83,7 +85,15 @@ const champsEffectifs = (datasets, form) => {
 };
 
 // ─── Ligne triable de la disposition ─────────────────────────────────────────
-const Ligne = ({ bloc, widgetsParCle, apercu, onTaille, onSupprimer, onEditer }) => {
+const Ligne = ({
+  bloc,
+  widgetsParCle,
+  apercu,
+  onGrille,
+  onSupprimer,
+  onEditer,
+  onDupliquer,
+}) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: bloc.id });
 
@@ -95,13 +105,16 @@ const Ligne = ({ bloc, widgetsParCle, apercu, onTaille, onSupprimer, onEditer })
 
   const estKpi = bloc.type === "kpi";
   const estGraphique = bloc.type === "graphique";
-  const calcule = estKpi || estGraphique;
+  const estTableau = bloc.type === "tableau";
+  const calcule = estKpi || estGraphique || estTableau;
   const widget = widgetsParCle[bloc.source];
   const Icone = estKpi
     ? ICONES_KPI[bloc.icone] || HiChartBar
     : estGraphique
       ? HiChartPie
-      : HiViewGrid;
+      : estTableau
+        ? HiViewList
+        : HiViewGrid;
 
   return (
     <div ref={setNodeRef} style={style} className="md-ligne">
@@ -126,10 +139,18 @@ const Ligne = ({ bloc, widgetsParCle, apercu, onTaille, onSupprimer, onEditer })
           {calcule ? (
             <>
               {bloc.dataset}
-              {bloc.jointure?.dataset ? ` × ${bloc.jointure.dataset}` : ""} ·{" "}
-              {bloc.mesure}
-              {bloc.champ ? ` (${bloc.champ})` : ""}
-              {estGraphique ? ` · par ${bloc.dimension}` : ""}
+              {bloc.jointure?.dataset ? ` × ${bloc.jointure.dataset}` : ""}
+              {estTableau ? (
+                <> · {bloc.colonnes?.length || 0} colonne(s) · {bloc.limite} lignes</>
+              ) : (
+                <>
+                  {" "}
+                  · {bloc.mesure}
+                  {bloc.champ ? ` (${bloc.champ})` : ""}
+                  {estGraphique ? ` · par ${bloc.dimension}` : ""}
+                  {estGraphique && bloc.serie ? ` × ${bloc.serie}` : ""}
+                </>
+              )}
               {bloc.filtres?.length ? ` · ${bloc.filtres.length} filtre(s)` : ""}
             </>
           ) : (
@@ -144,6 +165,8 @@ const Ligne = ({ bloc, widgetsParCle, apercu, onTaille, onSupprimer, onEditer })
             <em title={apercu.erreur}>indisponible</em>
           ) : !apercu ? (
             "…"
+          ) : estTableau ? (
+            `${Number(apercu.total || 0).toLocaleString("fr-FR")} ligne(s)`
           ) : estGraphique ? (
             `${apercu.groupes ?? 0} groupe(s)`
           ) : (
@@ -152,22 +175,40 @@ const Ligne = ({ bloc, widgetsParCle, apercu, onTaille, onSupprimer, onEditer })
         </span>
       )}
 
-      <select
-        className="md-taille"
-        value={bloc.taille}
-        onChange={(e) => onTaille(bloc.id, e.target.value)}
-        title="Largeur du bloc"
-      >
-        {TAILLES.map((t) => (
-          <option key={t.key} value={t.key}>{t.label}</option>
-        ))}
-      </select>
+      {/* Grille : largeur en colonnes (sur 12) et hauteur en unités de 90 px */}
+      <label className="md-grille-champ" title="Largeur, en colonnes sur 12">
+        L
+        <input
+          type="number"
+          min="1"
+          max="12"
+          value={bloc.w ?? 4}
+          onChange={(e) => onGrille(bloc.id, "w", Number(e.target.value))}
+        />
+      </label>
+      <label className="md-grille-champ" title="Hauteur, en unités de 90 px">
+        H
+        <input
+          type="number"
+          min="1"
+          max="12"
+          value={bloc.h ?? 3}
+          onChange={(e) => onGrille(bloc.id, "h", Number(e.target.value))}
+        />
+      </label>
 
       {calcule && (
         <button className="md-icone-btn" onClick={() => onEditer(bloc)} title="Modifier">
           <HiChartBar />
         </button>
       )}
+      <button
+        className="md-icone-btn"
+        onClick={() => onDupliquer(bloc)}
+        title="Dupliquer ce bloc"
+      >
+        <HiDuplicate />
+      </button>
       <button
         className="md-icone-btn md-danger"
         onClick={() => onSupprimer(bloc.id)}
@@ -189,6 +230,7 @@ const ConstructeurKpi = ({
   typesGraphique,
   tris,
   limites,
+  lignesBornes = { min: 5, max: 200 },
   initial,
   natureInitiale = "kpi",
   onValider,
@@ -212,13 +254,18 @@ const ConstructeurKpi = ({
         jointure: null,
         // graphique
         dimension: "",
+        serie: "",
+        empile: false,
         typeGraphique: "barres",
-        limite: 10,
+        limite: natureInitiale === "tableau" ? 25 : 10,
         tri: "valeurDesc",
+        // tableau
+        colonnes: [],
       },
   );
 
   const estGraphique = form.type === "graphique";
+  const estTableau = form.type === "tableau";
 
   const ds = datasets[form.dataset];
   const champs = champsEffectifs(datasets, form);
@@ -297,13 +344,25 @@ const ConstructeurKpi = ({
 
   const typeDuChamp = (nom) => champs.find((c) => c.name === nom)?.type || "texte";
 
+  const basculerColonne = (nom) => {
+    const suivant = form.colonnes.includes(nom)
+      ? form.colonnes.filter((c) => c !== nom)
+      : [...form.colonnes, nom];
+    set("colonnes", suivant);
+  };
+
   const valide =
     !!form.dataset &&
-    (!besoinChamp || !!form.champ) &&
     !!form.titre.trim() &&
-    (!estGraphique || !!form.dimension);
+    (estTableau
+      ? form.colonnes.length > 0
+      : (!besoinChamp || !!form.champ) && (!estGraphique || !!form.dimension));
 
-  const nomNature = estGraphique ? "graphique" : "tuile chiffrée";
+  const nomNature = estTableau
+    ? "tableau"
+    : estGraphique
+      ? "graphique"
+      : "tuile chiffrée";
 
   return (
     <div className="md-modale-fond" onClick={onFermer}>
@@ -338,14 +397,16 @@ const ConstructeurKpi = ({
               {ds?.description && <small>{ds.description}</small>}
             </div>
 
-            <div className="md-champ">
-              <label>Mesure</label>
-              <select value={form.mesure} onChange={(e) => set("mesure", e.target.value)}>
-                {mesures.map((m) => (
-                  <option key={m.key} value={m.key}>{m.label}</option>
-                ))}
-              </select>
-            </div>
+            {!estTableau && (
+              <div className="md-champ">
+                <label>Mesure</label>
+                <select value={form.mesure} onChange={(e) => set("mesure", e.target.value)}>
+                  {mesures.map((m) => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Croisement avec une seconde source — bases DBF uniquement */}
@@ -407,7 +468,78 @@ const ConstructeurKpi = ({
             )}
           </div>
 
-          {besoinChamp && (
+          {estTableau && (
+            <>
+              <div className="md-champ">
+                <label>
+                  Colonnes affichées ({form.colonnes.length} / {limites.colonnesMax ?? 12})
+                </label>
+                <div className="md-choix-colonnes">
+                  {champs.map((c) => {
+                    const coche = form.colonnes.includes(c.name);
+                    return (
+                      <label
+                        key={c.name}
+                        className={`md-choix-colonne ${coche ? "coche" : ""}`}
+                        title={c.name}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={coche}
+                          onChange={() => basculerColonne(c.name)}
+                        />
+                        <span>{c.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <small>
+                  L'ordre des colonnes suit l'ordre dans lequel vous les cochez.
+                </small>
+              </div>
+
+              <div className="md-duo">
+                <div className="md-champ">
+                  <label>Trier sur</label>
+                  <select value={form.champ} onChange={(e) => set("champ", e.target.value)}>
+                    <option value="">— ordre de la base —</option>
+                    {champs.map((c) => (
+                      <option key={c.name} value={c.name}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md-champ">
+                  <label>Sens</label>
+                  <select
+                    value={form.tri}
+                    onChange={(e) => set("tri", e.target.value)}
+                    disabled={!form.champ}
+                  >
+                    <option value="valeurDesc">Décroissant</option>
+                    <option value="valeurAsc">Croissant</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="md-champ">
+                <label>Lignes affichées : {form.limite}</label>
+                <input
+                  type="range"
+                  min={lignesBornes.min}
+                  max={lignesBornes.max}
+                  step="5"
+                  value={form.limite}
+                  onChange={(e) => set("limite", Number(e.target.value))}
+                />
+                <small>
+                  Le tri porte sur l'ensemble des lignes filtrées, pas seulement
+                  sur celles affichées. Le total réel est rappelé sur le bloc.
+                </small>
+              </div>
+            </>
+          )}
+
+          {!estTableau && besoinChamp && (
             <div className="md-champ">
               <label>Champ à mesurer</label>
               <select value={form.champ} onChange={(e) => set("champ", e.target.value)}>
@@ -441,6 +573,40 @@ const ConstructeurKpi = ({
                 <small>
                   Une barre (ou une part) par valeur distincte de ce champ.
                 </small>
+              </div>
+
+              <div className="md-duo">
+                <div className="md-champ">
+                  <label>Ventiler par (facultatif)</label>
+                  <select
+                    value={form.serie}
+                    onChange={(e) => set("serie", e.target.value)}
+                    disabled={form.typeGraphique === "camembert"}
+                  >
+                    <option value="">— série unique —</option>
+                    {champs
+                      .filter((c) => c.name !== form.dimension)
+                      .map((c) => (
+                        <option key={c.name} value={c.name}>{c.label}</option>
+                      ))}
+                  </select>
+                  <small>
+                    {form.typeGraphique === "camembert"
+                      ? "Indisponible sur un camembert."
+                      : "Découpe chaque groupe en plusieurs séries."}
+                  </small>
+                </div>
+                <div className="md-champ">
+                  <label>Disposition des séries</label>
+                  <select
+                    value={form.empile ? "empile" : "cote"}
+                    onChange={(e) => set("empile", e.target.value === "empile")}
+                    disabled={!form.serie}
+                  >
+                    <option value="cote">Côte à côte</option>
+                    <option value="empile">Empilées</option>
+                  </select>
+                </div>
               </div>
 
               <div className="md-duo">
@@ -615,18 +781,30 @@ const MonDashboardScreen = () => {
   const [enregistrer, { isLoading: enregistrement }] = useSetMonDashboardMutation();
   const [reinitialiser] = useResetMonDashboardMutation();
 
-  const [blocs, setBlocs] = useState([]);
+  const [pages, setPages] = useState([]);
+  const [iPage, setIPage] = useState(0);
   const [modale, setModale] = useState(null); // null | { initial? }
   const [message, setMessage] = useState(null);
   const [modifie, setModifie] = useState(false);
 
   // Charge la disposition serveur une fois.
   useEffect(() => {
-    if (disposition?.blocs) {
-      setBlocs(disposition.blocs.map((b) => ({ ...b })));
+    if (disposition?.pages) {
+      setPages(
+        disposition.pages.length
+          ? disposition.pages.map((p) => ({
+              ...p,
+              blocs: p.blocs.map((b) => ({ ...b })),
+            }))
+          : [{ id: "page-1", nom: "Mon tableau", blocs: [] }],
+      );
+      setIPage(0);
       setModifie(false);
     }
   }, [disposition]);
+
+  const pageCourante = pages[iPage] || { blocs: [] };
+  const blocs = useMemo(() => pageCourante.blocs || [], [pageCourante]);
 
   const widgets = useMemo(() => catalogue?.widgets || [], [catalogue]);
   const widgetsParCle = useMemo(
@@ -639,10 +817,11 @@ const MonDashboardScreen = () => {
   const typesGraphique = catalogue?.typesGraphique || [];
   const tris = catalogue?.tris || [];
   const limites = catalogue?.limites || { min: 3, max: 30 };
+  const lignesBornes = catalogue?.lignes || { min: 5, max: 200, colonnesMax: 12 };
 
-  // Aperçu en direct des blocs calculés de la disposition en cours d'édition.
+  // Aperçu en direct des blocs calculés de la page en cours d'édition.
   const blocsCalcules = useMemo(
-    () => blocs.filter((b) => b.type === "kpi" || b.type === "graphique"),
+    () => blocs.filter((b) => ["kpi", "graphique", "tableau"].includes(b.type)),
     [blocs],
   );
   const { data: evaluation } = useEvaluerKpisQuery(
@@ -659,10 +838,38 @@ const MonDashboardScreen = () => {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  // Toute modification de blocs porte sur la PAGE COURANTE.
   const majBlocs = (next) => {
-    setBlocs(next);
+    setPages((p) =>
+      p.map((page, i) => (i === iPage ? { ...page, blocs: next } : page)),
+    );
     setModifie(true);
     setMessage(null);
+  };
+
+  const majPages = (next) => {
+    setPages(next);
+    setModifie(true);
+    setMessage(null);
+  };
+
+  const ajouterPage = () => {
+    const nom = `Page ${pages.length + 1}`;
+    majPages([...pages, { id: nouvelId("page"), nom, blocs: [] }]);
+    setIPage(pages.length);
+  };
+
+  const renommerPage = (nom) =>
+    majPages(pages.map((p, i) => (i === iPage ? { ...p, nom } : p)));
+
+  const supprimerPage = () => {
+    if (pages.length <= 1) return;
+    if (!window.confirm(`Supprimer la page « ${pageCourante.nom} » et ses blocs ?`)) {
+      return;
+    }
+    const suivant = pages.filter((_, i) => i !== iPage);
+    majPages(suivant);
+    setIPage(Math.max(0, iPage - 1));
   };
 
   const onDragEnd = ({ active, over }) => {
@@ -680,6 +887,19 @@ const MonDashboardScreen = () => {
     ]);
   };
 
+  // Duplique un bloc juste après l'original, avec un identifiant neuf.
+  const dupliquer = (bloc) => {
+    const copie = {
+      ...JSON.parse(JSON.stringify(bloc)),
+      id: nouvelId(bloc.type),
+      titre: bloc.titre ? `${bloc.titre} (copie)` : bloc.titre,
+    };
+    const i = blocs.findIndex((b) => b.id === bloc.id);
+    const suivant = [...blocs];
+    suivant.splice(i + 1, 0, copie);
+    majBlocs(suivant);
+  };
+
   const validerKpi = (form) => {
     const existe = blocs.some((b) => b.id === form.id);
     majBlocs(existe ? blocs.map((b) => (b.id === form.id ? form : b)) : [...blocs, form]);
@@ -689,7 +909,7 @@ const MonDashboardScreen = () => {
   const sauver = async () => {
     setMessage(null);
     try {
-      await enregistrer(blocs).unwrap();
+      await enregistrer(pages).unwrap();
       setModifie(false);
       setMessage({ ok: true, texte: "Tableau de bord enregistré." });
     } catch (e) {
@@ -749,10 +969,62 @@ const MonDashboardScreen = () => {
         </div>
       )}
 
+      {/* Pages du tableau de bord */}
+      <div className="md-pages">
+        <div className="md-pages-onglets">
+          {pages.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`md-page-onglet ${i === iPage ? "actif" : ""}`}
+              onClick={() => setIPage(i)}
+            >
+              {p.nom}
+              <span className="md-page-nb">{p.blocs.length}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="md-page-ajout"
+            onClick={ajouterPage}
+            disabled={pages.length >= 10}
+            title={pages.length >= 10 ? "10 pages au maximum" : "Ajouter une page"}
+          >
+            <HiPlus />
+          </button>
+        </div>
+
+        <div className="md-page-outils">
+          <input
+            type="text"
+            className="md-page-nom"
+            value={pageCourante.nom || ""}
+            maxLength={40}
+            onChange={(e) => renommerPage(e.target.value)}
+            title="Renommer la page courante"
+          />
+          <button
+            type="button"
+            className="md-icone-btn md-danger"
+            onClick={supprimerPage}
+            disabled={pages.length <= 1}
+            title={
+              pages.length <= 1
+                ? "Il doit rester au moins une page"
+                : "Supprimer cette page"
+            }
+          >
+            <HiTrash />
+          </button>
+        </div>
+      </div>
+
       <div className="md-colonnes">
         {/* Disposition courante */}
         <section className="md-panneau">
-          <h2>Ma disposition ({blocs.length})</h2>
+          <h2>
+            {pageCourante.nom || "Page"} — {blocs.length} bloc(s)
+          </h2>
           {blocs.length === 0 ? (
             <p className="md-note">
               Aucun bloc. Ajoutez un widget depuis la colonne de droite ou créez
@@ -767,11 +1039,18 @@ const MonDashboardScreen = () => {
                     bloc={b}
                     widgetsParCle={widgetsParCle}
                     apercu={apercuParId.get(b.id)}
-                    onTaille={(id, taille) =>
-                      majBlocs(blocs.map((x) => (x.id === id ? { ...x, taille } : x)))
+                    onGrille={(id, cle, valeur) =>
+                      majBlocs(
+                        blocs.map((x) =>
+                          x.id === id
+                            ? { ...x, [cle]: Math.min(12, Math.max(1, valeur || 1)) }
+                            : x,
+                        ),
+                      )
                     }
                     onSupprimer={(id) => majBlocs(blocs.filter((x) => x.id !== id))}
                     onEditer={(bloc) => setModale({ initial: { ...bloc } })}
+                    onDupliquer={dupliquer}
                   />
                 ))}
               </SortableContext>
@@ -820,6 +1099,12 @@ const MonDashboardScreen = () => {
               >
                 <HiPresentationChartLine /> Composer un graphique
               </button>
+              <button
+                className="md-btn md-primaire md-plein"
+                onClick={() => setModale({ nature: "tableau" })}
+              >
+                <HiViewList /> Composer un tableau
+              </button>
             </div>
           )}
         </aside>
@@ -832,7 +1117,8 @@ const MonDashboardScreen = () => {
           operateurs={operateurs}
           typesGraphique={typesGraphique}
           tris={tris}
-          limites={limites}
+          limites={{ ...limites, colonnesMax: lignesBornes.colonnesMax }}
+          lignesBornes={lignesBornes}
           initial={modale.initial}
           natureInitiale={modale.nature || "kpi"}
           onValider={validerKpi}

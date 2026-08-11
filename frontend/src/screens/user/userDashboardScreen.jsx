@@ -16,11 +16,8 @@ import {
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import RENDUS from "../../components/dashboard/DashboardWidgets";
 import GraphiqueBloc from "../../components/dashboard/GraphiqueBloc";
-import {
-  ICONES_KPI,
-  formaterValeur,
-  classeTaille,
-} from "../../config/dashboardCatalogue";
+import TableauBloc from "../../components/dashboard/TableauBloc";
+import { ICONES_KPI, formaterValeur } from "../../config/dashboardCatalogue";
 import "./UserdashboardScreen.css";
 
 // Tuile KPI composée par l'utilisateur.
@@ -61,11 +58,23 @@ const UserDashboard = () => {
   }, []);
 
   const { data, isLoading } = useGetMonDashboardQuery();
-  const blocs = useMemo(() => data?.blocs || [], [data]);
+  const pages = useMemo(() => data?.pages || [], [data]);
+  const [pageActive, setPageActive] = useState(0);
+
+  // La page courante peut disparaître (droits retirés, page supprimée
+  // ailleurs) : on retombe sur la première.
+  const indexPage = pageActive < pages.length ? pageActive : 0;
+  const blocs = useMemo(
+    () => pages[indexPage]?.blocs || [],
+    [pages, indexPage],
+  );
 
   // Tuiles ET graphiques sont évalués en un seul appel groupé.
   const blocsCalcules = useMemo(
-    () => blocs.filter((b) => b.type === "kpi" || b.type === "graphique"),
+    () =>
+      blocs.filter((b) =>
+        ["kpi", "graphique", "tableau"].includes(b.type),
+      ),
     [blocs],
   );
   const { data: evaluation } = useEvaluerKpisQuery(
@@ -123,32 +132,51 @@ const UserDashboard = () => {
           </Link>
         </div>
       ) : (
+        <>
+        {pages.length > 1 && (
+          <nav className="db-onglets">
+            {pages.map((p, i) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`db-onglet ${i === indexPage ? "actif" : ""}`}
+                onClick={() => setPageActive(i)}
+              >
+                {p.nom}
+                <span className="db-onglet-nb">{p.blocs.length}</span>
+              </button>
+            ))}
+          </nav>
+        )}
         <div className="db-grille">
           {blocs.map((b) => {
-            const cls = classeTaille(b.taille);
-            if (b.type === "kpi") {
-              return (
-                <div key={b.id} className={`db-bloc ${cls}`}>
-                  <TuileKpi bloc={b} resultat={resultatParId.get(b.id)} />
-                </div>
-              );
+            // Grille 12 colonnes : largeur et hauteur portées par le bloc.
+            const style = {
+              gridColumn: `span ${Math.min(12, Math.max(1, b.w || 4))}`,
+              gridRow: `span ${Math.min(12, Math.max(1, b.h || 3))}`,
+            };
+            const resultat = resultatParId.get(b.id);
+
+            let contenu = null;
+            if (b.type === "kpi") contenu = <TuileKpi bloc={b} resultat={resultat} />;
+            else if (b.type === "graphique")
+              contenu = <GraphiqueBloc bloc={b} resultat={resultat} />;
+            else if (b.type === "tableau")
+              contenu = <TableauBloc bloc={b} resultat={resultat} />;
+            else {
+              const Rendu = RENDUS[b.source];
+              if (Rendu) contenu = <Rendu />;
             }
-            if (b.type === "graphique") {
-              return (
-                <div key={b.id} className={`db-bloc ${cls}`}>
-                  <GraphiqueBloc bloc={b} resultat={resultatParId.get(b.id)} />
-                </div>
-              );
-            }
-            const Rendu = RENDUS[b.source];
-            if (!Rendu) return null;
+            if (!contenu) return null;
+
             return (
-              <div key={b.id} className={`db-bloc ${cls}`}>
-                <Rendu />
+              <div key={b.id} className="db-bloc" style={style}>
+                {contenu}
               </div>
             );
           })}
         </div>
+        </>
       )}
 
       <div className="ud-notice">

@@ -30,14 +30,19 @@ const blocSchema = new mongoose.Schema(
     id: { type: String, required: true },
     type: {
       type: String,
-      enum: ["widget", "kpi", "graphique"],
+      enum: ["widget", "kpi", "graphique", "tableau"],
       required: true,
     },
+    // Ancienne largeur en trois crans. Conservée pour les dispositions
+    // enregistrées avant la grille : elle sert à déduire `w` à la reprise.
     taille: {
       type: String,
       enum: ["tiers", "moitie", "pleine"],
       default: "tiers",
     },
+    // Grille 12 colonnes : largeur en colonnes, hauteur en unités de 90 px.
+    w: { type: Number, default: 4, min: 1, max: 12 },
+    h: { type: Number, default: 3, min: 1, max: 12 },
 
     // ── type "widget" ────────────────────────────────────────────────────────
     source: { type: String, default: "" },
@@ -81,13 +86,35 @@ const blocSchema = new mongoose.Schema(
       enum: ["barres", "lignes", "aires", "camembert"],
       default: "barres",
     },
-    // Nombre de groupes affichés ; le reste est cumulé dans « Autres ».
-    limite: { type: Number, default: 10, min: 3, max: 30 },
+    // Second regroupement : ventile chaque groupe en plusieurs séries
+    // (barres groupées / empilées, courbes multiples). Vide = série unique.
+    serie: { type: String, default: "" },
+    // Barres empilées plutôt que côte à côte (n'a de sens qu'avec `serie`).
+    empile: { type: Boolean, default: false },
+
+    // ── type "tableau" ──────────────────────────────────────────────────────
+    // Colonnes affichées, dans l'ordre. Le tri utilise `champ` + `tri`.
+    colonnes: { type: [String], default: [] },
+
+    // Nombre de groupes (graphique) ou de lignes (tableau) affichés ;
+    // pour un graphique, le reste est cumulé dans « Autres ».
+    // (bornes fines par type dans dashboardKpiService)
+    limite: { type: Number, default: 10, min: 3, max: 200 },
     tri: {
       type: String,
       enum: ["valeurDesc", "valeurAsc", "libelle"],
       default: "valeurDesc",
     },
+  },
+  { _id: false },
+);
+
+// Une PAGE = un onglet du tableau de bord, avec ses propres blocs.
+const pageSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    nom: { type: String, default: "Page" },
+    blocs: { type: [blocSchema], default: [] },
   },
   { _id: false },
 );
@@ -102,6 +129,10 @@ const userDashboardLayoutSchema = new mongoose.Schema(
     },
     // false => disposition par défaut déduite des droits.
     useCustom: { type: Boolean, default: false },
+    pages: { type: [pageSchema], default: [] },
+    // HÉRITAGE : dispositions enregistrées avant les pages multiples. Elles
+    // sont converties en une page unique à la première lecture (cf.
+    // dashboardLayoutController.normaliserPages) ; ce champ n'est plus écrit.
     blocs: { type: [blocSchema], default: [] },
   },
   { timestamps: true },

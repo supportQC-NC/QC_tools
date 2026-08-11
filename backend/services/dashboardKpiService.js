@@ -28,6 +28,9 @@ import {
   TRI_KEYS,
   LIMITE_MIN,
   LIMITE_MAX,
+  LIGNES_MIN,
+  LIGNES_MAX,
+  COLONNES_MAX,
 } from "../config/dashboardCatalogue.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
@@ -456,6 +459,17 @@ export const validerGraphique = (bloc, masque = null) => {
   if (!TYPE_GRAPHIQUE_KEYS.includes(bloc.typeGraphique)) {
     return `Type de graphique inconnu : ${bloc.typeGraphique}`;
   }
+  if (bloc.serie) {
+    if (!champsParNom.has(bloc.serie)) {
+      return `Champ de ventilation inconnu : ${bloc.serie}`;
+    }
+    if (bloc.serie === bloc.dimension) {
+      return "Le regroupement et la ventilation doivent porter sur deux champs différents.";
+    }
+    if (bloc.typeGraphique === "camembert") {
+      return "Un camembert ne peut pas être ventilé en plusieurs séries.";
+    }
+  }
   if (bloc.tri && !TRI_KEYS.includes(bloc.tri)) {
     return `Tri inconnu : ${bloc.tri}`;
   }
@@ -517,27 +531,77 @@ export const evaluerGraphique = async ({
   }
 
   const typeDim = champsParNom.get(bloc.dimension).type;
-  const groupes = new Map(); // libellé -> valeurs à agréger
+  const typeSerie = bloc.serie ? champsParNom.get(bloc.serie).type : null;
+
+  // groupe -> série -> valeurs à agréger. Sans ventilation, une seule série
+  // nommée « valeur » : le rendu est ainsi uniforme dans les deux cas.
+  const SERIE_UNIQUE = "valeur";
+  const groupes = new Map();
+  const clesSeries = new Set();
+
   for (const l of lignes) {
-    const cle = libelleGroupe(l[bloc.dimension], typeDim);
-    if (!groupes.has(cle)) groupes.set(cle, []);
-    groupes.get(cle).push(bloc.mesure === "count" ? 1 : nombre(l[bloc.champ]));
+    const cleG = libelleGroupe(l[bloc.dimension], typeDim);
+    const cleS = bloc.serie
+      ? libelleGroupe(l[bloc.serie], typeSerie)
+      : SERIE_UNIQUE;
+    clesSeries.add(cleS);
+    if (!groupes.has(cleG)) groupes.set(cleG, new Map());
+    const parSerie = groupes.get(cleG);
+    if (!parSerie.has(cleS)) parSerie.set(cleS, []);
+    parSerie.get(cleS).push(bloc.mesure === "count" ? 1 : nombre(l[bloc.champ]));
   }
 
-  let series = [...groupes.entries()].map(([libelle, valeurs]) => ({
-    libelle,
-    valeur: Math.round(agreger(valeurs, bloc.mesure) * 100) / 100,
-  }));
+  // Ventilation : on borne le nombre de séries pour rester lisible, le reste
+  // est cumulé dans « Autres séries » — jamais supprimé en silence.
+  const MAX_SERIES = 8;
+  let listeSeries = [...clesSeries];
+  let seriesCumulees = 0;
+  if (listeSeries.length > MAX_SERIES) {
+    // On garde les séries les plus grosses, toutes valeurs confondues.
+    const poids = new Map();
+    for (const parSerie of groupes.values()) {
+      for (const [s, vals] of parSerie) {
+        poids.set(s, (poids.get(s) || 0) + agreger(vals, bloc.mesure));
+      }
+    }
+    const gardees = new Set(
+      [...poids.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_SERIES).map(([s]) => s),
+    );
+    seriesCumulees = listeSeries.length - gardees.size;
+    for (const parSerie of groupes.values()) {
+      for (const [s, vals] of [...parSerie]) {
+        if (gardees.has(s)) continue;
+        parSerie.delete(s);
+        const autres = parSerie.get("Autres séries") || [];
+        parSerie.set("Autres séries", autres.concat(vals));
+      }
+    }
+    listeSeries = [...gardees, "Autres séries"];
+  }
+
+  // Total d'un groupe : sert au tri et à la limite quand il y a plusieurs séries.
+  const totalGroupe = (parSerie) =>
+    [...parSerie.values()].reduce((s, vals) => s + agreger(vals, bloc.mesure), 0);
+
+  let series = [...groupes.entries()].map(([libelle, parSerie]) => {
+    const ligne = { libelle, _total: Math.round(totalGroupe(parSerie) * 100) / 100 };
+    for (const s of listeSeries) {
+      const vals = parSerie.get(s);
+      ligne[s] = vals ? Math.round(agreger(vals, bloc.mesure) * 100) / 100 : 0;
+    }
+    return ligne;
+  });
 
   const nbGroupes = series.length;
 
-  // Tri puis limite + cumul du reste.
+  // Tri puis limite + cumul du reste. Avec plusieurs séries, on ordonne sur le
+  // total du groupe : c'est le seul critère qui ait un sens.
   if (bloc.tri === "libelle") {
     series.sort((a, b) => a.libelle.localeCompare(b.libelle, "fr", { numeric: true }));
   } else if (bloc.tri === "valeurAsc") {
-    series.sort((a, b) => a.valeur - b.valeur);
+    series.sort((a, b) => a._total - b._total);
   } else {
-    series.sort((a, b) => b.valeur - a.valeur);
+    series.sort((a, b) => b._total - a._total);
   }
 
   const limite = Number(bloc.limite) || 10;
@@ -547,15 +611,128 @@ export const evaluerGraphique = async ({
     // « Autres » n'a de sens qu'en cumul : pour min/moyenne/max on le laisse
     // de côté et on le signale par le nombre total de groupes.
     if (bloc.mesure === "count" || bloc.mesure === "somme") {
-      gardes.push({
-        libelle: `Autres (${reste.length})`,
-        valeur: Math.round(reste.reduce((s, r) => s + r.valeur, 0) * 100) / 100,
-      });
+      const cumul = { libelle: `Autres (${reste.length})`, _total: 0 };
+      for (const s of listeSeries) {
+        cumul[s] = Math.round(reste.reduce((t, r) => t + (r[s] || 0), 0) * 100) / 100;
+        cumul._total += cumul[s];
+      }
+      gardes.push(cumul);
     }
     series = gardes;
   }
 
-  return { series, lignes: lignes.length, groupes: nbGroupes, erreur: null };
+  return {
+    series,
+    clesSeries: listeSeries,
+    ventile: !!bloc.serie,
+    seriesCumulees,
+    lignes: lignes.length,
+    groupes: nbGroupes,
+    erreur: null,
+  };
+};
+
+// ─── Visuel tableau ──────────────────────────────────────────────────────────
+
+/**
+ * Valide un bloc « tableau ». Renvoie un message d'erreur ou null.
+ */
+export const validerTableau = (bloc, masque = null) => {
+  const ds = KPI_DATASETS[bloc?.dataset];
+  if (!ds) return `Source inconnue : ${bloc?.dataset}`;
+
+  const jointureInvalide = validerJointure(bloc);
+  if (jointureInvalide) return jointureInvalide;
+
+  const champsParNom = new Map(
+    champsEffectifs(bloc, masque).map((c) => [c.name, c]),
+  );
+
+  const colonnes = bloc.colonnes || [];
+  if (colonnes.length === 0) return "Choisissez au moins une colonne.";
+  if (colonnes.length > COLONNES_MAX) {
+    return `${COLONNES_MAX} colonnes au maximum.`;
+  }
+  for (const c of colonnes) {
+    if (!champsParNom.has(c)) return `Colonne inconnue : ${c}`;
+  }
+
+  for (const f of bloc.filtres || []) {
+    if (!champsParNom.has(f.champ)) return `Champ de filtre inconnu : ${f.champ}`;
+    if (!OPERATEUR_KEYS.includes(f.operateur)) {
+      return `Opérateur inconnu : ${f.operateur}`;
+    }
+  }
+
+  // Tri facultatif : `champ` doit alors être une colonne connue.
+  if (bloc.champ && !champsParNom.has(bloc.champ)) {
+    return `Colonne de tri inconnue : ${bloc.champ}`;
+  }
+  if (bloc.tri && !TRI_KEYS.includes(bloc.tri)) return `Tri inconnu : ${bloc.tri}`;
+
+  const limite = Number(bloc.limite);
+  if (!Number.isFinite(limite) || limite < LIGNES_MIN || limite > LIGNES_MAX) {
+    return `Le nombre de lignes doit être compris entre ${LIGNES_MIN} et ${LIGNES_MAX}.`;
+  }
+  return null;
+};
+
+/**
+ * Évalue un tableau : mêmes source / croisement / filtres, puis tri et
+ * projection sur les colonnes choisies.
+ *
+ * @returns {Promise<{ colonnes:Array, lignes:Array, total:number, erreur:string|null }>}
+ */
+export const evaluerTableau = async ({
+  user,
+  bloc,
+  nomDossierDBF,
+  masque = null,
+}) => {
+  const invalide = validerTableau(bloc, masque);
+  if (invalide) return { colonnes: [], lignes: [], total: 0, erreur: invalide };
+
+  const ctx = await preparerContexte({ user, bloc, nomDossierDBF });
+  if (ctx.erreur) {
+    return { colonnes: [], lignes: [], total: 0, erreur: ctx.erreur };
+  }
+
+  const champs = champsEffectifs(bloc, masque);
+  const champsParNom = new Map(champs.map((c) => [c.name, c]));
+  let lignes = await chargerLignes({ bloc, user, entreprise: ctx.entreprise });
+
+  for (const f of bloc.filtres || []) {
+    const type = champsParNom.get(f.champ).type;
+    lignes = lignes.filter((l) => comparer(l[f.champ], f.operateur, f.valeur, type));
+  }
+
+  const total = lignes.length;
+
+  if (bloc.champ) {
+    const typeTri = champsParNom.get(bloc.champ).type;
+    const sens = bloc.tri === "valeurAsc" ? 1 : -1;
+    lignes = [...lignes].sort((a, b) => {
+      const x = a[bloc.champ];
+      const y = b[bloc.champ];
+      if (typeTri === "nombre") return (nombre(x) - nombre(y)) * sens;
+      return safeTrim(x).localeCompare(safeTrim(y), "fr", { numeric: true }) * sens;
+    });
+  }
+
+  const limite = Number(bloc.limite) || 25;
+  const colonnes = bloc.colonnes.map((c) => ({
+    name: c,
+    label: champsParNom.get(c).label,
+    type: champsParNom.get(c).type,
+  }));
+
+  const projetees = lignes.slice(0, limite).map((l) => {
+    const sortie = {};
+    for (const c of bloc.colonnes) sortie[c] = l[c];
+    return sortie;
+  });
+
+  return { colonnes, lignes: projetees, total, erreur: null };
 };
 
 export default {
@@ -563,6 +740,8 @@ export default {
   validerKpi,
   evaluerGraphique,
   validerGraphique,
+  evaluerTableau,
+  validerTableau,
   validerJointure,
   champsEffectifs,
   champVisible,

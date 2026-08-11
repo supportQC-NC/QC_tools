@@ -30,7 +30,15 @@ const GraphiqueBloc = ({ bloc, resultat }) => {
   const series = resultat?.series || [];
   const erreur = resultat?.erreur;
 
+  // Le serveur renvoie toujours une liste de séries : ["valeur"] sans
+  // ventilation, les valeurs distinctes du champ de ventilation sinon. Le rendu
+  // est donc identique dans les deux cas.
+  const cles = resultat?.clesSeries?.length ? resultat.clesSeries : ["valeur"];
+  const ventile = !!resultat?.ventile && cles.length > 1;
+  const pileId = ventile && bloc.empile ? "pile" : undefined;
+
   const formatteur = (v) => formaterValeur(v, bloc.format);
+  const nomSerie = (cle) => (cle === "valeur" ? bloc.titre || "Valeur" : cle);
 
   const corps = () => {
     if (erreur) return <p className="db-vide">{erreur}</p>;
@@ -76,44 +84,61 @@ const GraphiqueBloc = ({ bloc, resultat }) => {
       </>
     );
 
+    // Couleur d'une série : la couleur du bloc quand il n'y en a qu'une,
+    // la palette sinon.
+    const couleurDe = (cle, i) =>
+      ventile ? PALETTE_GRAPHIQUE[i % PALETTE_GRAPHIQUE.length] : bloc.couleur;
+
+    const legende = ventile ? <Legend wrapperStyle={{ fontSize: 11 }} /> : null;
+
     if (bloc.typeGraphique === "lignes") {
       return (
         <ResponsiveContainer width="100%" height={HAUTEUR}>
           <LineChart data={series}>
             {axes}
-            <Line
-              type="monotone"
-              dataKey="valeur"
-              name={bloc.titre}
-              stroke={bloc.couleur}
-              strokeWidth={2}
-              dot={{ r: 2 }}
-            />
+            {legende}
+            {cles.map((cle, i) => (
+              <Line
+                key={cle}
+                type="monotone"
+                dataKey={cle}
+                name={nomSerie(cle)}
+                stroke={couleurDe(cle, i)}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       );
     }
 
     if (bloc.typeGraphique === "aires") {
-      const idDegrade = `deg-${bloc.id}`;
       return (
         <ResponsiveContainer width="100%" height={HAUTEUR}>
           <AreaChart data={series}>
             <defs>
-              <linearGradient id={idDegrade} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={bloc.couleur} stopOpacity={0.4} />
-                <stop offset="95%" stopColor={bloc.couleur} stopOpacity={0} />
-              </linearGradient>
+              {cles.map((cle, i) => (
+                <linearGradient key={cle} id={`deg-${bloc.id}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={couleurDe(cle, i)} stopOpacity={0.4} />
+                  <stop offset="95%" stopColor={couleurDe(cle, i)} stopOpacity={0} />
+                </linearGradient>
+              ))}
             </defs>
             {axes}
-            <Area
-              type="monotone"
-              dataKey="valeur"
-              name={bloc.titre}
-              stroke={bloc.couleur}
-              fill={`url(#${idDegrade})`}
-              strokeWidth={2}
-            />
+            {legende}
+            {cles.map((cle, i) => (
+              <Area
+                key={cle}
+                type="monotone"
+                dataKey={cle}
+                name={nomSerie(cle)}
+                stackId={pileId}
+                stroke={couleurDe(cle, i)}
+                fill={`url(#deg-${bloc.id}-${i})`}
+                strokeWidth={2}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       );
@@ -123,12 +148,17 @@ const GraphiqueBloc = ({ bloc, resultat }) => {
       <ResponsiveContainer width="100%" height={HAUTEUR}>
         <BarChart data={series}>
           {axes}
-          <Bar
-            dataKey="valeur"
-            name={bloc.titre}
-            fill={bloc.couleur}
-            radius={[4, 4, 0, 0]}
-          />
+          {legende}
+          {cles.map((cle, i) => (
+            <Bar
+              key={cle}
+              dataKey={cle}
+              name={nomSerie(cle)}
+              stackId={pileId}
+              fill={couleurDe(cle, i)}
+              radius={pileId ? undefined : [4, 4, 0, 0]}
+            />
+          ))}
         </BarChart>
       </ResponsiveContainer>
     );
@@ -143,6 +173,9 @@ const GraphiqueBloc = ({ bloc, resultat }) => {
             {Number(resultat.lignes || 0).toLocaleString("fr-FR")} ligne(s)
             {resultat.groupes > series.length
               ? ` · ${resultat.groupes} groupes`
+              : ""}
+            {resultat.seriesCumulees > 0
+              ? ` · ${resultat.seriesCumulees} séries cumulées`
               : ""}
           </span>
         )}

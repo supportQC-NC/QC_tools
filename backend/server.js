@@ -110,6 +110,8 @@ import mailingRoutes from "./routes/mailingRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 // ========== ROUTES DICTIONNAIRE DES RAYONS (étiquettes rayons/sous-zones) ==========
 import dictionnaireRayonsRoutes from "./routes/dictionnaireRayonsRoutes.js";
+// ========== API PARTENAIRE (clé d'API, lecture seule, prestataires externes) ==========
+import publicApiRoutes from "./routes/publicApiRoutes.js";
 import { startMailingScheduler } from "./services/mailingScheduler.js";
 import { startAiSnapshotScheduler } from "./services/aiSnapshotService.js";
 // =======================================
@@ -258,6 +260,11 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/mailing", mailingRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/dictionnaire-rayons", dictionnaireRayonsRoutes);
+// ========== API PARTENAIRE ==========
+// Authentification par clé d'API (X-API-Key), PAS par cookie JWT.
+// Lecture seule, périmètre verrouillé par société ET par ressource.
+// Doc intégrateur : docs/API_PARTENAIRE.md
+app.use("/api/public/v1", publicApiRoutes);
 // =======================================
 
 // ==========================================

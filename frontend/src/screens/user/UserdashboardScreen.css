@@ -910,3 +910,145 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+/* Visuel tableau */
+.db-tableau-scroll {
+  overflow: auto;
+  max-height: 340px;
+}
+
+.db-tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.db-tableau thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-tertiary, var(--bg-secondary));
+  color: var(--text-secondary);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.db-tableau td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.db-tableau tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.db-tableau tbody tr:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.db-tableau .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-tableau-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.db-mini-export {
+  margin-left: 0.4rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #8b5cf6;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+/* =====================================================================
+   Grille 12 colonnes (remplace les trois largeurs fixes) + onglets de page
+   ===================================================================== */
+.db-grille {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 90px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.db-grille > .db-bloc {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.db-grille > .db-bloc > * {
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* En dessous de 1100 px, la grille retombe sur une colonne : les spans
+   n'ont plus de sens sur un écran étroit. */
+@media (max-width: 1100px) {
+  .db-grille {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .db-grille > .db-bloc {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+  }
+}
+
+/* Onglets de pages */
+.db-onglets {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+}
+
+.db-onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.db-onglet:hover {
+  background: var(--bg-secondary);
+}
+
+.db-onglet.actif {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  border-bottom-color: transparent;
+  color: #a78bfa;
+}
+
+.db-onglet-nb {
+  padding: 0 0.4rem;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.18);
+  color: #a78bfa;
+  font-size: 0.68rem;
+}
