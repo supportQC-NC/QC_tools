@@ -3,6 +3,10 @@
 Documentation d'intégration destinée à un prestataire externe.
 **Version 1** — base d'URL : `https://robot-nc.com/api/public/v1`
 
+> Tous les exemples de cette page sont des **réponses réelles**, relevées en
+> production sur la société SITEC. Les volumes et temps de réponse annoncés sont
+> mesurés depuis Nouméa, hors du réseau du groupe.
+
 ---
 
 ## 1. Ce que fait cette API
@@ -156,8 +160,8 @@ curl -H "X-API-Key: VOTRE_CLE" https://robot-nc.com/api/public/v1/ping
   "ok": true,
   "horodatage": "2026-08-11T23:38:22.741Z",
   "cle": {
-    "nom": "Site marchand SITEC - prestataire externe",
-    "prefixe": "qcapi_BZekqeC4q_uy",
+    "nom": "Site marchand SITEC",
+    "prefixe": "qcapi_3mi6PzfT_KMv",
     "scopes": ["articles:read", "clients:read"],
     "scopesDisponibles": ["articles:read", "clients:read"],
     "limiteParMinute": 300,
@@ -223,7 +227,7 @@ fichier entier *avant* pagination)
 | `enPromo` | `1` | Uniquement les promotions **actives aujourd'hui**. |
 | `web` | `1` | Uniquement les articles marqués publiables sur le web (`WEB = "O"`). |
 | `avecPhoto` | `1` | Uniquement les articles marqués comme ayant une photo (`FOTO = "F"`). |
-| `tgc` | nombre | Taux de taxe exact (champ `TAXES`). |
+| `tgc` | nombre | Égalité exacte sur le champ `TAXES`. ⚠️ Ce n'est **pas** le taux de TGC — voir l'avertissement sous `GET /:societe/articles/tgc`. |
 
 > Les filtres booléens s'activent avec `1`, `true` ou `oui`. Les omettre = pas
 > de filtre (et **non** « valeur fausse »).
@@ -294,6 +298,12 @@ peut varier légèrement d'une société à l'autre du groupe.
 
 Types DBF : `C` = texte, `N` = numérique, `D` = date, `L` = booléen.
 
+> `nbEnregistrements` provient ici de l'en-tête du fichier et compte aussi les
+> enregistrements **marqués supprimés** : il est légèrement supérieur au nombre
+> de lignes réellement servies (ex. 21 857 contre 21 846 articles ; 1 366 contre
+> 1 362 clients). Le compte qui fait foi est `pagination.totalRecords` d'une
+> liste sans filtre, ou l'en-tête `X-Total-Records` d'un export.
+
 #### `GET /:societe/articles/version` — empreinte du jeu de données
 
 Appel très léger, à utiliser pour décider s'il faut resynchroniser.
@@ -312,15 +322,33 @@ Appel très léger, à utiliser pour décider s'il faut resynchroniser.
 
 #### `GET /:societe/articles/groupes` — familles avec comptage
 
-```json
-{ "societe": {...}, "total": 214, "groupes": [{ "code": "BA70", "count": 132 }] }
-```
-
-#### `GET /:societe/articles/tgc` — taux de taxe présents
+Valeurs distinctes du champ `GROUPE`, triées, avec le nombre d'articles.
 
 ```json
-{ "societe": {...}, "taux": [0, 3, 6, 11, 22] }
+{
+  "societe": {...},
+  "total": 1832,
+  "groupes": [{ "code": "*A10", "count": 2 }, { "code": "*AA21", "count": 2 }]
+}
 ```
+
+> Sur SITEC, `GROUPE` est très granulaire (**1 832 valeurs distinctes** pour
+> 21 846 articles, dont des codes non significatifs comme `.` ou `*`). Ce champ
+> n'est **pas** utilisable tel quel comme arborescence de rayons pour un site
+> marchand : prévoyez votre propre table de correspondance, ou demandez-nous un
+> regroupement métier.
+
+#### `GET /:societe/articles/tgc` — valeurs distinctes du champ `TAXES`
+
+```json
+{ "societe": {...}, "taux": [0, 2.36, 3, 5, 6, 6.5, 7, 8, 10, 11, 13, 22, 87] }
+```
+
+> ⚠️ **Ce n'est pas la liste des taux de TGC.** Sur SITEC, `TAXES` contient des
+> valeurs qui ne sont pas des taux de taxe (jusqu'à `87`), et il vaut très
+> souvent `0` alors que l'article est bien taxé. **Le taux de taxe à utiliser
+> pour tout calcul de prix est `ATVA`** (voir §6 et §7.1). Cette route est
+> conservée pour le filtre `?tgc=`, qui interroge `TAXES`.
 
 ---
 
@@ -370,6 +398,24 @@ Renvoie, en un appel, toutes les valeurs distinctes utilisables comme filtres
 chacune avec son nombre d'occurrences. Pratique pour construire des listes
 déroulantes sans parcourir toute la base.
 
+```json
+{
+  "societe": {...},
+  "representants": [{ "code": 0, "count": 643 }, { "code": 1, "count": 473 }],
+  "catclis": [],
+  "types": [{ "code": "*", "count": 6 }, { "code": "ARTISAN", "count": 1 }],
+  "categories": [
+    { "code": "ADMINISTRATION", "count": 92 },
+    { "code": "COMPTANT", "count": 98 },
+    { "code": "PARTICULIER", "count": 16 }
+  ]
+}
+```
+
+> Certaines listes peuvent être **vides** (ici `catclis`) : le champ existe mais
+> n'est pas renseigné sur cette société. Ne présumez pas qu'une liste est
+> peuplée.
+
 ---
 
 ### 5.4 Exports complets (synchronisation)
@@ -404,8 +450,17 @@ curl -H "X-API-Key: VOTRE_CLE" \
 {"NART":"906751","DESIGN":"FLASQUE DE SERRAGE 125","GENCOD":"4002395307708","PVTE":1132,"_stockTotal":1}
 ```
 
-Ordre de grandeur mesuré sur SITEC : **21 846 articles, ~2,3 Mo, ~1,4 s** avec
-la projection ci-dessus. Sans projection (92 champs), comptez plutôt ~30 Mo.
+**Volumes mesurés en production** (SITEC, appels depuis Nouméa) :
+
+| Appel | Lignes | Taille | Durée |
+|---|---|---|---|
+| `articles/export` — sans projection (92 champs + calculés) | 21 846 | 29,2 Mo | ~7,1 s |
+| `articles/export?web=1&enStock=1` | 5 105 | 6,9 Mo | ~2,8 s |
+| `articles/export?champs=` (8 champs) | 21 846 | 3,3 Mo | ~2,5 s |
+| `clients/export` | 1 362 | — | < 1 s |
+
+La projection `champs=` divise le volume par ~9 : ne rapatriez que ce dont vous
+avez besoin.
 
 ---
 
@@ -482,8 +537,8 @@ nous demander confirmation.
 | `PVPROMO` | N(8) | Prix promotionnel **HT**. `0` si aucune promo. |
 | `DPROMOD` | D | Date de début de promotion (incluse). |
 | `DPROMOF` | D | Date de fin de promotion (incluse). |
-| `ATVA` | N(5,2) | **Taux de taxe (%) servant à passer du HT au TTC** : `PVTETTC = tronquer(PVTE × (1 + ATVA/100))`. |
-| `TAXES` | N(5,2) | Taux de taxe ERP. C'est ce champ qu'interroge le filtre `?tgc=`. Il peut différer d'`ATVA` sur certaines fiches — pour un calcul de prix, préférez `ATVA`. |
+| `ATVA` | N(5,2) | **Taux de taxe (%) — le seul à utiliser pour les calculs de prix** : `PVTETTC = tronquer(PVTE × (1 + ATVA/100))`. Vérifié en production : `PVTE=10800`, `ATVA=11` → `PVTETTC=11988`. |
+| `TAXES` | N(5,2) | ⚠️ **Ne pas confondre avec le taux de TGC.** Sur SITEC ce champ vaut `0` sur des articles pourtant taxés à 11 %, et prend des valeurs qui ne sont pas des taux (jusqu'à `87`). Son usage exact est interne à l'ERP. Il n'est exposé que parce que le filtre `?tgc=` l'interroge. |
 | `CODTGC` | C(1) | Code de régime TGC. |
 | `TXADEDUIRE` | N(5,2) | Taux à déduire *(usage ERP interne)*. |
 | `PREV` | N(11,2) | **Prix de revient** (coût). Sert au calcul de la valeur de stock et du taux de marque : `(PVTE − PREV) / PVTE`. |
@@ -516,7 +571,7 @@ nous demander confirmation.
 
 | Champ | Type | Description |
 |---|---|---|
-| `GROUPE` | C(6) | **Code famille / groupe.** Liste et comptages via `GET /:societe/articles/groupes`. |
+| `GROUPE` | C(6) | Code famille / groupe. Liste et comptages via `GET /:societe/articles/groupes`. ⚠️ Très granulaire (1 832 valeurs sur SITEC) et non hiérarchisé : à ne pas utiliser tel quel comme arborescence de catégories. |
 | `FOURN` | N(3) | Code fournisseur principal. |
 | `GISM1` … `GISM5` | C(6) | Gisements (emplacements en magasin), du plus général au plus fin. |
 | `PLACE` | C(6) | Emplacement complémentaire. |
