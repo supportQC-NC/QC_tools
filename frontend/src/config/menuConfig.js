@@ -30,7 +30,7 @@ import {
   HiClock,
   HiCog
 } from "react-icons/hi";
-import { moduleForPath } from "./adminModules";
+import { moduleForPath, estCommercial } from "./adminModules";
 
 // =============================================
 // CONFIGURATION DES MENUS AVEC SOUS-GROUPES
@@ -431,6 +431,17 @@ export const getUserMenus = (userInfo) => {
     ],
   });
 
+  // 0 bis. Espace commercial — visible uniquement si l'utilisateur est rattaché
+  // à au moins un code vendeur (profil commercial).
+  if (estCommercial(userInfo)) {
+    menus.push({
+      type: "section",
+      label: "Espace commercial",
+      collapsible: true,
+      items: COMMERCIAL_ITEMS.map((it) => ({ ...it })),
+    });
+  }
+
   // 1. Section Administration — filtrée par permission de module.
   //    Visible pour un admin OU tout utilisateur ayant au moins une entrée
   //    autorisée (chaque entrée -> clé via moduleForPath -> hasModulePermission).
@@ -594,6 +605,16 @@ export const DEFAULT_MENU_HINTS = {
   "/": "Mon tableau de bord : widgets et indicateurs que j'ai choisis.",
   "/mon-dashboard": "Composer mon tableau de bord (widgets et tuiles chiffrées).",
   "/mes-taches": "Vos tâches personnelles à traiter.",
+  // Espace commercial
+  "/commercial": "Mon activité commerciale : portefeuille, relances, alertes.",
+  "/commercial/clients": "Mes clients (clients dont je suis le représentant).",
+  "/commercial/proformas": "Mes proformas et devis, dont ceux à relancer.",
+  "/commercial/reservations": "Les réservations en cours de mes clients.",
+  "/commercial/commandes-speciales":
+    "Mes commandes spéciales et leur avancement.",
+  "/commercial/factures": "Les factures réalisées sous mon code vendeur.",
+  "/commercial/alertes":
+    "Articles réservés par mes clients qui viennent d'entrer en stock.",
   "/espace-equipe": "Messagerie et espace de travail de vos équipes.",
   // Gestion
   "/admin/users": "Gérer les comptes utilisateurs et leurs accès.",
@@ -669,6 +690,19 @@ export const DEFAULT_MENU_HINTS = {
     "Catalogue des nouveautés en stock, envoyé aux clients abonnés.",
 };
 
+// Onglets de l'ESPACE COMMERCIAL — section fixe, affichée uniquement aux
+// utilisateurs au profil commercial (Permission.commercial). Non gérée par le
+// constructeur de menu : ces écrans ne dépendent d'aucun module.
+export const COMMERCIAL_ITEMS = [
+  { label: "Mon tableau de bord", path: "/commercial", icon: HiViewGrid, exact: true },
+  { label: "Mon portefeuille", path: "/commercial/clients", icon: HiUserGroup },
+  { label: "Mes proformas", path: "/commercial/proformas", icon: HiDocumentReport },
+  { label: "Mes réservations", path: "/commercial/reservations", icon: HiClipboardList },
+  { label: "Mes commandes spéciales", path: "/commercial/commandes-speciales", icon: HiSparkles },
+  { label: "Mes factures", path: "/commercial/factures", icon: HiCurrencyDollar },
+  { label: "Mes alertes", path: "/commercial/alertes", icon: HiInformationCircle },
+];
+
 // Onglets de l'espace personnel (section fixe, non gérée par le constructeur).
 const PERSONAL_ITEMS = [
   { label: "Tableau de bord", path: "/", icon: HiViewGrid, exact: true },
@@ -694,6 +728,7 @@ export const getAllMenuItems = () => {
     out.push({ path: item.path, label: item.label, group });
   };
   PERSONAL_ITEMS.forEach((it) => push(it, "Mon espace"));
+  COMMERCIAL_ITEMS.forEach((it) => push(it, "Espace commercial"));
   const walk = (nodes, group) => {
     (nodes || []).forEach((node) => {
       if (node.type === "subgroup") walk(node.items, node.label);
@@ -828,6 +863,16 @@ export const buildSidebar = (userInfo, layout, hints) => {
     icon: HiChatAlt2,
     items: PERSONAL_ITEMS.map((it) => ({ ...it })),
   });
+
+  // 1 bis. Espace commercial (fixe, hors constructeur de menu).
+  if (estCommercial(userInfo)) {
+    subgroups.push({
+      type: "subgroup",
+      label: "Espace commercial",
+      icon: HiTrendingUp,
+      items: COMMERCIAL_ITEMS.map((it) => ({ ...it })),
+    });
+  }
 
   // 2. Chapitres définis par l'admin.
   for (const ch of lay.chapitres || []) {

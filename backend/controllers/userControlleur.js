@@ -3,6 +3,8 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import jwt from "jsonwebtoken";
 import User from "../models/UserModel.js";
 import Permission from "../models/PermissionModel.js";
+import Entreprise from "../models/EntrepriseModel.js";
+import { estCodeCommercial } from "../middleware/commercialAccess.js";
 import generateToken from "../utils/generateToken.js";
 import sendEmail from "../utils/sendEmail.js";
 import crypto from "crypto";
@@ -41,6 +43,73 @@ const buildActorScope = (actorPerm, role) => {
       modules: {},
     }
   );
+};
+
+// ── PROFIL COMMERCIAL ────────────────────────────────────────────────────────
+// Normalise `permissions.commercial` ({ actif, codes:[{entreprise, code}] }).
+// Règles :
+//   - un code n'est retenu que si la SOCIÉTÉ est dans le périmètre accordé à
+//     l'utilisateur cible (sinon la ligne est orpheline et n'ouvrirait rien) ;
+//   - un acteur non super-admin ne peut rattacher que SES propres sociétés ;
+//   - le code doit être déclaré COMMERCIAL dans le dictionnaire de la société
+//     (onglet « Vendeurs » de la fiche entreprise) : un code REPRES peut aussi
+//     désigner une caisse ou un vendeur magasin, qui n'ont pas d'espace ;
+//   - les doublons (même société + même code) sont fusionnés.
+const sanitizeCommercial = async (
+  commercial,
+  { entreprisesCible, allCible, actorScope, superA },
+) => {
+  if (!commercial) return null;
+  const actif = !!commercial.actif;
+  const cibleSet = allCible
+    ? null
+    : new Set((entreprisesCible || []).map((e) => String(e)));
+  const acteurSet =
+    superA || actorScope?.allEntreprises
+      ? null
+      : new Set((actorScope?.entreprises || []).map((e) => String(e)));
+
+  // Lignes recevables sur le seul critère du périmètre.
+  const vues = new Set();
+  const retenues = [];
+  for (const ligne of commercial.codes || []) {
+    const ent = ligne?.entreprise ? String(ligne.entreprise) : "";
+    const code = String(ligne?.code ?? "").trim();
+    if (!ent || !code) continue;
+    if (cibleSet && !cibleSet.has(ent)) continue;
+    if (acteurSet && !acteurSet.has(ent)) continue;
+    const cle = `${ent}::${code}`;
+    if (vues.has(cle)) continue;
+    vues.add(cle);
+    retenues.push({ entreprise: ent, code });
+  }
+  if (!retenues.length) return { actif, codes: [] };
+
+  // Contrôle contre le dictionnaire des codes REPRES de chaque société.
+  const entreprises = await Entreprise.find({
+    _id: { $in: [...new Set(retenues.map((l) => l.entreprise))] },
+  }).select("vendeurs");
+  const parId = new Map(entreprises.map((e) => [e._id.toString(), e]));
+
+  const codes = retenues.filter((l) =>
+    estCodeCommercial(parId.get(l.entreprise), l.code),
+  );
+  return { actif, codes };
+};
+
+// Accès accordés D'OFFICE à un commercial (cahier des charges §3) : la recherche
+// d'articles. Le reste de son espace (dashboard, portefeuille, proformas,
+// réservations, commandes spéciales, alertes) est porté par /api/commercial,
+// gaté par le profil lui-même et non par un module.
+//
+// ⚠️ Uniquement à l'ACTIVATION du profil (création, ou passage inactif -> actif).
+// Ensuite l'administrateur reste libre de retirer ce module, comme d'en accorder
+// n'importe quel autre : un commercial n'est pas enfermé dans un jeu de droits.
+const appliquerAccesCommercial = (modules, commercial, dejaCommercial = false) => {
+  if (!commercial?.actif || dejaCommercial) return modules;
+  const m = modules ? { ...modules } : {};
+  m.stock = { ...(m.stock || {}), read: true };
+  return m;
 };
 
 // @desc    Auth user & get token
@@ -414,14 +483,24 @@ const createUser = asyncHandler(async (req, res) => {
   const isAdminRole = targetRole === "admin";
 
   if (permissions) {
+    const actorPerm = await Permission.findOne({ user: req.user._id });
+    const commercial = await sanitizeCommercial(permissions.commercial, {
+      entreprisesCible: permissions.entreprises,
+      allCible: permissions.allEntreprises === true || isAdminRole,
+      actorScope: buildActorScope(actorPerm, req.user.role),
+      superA,
+    });
     await Permission.create({
       user: user._id,
       entreprises: permissions.entreprises || [],
-      modules: permissions.modules || {},
+      modules: appliquerAccesCommercial(permissions.modules || {}, commercial),
       // analyse / commerciauxScope : réservés au super-admin (sinon ignorés,
       // pour empêcher toute injection/escalade par un acteur non super-admin).
       analyse: superA ? permissions.analyse || {} : {},
       commerciauxScope: superA ? permissions.commerciauxScope || {} : {},
+      // Profil commercial : ne donne accès qu'à SES propres données, dans SES
+      // sociétés -> modifiable par tout acteur habilité à gérer l'utilisateur.
+      commercial: commercial || { actif: false, codes: [] },
       allEntreprises:
         permissions.allEntreprises !== undefined
           ? permissions.allEntreprises
@@ -438,6 +517,7 @@ const createUser = asyncHandler(async (req, res) => {
       modules: {},
       analyse: {},
       commerciauxScope: {},
+      commercial: { actif: false, codes: [] },
       allEntreprises: isAdminRole,
       allModules: isAdminRole,
     });
@@ -666,13 +746,33 @@ const updateUser = asyncHandler(async (req, res) => {
   if (req.body.permissions) {
     const p = req.body.permissions;
     const isAdminRole = updatedUser.role === "admin";
+    // Profil commercial : normalisé et borné aux sociétés du couple acteur/cible.
+    // Absent du corps -> champ NON touché (on ne perd pas le profil existant).
+    const actorPerm = await Permission.findOne({ user: req.user._id });
+    const permCible = await Permission.findOne({ user: user._id }).select(
+      "commercial",
+    );
+    const dejaCommercial = !!permCible?.commercial?.actif;
+    const commercial =
+      p.commercial === undefined
+        ? undefined
+        : await sanitizeCommercial(p.commercial, {
+            entreprisesCible: p.entreprises,
+            allCible: p.allEntreprises === true || isAdminRole,
+            actorScope: buildActorScope(actorPerm, req.user.role),
+            superA,
+          });
     const update = {
       entreprises: p.entreprises || [],
-      modules: p.modules,
+      modules:
+        commercial === undefined
+          ? p.modules
+          : appliquerAccesCommercial(p.modules, commercial, dejaCommercial),
       allEntreprises:
         p.allEntreprises !== undefined ? p.allEntreprises : isAdminRole,
       allModules: p.allModules !== undefined ? p.allModules : isAdminRole,
     };
+    if (commercial !== undefined) update.commercial = commercial;
     // analyse / commerciauxScope : modifiables uniquement par un super-admin.
     // Sinon on NE touche pas à ces champs (valeurs existantes préservées).
     if (superA) {

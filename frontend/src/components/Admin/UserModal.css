@@ -308,6 +308,13 @@
   gap: 10px;
 }
 
+/* Profil métier (carte Commercial, seule) : ne pas l'étirer sur toute la
+   largeur, elle se lirait comme une bannière et non comme un choix. */
+.role-cards.role-cards-solo {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 240px));
+  justify-content: start;
+}
+
 .role-card {
   position: relative;
   display: flex;

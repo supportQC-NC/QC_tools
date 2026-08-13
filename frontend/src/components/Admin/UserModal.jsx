@@ -8,6 +8,7 @@ import {
   HiUser,
   HiUserGroup,
   HiShieldCheck,
+  HiTrendingUp,
 } from "react-icons/hi";
 import {
   useCreateUserMutation,
@@ -72,8 +73,16 @@ const getDefaultModulePermissions = () => {
 const SECTIONS = [
   { key: "identite", label: "Identité & rôle" },
   { key: "permissions", label: "Permissions" },
+  { key: "commercial", label: "Profil commercial" },
   { key: "champsDbf", label: "Champs DBF", editionSeule: true },
 ];
+
+// Codes vendeur saisis pour une société : "12" ou "12, 15" -> ["12","15"].
+const parseCodes = (saisie) =>
+  String(saisie || "")
+    .split(/[,;/\s]+/)
+    .map((c) => c.trim())
+    .filter(Boolean);
 
 const UserModal = ({ user, onClose, asPage = false }) => {
   const isEdit = !!user;
@@ -97,6 +106,8 @@ const UserModal = ({ user, onClose, asPage = false }) => {
       modules: getDefaultModulePermissions(),
       analyse: { filiales: { DQ: false, QC: false, LD: false } },
       commerciauxScope: {},
+      // Profil commercial : { actif, codes: [{ entreprise, code }] }.
+      commercial: { actif: false, codes: [] },
     },
   });
 
@@ -214,6 +225,13 @@ const UserModal = ({ user, onClose, asPage = false }) => {
             },
           },
           commerciauxScope: user.permissions?.commerciauxScope || {},
+          commercial: {
+            actif: user.permissions?.commercial?.actif || false,
+            codes: (user.permissions?.commercial?.codes || []).map((l) => ({
+              entreprise: String(l.entreprise?._id || l.entreprise || ""),
+              code: String(l.code || ""),
+            })),
+          },
         },
       });
     }
@@ -378,6 +396,67 @@ const UserModal = ({ user, onClose, asPage = false }) => {
     });
   };
 
+  // ── PROFIL COMMERCIAL ────────────────────────────────────────────────────
+  // Active/désactive le profil (le rattachement société+code reste conservé).
+  const toggleCommercialActif = () => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        commercial: {
+          ...prev.permissions.commercial,
+          actif: !prev.permissions.commercial?.actif,
+        },
+      },
+    }));
+  };
+
+  // Codes vendeur d'UNE société (remplace toutes ses lignes).
+  const setCodesSociete = (entId, saisie) => {
+    setFormData((prev) => {
+      const autres = (prev.permissions.commercial?.codes || []).filter(
+        (l) => String(l.entreprise) !== String(entId),
+      );
+      const nouveaux = parseCodes(saisie).map((code) => ({
+        entreprise: String(entId),
+        code,
+      }));
+      return {
+        ...prev,
+        permissions: {
+          ...prev.permissions,
+          commercial: {
+            ...prev.permissions.commercial,
+            codes: [...autres, ...nouveaux],
+          },
+        },
+      };
+    });
+  };
+
+  // Nombre total de codes vendeur retenus (toutes sociétés) — repère visuel.
+  const nbCodesCommerciaux = (formData.permissions.commercial?.codes || [])
+    .length;
+
+  // Saisie courante d'une société ("12" ou "12, 15").
+  const codesSociete = (entId) =>
+    (formData.permissions.commercial?.codes || [])
+      .filter((l) => String(l.entreprise) === String(entId))
+      .map((l) => l.code)
+      .join(", ");
+
+  // Sociétés proposables pour le rattachement : le périmètre du compte édité.
+  const societesCommerciales = useMemo(() => {
+    if (formData.permissions.allEntreprises) return grantableEntreprises;
+    return grantableEntreprises.filter((e) =>
+      formData.permissions.entreprises.includes(e._id),
+    );
+  }, [
+    grantableEntreprises,
+    formData.permissions.allEntreprises,
+    formData.permissions.entreprises,
+  ]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -491,6 +570,41 @@ const UserModal = ({ user, onClose, asPage = false }) => {
               );
             })}
           </div>
+        </div>
+
+        {/* Profil COMMERCIAL — cumulable avec n'importe quel rôle : c'est un
+            profil métier (rattachement à un code vendeur), pas un rôle d'accès.
+            Un commercial peut donc aussi être responsable d'équipe, et recevoir
+            n'importe quel module par la voie habituelle (onglet Permissions). */}
+        <div className="form-group">
+          <label>Profil métier</label>
+          <div className="role-cards role-cards-solo">
+            <button
+              type="button"
+              className={`role-card ${formData.permissions.commercial?.actif ? "selected" : ""}`}
+              onClick={toggleCommercialActif}
+            >
+              {formData.permissions.commercial?.actif && (
+                <HiCheck className="role-card-check" />
+              )}
+              <span className="role-card-icon">
+                <HiTrendingUp />
+              </span>
+              <span className="role-card-label">Commercial</span>
+              <span className="role-card-desc">
+                Espace dédié : portefeuille, relances, alertes
+              </span>
+            </button>
+          </div>
+          {formData.permissions.commercial?.actif && (
+            <span className="label-hint">
+              Rattachez-le à ses sociétés (onglet Permissions), puis choisissez
+              son code vendeur par société dans l'onglet « Profil commercial ».
+              {nbCodesCommerciaux === 0
+                ? " ⚠️ Aucun code sélectionné pour l'instant : son espace serait vide."
+                : ` ${nbCodesCommerciaux} code(s) sélectionné(s).`}
+            </span>
+          )}
         </div>
 
         <div className="form-group">
@@ -779,6 +893,131 @@ const UserModal = ({ user, onClose, asPage = false }) => {
                     })
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── PROFIL COMMERCIAL ──────────────────────────────────────────
+            Un commercial accède à son espace dédié (/commercial) : dashboard,
+            portefeuille, proformas, réservations, commandes spéciales, alertes.
+            Le rattachement est le couple SOCIÉTÉ + CODE VENDEUR (REPRES) : le
+            même commercial peut avoir un code différent par société. */}
+        {(!asPage || section === "commercial") && (
+          <div className="permissions-section">
+            <h3>Profil commercial</h3>
+            <p className="admin-note">
+              Un utilisateur marqué commercial dispose de son espace dédié
+              (tableau de bord, portefeuille clients, proformas, réservations,
+              commandes spéciales, alertes). Ses données y sont filtrées sur le
+              couple société + code vendeur (clients.REPRES, facture.REPRES,
+              proforma.REPRES). À l'activation, la « Recherche Article » lui est
+              accordée — vous pouvez ensuite la retirer, et lui accorder
+              n'importe quel autre module ou société via l'onglet Permissions :
+              le profil commercial ne verrouille aucun droit.
+            </p>
+
+            <div className="global-permissions">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={!!formData.permissions.commercial?.actif}
+                  onChange={toggleCommercialActif}
+                />
+                <span>Cet utilisateur est un commercial</span>
+              </label>
+            </div>
+
+            {formData.permissions.commercial?.actif && (
+              <div className="analyse-section">
+                <label className="analyse-title">
+                  Code vendeur par société
+                </label>
+                <p className="admin-note">
+                  Choisissez son code REPRES pour chaque société (ex. QC → 12,
+                  KQ → 08) — plusieurs codes possibles. Seuls les codes typés
+                  « Commercial » dans la fiche société (onglet Vendeurs) sont
+                  proposés : un code de caisse ou de vendeur magasin n'ouvre pas
+                  d'espace commercial. Une société sans code sélectionné
+                  n'apparaîtra pas dans son espace.
+                </p>
+
+                {societesCommerciales.length === 0 ? (
+                  <div className="no-options">
+                    Accordez d'abord au moins une société à cet utilisateur
+                    (onglet Permissions).
+                  </div>
+                ) : (
+                  societesCommerciales.map((e) => {
+                    // DICTIONNAIRE de la société : seuls les codes REPRES typés
+                    // « Commercial » (onglet Vendeurs de la fiche entreprise)
+                    // ouvrent droit à l'espace. Un code de caisse ou de vendeur
+                    // magasin est refusé à l'enregistrement.
+                    const declares = (e.vendeurs || []).filter(
+                      (v) => v.code && v.type === "commercial",
+                    );
+                    const nomVendeur = (v) =>
+                      `${v.prenom || ""} ${v.nom || ""}`.trim() || "sans nom";
+                    return (
+                      <div key={e._id} className="comm-ent">
+                        <div className="comm-ent-head">
+                          <span className="comm-ent-trig">{e.trigramme}</span>
+                          <span className="label-hint">{e.nomComplet}</span>
+                        </div>
+                        <div className="form-group">
+                          {declares.length === 0 ? (
+                            <span className="label-hint">
+                              Aucun code REPRES n'est typé « Commercial » pour
+                              cette société. Renseignez-le dans la fiche société
+                              (onglet Vendeurs) : les codes de caisse ou de
+                              vendeur magasin n'ouvrent pas d'espace commercial.
+                            </span>
+                          ) : (
+                            <>
+                              <div className="ent-pills">
+                                {declares.map((v) => {
+                                  const on = codesSociete(e._id)
+                                    .split(/[,;/\s]+/)
+                                    .filter(Boolean)
+                                    .includes(v.code);
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={v.code}
+                                      className={`ent-pill ${on ? "selected" : ""}`}
+                                      onClick={() =>
+                                        setCodesSociete(
+                                          e._id,
+                                          on
+                                            ? codesSociete(e._id)
+                                                .split(/[,;/\s]+/)
+                                                .filter(
+                                                  (c) => c && c !== v.code,
+                                                )
+                                                .join(", ")
+                                            : `${codesSociete(e._id)}, ${v.code}`,
+                                        )
+                                      }
+                                      title={nomVendeur(v)}
+                                    >
+                                      {on && <HiCheck />}
+                                      <span>
+                                        {v.code} · {nomVendeur(v)}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <span className="label-hint">
+                                Codes retenus : {codesSociete(e._id) || "aucun"}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>

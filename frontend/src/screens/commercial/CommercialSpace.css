@@ -1,0 +1,516 @@
+/* CommercialSpace.css — feuille COMMUNE à tout l'espace commercial (/commercial/*).
+   Accent violet #7c3aed. Thème admin (--admin-*). Préfixe .co-  */
+
+.co-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  padding-bottom: 2rem;
+}
+
+/* ── Header ── */
+.co-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.co-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+.co-header-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--admin-radius);
+  background: linear-gradient(135deg, #6d28d9, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+}
+.co-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.co-header-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+}
+.co-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Sélecteur de société (limité aux sociétés du commercial) */
+.co-societes {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  flex-wrap: wrap;
+}
+.co-societe-btn {
+  border: none;
+  background: transparent;
+  color: var(--admin-text-muted);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.co-societe-btn:hover {
+  color: var(--admin-text);
+}
+.co-societe-btn.active {
+  background: linear-gradient(135deg, #6d28d9, #a855f7);
+  color: #fff;
+}
+.co-societe-code {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* ── Navigation interne de l'espace ── */
+.co-nav {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.65rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+  overflow-x: auto;
+}
+.co-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.co-nav a:hover {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+}
+.co-nav a.active {
+  background: rgba(124, 58, 237, 0.15);
+  color: #a855f7;
+}
+.co-nav-badge {
+  background: #dc2626;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+/* ── Corps ── */
+.co-body {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Tuiles KPI ── */
+.co-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.9rem;
+}
+.co-kpi {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+a.co-kpi:hover {
+  transform: translateY(-2px);
+  border-color: #7c3aed;
+}
+.co-kpi-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.co-kpi-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.co-kpi-sub {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+.co-kpi.alerte {
+  border-color: #dc2626;
+}
+.co-kpi.alerte .co-kpi-value {
+  color: #f87171;
+}
+.co-kpi.ok .co-kpi-value {
+  color: #34d399;
+}
+
+/* ── Cartes / sections ── */
+.co-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  overflow: hidden;
+}
+.co-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--admin-border);
+  flex-wrap: wrap;
+}
+.co-card-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.co-card-head h2 svg {
+  color: #a855f7;
+}
+.co-card-body {
+  padding: 1rem;
+}
+.co-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.25rem;
+}
+
+/* ── Tableaux ── */
+.co-table-wrap {
+  overflow-x: auto;
+}
+.co-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.co-table th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--admin-border);
+}
+.co-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: middle;
+}
+.co-table tbody tr:hover {
+  background: var(--admin-bg-tertiary);
+}
+.co-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.co-table a {
+  color: #a855f7;
+  text-decoration: none;
+  font-weight: 600;
+}
+.co-table a:hover {
+  text-decoration: underline;
+}
+.co-row-alerte td {
+  background: rgba(220, 38, 38, 0.07);
+}
+
+/* ── Puces / badges ── */
+.co-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.co-chip-speciale {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fbbf24;
+}
+.co-chip-reservation {
+  background: rgba(37, 99, 235, 0.18);
+  color: #60a5fa;
+}
+.co-chip-preparer {
+  background: rgba(5, 150, 105, 0.18);
+  color: #34d399;
+}
+.co-chip-devis {
+  background: rgba(124, 58, 237, 0.18);
+  color: #c084fc;
+}
+.co-chip-muted {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+}
+.co-chip-danger {
+  background: rgba(220, 38, 38, 0.18);
+  color: #f87171;
+}
+.co-evol-up {
+  color: #34d399;
+  font-weight: 700;
+}
+.co-evol-down {
+  color: #f87171;
+  font-weight: 700;
+}
+
+/* ── Barre d'outils / filtres ── */
+.co-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+.co-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.co-field label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+  font-weight: 700;
+}
+.co-field input,
+.co-field select {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.83rem;
+  min-width: 170px;
+}
+.co-field input:focus,
+.co-field select:focus {
+  outline: none;
+  border-color: #7c3aed;
+}
+
+.co-tabs {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.co-tab {
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.co-tab.active {
+  background: linear-gradient(135deg, #6d28d9, #a855f7);
+  border-color: transparent;
+  color: #fff;
+}
+
+.co-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+.co-btn:hover:not(:disabled) {
+  border-color: #7c3aed;
+}
+.co-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.co-btn-primary {
+  background: linear-gradient(135deg, #6d28d9, #a855f7);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ── États ── */
+.co-empty,
+.co-loading {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--admin-text-muted);
+  font-size: 0.88rem;
+}
+.co-error {
+  margin: 1rem 1.5rem;
+  padding: 0.85rem 1rem;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  border-radius: var(--admin-radius-sm);
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+.co-hint {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+
+/* ── Pagination ── */
+.co-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border-top: 1px solid var(--admin-border);
+  font-size: 0.82rem;
+  color: var(--admin-text-muted);
+}
+
+/* ── Fiche client ── */
+.co-fiche-head {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.co-fiche-infos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+.co-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.co-info-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--admin-text-muted);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.co-info-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* ── Mini graphique mensuel (barres CSS) ── */
+.co-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 110px;
+  padding-top: 0.5rem;
+}
+.co-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  height: 100%;
+  justify-content: flex-end;
+}
+.co-bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, #a855f7, #6d28d9);
+  min-height: 2px;
+}
+.co-bar-n1 {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+}
+.co-bar-label {
+  font-size: 0.62rem;
+  color: var(--admin-text-muted);
+}
+
+/* ── Sélection multiple (relances) ── */
+.co-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: rgba(124, 58, 237, 0.12);
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .co-body {
+    padding: 1rem;
+  }
+  .co-header {
+    padding: 1rem;
+  }
+}

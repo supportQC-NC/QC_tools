@@ -52,6 +52,21 @@ Access control is **two-dimensional** — a user needs both the right *module* a
 
 The list of permission modules lives in **`backend/config/adminModules.js`** and is **mirrored in `frontend/src/config/adminModules.js`** (which also maps route paths → module keys for `<ModuleRoute>`). When adding a module, update **both** files and `backend/models/PermissionModel.js`.
 
+## Espace commercial (profil, pas module)
+
+Un utilisateur peut être marqué **commercial** (`Permission.commercial = { actif, codes: [{ entreprise, code }] }`). Le rattachement est le couple **société + code vendeur (REPRES)** — un même commercial a un code différent par société (QC=12, KQ=08…). Ce profil n'est **pas** un module de permission : il ouvre `/commercial/*` (front) et `/api/commercial/*` (back), gardés par `requireCommercial` + `checkCommercialEntreprise` (`backend/middleware/commercialAccess.js`), qui pose `req.codesCommercial` — seul filtre utilisé par `services/commercialService.js`. Un commercial ne voit donc jamais les données d'un autre code. Activer le profil accorde `modules.stock.read` (recherche d'articles), **uniquement à l'activation** : ensuite l'admin reste libre de le retirer et d'accorder n'importe quel module/société.
+
+**Un code REPRES n'est pas forcément un commercial** (caisse, vendeur magasin, compte technique). Le dictionnaire fait foi : `entreprise.vendeurs[].type === "commercial"` (onglet Vendeurs de la fiche société). Ce filtre s'applique à l'UI, à l'enregistrement (`sanitizeCommercial`) **et à chaque requête** (`getEntreprisesCommercial`) — repasser un code en « vendeur » ferme l'accès immédiatement. La création/édition d'utilisateur se fait en page plein écran (`/admin/users/nouveau`, `/admin/users/:id`), plus en modale.
+
+Le service ne duplique rien : il lit les caches existants (`clientCacheService`, `factureCacheService`, `proformaCacheService`), reprend l'analyse CA de `commerciauxService` et les alertes de `resaEntreesService`. Catégories des documents = `proforma.ETAT` (**0 = commande spéciale, 1 = réservation, 2 = à préparer, autre = devis**, même convention que l'écran Données ▸ Réservations), libellés via `entreprise.mappingEtatsProforma`. Seule écriture du module : `SuiviCommercialModel` (relances de proformas, alertes acquittées) — l'ERP reste en lecture seule.
+
+⚠️ **Perf — le dashboard est découpé en trois requêtes** parce que les caches DBF n'ont pas du tout le même coût à froid sur QC (clients ~3 s, proformas ~35 s, factures ~140 s pour 1,7 M factures + 6,2 M lignes, et ce cache s'invalide à chaque facturation) :
+1. `GET /dashboard` — portefeuille + documents (caches clients/proformas seulement) ;
+2. `GET /dashboard/ca` — CA, top 3 clients, clients à recontacter (cache factures) ;
+3. `GET /:dossier/alertes` — croisement réservations × entrées (`resaEntreesService`, scan streaming).
+
+Le front affiche (1) immédiatement et remplit (2) et (3) en différé. **Ne pas refusionner ces endpoints.**
+
 ## Request flow / conventions
 
 Backend follows routes → controllers → services:

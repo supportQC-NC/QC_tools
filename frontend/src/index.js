@@ -15,6 +15,8 @@ import App from "./App";
 import PrivateRoute from "./components/Utils/PrivateRoute";
 import ModuleRoute from "./components/Utils/ModuleRoute";
 import TeamRoute from "./components/Utils/TeamRoute";
+import CommercialRoute from "./components/Utils/CommercialRoute";
+import AccueilRoute from "./components/Utils/AccueilRoute";
 
 import Login from "./screens/LoginScreen/LoginScreen";
 import ForgotPassword from "./screens/ForgotPasswordScreen/ForgotPasswordScreen";
@@ -26,6 +28,7 @@ import AdminUsers from "./screens/admin/AdminUsersScreen";
 import AdminEntreprises from "./screens/admin/AdminEntreprisesScreen";
 import AdminEntrepriseConfigScreen from "./screens/admin/AdminEntrepriseConfigScreen";
 import AdminUserConfigScreen from "./screens/admin/AdminUserConfigScreen";
+import AdminUserCreateScreen from "./screens/admin/AdminUserCreateScreen";
 import AdminArticles from "./screens/admin/AdminArticlesScreen";
 import AdminConcurrents from "./screens/admin/AdminConcurrentsScreen";
 import AdminRelevesScreen from "./screens/admin/AdminRelevesScreen";
@@ -75,7 +78,6 @@ import AdminFacturesScreen from "./screens/admin/AdminFacturesScreen";
 import AdminFactureDetailScreen from "./screens/admin/AdminFactureDetailsScreen";
 import AdminClientDetailScreen from "./screens/admin/AdminClientDetailsScreen";
 import AdminClientsScreen from "./screens/admin/AdminClientsScreen";
-import UserDashboard from "./screens/user/userDashboardScreen";
 import AdminCommerciauxScreen from "./screens/admin/AdminCommerciauxScreen";
 import AdminCommercialDetailScreen from "./screens/admin/AdminCommercialDetailScreen";
 import AdminFilialesScreen from "./screens/admin/AdminFilialesScreen";
@@ -103,6 +105,14 @@ import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 import MonMenuScreen from "./screens/user/MonMenuScreen";
 import ReceptionManuelleScreen from "./screens/user/ReceptionManuelleScreen";
 import MonDashboardScreen from "./screens/user/MonDashboardScreen";
+import CommercialDashboardScreen from "./screens/commercial/CommercialDashboardScreen";
+import CommercialPortefeuilleScreen from "./screens/commercial/CommercialPortefeuilleScreen";
+import CommercialClientScreen from "./screens/commercial/CommercialClientScreen";
+import CommercialProformasScreen from "./screens/commercial/CommercialProformasScreen";
+import CommercialReservationsScreen from "./screens/commercial/CommercialReservationsScreen";
+import CommercialSpecialesScreen from "./screens/commercial/CommercialSpecialesScreen";
+import CommercialFacturesScreen from "./screens/commercial/CommercialFacturesScreen";
+import CommercialAlertesScreen from "./screens/commercial/CommercialAlertesScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -114,7 +124,9 @@ const router = createBrowserRouter(
 
       {/* ===================== Routes utilisateur ===================== */}
       <Route element={<PrivateRoute />}>
-        <Route path="/" element={<UserDashboard />} />
+        {/* Accueil : tableau de bord général, ou espace commercial si l'utilisateur
+            est rattaché à un code vendeur (voir AccueilRoute). */}
+        <Route path="/" element={<AccueilRoute />} />
         <Route path="/profile" element={<ProfileScreen />} />
         <Route path="/articles" element={<ArticleSearch />} />
         <Route path="/inventaire" element={<InventaireScreen />} />
@@ -134,6 +146,42 @@ const router = createBrowserRouter(
         <Route path="/mon-dashboard" element={<MonDashboardScreen />} />
         {/* Tableau de bord unique : l'ancienne route admin y renvoie. */}
         <Route path="/admin" element={<Navigate to="/" replace />} />
+      </Route>
+
+      {/* ===================== Espace commercial =====================
+          Gaté par le PROFIL commercial (Permission.commercial), pas par un
+          module : chaque commercial ne voit que les données de son ou ses
+          codes vendeur, société par société (filtrage serveur). */}
+      <Route element={<CommercialRoute />}>
+        <Route path="/commercial" element={<CommercialDashboardScreen />} />
+        <Route
+          path="/commercial/clients"
+          element={<CommercialPortefeuilleScreen />}
+        />
+        <Route
+          path="/commercial/clients/:dossier/:tiers"
+          element={<CommercialClientScreen />}
+        />
+        <Route
+          path="/commercial/proformas"
+          element={<CommercialProformasScreen />}
+        />
+        <Route
+          path="/commercial/reservations"
+          element={<CommercialReservationsScreen />}
+        />
+        <Route
+          path="/commercial/commandes-speciales"
+          element={<CommercialSpecialesScreen />}
+        />
+        <Route
+          path="/commercial/factures"
+          element={<CommercialFacturesScreen />}
+        />
+        <Route
+          path="/commercial/alertes"
+          element={<CommercialAlertesScreen />}
+        />
       </Route>
 
       {/* ======= Écrans admin : garde par module (admin OU utilisateur
@@ -198,6 +246,8 @@ const router = createBrowserRouter(
           données scopées à son équipe côté API) */}
       <Route element={<ModuleRoute module="users_admin" roles={["responsable"]} />}>
         <Route path="/admin/users" element={<AdminUsers />} />
+        {/* Création : page plein écran (le formulaire ne tient plus en modale). */}
+        <Route path="/admin/users/nouveau" element={<AdminUserCreateScreen />} />
         <Route
           path="/admin/users/:id"
           element={<AdminUserConfigScreen />}

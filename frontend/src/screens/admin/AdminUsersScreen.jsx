@@ -16,7 +16,6 @@ import {
   useDeleteUserMutation,
   useToggleUserActiveMutation,
 } from "../../slices/userApiSlice";
-import UserModal from "../../components/Admin/UserModal";
 import "./AdminUsersScreen.css";
 
 const ROLE_FILTERS = [
@@ -30,8 +29,6 @@ const AdminUsers = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("tous");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
 
   // Un responsable ne supprime pas de compte (réservé aux admins côté API).
   const { userInfo } = useSelector((state) => state.auth);
@@ -58,14 +55,11 @@ const AdminUsers = () => {
       ? users?.length || 0
       : users?.filter((u) => u.role === key).length || 0;
 
-  const handleCreate = () => {
-    setSelectedUser(null);
-    setModalOpen(true);
-  };
+  // Création ET édition passent par une PAGE plein écran : il y a trop de
+  // réglages par utilisateur (rôle, profil commercial, sociétés, modules,
+  // champs DBF) pour tenir dans une modale.
+  const handleCreate = () => navigate("/admin/users/nouveau");
 
-  // L'édition ouvre la PAGE de configuration : il y a désormais trop de
-  // réglages par utilisateur (permissions, sociétés, analyse, champs DBF)
-  // pour tenir dans une modale. Celle-ci reste pour la création rapide.
   const handleEdit = (user) => navigate(`/admin/users/${user._id}`);
 
   const handleDelete = async (user) => {
@@ -84,11 +78,6 @@ const AdminUsers = () => {
     } catch (err) {
       alert(err?.data?.message || "Erreur lors de la modification");
     }
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setSelectedUser(null);
   };
 
   if (isLoading) {
@@ -249,9 +238,6 @@ const AdminUsers = () => {
         </table>
       </div>
 
-      {modalOpen && (
-        <UserModal user={selectedUser} onClose={handleCloseModal} />
-      )}
     </div>
   );
 };

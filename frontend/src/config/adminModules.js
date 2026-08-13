@@ -149,6 +149,32 @@ export function hasModuleAccess(userInfo, moduleKey, action = "read") {
   return !!(m && m[action]);
 }
 
+// ===========================================================================
+// PROFIL COMMERCIAL — espace dédié /commercial/*
+// ===========================================================================
+// Le profil est porté par Permission.commercial ({ actif, codes:[{entreprise, code}] })
+// et NON par un module : un commercial voit son espace dès qu'il est actif et
+// rattaché à au moins un code vendeur. Les modules supplémentaires (recherche
+// article, etc.) restent gérés par le système de droits habituel.
+
+// L'utilisateur a-t-il un profil commercial exploitable ?
+export function estCommercial(userInfo) {
+  const c = userInfo?.permissions?.commercial;
+  return !!(c && c.actif && (c.codes || []).length > 0);
+}
+
+// Sociétés (ids) sur lesquelles il possède un code vendeur.
+export function entreprisesCommerciales(userInfo) {
+  const c = userInfo?.permissions?.commercial;
+  if (!c?.actif) return [];
+  const ids = new Set(
+    (c.codes || [])
+      .map((l) => String(l.entreprise?._id || l.entreprise || ""))
+      .filter(Boolean),
+  );
+  return [...ids];
+}
+
 // Clé de permission protégeant un chemin (préfixe le plus spécifique), ou null.
 export function moduleForPath(pathname) {
   let best = null;

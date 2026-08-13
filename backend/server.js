@@ -72,6 +72,7 @@ import clientRoutes from "./routes/clientRoutes.js";
 import filialesRoutes from "./routes/filialesRoutes.js";
  import reapproLocalRoutes from "./routes/reapproLocalRoutes.js";
 import commerciauxRoutes from "./routes/commerciauxRoutes.js";
+import commercialRoutes from "./routes/commercialRoutes.js";
 import topVentesRoutes from "./routes/topVentesRoutes.js";
 import menuHintRoutes from "./routes/menuHintRoutes.js";
 import menuLayoutRoutes from "./routes/menuLayoutRoutes.js";
@@ -233,6 +234,9 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/dashboard-layout", dashboardLayoutRoutes);
 app.use("/api/commerciaux", commerciauxRoutes);
+// Espace dédié aux utilisateurs au profil commercial (ne pas confondre avec
+// /api/commerciaux, qui est l'écran d'ANALYSE des commerciaux côté direction).
+app.use("/api/commercial", commercialRoutes);
 app.use("/api/top-ventes", topVentesRoutes);
 app.use("/api/menu-hints", menuHintRoutes);
 app.use("/api/menu-layout", menuLayoutRoutes);

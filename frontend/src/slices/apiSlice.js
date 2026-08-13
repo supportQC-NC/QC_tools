@@ -90,6 +90,14 @@ export const apiSlice = createApi({
     "EnvoiCdeParametre",
     // ========== TAGS COMMERCIAUX ==========
     "TopVentes",
+    // ========== TAGS ESPACE COMMERCIAL (portefeuille du commercial) ==========
+    "CommercialProfil",
+    "CommercialDashboard",
+    "CommercialClients",
+    "CommercialProformas",
+    "CommercialFactures",
+    "CommercialAlertes",
+    "CommercialRelances",
     // ========== TAGS INFOBULLES MENU ==========
     "MenuHint",
     "MenuLayout",

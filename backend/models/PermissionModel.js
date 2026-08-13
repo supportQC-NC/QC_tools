@@ -314,6 +314,33 @@ const permissionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: () => ({}),
     },
+    // ══════════ PROFIL COMMERCIAL — espace dédié « mes clients » ══════════
+    // Un utilisateur marqué commercial accède à /commercial/* : son dashboard,
+    // son portefeuille clients, ses proformas, réservations, commandes spéciales.
+    // Le rattachement est le couple SOCIÉTÉ + CODE VENDEUR (REPRES) : un même
+    // commercial a un code DIFFÉRENT selon la société (QC=12, KQ=08, DQ=15...).
+    // Plusieurs codes pour une même société sont autorisés (une ligne par code).
+    // Toutes les données de l'espace sont filtrées sur ce couple — jamais sur le
+    // seul code (voir middleware/commercialAccess.js).
+    commercial: {
+      actif: { type: Boolean, default: false },
+      codes: {
+        type: [
+          new mongoose.Schema(
+            {
+              entreprise: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Entreprise",
+                required: true,
+              },
+              code: { type: String, trim: true, default: "" },
+            },
+            { _id: false },
+          ),
+        ],
+        default: () => [],
+      },
+    },
     // ══════════ CHAMPS DBF VISIBLES — par table de l'ERP ══════════
     // Objet table(string) -> { mode: "tous" | "liste", champs: [String] }.
     //   "tous"  : aucune restriction (défaut, comportement historique)
