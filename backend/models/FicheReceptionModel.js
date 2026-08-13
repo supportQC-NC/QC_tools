@@ -3,7 +3,8 @@
 // Module « Contrôle réception MANUEL » (version papier du contrôle de réception).
 //
 // Aucune donnée de comptage n'est saisie dans l'application : l'utilisateur
-// IMPRIME une fiche de contrôle (PDF) qu'il remplit à la main sur le quai.
+// IMPRIME une fiche de contrôle (PDF SANS quantité commandée — comptage
+// toujours à l'aveugle) qu'il remplit à la main sur le quai.
 // Ce document ne sert donc qu'au SUIVI LÉGER de ces impressions :
 //   - qui a imprimé la fiche d'une commande, quand, combien de fois ;
 //   - un statut posé manuellement par l'utilisateur (à contrôler / imprimé / contrôlé).
@@ -21,8 +22,6 @@ const impressionSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     nom: { type: String, default: "" },
     at: { type: Date, default: Date.now },
-    // Fiche générée en « comptage à l'aveugle » (colonne Qté commandée masquée).
-    aveugle: { type: Boolean, default: false },
     nbLignes: { type: Number, default: 0 },
   },
   { _id: false },

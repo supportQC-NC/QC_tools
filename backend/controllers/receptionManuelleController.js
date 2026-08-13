@@ -147,18 +147,14 @@ const getCommandeDetails = asyncHandler(async (req, res) => {
 
 /**
  * @desc    Génère la fiche de contrôle PDF (à remplir à la main) et trace
- *          l'impression dans le suivi.
+ *          l'impression dans le suivi. La quantité commandée n'y figure
+ *          JAMAIS : le comptage est toujours à l'aveugle.
  * @route   POST /api/reception-manuelle/:nomDossierDBF/commandes/:numcde/fiche-pdf
- * @body    { aveugle?: boolean }  -> true (défaut) = colonne « Qté cdée » masquée
  * @access  Private (module reception_manuelle, write) + entreprise
  */
 const genererFiche = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   assertCommandeFiles(entreprise, res);
-
-  // Par DÉFAUT la quantité commandée est MASQUÉE (comptage à l'aveugle) :
-  // il faut la demander explicitement (aveugle:false ou ?aveugle=0).
-  const aveugle = !(req.body?.aveugle === false || req.query?.aveugle === "0");
 
   const { entete, commentaires, lignes } = await getCommandeComplete(
     entreprise,
@@ -198,7 +194,6 @@ const genererFiche = asyncHandler(async (req, res) => {
               user: req.user._id,
               nom,
               at: maintenant,
-              aveugle,
               nbLignes: lignes.length,
             },
           ],
@@ -222,7 +217,7 @@ const genererFiche = asyncHandler(async (req, res) => {
     commande: entete,
     lignes,
     commentaires,
-    options: { aveugle, editePar: nom },
+    options: { editePar: nom },
     stream: res,
   });
 });

@@ -9,8 +9,9 @@
 //   - pages suivantes = le détail des lignes, une ligne par article, avec des
 //     cases vides « Qté reçue », « Écart » et « Observation ».
 //
-// Option « comptage à l'aveugle » (aveugle = true) : la colonne « Qté cdée »
-// n'est pas imprimée, pour que le comptage ne soit pas influencé.
+// RÈGLE MÉTIER : la QUANTITÉ COMMANDÉE n'apparaît JAMAIS sur une fiche de
+// contrôle (ni par ligne, ni en total) — le comptage se fait toujours à
+// l'aveugle pour ne pas être influencé par la quantité attendue.
 //
 // Le PDF est diffusé dans un stream (res) — rien n'est écrit sur disque.
 
@@ -96,10 +97,11 @@ const logoBuffer = (entreprise) => {
 // entier (même en majuscules larges) sans troncature. « Code art. » est réduit
 // (jamais plus de 6 caractères), le gencode a sa propre colonne, et le reste
 // de la largeur va à « Observation ».
+// Aucune colonne « Qté cdée » : le comptage est toujours à l'aveugle.
 // ---------------------------------------------------------------------------
 const DESIGNATION_W = 330;
 
-const buildColonnes = (aveugle) => {
+const buildColonnes = () => {
   const cols = [
     { key: "check", label: "", w: 16, align: "center" },
     { key: "nl", label: "NL", w: 22, align: "center" },
@@ -108,9 +110,6 @@ const buildColonnes = (aveugle) => {
     { key: "designation", label: "DÉSIGNATION", w: DESIGNATION_W, align: "left" },
     { key: "gencod", label: "GENCODE", w: 58, align: "left" },
     { key: "refer", label: "RÉF. FRN", w: 52, align: "left" },
-    ...(aveugle
-      ? []
-      : [{ key: "qteCommandee", label: "QTÉ CDÉE", w: 46, align: "right" }]),
     { key: "qteRecue", label: "QTÉ REÇUE", w: 60, align: "center", saisie: true },
     { key: "ecart", label: "ÉCART", w: 45, align: "center", saisie: true },
     { key: "obs", label: "OBSERVATION", w: 0, align: "left", saisie: true },
@@ -183,7 +182,7 @@ const drawGrandeCase = (doc, { titre, aide, x, y, w, h }) => {
 // ---------------------------------------------------------------------------
 // PAGE 1 — EN-TÊTE DE LA COMMANDE + 4 GRANDES CASES
 // ---------------------------------------------------------------------------
-const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, options, aveugle }) => {
+const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, options }) => {
   const couleur = safeTrim(entreprise?.couleurPrimaire) || "#0f766e";
   let y = M;
 
@@ -220,7 +219,7 @@ const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, optio
     .text(
       `Éditée le ${fmtDateHeure(new Date())}${
         options?.editePar ? ` par ${options.editePar}` : ""
-      }${aveugle ? " · comptage à l'aveugle" : ""}`,
+      } · comptage à l'aveugle`,
       M,
       y + 33,
       { width: CW, align: "right" },
@@ -252,7 +251,7 @@ const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, optio
       lineBreak: false,
     });
 
-  const totalUnites = lignes.reduce((s, l) => s + (Number(l.qteCommandee) || 0), 0);
+  // ⚠️ Aucune quantité commandée ici non plus (même en total) : comptage à l'aveugle.
   const infos = [
     ["Fournisseur", commande?.fournisseurNom],
     ["Bateau / vol", commande?.bateau],
@@ -263,7 +262,6 @@ const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, optio
       commande?.etatLabel || (commande?.etat != null ? `État ${commande.etat}` : ""),
     ],
     ["Lignes à contrôler", String(lignes.length)],
-    ["Unités commandées", fmtNb(totalUnites)],
     ["Nouveautés", String(lignes.filter((l) => l.estNouveau).length)],
   ];
   const zoneX = M + 175;
@@ -390,7 +388,7 @@ const drawTableHeader = (doc, cols, y) => {
 
 // Une ligne article : partie gauche imprimée (bande grise alternée), partie
 // droite (qté reçue / écart / observation) laissée BLANCHE pour l'écriture.
-const drawLigne = (doc, cols, xSaisie, ligne, y, index, aveugle) => {
+const drawLigne = (doc, cols, xSaisie, ligne, y, index) => {
   if (index % 2 === 1) {
     doc.save().fillColor(GRIS_BANDE).rect(M, y, xSaisie - M, ROW_H).fill().restore();
   }
@@ -438,9 +436,6 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, aveugle) => {
   cell("designation", ligne.designation);
   cell("gencod", ligne.gencod, { size: 7, color: GRIS_LABEL });
   cell("refer", ligne.refer, { size: 7, color: GRIS_LABEL });
-  if (!aveugle) {
-    cell("qteCommandee", fmtNb(ligne.qteCommandee), { bold: true, size: 8.5 });
-  }
 
   return y + ROW_H;
 };
@@ -451,9 +446,10 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, aveugle) => {
  * @param {object} p
  * @param {object} p.entreprise    document Entreprise (logo, couleurs, nom)
  * @param {object} p.commande      entête { numcde, fournisseurNom, bateau, arrivee, datcde, etat, etatLabel }
- * @param {Array}  p.lignes        [{ nl, nart, designation, refer, gencod, qteCommandee, estNouveau, inconnu }]
+ * @param {Array}  p.lignes        [{ nl, nart, designation, refer, gencod, estNouveau, inconnu }]
+ *                                 (la quantité commandée n'est jamais imprimée)
  * @param {Array}  p.commentaires  lignes de commentaire de la commande (NART « ! »)
- * @param {object} p.options       { aveugle:boolean, editePar:string }
+ * @param {object} p.options       { editePar:string }
  * @param {WritableStream} p.stream
  * @returns {Promise<{nbPages:number, nbLignes:number}>}
  */
@@ -470,8 +466,7 @@ export const genererFicheReceptionPDF = async ({
   });
   const PDFDocument = mod.default;
 
-  const aveugle = !!options.aveugle;
-  const { cols, xSaisie } = buildColonnes(aveugle);
+  const { cols, xSaisie } = buildColonnes();
 
   const doc = new PDFDocument({
     ...PAGE_OPTS,
@@ -490,7 +485,6 @@ export const genererFicheReceptionPDF = async ({
     lignes,
     commentaires,
     options,
-    aveugle,
   });
 
   // ── Pages suivantes : détail des lignes ───────────────────────────────────
@@ -505,7 +499,7 @@ export const genererFicheReceptionPDF = async ({
       y = drawEntetePageDetail(doc, { entreprise, commande });
       y = drawTableHeader(doc, cols, y);
     }
-    y = drawLigne(doc, cols, xSaisie, ligne, y, i, aveugle);
+    y = drawLigne(doc, cols, xSaisie, ligne, y, i);
   });
 
   if (lignes.length === 0) {
@@ -518,9 +512,8 @@ export const genererFicheReceptionPDF = async ({
 
   // ── Pieds de page (numérotation connue une fois toutes les pages écrites) ──
   const range = doc.bufferedPageRange();
-  const legende = aveugle
-    ? "N = nouveauté · ? = article inconnu · comptage à l'aveugle (qté commandée masquée)"
-    : "N = nouveauté · ? = article inconnu";
+  const legende =
+    "N = nouveauté · ? = article inconnu · comptage à l'aveugle (quantité commandée jamais imprimée)";
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(range.start + i);
     const fy = PAGE_H - M - 10;

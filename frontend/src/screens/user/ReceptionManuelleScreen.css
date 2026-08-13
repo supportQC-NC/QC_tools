@@ -131,8 +131,11 @@
   border: 1px dashed var(--admin-border);
   border-radius: var(--admin-radius-sm);
 }
-.rm-check input {
-  accent-color: #14b8a6;
+/* Rappel non interactif : la fiche est toujours imprimée à l'aveugle. */
+.rm-check-info {
+  cursor: help;
+  color: var(--admin-text-muted);
+  font-style: italic;
 }
 
 /* ── Boutons ── */
@@ -253,10 +256,6 @@
 }
 .rm-muted {
   color: var(--admin-text-muted);
-}
-.rm-muted-strike {
-  color: var(--admin-text-muted);
-  text-decoration: line-through;
 }
 .rm-td-info {
   text-align: center;

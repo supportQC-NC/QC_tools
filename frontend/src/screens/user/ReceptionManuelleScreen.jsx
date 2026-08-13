@@ -67,9 +67,6 @@ const ReceptionManuelleScreen = () => {
   const [search, setSearch] = useState("");
   const [statut, setStatut] = useState("");
   const [page, setPage] = useState(1);
-  // Par défaut la fiche s'imprime SANS la quantité commandée (comptage à
-  // l'aveugle) ; l'utilisateur peut demander à l'afficher.
-  const [aveugle, setAveugle] = useState(true);
   const [apercu, setApercu] = useState(null); // numcde en aperçu
   const [busy, setBusy] = useState(""); // numcde en cours d'impression
   const [error, setError] = useState("");
@@ -108,12 +105,7 @@ const ReceptionManuelleScreen = () => {
       `${BASE_URL}/api/reception-manuelle/${nomDossierDBF}/commandes/${encodeURIComponent(
         numcde,
       )}/fiche-pdf`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aveugle }),
-      },
+      { method: "POST", credentials: "include" },
     );
     if (!res.ok) {
       let msg = `Génération de la fiche échouée (${res.status})`;
@@ -258,17 +250,12 @@ const ReceptionManuelleScreen = () => {
             </select>
           </label>
 
-          <label
-            className="rm-check"
-            title="Par défaut la fiche est imprimée sans la quantité commandée (comptage à l'aveugle)"
+          <span
+            className="rm-check rm-check-info"
+            title="La quantité commandée n'apparaît jamais sur la fiche imprimée"
           >
-            <input
-              type="checkbox"
-              checked={!aveugle}
-              onChange={(e) => setAveugle(!e.target.checked)}
-            />
-            <span>Afficher la qté commandée</span>
-          </label>
+            Comptage à l'aveugle
+          </span>
 
           <button
             type="button"
@@ -438,7 +425,6 @@ const ReceptionManuelleScreen = () => {
         <ApercuCommande
           nomDossierDBF={nomDossierDBF}
           numcde={apercu}
-          aveugle={aveugle}
           busy={busy === apercu}
           onImprimer={() => imprimerFiche(apercu)}
           onTelecharger={() => telechargerFiche(apercu)}
@@ -450,12 +436,12 @@ const ReceptionManuelleScreen = () => {
 };
 
 // ---------------------------------------------------------------------------
-// APERÇU : lignes de la commande telles qu'elles seront imprimées.
+// APERÇU : lignes de la commande. La quantité commandée est affichée ICI (vue
+// bureau) mais n'est JAMAIS imprimée sur la fiche de contrôle.
 // ---------------------------------------------------------------------------
 const ApercuCommande = ({
   nomDossierDBF,
   numcde,
-  aveugle,
   busy,
   onImprimer,
   onTelecharger,
@@ -532,8 +518,8 @@ const ApercuCommande = ({
                 <th>Désignation</th>
                 <th>Réf. frn</th>
                 <th>Gencode</th>
-                <th className="rm-num">
-                  {aveugle ? "Qté cdée (masquée)" : "Qté cdée"}
+                <th className="rm-num" title="Non imprimée sur la fiche">
+                  Qté cdée
                 </th>
               </tr>
             </thead>
@@ -566,9 +552,7 @@ const ApercuCommande = ({
                     </td>
                     <td className="rm-muted">{l.refer || "—"}</td>
                     <td className="rm-mono rm-muted">{l.gencod || "—"}</td>
-                    <td className={`rm-num ${aveugle ? "rm-muted-strike" : ""}`}>
-                      {fmtInt(l.qteCommandee)}
-                    </td>
+                    <td className="rm-num rm-muted">{fmtInt(l.qteCommandee)}</td>
                   </tr>
                 ))
               )}
@@ -578,9 +562,8 @@ const ApercuCommande = ({
 
         <div className="rm-modal-footer">
           <span className="rm-footer-note">
-            {aveugle
-              ? "La fiche sera imprimée SANS la quantité commandée (comptage à l'aveugle)."
-              : "La fiche sera imprimée avec la quantité commandée."}
+            La fiche est imprimée SANS la quantité commandée (comptage à
+            l'aveugle).
           </span>
           <div className="rm-modal-actions">
             <button
