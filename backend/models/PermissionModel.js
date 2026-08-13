@@ -240,6 +240,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Fréquentation magasin (plages horaires depuis les factures éditées)
+      frequentation_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Balances / clients à bloquer (encours depuis balances.dbf)
       balances_clients: {
         read: { type: Boolean, default: false },

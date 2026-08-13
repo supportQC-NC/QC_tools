@@ -27,6 +27,7 @@ import {
   HiSparkles,
   HiTrendingUp,
   HiUser,
+  HiClock,
   HiCog
 } from "react-icons/hi";
 import { moduleForPath } from "./adminModules";
@@ -100,6 +101,7 @@ export const adminMenuStructure = [
       { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
       { label: "Rapports TGC", path: "/admin/rapport-tgc", icon: HiCurrencyDollar },
       { label: "Balances clients", path: "/admin/balances-clients", icon: HiCurrencyDollar },
+      { label: "Fréquentation magasin", path: "/admin/frequentation", icon: HiClock },
       { label: "Top Articles", path: "/admin/top-articles", icon: HiChartBar },
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
       { label: "Analyse Réappro", path: "/admin/analyse-reappro", icon: HiRefresh },
@@ -618,6 +620,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
   "/reception-manuelle":
     "Imprimer les fiches de contrôle papier des commandes à réceptionner.",
+  "/admin/frequentation":
+    "Plages horaires de fréquentation du magasin, d'après les factures éditées.",
   "/admin/suivi-entrees":
     "Marchandises entrées du jour (entrees.dbf) enrichies + contrôle TGC.",
   "/admin/resa-entrees":

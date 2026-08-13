@@ -43,6 +43,7 @@ import SuiviEntreesScreen from "./screens/admin/SuiviEntreesScreen";
 import ResaEntreesScreen from "./screens/admin/ResaEntreesScreen";
 import RapportTgcScreen from "./screens/admin/RapportTgcScreen";
 import BalancesClientsScreen from "./screens/admin/BalancesClientsScreen";
+import AdminFrequentationScreen from "./screens/admin/AdminFrequentationScreen";
 import CommunicationClientScreen from "./screens/admin/CommunicationClientScreen";
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
@@ -186,6 +187,11 @@ const router = createBrowserRouter(
       {/* Analyse · Balances / clients à bloquer -> module "balances_clients" */}
       <Route element={<ModuleRoute module="balances_clients" />}>
         <Route path="/admin/balances-clients" element={<BalancesClientsScreen />} />
+      </Route>
+
+      {/* Analyse · Fréquentation magasin -> module "frequentation_admin" */}
+      <Route element={<ModuleRoute module="frequentation_admin" />}>
+        <Route path="/admin/frequentation" element={<AdminFrequentationScreen />} />
       </Route>
 
       {/* Administration · Utilisateurs -> module "users_admin" (ou responsable,

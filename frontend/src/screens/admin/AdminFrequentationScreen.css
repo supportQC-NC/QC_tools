@@ -1,0 +1,337 @@
+/* AdminFrequentationScreen.css — module « Fréquentation magasin ».
+   Thème admin sombre (--admin-*). Classes préfixées .fq- (pas de style global). */
+
+.fq-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  padding-bottom: 2.5rem;
+}
+
+/* ── Header ── */
+.fq-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.fq-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.fq-header-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--admin-radius);
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+}
+.fq-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.fq-header-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+  max-width: 60ch;
+}
+.fq-entreprise-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.fq-entreprise-badge svg {
+  color: #3b82f6;
+  font-size: 1.05rem;
+}
+
+/* ── Toolbar ── */
+.fq-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 1rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.fq-toolbar-left {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.fq-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.fq-field label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+}
+.fq-field input,
+.fq-field select {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+}
+.fq-presets {
+  display: flex;
+  gap: 0.35rem;
+  padding-bottom: 0.1rem;
+}
+.fq-presets button {
+  background: transparent;
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-text-secondary);
+  font-size: 0.75rem;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+.fq-presets button:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+.fq-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Boutons ── */
+.fq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+.fq-btn:hover:not(:disabled) {
+  background: var(--admin-bg-hover);
+}
+.fq-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.fq-btn-primary {
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  border-color: transparent;
+  color: #fff;
+}
+.fq-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.fq-btn-excel {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+/* ── Alertes / états ── */
+.fq-alert {
+  margin: 1rem 1.5rem 0;
+  padding: 0.7rem 1rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+}
+.fq-alert-err {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--admin-danger);
+  color: #fca5a5;
+}
+.fq-alert-warn {
+  background: var(--admin-warning-light);
+  border: 1px solid var(--admin-warning);
+  color: #fcd34d;
+}
+.fq-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.25rem 1.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius);
+  color: var(--admin-text-muted);
+  font-size: 0.85rem;
+}
+.fq-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 45vh;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+.fq-empty-icon {
+  font-size: 2.5rem;
+  color: var(--admin-primary);
+}
+.fq-empty h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--admin-text);
+}
+.fq-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--admin-border);
+  border-top-color: var(--admin-primary);
+  border-radius: 50%;
+  animation: fq-rotate 0.8s linear infinite;
+}
+@keyframes fq-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── KPI ── */
+.fq-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem 0;
+}
+.fq-kpi {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.fq-kpi-primary {
+  border-color: var(--admin-primary);
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.18),
+    var(--admin-bg-secondary)
+  );
+}
+.fq-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.fq-kpi-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--admin-text-muted);
+}
+
+/* ── Cartes de graphiques ── */
+.fq-card {
+  margin: 1.25rem 1.5rem 0;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  overflow: hidden;
+}
+.fq-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+.fq-card-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.fq-card-header h2 svg {
+  color: var(--admin-primary);
+}
+.fq-card-note {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+.fq-chart {
+  padding: 0.9rem 0.6rem 0.6rem 0;
+}
+
+/* ── Carte de chaleur ── */
+.fq-heat-wrap {
+  overflow-x: auto;
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+.fq-heat {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 0.72rem;
+}
+.fq-heat thead th {
+  color: var(--admin-text-muted);
+  font-weight: 600;
+  font-size: 0.65rem;
+  padding: 0.2rem 0.15rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.fq-heat tbody th {
+  color: var(--admin-text-secondary);
+  font-weight: 600;
+  text-align: right;
+  padding-right: 0.5rem;
+  white-space: nowrap;
+}
+.fq-heat tbody td {
+  min-width: 34px;
+  height: 26px;
+  text-align: center;
+  border-radius: 4px;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.fq-footnote {
+  margin: 1.25rem 1.5rem 0;
+  font-size: 0.72rem;
+  color: var(--admin-text-muted);
+}

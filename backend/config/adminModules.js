@@ -60,6 +60,7 @@ export const PERMISSION_MODULES = [
   { key: "collecteurs_admin", label: "Collecteurs", group: "analyse" },
   { key: "rapport_tgc", label: "Rapports TGC", group: "analyse" },
   { key: "balances_clients", label: "Balances / clients à bloquer", group: "analyse" },
+  { key: "frequentation_admin", label: "Fréquentation magasin", group: "analyse" },
   // ── Administration ────────────────────────────────────────────────────────
   { key: "dashboard_admin", label: "Tableau de bord", group: "administration" },
   { key: "users_admin", label: "Utilisateurs", group: "administration" },

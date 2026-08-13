@@ -68,6 +68,8 @@ export const apiSlice = createApi({
     "ResaEntrees",
     // ========== TAGS RAPPORT TGC ==========
     "RapportTgc",
+    // ========== TAGS FRÉQUENTATION MAGASIN ==========
+    "Frequentation",
     // ========== TAGS BALANCES CLIENTS ==========
     "Balances",
     // ========== TAGS COMMUNICATION CLIENT (nouveautés) ==========

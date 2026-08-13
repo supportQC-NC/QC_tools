@@ -40,6 +40,8 @@ import changementPrixRoutes from "./routes/changementPrixRoutes.js";
 import pachatHistoriqueRoutes from "./routes/pachatHistoriqueRoutes.js";
 import suiviEntreesRoutes from "./routes/suiviEntreesRoutes.js";
 import rapportTgcRoutes from "./routes/rapportTgcRoutes.js";
+// ========== ROUTES FRÉQUENTATION MAGASIN (plages horaires depuis les factures) ==========
+import frequentationRoutes from "./routes/frequentationRoutes.js";
 import balancesRoutes from "./routes/balancesRoutes.js";
 import configRapportsRoutes from "./routes/configRapportsRoutes.js";
 import communicationClientRoutes from "./routes/communicationClientRoutes.js";
@@ -214,6 +216,8 @@ app.use("/api/changement-prix", changementPrixRoutes);
 app.use("/api/historique-pachat", pachatHistoriqueRoutes);
 app.use("/api/suivi-entrees", suiviEntreesRoutes);
 app.use("/api/rapport-tgc", rapportTgcRoutes);
+// ========== ROUTES FRÉQUENTATION MAGASIN ==========
+app.use("/api/frequentation", frequentationRoutes);
 app.use("/api/balances-clients", balancesRoutes);
 app.use("/api/config-rapports", configRapportsRoutes);
 app.use("/api/communication-client", communicationClientRoutes);
