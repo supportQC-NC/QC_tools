@@ -42,6 +42,7 @@ import suiviEntreesRoutes from "./routes/suiviEntreesRoutes.js";
 import rapportTgcRoutes from "./routes/rapportTgcRoutes.js";
 // ========== ROUTES FRÉQUENTATION MAGASIN (plages horaires depuis les factures) ==========
 import frequentationRoutes from "./routes/frequentationRoutes.js";
+import frequentationContexteRoutes from "./routes/frequentationContexteRoutes.js";
 import balancesRoutes from "./routes/balancesRoutes.js";
 import configRapportsRoutes from "./routes/configRapportsRoutes.js";
 import communicationClientRoutes from "./routes/communicationClientRoutes.js";
@@ -118,6 +119,7 @@ import dictionnaireRayonsRoutes from "./routes/dictionnaireRayonsRoutes.js";
 import publicApiRoutes from "./routes/publicApiRoutes.js";
 import { startMailingScheduler } from "./services/mailingScheduler.js";
 import { startAiSnapshotScheduler } from "./services/aiSnapshotService.js";
+import { startMeteoScheduler } from "./services/meteoService.js";
 // =======================================
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -218,6 +220,7 @@ app.use("/api/suivi-entrees", suiviEntreesRoutes);
 app.use("/api/rapport-tgc", rapportTgcRoutes);
 // ========== ROUTES FRÉQUENTATION MAGASIN ==========
 app.use("/api/frequentation", frequentationRoutes);
+app.use("/api/frequentation-contexte", frequentationContexteRoutes);
 app.use("/api/balances-clients", balancesRoutes);
 app.use("/api/config-rapports", configRapportsRoutes);
 app.use("/api/communication-client", communicationClientRoutes);
@@ -345,4 +348,5 @@ server.listen(PORT, () => {
 
   startMailingScheduler();
   startAiSnapshotScheduler();
+  startMeteoScheduler();
 });

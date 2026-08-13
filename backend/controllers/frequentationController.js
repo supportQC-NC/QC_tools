@@ -7,8 +7,8 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import { getFrequentation } from "../services/frequentationService.js";
 import { genererExcelFrequentation } from "../services/frequentationExcelService.js";
 
-// Période demandée : ?du=YYYY-MM-DD&au=YYYY-MM-DD&pas=15|30|60
-// Défaut : les 30 derniers jours, pas horaire.
+// Période demandée : ?du=YYYY-MM-DD&au=YYYY-MM-DD&pas=15|30|60&jour=0..6
+// Défaut : les 30 derniers jours, pas horaire, tous les jours de la semaine.
 const resolvePeriode = (req) => {
   const iso = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -18,10 +18,17 @@ const resolvePeriode = (req) => {
   const ilYa30j = new Date();
   ilYa30j.setDate(ilYa30j.getDate() - 30);
 
+  const jourBrut = req.query.jour;
+  const jour =
+    jourBrut === undefined || jourBrut === "" || jourBrut === "all"
+      ? null
+      : parseInt(jourBrut, 10);
+
   return {
     du: req.query.du || iso(ilYa30j),
     au: req.query.au || iso(aujourdhui),
     pas: parseInt(req.query.pas, 10) || 60,
+    jour: Number.isInteger(jour) ? jour : null,
   };
 };
 
@@ -58,7 +65,9 @@ const exportExcel = asyncHandler(async (req, res) => {
     nomSociete: entreprise.nomComplet || entreprise.nomDossierDBF,
   });
 
-  const fname = `frequentation_${entreprise.nomDossierDBF}_${data.periode.du}_${data.periode.au}.xlsx`;
+  const suffixeJour =
+    data.periode.jour === null ? "" : `_${data.periode.jourLabel.toLowerCase()}`;
+  const fname = `frequentation_${entreprise.nomDossierDBF}_${data.periode.du}_${data.periode.au}${suffixeJour}.xlsx`;
   res.setHeader(
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

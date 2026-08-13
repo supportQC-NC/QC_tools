@@ -29,14 +29,38 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  Cell,
 } from "recharts";
 import {
   selectGlobalDossier,
   selectGlobalEntreprise,
 } from "../../slices/entrepriseGlobalSlice";
 import { useLazyGetFrequentationQuery } from "../../slices/frequentationApiSlice";
+import OngletVacances from "../../components/frequentation/OngletVacances";
+import OngletEvenements from "../../components/frequentation/OngletEvenements";
+import OngletMeteo from "../../components/frequentation/OngletMeteo";
 import { BASE_URL } from "../../constants";
 import "./AdminFrequentationScreen.css";
+
+// Jours de la semaine (index serveur : 0 = lundi … 6 = dimanche).
+const JOURS = [
+  "Lundi",
+  "Mardi",
+  "Mercredi",
+  "Jeudi",
+  "Vendredi",
+  "Samedi",
+  "Dimanche",
+];
+
+const ONGLETS = [
+  { cle: "analyse", label: "Analyse" },
+  { cle: "vacances", label: "Vacances scolaires" },
+  { cle: "evenements", label: "Événements spéciaux" },
+  { cle: "meteo", label: "Météo" },
+];
+
+const COULEUR_METEO = { beau: "#f59e0b", mitige: "#94a3b8", pluvieux: "#3b82f6" };
 
 const AXE = "#8b8b9e";
 const GRILLE = "#2a2a3a";
@@ -84,9 +108,11 @@ const AdminFrequentationScreen = () => {
   const nomDossierDBF = useSelector(selectGlobalDossier);
   const entreprise = useSelector(selectGlobalEntreprise);
 
+  const [onglet, setOnglet] = useState("analyse");
   const [du, setDu] = useState(ilYaJours(30));
   const [au, setAu] = useState(iso(new Date()));
   const [pas, setPas] = useState(60);
+  const [jour, setJour] = useState(""); // "" = tous les jours de la semaine
   const [error, setError] = useState("");
   const [excelLoading, setExcelLoading] = useState(false);
 
@@ -127,7 +153,7 @@ const AdminFrequentationScreen = () => {
       setError("La date de début doit précéder la date de fin.");
       return;
     }
-    const params = { nomDossierDBF, du, au, pas };
+    const params = { nomDossierDBF, du, au, pas, jour: jour === "" ? null : Number(jour) };
     setAnalysee(params);
     try {
       await lancer(params).unwrap();
@@ -141,8 +167,9 @@ const AdminFrequentationScreen = () => {
     setError("");
     setExcelLoading(true);
     try {
+      const suffixe = analysee.jour === null ? "" : `&jour=${analysee.jour}`;
       const res = await fetch(
-        `${BASE_URL}/api/frequentation/${analysee.nomDossierDBF}/excel?du=${analysee.du}&au=${analysee.au}&pas=${analysee.pas}`,
+        `${BASE_URL}/api/frequentation/${analysee.nomDossierDBF}/excel?du=${analysee.du}&au=${analysee.au}&pas=${analysee.pas}${suffixe}`,
         { credentials: "include" },
       );
       if (!res.ok) {
@@ -225,6 +252,25 @@ const AdminFrequentationScreen = () => {
         )}
       </header>
 
+      <nav className="fq-tabs">
+        {ONGLETS.map((o) => (
+          <button
+            key={o.cle}
+            type="button"
+            className={`fq-tab ${onglet === o.cle ? "fq-tab-actif" : ""}`}
+            onClick={() => setOnglet(o.cle)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </nav>
+
+      {onglet === "vacances" && <OngletVacances />}
+      {onglet === "evenements" && <OngletEvenements />}
+      {onglet === "meteo" && <OngletMeteo />}
+
+      {onglet === "analyse" && (
+      <>
       <div className="fq-toolbar">
         <div className="fq-toolbar-left">
           <div className="fq-field">
@@ -257,6 +303,22 @@ const AdminFrequentationScreen = () => {
               <option value={60}>1 heure</option>
               <option value={30}>30 minutes</option>
               <option value={15}>15 minutes</option>
+            </select>
+          </div>
+          <div className="fq-field">
+            <label htmlFor="fq-jour">Jour de la semaine</label>
+            <select
+              id="fq-jour"
+              value={jour}
+              onChange={(e) => setJour(e.target.value)}
+              title="Analyser un seul jour pour suivre son évolution sur la période"
+            >
+              <option value="">Tous les jours</option>
+              {JOURS.map((j, i) => (
+                <option key={j} value={i}>
+                  {j}
+                </option>
+              ))}
             </select>
           </div>
           <div className="fq-presets">
@@ -370,6 +432,15 @@ const AdminFrequentationScreen = () => {
               </span>
             </div>
           </div>
+
+          {kpi.ticketsExclus > 0 && (
+            <div className="fq-alert fq-alert-info">
+              {fmt(kpi.ticketsExclus)} vente(s) retirée(s) des moyennes sur{" "}
+              {kpi.nbPeriodesExclues} période(s) d'événement marquée(s)
+              « exclure de l'analyse » — elles restent comptées dans le
+              récapitulatif des événements ci-dessous.
+            </div>
+          )}
 
           {kpi.sansHeure > 0 && (
             <div className="fq-alert fq-alert-warn">
@@ -559,6 +630,236 @@ const AdminFrequentationScreen = () => {
             </div>
           </section>
 
+          {/* ── Impact de la météo ── */}
+          <section className="fq-card">
+            <header className="fq-card-header">
+              <h2>Impact de la météo</h2>
+              <span className="fq-card-note">
+                Moyenne de tickets par jour selon le temps à{" "}
+                {data.periode.lieuMeteo}
+                {data.joursSansMeteo
+                  ? ` · ${data.joursSansMeteo} jour(s) sans relevé`
+                  : ""}
+              </span>
+            </header>
+            <div className="fq-split">
+              <div className="fq-chart fq-chart-half">
+                <ResponsiveContainer width="100%" height={230}>
+                  <BarChart data={data.parMeteo || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRILLE} />
+                    <XAxis dataKey="label" stroke={AXE} fontSize={11} />
+                    <YAxis stroke={AXE} fontSize={11} />
+                    <Tooltip
+                      {...tooltipStyle}
+                      formatter={(value, name) => [fmtDec(value), name]}
+                    />
+                    <Bar
+                      dataKey="moyenneTickets"
+                      name="Tickets / jour"
+                      radius={[4, 4, 0, 0]}
+                    >
+                      {(data.parMeteo || []).map((m) => (
+                        <Cell key={m.categorie} fill={COULEUR_METEO[m.categorie]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="fq-mini-table">
+                <table className="fq-table">
+                  <thead>
+                    <tr>
+                      <th>Temps</th>
+                      <th className="fq-num">Jours</th>
+                      <th className="fq-num">Tickets / jour</th>
+                      <th className="fq-num">vs beau temps</th>
+                      <th className="fq-num">Panier moyen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.parMeteo || []).map((m) => (
+                      <tr key={m.categorie}>
+                        <td>
+                          <span className={`fq-chip fq-chip-${m.categorie}`}>
+                            {m.label}
+                          </span>
+                        </td>
+                        <td className="fq-num">{m.nbJours}</td>
+                        <td className="fq-num fq-strong">{fmtDec(m.moyenneTickets)}</td>
+                        <td
+                          className={`fq-num ${
+                            m.ecartVsBeau < 0 ? "fq-neg" : m.ecartVsBeau > 0 ? "fq-pos" : ""
+                          }`}
+                        >
+                          {m.ecartVsBeau === null || m.categorie === "beau"
+                            ? "—"
+                            : `${m.ecartVsBeau > 0 ? "+" : ""}${m.ecartVsBeau} %`}
+                        </td>
+                        <td className="fq-num">{fmt(m.panierMoyen)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Impact des vacances scolaires ── */}
+          <section className="fq-card">
+            <header className="fq-card-header">
+              <h2>Impact des vacances scolaires</h2>
+              <span className="fq-card-note">
+                Périodes saisies dans l'onglet « Vacances scolaires »
+              </span>
+            </header>
+            {data.vacances?.pendant?.nbJours === 0 &&
+            data.vacances?.periodes?.length === 0 ? (
+              <p className="fq-vide">
+                Aucune période de vacances ne recoupe la plage analysée. Saisissez
+                le calendrier dans l'onglet « Vacances scolaires ».
+              </p>
+            ) : (
+              <div className="fq-split">
+                <div className="fq-compare">
+                  <div className="fq-compare-bloc">
+                    <span className="fq-compare-value">
+                      {fmtDec(data.vacances.pendant.moyenneTickets)}
+                    </span>
+                    <span className="fq-compare-label">
+                      tickets / jour pendant les vacances
+                      <br />
+                      <em>{data.vacances.pendant.nbJours} jour(s)</em>
+                    </span>
+                  </div>
+                  <div className="fq-compare-bloc">
+                    <span className="fq-compare-value">
+                      {fmtDec(data.vacances.hors.moyenneTickets)}
+                    </span>
+                    <span className="fq-compare-label">
+                      tickets / jour hors vacances
+                      <br />
+                      <em>{data.vacances.hors.nbJours} jour(s)</em>
+                    </span>
+                  </div>
+                  <div
+                    className={`fq-compare-bloc fq-compare-ecart ${
+                      data.vacances.ecart < 0 ? "fq-neg" : "fq-pos"
+                    }`}
+                  >
+                    <span className="fq-compare-value">
+                      {data.vacances.ecart === null
+                        ? "—"
+                        : `${data.vacances.ecart > 0 ? "+" : ""}${data.vacances.ecart} %`}
+                    </span>
+                    <span className="fq-compare-label">écart</span>
+                  </div>
+                </div>
+                <div className="fq-mini-table">
+                  <table className="fq-table">
+                    <thead>
+                      <tr>
+                        <th>Période</th>
+                        <th className="fq-num">Jours</th>
+                        <th className="fq-num">Tickets / jour</th>
+                        <th className="fq-num">Panier moyen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data.vacances.periodes || []).map((p) => (
+                        <tr key={p._id}>
+                          <td>
+                            {p.libelle}
+                            <span className="fq-sub">
+                              {frDate(p.dateDebut)} → {frDate(p.dateFin)}
+                            </span>
+                          </td>
+                          <td className="fq-num">{p.nbJours}</td>
+                          <td className="fq-num fq-strong">{fmtDec(p.moyenneTickets)}</td>
+                          <td className="fq-num">{fmt(p.panierMoyen)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ── Impact des événements spéciaux ── */}
+          <section className="fq-card">
+            <header className="fq-card-header">
+              <h2>Événements spéciaux</h2>
+              <span className="fq-card-note">
+                « Attendu » = moyenne du même jour de semaine, hors événement
+              </span>
+            </header>
+            {(data.evenements || []).length === 0 ? (
+              <p className="fq-vide">
+                Aucun événement enregistré sur cette période. Saisissez grèves,
+                blocages, cyclones ou jours fériés dans l'onglet « Événements
+                spéciaux ».
+              </p>
+            ) : (
+              <div className="fq-table-wrap">
+                <table className="fq-table">
+                  <thead>
+                    <tr>
+                      <th>Événement</th>
+                      <th>Type</th>
+                      <th>Période</th>
+                      <th className="fq-num">Jours</th>
+                      <th className="fq-num">Tickets constatés</th>
+                      <th className="fq-num">Attendus</th>
+                      <th className="fq-num">Écart</th>
+                      <th>Analyse</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.evenements.map((e) => (
+                      <tr key={e._id}>
+                        <td className="fq-strong">{e.libelle}</td>
+                        <td>
+                          <span className={`fq-chip fq-chip-${e.type}`}>{e.type}</span>
+                        </td>
+                        <td>
+                          {frDate(e.dateDebut)}
+                          {e.dateFin !== e.dateDebut ? ` → ${frDate(e.dateFin)}` : ""}
+                          {(e.heureDebut || e.heureFin) && (
+                            <span className="fq-sub">
+                              {e.heureDebut || "00:00"} → {e.heureFin || "23:59"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="fq-num">{e.nbJours}</td>
+                        <td className="fq-num">{fmt(e.ticketsConstates)}</td>
+                        <td className="fq-num fq-muted">{fmt(e.ticketsAttendus)}</td>
+                        <td
+                          className={`fq-num fq-strong ${
+                            e.ecart < 0 ? "fq-neg" : e.ecart > 0 ? "fq-pos" : ""
+                          }`}
+                        >
+                          {e.ecart === null ? "—" : `${e.ecart > 0 ? "+" : ""}${e.ecart} %`}
+                        </td>
+                        <td>
+                          {e.exclure ? (
+                            <span
+                              className="fq-chip fq-chip-exclu"
+                              title={`${fmt(e.ticketsExclus)} vente(s) retirée(s) des moyennes`}
+                            >
+                              exclu
+                            </span>
+                          ) : (
+                            <span className="fq-muted">inclus</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
           <p className="fq-footnote">
             Source : facture.dbf (TYPFACT « F » = ventes ; les avoirs, RESA et
             transferts ne comptent pas comme passages). Les comptes internes
@@ -567,6 +868,8 @@ const AdminFrequentationScreen = () => {
             {data._cache ? " (résultat en cache)" : ""}.
           </p>
         </>
+      )}
+      </>
       )}
     </div>
   );

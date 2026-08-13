@@ -24,6 +24,9 @@
 import path from "path";
 import fs from "fs";
 import { DBFFile } from "dbffile";
+import VacancesScolaires from "../models/VacancesScolairesModel.js";
+import EvenementSpecial from "../models/EvenementSpecialModel.js";
+import { lieuPourEntreprise, getMeteoParDate } from "./meteoService.js";
 
 const BATCH = 2000;
 const TTL_MS = 15 * 60 * 1000;
@@ -201,14 +204,104 @@ const getFactureIndex = async (entreprise) => {
   return promesse;
 };
 
+// ───────── Contexte : météo, vacances scolaires, événements spéciaux ────────
+
+/**
+ * Charge le contexte d'une période : météo du lieu de la société, périodes de
+ * vacances scolaires et événements spéciaux qui recoupent la plage.
+ */
+const chargerContexte = async (entreprise, du, au) => {
+  const lieu = lieuPourEntreprise(entreprise);
+
+  const [meteoParDate, vacances, evenements] = await Promise.all([
+    getMeteoParDate(lieu.slug, du, au),
+    VacancesScolaires.find({ dateDebut: { $lte: au }, dateFin: { $gte: du } })
+      .sort({ dateDebut: 1 })
+      .lean(),
+    EvenementSpecial.find({
+      dateDebut: { $lte: au },
+      dateFin: { $gte: du },
+      // Événement global (aucune société listée) OU visant cette société.
+      $or: [{ entreprises: { $size: 0 } }, { entreprises: entreprise._id }],
+    })
+      .sort({ dateDebut: 1 })
+      .lean(),
+  ]);
+
+  return { lieu, meteoParDate, vacances, evenements };
+};
+
+// Clé d'instant comparable : AAAAMMJJ * 1440 + minutes depuis minuit.
+// Monotone en (date, heure), donc directement comparable par <= / >=.
+const instantKey = (ymd, minutes) => ymd * 1440 + Math.max(0, minutes);
+
+// "HH:MM" -> minutes depuis minuit (null si vide/invalide).
+const minutesDeHeure = (h) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(safeTrim(h));
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (hh > 23 || mm > 59) return null;
+  return hh * 60 + mm;
+};
+
+/**
+ * Fenêtres d'exclusion issues des événements marqués « exclure » : leurs
+ * ventes sortent des moyennes (mais restent comptées pour l'événement).
+ */
+const construireExclusions = (evenements) =>
+  evenements
+    .filter((e) => e.exclure)
+    .map((e) => {
+      const dDeb = ymdFromInput(e.dateDebut);
+      const dFin = ymdFromInput(e.dateFin);
+      const mDeb = minutesDeHeure(e.heureDebut) ?? 0;
+      const mFin = minutesDeHeure(e.heureFin) ?? 1439;
+      return {
+        id: String(e._id),
+        libelle: e.libelle,
+        debut: instantKey(dDeb, mDeb),
+        fin: instantKey(dFin, mFin),
+      };
+    })
+    .filter((x) => x.debut && x.fin && x.debut <= x.fin);
+
+// Statistiques d'un groupe de journées (moyennes par jour ouvert).
+const statsJours = (liste) => {
+  const nbJours = liste.length;
+  const tickets = liste.reduce((s, j) => s + j.nb, 0);
+  const ca = liste.reduce((s, j) => s + j.ca, 0);
+  return {
+    nbJours,
+    tickets,
+    ca,
+    moyenneTickets: nbJours ? +(tickets / nbJours).toFixed(1) : 0,
+    moyenneCa: nbJours ? Math.round(ca / nbJours) : 0,
+    panierMoyen: tickets ? Math.round(ca / tickets) : 0,
+  };
+};
+
+// Écart en % entre une valeur et une référence (null si référence nulle).
+const ecartPct = (valeur, reference) =>
+  reference ? +(((valeur - reference) / reference) * 100).toFixed(1) : null;
+
 /**
  * Analyse de fréquentation d'une société sur une plage de dates.
  *
  * @param {object} entreprise           document Entreprise
- * @param {object} periode              { du:"YYYY-MM-DD", au:"YYYY-MM-DD", pas:number }
+ * @param {object} periode
+ * @param {string} periode.du           "AAAA-MM-JJ"
+ * @param {string} periode.au           "AAAA-MM-JJ"
+ * @param {number} periode.pas          15 | 30 | 60 (minutes)
+ * @param {number|null} periode.jour    0 = lundi … 6 = dimanche ; null = tous
+ *                                      (permet de suivre l'évolution d'un seul
+ *                                      jour de la semaine sur la période)
  * @returns {Promise<object>}           agrégats prêts pour les graphiques
  */
-export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
+export const getFrequentation = async (
+  entreprise,
+  { du, au, pas = 60, jour = null },
+) => {
   const duYmd = ymdFromInput(du);
   const auYmd = ymdFromInput(au);
   if (!duYmd || !auYmd) {
@@ -222,6 +315,15 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
     throw e;
   }
   const pasMin = PAS_AUTORISES.includes(Number(pas)) ? Number(pas) : 60;
+
+  // Filtre « un seul jour de la semaine » (0 = lundi … 6 = dimanche).
+  const jourFiltre =
+    jour === null || jour === undefined || jour === "" ? null : Number(jour);
+  if (jourFiltre !== null && !(jourFiltre >= 0 && jourFiltre <= 6)) {
+    const e = new Error("Jour de la semaine invalide (0 = lundi … 6 = dimanche).");
+    e.statusCode = 400;
+    throw e;
+  }
 
   const nbJoursPlage =
     Math.round(
@@ -238,6 +340,20 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
   const t0 = Date.now();
   const index = await getFactureIndex(entreprise);
   const nbTranches = Math.ceil((24 * 60) / pasMin);
+
+  // Contexte (météo / vacances / événements) chargé AVANT l'agrégation : les
+  // fenêtres d'événements « exclus » doivent être connues pendant le comptage.
+  const contexte = await chargerContexte(
+    entreprise,
+    isoFromYmd(duYmd),
+    isoFromYmd(auYmd),
+  );
+  const exclusions = construireExclusions(contexte.evenements);
+  // Ventes retirées des moyennes, comptées à part par événement.
+  const exclusParEvt = new Map(
+    exclusions.map((x) => [x.id, { nb: 0, ca: 0, jours: new Set() }]),
+  );
+  let nbExclus = 0;
 
   // Accumulateurs
   const parTranche = Array.from({ length: nbTranches }, () => ({ nb: 0, ca: 0 }));
@@ -273,6 +389,14 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
     const ymd = aYmd[i];
     if (ymd < duYmd || ymd > auYmd) continue;
 
+    // Jour de la semaine (mémoïsé) — calculé en premier pour pouvoir filtrer.
+    let js = jsParYmd.get(ymd);
+    if (js === undefined) {
+      js = jourSemaineOf(ymd);
+      jsParYmd.set(ymd, js);
+    }
+    if (jourFiltre !== null && js !== jourFiltre) continue;
+
     // Comptes internes (TIERS > 9900) : ce ne sont pas des passages client.
     if (aTiers[i] > TIERS_MAX) {
       comptesInternes += 1;
@@ -282,6 +406,21 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
     if (aTyp[i] === TYP_A) {
       nbAvoirs += 1;
       continue;
+    }
+
+    // Fenêtre d'événement exclue : la vente sort des moyennes et n'est
+    // comptée que dans le récapitulatif de l'événement concerné.
+    if (exclusions.length) {
+      const cle = instantKey(ymd, aMin[i]);
+      const zone = exclusions.find((x) => cle >= x.debut && cle <= x.fin);
+      if (zone) {
+        const acc = exclusParEvt.get(zone.id);
+        acc.nb += 1;
+        acc.ca += aMontant[i];
+        acc.jours.add(ymd);
+        nbExclus += 1;
+        continue;
+      }
     }
 
     const montant = aMontant[i];
@@ -294,12 +433,6 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
     jour.ca += montant;
     parJourMap.set(ymd, jour);
 
-    // Jour de la semaine
-    let js = jsParYmd.get(ymd);
-    if (js === undefined) {
-      js = jourSemaineOf(ymd);
-      jsParYmd.set(ymd, js);
-    }
     parJourSem[js].nb += 1;
     parJourSem[js].ca += montant;
     parJourSem[js].dates.add(ymd);
@@ -356,13 +489,40 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
 
   const jours = [...parJourMap.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([ymd, v]) => ({
-      date: isoFromYmd(ymd),
-      jourSemaine: JOURS_SEMAINE[jourSemaineOf(ymd)],
-      nb: v.nb,
-      ca: Math.round(v.ca),
-      panierMoyen: v.nb ? Math.round(v.ca / v.nb) : 0,
-    }));
+    .map(([ymd, v]) => {
+      const date = isoFromYmd(ymd);
+      const m = contexte.meteoParDate.get(date) || null;
+      const evts = contexte.evenements.filter(
+        (e) => date >= e.dateDebut && date <= e.dateFin,
+      );
+      const vac = contexte.vacances.find(
+        (p) => date >= p.dateDebut && date <= p.dateFin,
+      );
+      return {
+        date,
+        jourSemaine: JOURS_SEMAINE[jourSemaineOf(ymd)],
+        nb: v.nb,
+        ca: Math.round(v.ca),
+        panierMoyen: v.nb ? Math.round(v.ca / v.nb) : 0,
+        meteo: m
+          ? {
+              categorie: m.categorie,
+              libelle: m.libelle,
+              pluieMm: m.pluieMm,
+              soleilHeures: m.soleilHeures,
+              tMin: m.tMin,
+              tMax: m.tMax,
+            }
+          : null,
+        vacances: vac ? vac.libelle : "",
+        evenements: evts.map((e) => ({
+          _id: String(e._id),
+          libelle: e.libelle,
+          type: e.type,
+          impact: e.impact,
+        })),
+      };
+    });
 
   // Carte de chaleur : total par (jour de semaine, tranche) + moyenne par
   // occurrence du jour (plus juste quand la plage couvre un nombre inégal de
@@ -381,6 +541,106 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
     }
   }
 
+  // ── Croisements : météo / vacances scolaires / événements ─────────────────
+
+  // Météo : moyennes par catégorie de temps (jours sans relevé mis à part).
+  const CAT_LABELS = { beau: "Beau temps", mitige: "Mitigé", pluvieux: "Pluvieux" };
+  const joursAvecMeteo = jours.filter((j) => j.meteo);
+  const parMeteo = ["beau", "mitige", "pluvieux"].map((cat) => {
+    const liste = joursAvecMeteo.filter((j) => j.meteo.categorie === cat);
+    return { categorie: cat, label: CAT_LABELS[cat], ...statsJours(liste) };
+  });
+  const refBeau = parMeteo.find((m) => m.categorie === "beau");
+  parMeteo.forEach((m) => {
+    m.ecartVsBeau =
+      m.categorie === "beau" ? 0 : ecartPct(m.moyenneTickets, refBeau?.moyenneTickets);
+  });
+
+  // Vacances scolaires : pendant / hors vacances.
+  const joursVacances = jours.filter((j) => j.vacances);
+  const joursHorsVacances = jours.filter((j) => !j.vacances);
+  const vacancesStats = {
+    pendant: statsJours(joursVacances),
+    hors: statsJours(joursHorsVacances),
+    periodes: contexte.vacances.map((p) => {
+      const liste = jours.filter(
+        (j) => j.date >= p.dateDebut && j.date <= p.dateFin,
+      );
+      return {
+        _id: String(p._id),
+        libelle: p.libelle,
+        dateDebut: p.dateDebut,
+        dateFin: p.dateFin,
+        ...statsJours(liste),
+      };
+    }),
+  };
+  vacancesStats.ecart = ecartPct(
+    vacancesStats.pendant.moyenneTickets,
+    vacancesStats.hors.moyenneTickets,
+  );
+
+  // Événements : comparaison au MÊME jour de semaine hors événement, la
+  // référence la plus honnête (un blocage un samedi ne se compare pas à un mardi).
+  const refParJourSem = new Array(7).fill(null).map(() => ({ nb: 0, jours: 0 }));
+  jours.forEach((j) => {
+    if (j.evenements.length) return;
+    const idx = JOURS_SEMAINE.indexOf(j.jourSemaine);
+    if (idx < 0) return;
+    refParJourSem[idx].nb += j.nb;
+    refParJourSem[idx].jours += 1;
+  });
+  const moyenneRef = (jourLabel) => {
+    const idx = JOURS_SEMAINE.indexOf(jourLabel);
+    const r = idx >= 0 ? refParJourSem[idx] : null;
+    return r && r.jours ? r.nb / r.jours : 0;
+  };
+
+  const evenementsStats = contexte.evenements.map((e) => {
+    const id = String(e._id);
+    // Journées de l'événement restées dans l'analyse (événement non exclu).
+    const liste = jours.filter(
+      (j) => j.date >= e.dateDebut && j.date <= e.dateFin,
+    );
+    // Ventes retirées des moyennes pour cet événement (événement exclu).
+    const exclu = exclusParEvt.get(id);
+
+    // Jours couverts : ceux visibles + ceux entièrement sortis de l'analyse.
+    const joursCouverts = exclu
+      ? new Set([
+          ...liste.map((j) => j.date),
+          ...[...exclu.jours].map((y) => isoFromYmd(y)),
+        ])
+      : new Set(liste.map((j) => j.date));
+
+    // Référence : moyenne du même jour de semaine, hors événement.
+    const attendu = [...joursCouverts].reduce((s, date) => {
+      const idx = jourSemaineOf(ymdFromInput(date));
+      return s + moyenneRef(JOURS_SEMAINE[idx]);
+    }, 0);
+    const constate =
+      liste.reduce((s, j) => s + j.nb, 0) + (exclu ? exclu.nb : 0);
+
+    return {
+      _id: id,
+      libelle: e.libelle,
+      type: e.type,
+      impact: e.impact,
+      dateDebut: e.dateDebut,
+      dateFin: e.dateFin,
+      heureDebut: e.heureDebut || "",
+      heureFin: e.heureFin || "",
+      exclure: !!e.exclure,
+      nbJours: joursCouverts.size,
+      ticketsConstates: constate,
+      ticketsExclus: exclu ? exclu.nb : 0,
+      caExclu: exclu ? Math.round(exclu.ca) : 0,
+      ticketsAttendus: Math.round(attendu),
+      ecart: attendu ? +(((constate - attendu) / attendu) * 100).toFixed(1) : null,
+      jours: liste.map((j) => ({ date: j.date, nb: j.nb })),
+    };
+  });
+
   // KPI
   const trancheMax = tranches.reduce(
     (best, t) => (!best || t.nb > best.nb ? t : best),
@@ -396,7 +656,14 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
   );
 
   const data = {
-    periode: { du: isoFromYmd(duYmd), au: isoFromYmd(auYmd), pas: pasMin },
+    periode: {
+      du: isoFromYmd(duYmd),
+      au: isoFromYmd(auYmd),
+      pas: pasMin,
+      jour: jourFiltre,
+      jourLabel: jourFiltre === null ? "Tous les jours" : JOURS_SEMAINE[jourFiltre],
+      lieuMeteo: contexte.lieu.label,
+    },
     kpi: {
       nbFactures,
       nbAvoirs,
@@ -409,6 +676,9 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
       sansHeure,
       comptesInternes,
       tiersMax: TIERS_MAX,
+      // Ventes retirées des moyennes (fenêtres d'événements exclues).
+      ticketsExclus: nbExclus,
+      nbPeriodesExclues: exclusions.length,
       heurePointe: trancheMax ? trancheMax.label : "",
       heurePointeNb: trancheMax ? trancheMax.nb : 0,
       jourSemainePointe: jourSemMax && jourSemMax.nb ? jourSemMax.label : "",
@@ -423,6 +693,10 @@ export const getFrequentation = async (entreprise, { du, au, pas = 60 }) => {
     joursSemaine,
     heat,
     jours,
+    parMeteo,
+    joursSansMeteo: jours.length - joursAvecMeteo.length,
+    vacances: vacancesStats,
+    evenements: evenementsStats,
     _facturesIndexees: index.n,
     _indexCache: !!index.fromCache,
     _queryTime: `${Date.now() - t0}ms`,

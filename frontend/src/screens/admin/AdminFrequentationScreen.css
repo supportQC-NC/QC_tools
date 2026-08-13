@@ -335,3 +335,325 @@
   font-size: 0.72rem;
   color: var(--admin-text-muted);
 }
+
+/* ── Onglets ── */
+.fq-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.fq-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--admin-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+.fq-tab:hover {
+  color: var(--admin-text);
+}
+.fq-tab-actif {
+  color: var(--admin-primary);
+  border-bottom-color: var(--admin-primary);
+}
+
+/* ── Onglets de saisie (vacances / événements / météo) ── */
+.fq-onglet {
+  padding-bottom: 1.5rem;
+}
+.fq-form {
+  margin: 1.25rem 1.5rem;
+  padding: 1rem 1.1rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+.fq-form-inline {
+  padding-bottom: 0.75rem;
+}
+.fq-form-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.fq-form-row + .fq-form-row {
+  margin-top: 0.9rem;
+}
+.fq-grow {
+  flex: 1 1 220px;
+}
+.fq-form-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.fq-form-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+.fq-inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.fq-inline input[type="number"] {
+  width: 90px;
+}
+.fq-form input[type="text"],
+.fq-form input[type="date"],
+.fq-form input[type="number"],
+.fq-form select {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+  width: 100%;
+}
+.fq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.fq-chip-btn {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  color: var(--admin-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  cursor: pointer;
+}
+.fq-chip-on {
+  background: var(--admin-info-light);
+  border-color: var(--admin-primary);
+  color: #93c5fd;
+}
+
+/* ── Tableaux des onglets ── */
+.fq-table-wrap {
+  margin: 0 1.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+.fq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.fq-table thead th {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+.fq-table tbody td {
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: middle;
+}
+.fq-table tbody tr:hover {
+  background: var(--admin-bg-hover);
+}
+.fq-table input,
+.fq-table select {
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-xs);
+  padding: 0.25rem 0.4rem;
+  font-size: 0.8rem;
+  width: 100%;
+}
+.fq-row-edit {
+  background: var(--admin-bg-tertiary);
+}
+.fq-td-info {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--admin-text-muted);
+}
+.fq-num {
+  text-align: right;
+}
+.fq-right {
+  text-align: right;
+  white-space: nowrap;
+}
+.fq-right .fq-btn + .fq-btn {
+  margin-left: 0.3rem;
+}
+.fq-strong {
+  font-weight: 700;
+}
+.fq-muted {
+  color: var(--admin-text-muted);
+}
+.fq-sub {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+}
+.fq-pos {
+  color: #6ee7b7;
+}
+.fq-neg {
+  color: #fca5a5;
+}
+.fq-btn-sm {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+}
+.fq-btn-danger {
+  border-color: var(--admin-danger);
+  color: #fca5a5;
+}
+.fq-alert-ok {
+  background: var(--admin-success-light);
+  border: 1px solid var(--admin-success);
+  color: #6ee7b7;
+}
+.fq-alert-info {
+  background: var(--admin-info-light);
+  border: 1px solid var(--admin-info);
+  color: #93c5fd;
+}
+.fq-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  padding: 0.45rem 0.7rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  white-space: nowrap;
+}
+.fq-check input {
+  accent-color: var(--admin-primary);
+}
+
+/* ── Chips (catégories météo, types d'événement) ── */
+.fq-chip {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+}
+.fq-chip-beau {
+  background: var(--admin-warning-light);
+  color: #fcd34d;
+}
+.fq-chip-mitige {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+}
+.fq-chip-pluvieux {
+  background: var(--admin-info-light);
+  color: #93c5fd;
+}
+.fq-chip-greve,
+.fq-chip-blocage {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+.fq-chip-cyclone,
+.fq-chip-intemperies {
+  background: var(--admin-info-light);
+  color: #93c5fd;
+}
+.fq-chip-ferie {
+  background: rgba(168, 85, 247, 0.18);
+  color: #d8b4fe;
+}
+.fq-chip-operation {
+  background: var(--admin-success-light);
+  color: #6ee7b7;
+}
+.fq-chip-exclu {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+.fq-chip-provisoire {
+  margin-left: 0.35rem;
+  background: var(--admin-warning-light);
+  color: #fcd34d;
+  text-transform: none;
+  cursor: help;
+}
+
+/* ── Blocs de comparaison (météo / vacances) ── */
+.fq-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem 1.1rem;
+}
+.fq-chart-half,
+.fq-mini-table {
+  flex: 1 1 340px;
+  min-width: 300px;
+}
+.fq-mini-table .fq-table-wrap,
+.fq-mini-table .fq-table {
+  margin: 0;
+}
+.fq-compare {
+  flex: 1 1 320px;
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+.fq-compare-bloc {
+  flex: 1;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  justify-content: center;
+}
+.fq-compare-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.fq-compare-label {
+  font-size: 0.72rem;
+  color: var(--admin-text-muted);
+  line-height: 1.35;
+}
+.fq-compare-ecart {
+  align-items: center;
+  text-align: center;
+}
+.fq-vide {
+  margin: 0;
+  padding: 1.25rem 1.1rem;
+  font-size: 0.82rem;
+  color: var(--admin-text-muted);
+}
