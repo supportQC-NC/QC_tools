@@ -22,6 +22,7 @@ export const PERMISSION_MODULES = [
   { key: "proforma", label: "Proformas", group: "gestion" },
   { key: "ctr_commande", label: "Contrôle Commandes", group: "gestion" },
   { key: "reception", label: "Réception marchandises", group: "gestion" },
+  { key: "reception_manuelle", label: "Contrôle réception manuel", group: "gestion" },
   { key: "prep_commande", label: "Préparation Commandes", group: "gestion" },
   { key: "envoi_cde_fournisseur", label: "Envoi Cde Fournisseur", group: "gestion" },
   { key: "ctrl_info_produit", label: "Contrôle Infos Produit", group: "gestion" },

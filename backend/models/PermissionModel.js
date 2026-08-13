@@ -52,6 +52,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Contrôle réception MANUEL (fiches papier à remplir à la main)
+      reception_manuelle: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Préparation Commandes
       prep_commande: {
         read: { type: Boolean, default: false },

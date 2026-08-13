@@ -208,6 +208,20 @@ export const moduleMenuStructure = [
   // },
   {
     type: "subgroup",
+    label: "Réception",
+    icon: HiTruck,
+    collapsible: true,
+    items: [
+      {
+        moduleKey: "reception_manuelle",
+        label: "Contrôle manuel",
+        path: "/reception-manuelle",
+        icon: HiClipboardCheck,
+      },
+    ],
+  },
+  {
+    type: "subgroup",
     label: "Relevé",
     icon: HiChartBar,
     collapsible: true,
@@ -602,6 +616,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/demandes-bipage": "Demandes d'articles à biper (collecteur).",
   "/admin/bipages": "Détail des bipages remontés.",
   "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
+  "/reception-manuelle":
+    "Imprimer les fiches de contrôle papier des commandes à réceptionner.",
   "/admin/suivi-entrees":
     "Marchandises entrées du jour (entrees.dbf) enrichies + contrôle TGC.",
   "/admin/resa-entrees":

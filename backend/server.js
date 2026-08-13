@@ -31,6 +31,8 @@ import commandeRoutes from "./routes/commandeRoutes.js";
 import controleCommandeRoutes from "./routes/controleCommandeRoutes.js";
 // ========== ROUTES RÉCEPTION DE MARCHANDISES ==========
 import receptionRoutes from "./routes/receptionRoutes.js";
+// ========== ROUTES CONTRÔLE RÉCEPTION MANUEL (fiches papier) ==========
+import receptionManuelleRoutes from "./routes/receptionManuelleRoutes.js";
 // ========== ROUTES PRÉPARATION DE COMMANDE ==========
 import preparationRoutes from "./routes/preparationRoutes.js";
 import etiquetteRoutes from "./routes/etiquetteRoutes.js";
@@ -187,6 +189,8 @@ app.use("/api/commandes", commandeRoutes);
 app.use("/api/controle-commandes", controleCommandeRoutes);
 // ========== ROUTES RÉCEPTION DE MARCHANDISES ==========
 app.use("/api/receptions", receptionRoutes);
+// ========== ROUTES CONTRÔLE RÉCEPTION MANUEL (fiches papier) ==========
+app.use("/api/reception-manuelle", receptionManuelleRoutes);
 // ========== ROUTES PRÉPARATION DE COMMANDE ==========
 app.use("/api/preparations", preparationRoutes);
 // ========== ROUTES ZONES (INVENTAIRE) ==========

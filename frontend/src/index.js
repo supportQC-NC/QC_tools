@@ -100,6 +100,7 @@ import AdminTachesScreen from "./screens/admin/AdminTachesScreen";
 import MesTachesScreen from "./screens/user/MesTachesScreen";
 import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 import MonMenuScreen from "./screens/user/MonMenuScreen";
+import ReceptionManuelleScreen from "./screens/user/ReceptionManuelleScreen";
 import MonDashboardScreen from "./screens/user/MonDashboardScreen";
 
 const router = createBrowserRouter(
@@ -155,6 +156,11 @@ const router = createBrowserRouter(
       {/* Gestion · Changement de prix de vente -> module "changement_prix" */}
       <Route element={<ModuleRoute module="changement_prix" />}>
         <Route path="/changement-prix" element={<ChangementPrixScreen />} />
+      </Route>
+
+      {/* Gestion · Contrôle réception manuel (fiches papier) */}
+      <Route element={<ModuleRoute module="reception_manuelle" />}>
+        <Route path="/reception-manuelle" element={<ReceptionManuelleScreen />} />
       </Route>
 
       {/* Gestion · Historique prix d'achat -> module "historique_pachat" */}

@@ -60,6 +60,8 @@ export const apiSlice = createApi({
     "ChangementPrix",
     // ========== TAGS HISTORIQUE PRIX D'ACHAT ==========
     "PachatHistorique",
+    // ========== TAGS CONTRÔLE RÉCEPTION MANUEL (fiches papier) ==========
+    "ReceptionManuelle",
     // ========== TAGS SUIVI DES ENTREES ==========
     "SuiviEntrees",
     // ========== TAGS ENTREES SUR RESERVATION ==========
