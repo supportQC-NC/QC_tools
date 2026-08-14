@@ -19,6 +19,9 @@
 // Les libellés affichés viennent de entreprise.mappingEtatsProforma quand il
 // est renseigné.
 
+import path from "path";
+import fs from "fs";
+import { DBFFile } from "dbffile";
 import clientCacheService from "./clientCacheService.js";
 import factureCacheService from "./factureCacheService.js";
 import proformaCacheService from "./proformaCacheService.js";
@@ -89,6 +92,19 @@ const libelleEtat = (entreprise, etat) => {
 
 // Délai (jours) au-delà duquel une proforma non transformée est « à relancer ».
 export const DELAI_RELANCE_DEFAUT = 21;
+// Fenêtre glissante (mois) des documents « en cours ». L'ERP ne purge jamais :
+// sans cette borne, les compteurs remontent jusqu'à 2019 et plus personne ne
+// relance quoi que ce soit. 0 = tout l'historique (filtre explicite de l'écran).
+export const FENETRE_MOIS_DEFAUT = 12;
+
+/** Date plancher (YYYY-MM-DD) d'une fenêtre en mois, ou null si illimitée. */
+const bornePeriode = (mois) => {
+  const m = Number(mois);
+  if (!Number.isFinite(m) || m <= 0) return null;
+  const d = new Date();
+  d.setMonth(d.getMonth() - m);
+  return iso(d);
+};
 // Délai (jours) sans facture au-delà duquel un client est « à recontacter ».
 export const DELAI_CLIENT_INACTIF = 90;
 // Profondeur (jours) de recherche des entrées en stock pour les alertes.
@@ -189,6 +205,176 @@ const getDernieresVentes = async (entreprise) => {
   return map;
 };
 
+// ══════════ RÉSERVATIONS & COMMANDES SPÉCIALES (facture.dbf TYPFACT="R") ══════
+//
+// Source de vérité VALIDÉE avec le client (14/08/2026), après constat sur les
+// données QC : proforma.dbf ne contient AUCUN ETAT=0, ses états réels sont
+// 1 = « Reservation », 2 = « Commande à preparer », 3/4 = devis. Les vraies
+// réservations et commandes spéciales vivent dans facture.dbf TYPFACT="R",
+// avec entreprise.mappingEtatsReservation (1 = Réservation Stock,
+// 2 = Commande Spéciale) — la même source que « Entrées sur réservation ».
+//
+// ⚠️ PERF : on N'UTILISE PAS factureCacheService ici. Ce cache charge 1,7 M
+// factures + 6,2 M lignes de détail (~140 s) et s'invalide à chaque facturation.
+// On construit à la place un index LÉGER par streaming de facture.dbf seul, en
+// ne retenant que les entêtes TYPFACT="R" (quelques milliers de lignes).
+
+const RESA_BATCH = 2000;
+// TTL SEUL, volontairement : facture.dbf est modifié à chaque facture émise.
+// Invalider sur mtime/taille (comme le font les autres caches) ferait repayer
+// le scan complet (~40 s) à presque chaque requête en journée. Une réservation
+// créée à l'instant apparaît donc avec au plus 10 minutes de retard — sans
+// conséquence métier, alors que l'attente, elle, se voit tout de suite.
+const RESA_INDEX_TTL = 10 * 60 * 1000;
+const resaIndexCache = new Map(); // dossier -> { rows, loadedAt }
+
+const statSafe = (p) => {
+  try {
+    return fs.statSync(p);
+  } catch {
+    return null;
+  }
+};
+
+/** Libellé d'un état de réservation (mappingEtatsReservation de la société). */
+const libelleEtatResa = (entreprise, etat) => {
+  const m = entreprise?.mappingEtatsReservation;
+  const key = String(Number(etat));
+  if (m) {
+    const val = typeof m.get === "function" ? m.get(key) : m[key];
+    if (safeTrim(val)) return safeTrim(val);
+  }
+  return Number(etat) === 2 ? "Commande spéciale" : "Réservation";
+};
+
+/** Catégorie métier d'une réservation (facture.ETAT). */
+const categorieResa = (etat) => (Number(etat) === 2 ? "speciale" : "reservation");
+
+/** Index des entêtes de réservation (facture.dbf TYPFACT="R"), caché. */
+const getReservationsIndex = async (entreprise) => {
+  const dossier = entreprise.nomDossierDBF;
+  const p = path.join(entreprise.cheminBase, dossier, "facture.dbf");
+  const st = statSafe(p);
+  if (!st) throw new Error(`facture.dbf introuvable: ${p}`);
+
+  const hit = resaIndexCache.get(dossier);
+  if (hit && Date.now() - hit.loadedAt < RESA_INDEX_TTL) return hit.rows;
+
+  const t0 = Date.now();
+  const dbf = await DBFFile.open(p, { readMode: "loose" });
+  const rows = [];
+  let batch;
+  let scanned = 0;
+  while ((batch = await dbf.readRecords(RESA_BATCH)).length > 0) {
+    scanned += batch.length;
+    for (const r of batch) {
+      if (safeTrim(r.TYPFACT).toUpperCase() !== "R") continue;
+      rows.push({
+        numfact: safeTrim(r.NUMFACT),
+        date: parseDate(r.DATFACT),
+        tiers: safeTrim(r.TIERS),
+        nom: safeTrim(r.NOM),
+        texte: safeTrim(r.TEXTE),
+        montant: num(r.MONTANT),
+        repres: safeTrim(r.REPRES),
+        etat: Number(r.ETAT),
+      });
+    }
+  }
+
+  resaIndexCache.set(dossier, { rows, loadedAt: Date.now() });
+  console.log(
+    `[Commercial] Index réservations ${dossier}: ${rows.length} TYPFACT=R sur ${scanned} factures en ${Date.now() - t0}ms`,
+  );
+  return rows;
+};
+
+/**
+ * Réservations / commandes spéciales du commercial.
+ * @param {Object} opts categorie ("reservation"|"speciale"), tiers, search,
+ *                      fenetreMois (défaut 12, 0 = tout l'historique), page, limit
+ */
+export const getReservationsCommercial = async (
+  entreprise,
+  codes,
+  opts = {},
+) => {
+  const {
+    categorie,
+    tiers,
+    search,
+    fenetreMois = FENETRE_MOIS_DEFAUT,
+    page = 1,
+    limit = 50,
+  } = opts;
+
+  const [index, cacheClients] = await Promise.all([
+    getReservationsIndex(entreprise),
+    clientCacheService.getClients(entreprise),
+  ]);
+  const nomParTiers = new Map(
+    (cacheClients.records || []).map((c) => [
+      safeTrim(c.TIERS),
+      safeTrim(c.NOM),
+    ]),
+  );
+
+  const limiteYmd = bornePeriode(fenetreMois);
+
+  let rows = index
+    .filter((r) => estAMoi(r.repres, codes))
+    .map((r) => ({
+      numfact: r.numfact,
+      date: iso(r.date),
+      joursAnciennete: anciennete(r.date),
+      tiers: r.tiers,
+      nom: r.nom || nomParTiers.get(r.tiers) || "",
+      texte: r.texte,
+      montant: r.montant,
+      repres: r.repres,
+      etat: r.etat,
+      categorie: categorieResa(r.etat),
+      etatLabel: libelleEtatResa(entreprise, r.etat),
+    }));
+
+  if (categorie) rows = rows.filter((r) => r.categorie === categorie);
+  if (limiteYmd) rows = rows.filter((r) => r.date && r.date >= limiteYmd);
+
+  if (tiers !== undefined && tiers !== null && String(tiers) !== "") {
+    const t = String(tiers).trim();
+    rows = rows.filter((r) => r.tiers === t);
+  }
+  if (search) {
+    const q = search.toLowerCase();
+    rows = rows.filter(
+      (r) =>
+        r.numfact.toLowerCase().includes(q) ||
+        r.nom.toLowerCase().includes(q) ||
+        r.texte.toLowerCase().includes(q),
+    );
+  }
+
+  rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+
+  const totalRecords = rows.length;
+  const totalMontant = rows.reduce((s, r) => s + r.montant, 0);
+  const start = (page - 1) * limit;
+
+  return {
+    totalRecords,
+    totalMontant,
+    totalPages: Math.ceil(totalRecords / limit) || 1,
+    page,
+    limit,
+    hasNextPage: start + limit < totalRecords,
+    hasPrevPage: page > 1,
+    fenetreMois: Number(fenetreMois) || 0,
+    reservations: rows.slice(start, start + limit),
+  };
+};
+
+export { getReservationsIndex };
+
 // ──────────────────────────── Proformas / réservations ──────────────────────
 
 /** Mise en forme d'une proforma pour l'espace commercial. */
@@ -242,6 +428,7 @@ export const getProformasCommercial = async (
     page = 1,
     limit = 50,
     joursRelance = DELAI_RELANCE_DEFAUT,
+    fenetreMois = FENETRE_MOIS_DEFAUT,
   } = opts;
 
   const cache = await proformaCacheService.getProformas(entreprise);
@@ -250,6 +437,11 @@ export const getProformasCommercial = async (
     .map((p) => mapProforma(entreprise, p, suivis));
 
   if (categorie) rows = rows.filter((r) => r.categorie === categorie);
+
+  // Fenêtre glissante : au-delà, le document est considéré mort (l'ERP ne purge
+  // pas). Passer fenetreMois=0 depuis l'écran pour voir tout l'historique.
+  const limiteYmd = bornePeriode(fenetreMois);
+  if (limiteYmd) rows = rows.filter((r) => r.date && r.date >= limiteYmd);
 
   if (tiers !== undefined && tiers !== null && String(tiers) !== "") {
     const t = String(tiers).trim();
@@ -531,7 +723,7 @@ export const getFicheClient = async (
   if (!tiersSet.has(cible)) return null;
 
   const client = clients.find((c) => safeTrim(c.TIERS) === cible);
-  const [stats, dernieres, factures, docs] = await Promise.all([
+  const [stats, dernieres, factures, docs, resas] = await Promise.all([
     getStatsPortefeuille(entreprise, codes),
     getDernieresVentes(entreprise),
     getFacturesCommercial(entreprise, codes, {
@@ -540,18 +732,28 @@ export const getFicheClient = async (
       typfact: "FA",
       limit: 200,
     }),
+    // Fiche client : tout l'historique du client (fenetreMois=0), c'est une
+    // consultation ciblée et non un compteur d'activité.
     getProformasCommercial(
       entreprise,
       codes,
-      { tiers: cible, limit: 500 },
+      { tiers: cible, limit: 500, fenetreMois: 0 },
       suivis,
     ),
+    getReservationsCommercial(entreprise, codes, {
+      tiers: cible,
+      limit: 500,
+      fenetreMois: 0,
+    }),
   ]);
 
   const st = stats.parTiers.get(cible) || null;
   const last = dernieres.get(cible) || null;
   const parCategorie = { speciale: [], reservation: [], preparer: [], devis: [] };
   docs.proformas.forEach((p) => parCategorie[p.categorie].push(p));
+  // Réservations / commandes spéciales : source facture.dbf TYPFACT="R".
+  const resasParCat = { reservation: [], speciale: [] };
+  resas.reservations.forEach((r) => resasParCat[r.categorie].push(r));
 
   return {
     client: {
@@ -590,10 +792,12 @@ export const getFicheClient = async (
     },
     factures: factures.factures,
     totalFactures: factures.totalRecords,
-    reservations: parCategorie.reservation,
-    commandesSpeciales: parCategorie.speciale,
+    // Réservations & commandes spéciales : facture.dbf TYPFACT="R".
+    reservations: resasParCat.reservation,
+    commandesSpeciales: resasParCat.speciale,
+    // Documents proforma.dbf du client (à préparer + devis).
     aPreparer: parCategorie.preparer,
-    proformas: parCategorie.devis,
+    proformas: [...parCategorie.devis, ...parCategorie.reservation],
   };
 };
 
@@ -669,22 +873,40 @@ export const getDashboardSociete = async (
   opts = {},
   suivis = new Map(),
 ) => {
-  const { joursRelance = DELAI_RELANCE_DEFAUT } = opts;
+  const {
+    joursRelance = DELAI_RELANCE_DEFAUT,
+    fenetreMois = FENETRE_MOIS_DEFAUT,
+  } = opts;
 
-  const [{ clients }, cacheProforma] = await Promise.all([
+  const [{ clients }, cacheProforma, resas] = await Promise.all([
     getPortefeuille(entreprise, codes),
     proformaCacheService.getProformas(entreprise),
+    getReservationsCommercial(entreprise, codes, {
+      fenetreMois,
+      limit: 100000,
+    }),
   ]);
 
+  // Fenêtre glissante : l'ERP ne purge pas, sans borne les compteurs remontent
+  // à 2019 et ne veulent plus rien dire.
+  const limiteYmd = bornePeriode(fenetreMois);
   const docs = (cacheProforma.proformaRecords || [])
     .filter((p) => estAMoi(p.REPRES, codes))
-    .map((p) => mapProforma(entreprise, p, suivis));
+    .map((p) => mapProforma(entreprise, p, suivis))
+    .filter((d) => !limiteYmd || (d.date && d.date >= limiteYmd));
 
   const compte = (cat) => docs.filter((d) => d.categorie === cat);
-  const reservations = compte("reservation");
-  const speciales = compte("speciale");
   const preparer = compte("preparer");
-  const devis = compte("devis");
+  // Documents proforma relançables : devis + « réservations » proforma (ETAT=1),
+  // qui sont des documents en attente et non les réservations fermes.
+  const devis = [...compte("devis"), ...compte("reservation")];
+  // Réservations & commandes spéciales fermes : facture.dbf TYPFACT="R".
+  const reservations = resas.reservations.filter(
+    (r) => r.categorie === "reservation",
+  );
+  const speciales = resas.reservations.filter(
+    (r) => r.categorie === "speciale",
+  );
 
   const seuilRelance = Number(joursRelance) || DELAI_RELANCE_DEFAUT;
   const aRelancer = docs.filter((d) => {
@@ -708,6 +930,7 @@ export const getDashboardSociete = async (
       nomComplet: entreprise.nomComplet,
     },
     codes,
+    fenetreMois: Number(fenetreMois) || 0,
     portefeuille: {
       nbClients: clients.length,
     },
@@ -815,6 +1038,8 @@ export default {
   DELAI_RELANCE_DEFAUT,
   DELAI_CLIENT_INACTIF,
   FENETRE_ALERTES_JOURS,
+  FENETRE_MOIS_DEFAUT,
+  getReservationsCommercial,
   getPortefeuille,
   getPortefeuilleListe,
   getStatsPortefeuille,

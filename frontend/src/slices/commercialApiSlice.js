@@ -57,6 +57,16 @@ export const commercialApiSlice = apiSlice.injectEndpoints({
       providesTags: ["CommercialProformas"],
     }),
 
+    // Réservations & commandes spéciales : facture.dbf TYPFACT="R"
+    // (≠ proformas). ETAT 1 = réservation, 2 = commande spéciale.
+    getCommercialReservations: builder.query({
+      query: ({ dossier, ...params }) => ({
+        url: `${URL}/${dossier}/reservations`,
+        params,
+      }),
+      providesTags: ["CommercialProformas"],
+    }),
+
     getCommercialProformaLignes: builder.query({
       query: ({ dossier, numfact }) =>
         `${URL}/${dossier}/proformas/${numfact}/lignes`,
@@ -144,6 +154,7 @@ export const {
   useGetCommercialClientsQuery,
   useGetCommercialClientQuery,
   useGetCommercialProformasQuery,
+  useGetCommercialReservationsQuery,
   useGetCommercialProformaLignesQuery,
   useGetCommercialFacturesQuery,
   useGetCommercialAlertesQuery,

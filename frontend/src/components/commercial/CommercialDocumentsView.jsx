@@ -98,6 +98,9 @@ const CommercialDocumentsView = ({
     params.get("vue") === "relance" || vueRelanceParDefaut ? "relance" : "toutes",
   );
   const [search, setSearch] = useState("");
+  // L'ERP ne purge pas les proformas : sans fenêtre, la liste « à relancer »
+  // remonte jusqu'à 2019 et n'est plus actionnable.
+  const [fenetreMois, setFenetreMois] = useState(12);
   const [page, setPage] = useState(1);
   const [selection, setSelection] = useState([]);
   const [detail, setDetail] = useState(null);
@@ -114,7 +117,7 @@ const CommercialDocumentsView = ({
   useEffect(() => {
     setPage(1);
     setSelection([]);
-  }, [dossier, recherche, vue, categorie]);
+  }, [dossier, recherche, vue, categorie, fenetreMois]);
 
   const { data, isFetching, isError, error, refetch } =
     useGetCommercialProformasQuery(
@@ -123,6 +126,7 @@ const CommercialDocumentsView = ({
         categorie: categorie || undefined,
         aRelancer: vue === "relance" ? "1" : undefined,
         search: recherche || undefined,
+        fenetreMois,
         page,
         limit: 50,
       },
@@ -203,6 +207,19 @@ const CommercialDocumentsView = ({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+            </div>
+            <div className="co-field">
+              <label htmlFor="co-doc-fen">Période</label>
+              <select
+                id="co-doc-fen"
+                value={fenetreMois}
+                onChange={(e) => setFenetreMois(Number(e.target.value))}
+              >
+                <option value={12}>12 derniers mois</option>
+                <option value={6}>6 derniers mois</option>
+                <option value={24}>24 derniers mois</option>
+                <option value={0}>Tout l'historique</option>
+              </select>
             </div>
             <div style={{ marginLeft: "auto" }} className="co-hint">
               {data && (

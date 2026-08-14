@@ -25,6 +25,7 @@ import {
   getClients,
   getClient,
   getProformas,
+  getReservations,
   getProformaLignes,
   getFactures,
   getAlertes,
@@ -53,6 +54,8 @@ router.get("/:nomDossierDBF/clients", ...scope, getClients);
 router.get("/:nomDossierDBF/clients/:tiers", ...scope, getClient);
 
 router.get("/:nomDossierDBF/proformas", ...scope, getProformas);
+// Réservations / commandes spéciales : facture.dbf TYPFACT="R" (≠ proformas).
+router.get("/:nomDossierDBF/reservations", ...scope, getReservations);
 router.get(
   "/:nomDossierDBF/proformas/:numfact/lignes",
   ...scope,

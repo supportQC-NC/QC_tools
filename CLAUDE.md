@@ -58,14 +58,22 @@ Un utilisateur peut être marqué **commercial** (`Permission.commercial = { act
 
 **Un code REPRES n'est pas forcément un commercial** (caisse, vendeur magasin, compte technique). Le dictionnaire fait foi : `entreprise.vendeurs[].type === "commercial"` (onglet Vendeurs de la fiche société). Ce filtre s'applique à l'UI, à l'enregistrement (`sanitizeCommercial`) **et à chaque requête** (`getEntreprisesCommercial`) — repasser un code en « vendeur » ferme l'accès immédiatement. La création/édition d'utilisateur se fait en page plein écran (`/admin/users/nouveau`, `/admin/users/:id`), plus en modale.
 
-Le service ne duplique rien : il lit les caches existants (`clientCacheService`, `factureCacheService`, `proformaCacheService`), reprend l'analyse CA de `commerciauxService` et les alertes de `resaEntreesService`. Catégories des documents = `proforma.ETAT` (**0 = commande spéciale, 1 = réservation, 2 = à préparer, autre = devis**, même convention que l'écran Données ▸ Réservations), libellés via `entreprise.mappingEtatsProforma`. Seule écriture du module : `SuiviCommercialModel` (relances de proformas, alertes acquittées) — l'ERP reste en lecture seule.
+Le service ne duplique rien : il lit les caches existants (`clientCacheService`, `factureCacheService`, `proformaCacheService`), reprend l'analyse CA de `commerciauxService` et les alertes de `resaEntreesService`. Seule écriture du module : `SuiviCommercialModel` (relances de proformas, alertes acquittées) — l'ERP reste en lecture seule.
+
+**Deux sources distinctes, ne pas les confondre** (constaté sur les données QC, arbitré avec le client le 14/08/2026) :
+- **Réservations & commandes spéciales** = `facture.dbf` **TYPFACT="R"**, `ETAT` 1 = Réservation Stock, 2 = Commande Spéciale (`entreprise.mappingEtatsReservation`). Même source que « Entrées sur réservation » et que les alertes.
+- **Proformas** = `proforma.dbf`. Ses états réels chez QC sont 1 = « Reservation » (document en attente), 2 = « Commande à preparer », 3/4 = devis. **`ETAT=0` n'existe pas** — l'ancienne convention « 0 = commande spéciale » (commentaire de l'écran Données ▸ Réservations) est fausse.
+
+L'ERP **ne purge jamais** ces tables : tous les compteurs « en cours » / « à relancer » sont bornés par une **fenêtre glissante de 12 mois** (`FENETRE_MOIS_DEFAUT`, `fenetreMois=0` pour tout l'historique). Sans elle, on remonte à 2019 (4 686 « réservations en cours » au lieu de 33).
 
 ⚠️ **Perf — le dashboard est découpé en trois requêtes** parce que les caches DBF n'ont pas du tout le même coût à froid sur QC (clients ~3 s, proformas ~35 s, factures ~140 s pour 1,7 M factures + 6,2 M lignes, et ce cache s'invalide à chaque facturation) :
-1. `GET /dashboard` — portefeuille + documents (caches clients/proformas seulement) ;
+1. `GET /dashboard` — portefeuille + documents (caches clients/proformas + index réservations) ;
 2. `GET /dashboard/ca` — CA, top 3 clients, clients à recontacter (cache factures) ;
 3. `GET /:dossier/alertes` — croisement réservations × entrées (`resaEntreesService`, scan streaming).
 
 Le front affiche (1) immédiatement et remplit (2) et (3) en différé. **Ne pas refusionner ces endpoints.**
+
+L'index des réservations (`getReservationsIndex`) fait son propre streaming de `facture.dbf` en ne gardant que les entêtes TYPFACT="R" (~40 s pour 1,7 M factures → 881 lignes), au lieu des ~140 s du cache factures complet. Il est invalidé **par TTL seul (10 min), volontairement pas sur le mtime** : `facture.dbf` change à chaque facture émise, une invalidation sur fichier ferait repayer le scan à presque chaque requête.
 
 ## Request flow / conventions
 

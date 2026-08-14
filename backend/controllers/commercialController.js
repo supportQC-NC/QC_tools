@@ -247,6 +247,36 @@ const getProformas = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Réservations et commandes spéciales (facture.dbf TYPFACT="R")
+ * @route   GET /api/commercial/:nomDossierDBF/reservations
+ * @query   categorie (reservation|speciale), tiers, search, fenetreMois
+ *          (défaut 12, 0 = tout l'historique), page, limit
+ * @note    Source validée avec le client : proforma.dbf ne porte pas les
+ *          commandes spéciales (aucun ETAT=0). L'index est construit en
+ *          streaming sur les seuls entêtes TYPFACT="R" — on ne passe PAS par
+ *          le cache factures complet, bien trop lourd.
+ */
+const getReservations = asyncHandler(async (req, res) => {
+  const t0 = Date.now();
+  const result = await commercialService.getReservationsCommercial(
+    req.entreprise,
+    req.codesCommercial,
+    {
+      categorie: req.query.categorie || undefined,
+      tiers: req.query.tiers || undefined,
+      search: req.query.search || undefined,
+      fenetreMois:
+        req.query.fenetreMois !== undefined
+          ? Number(req.query.fenetreMois)
+          : undefined,
+      page: intParam(req.query.page, 1),
+      limit: intParam(req.query.limit, 50),
+    },
+  );
+  res.json({ ...result, _queryTime: `${Date.now() - t0}ms` });
+});
+
+/**
  * @desc    Lignes d'une proforma (le document doit être le sien)
  * @route   GET /api/commercial/:nomDossierDBF/proformas/:numfact/lignes
  */
@@ -494,6 +524,7 @@ export {
   getClients,
   getClient,
   getProformas,
+  getReservations,
   getProformaLignes,
   getFactures,
   getAlertes,
