@@ -499,6 +499,81 @@ a.co-kpi:hover {
   color: var(--admin-text-muted);
 }
 
+/* ── Visuels d'analyse (portage Power BI) ── */
+.co-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.co-svg-axe {
+  fill: var(--admin-text-muted);
+  font-size: 10px;
+}
+
+/* Treemap du profit */
+.co-treemap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 180px;
+}
+.co-treemap-case {
+  flex-grow: 1;
+  min-height: 56px;
+  border: none;
+  border-radius: var(--admin-radius-sm);
+  color: #fff;
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.15rem;
+  overflow: hidden;
+  text-align: left;
+}
+.co-treemap-case:hover {
+  outline: 2px solid #fff;
+}
+.co-treemap-lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.co-treemap-val {
+  font-size: 0.68rem;
+  opacity: 0.85;
+}
+
+/* Pivot hiérarchique */
+.co-pivot .co-row-sous td {
+  background: rgba(124, 58, 237, 0.05);
+}
+.co-expand,
+.co-expand-vide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+.co-expand {
+  border: none;
+  background: transparent;
+  color: #a855f7;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.co-pivot tfoot td {
+  background: var(--admin-bg-tertiary);
+  font-weight: 800;
+  border-top: 2px solid var(--admin-border);
+}
+
 /* ── Sélection multiple (relances) ── */
 .co-select-bar {
   display: flex;

@@ -82,6 +82,43 @@ export const commercialApiSlice = apiSlice.injectEndpoints({
       providesTags: ["CommercialFactures"],
     }),
 
+    // ── Analyse (portage du rapport Power BI) ────────────────────────────────
+    getCommercialAnalyse: builder.query({
+      query: ({ dossier, ...params }) => ({
+        url: `${URL}/${dossier}/analyse`,
+        params,
+      }),
+      providesTags: ["CommercialAnalyse"],
+    }),
+
+    getCommercialAnalyseFiltres: builder.query({
+      query: ({ dossier }) => `${URL}/${dossier}/analyse/filtres`,
+      providesTags: ["CommercialAnalyse"],
+    }),
+
+    // ── Prime (paramétrée par chaque commercial) ─────────────────────────────
+    getCommercialPrime: builder.query({
+      query: ({ dossier, annee, mois }) => ({
+        url: `${URL}/${dossier}/prime`,
+        params: { annee, mois },
+      }),
+      providesTags: ["CommercialPrime"],
+    }),
+
+    getCommercialPrimeConfig: builder.query({
+      query: ({ dossier }) => `${URL}/${dossier}/prime/config`,
+      providesTags: ["CommercialPrime"],
+    }),
+
+    updateCommercialPrimeConfig: builder.mutation({
+      query: ({ dossier, ...body }) => ({
+        url: `${URL}/${dossier}/prime/config`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["CommercialPrime"],
+    }),
+
     // Alertes « commande spéciale / réservation disponible » (entrée en stock).
     // ⚠️ Premier appel long (scan DBF) : à charger à part du dashboard.
     getCommercialAlertes: builder.query({
@@ -157,6 +194,11 @@ export const {
   useGetCommercialReservationsQuery,
   useGetCommercialProformaLignesQuery,
   useGetCommercialFacturesQuery,
+  useGetCommercialAnalyseQuery,
+  useGetCommercialAnalyseFiltresQuery,
+  useGetCommercialPrimeQuery,
+  useGetCommercialPrimeConfigQuery,
+  useUpdateCommercialPrimeConfigMutation,
   useGetCommercialAlertesQuery,
   useMarquerAlertesVuesMutation,
   useGetCommercialRelancesQuery,

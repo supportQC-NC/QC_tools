@@ -613,6 +613,10 @@ export const DEFAULT_MENU_HINTS = {
   "/commercial/commandes-speciales":
     "Mes commandes spéciales et leur avancement.",
   "/commercial/factures": "Les factures réalisées sous mon code vendeur.",
+  "/commercial/analyses":
+    "CA, marge et quantités de mon portefeuille par fournisseur, rayon, client ou article.",
+  "/commercial/prime":
+    "Suivi et simulation de ma prime — mes propres taux et paliers.",
   "/commercial/alertes":
     "Articles réservés par mes clients qui viennent d'entrer en stock.",
   "/espace-equipe": "Messagerie et espace de travail de vos équipes.",
@@ -700,6 +704,8 @@ export const COMMERCIAL_ITEMS = [
   { label: "Mes réservations", path: "/commercial/reservations", icon: HiClipboardList },
   { label: "Mes commandes spéciales", path: "/commercial/commandes-speciales", icon: HiSparkles },
   { label: "Mes factures", path: "/commercial/factures", icon: HiCurrencyDollar },
+  { label: "Mes analyses", path: "/commercial/analyses", icon: HiChartBar },
+  { label: "Ma prime", path: "/commercial/prime", icon: HiTrendingUp },
   { label: "Mes alertes", path: "/commercial/alertes", icon: HiInformationCircle },
 ];
 

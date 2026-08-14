@@ -17,6 +17,8 @@ import {
   HiCurrencyDollar,
   HiBell,
   HiOfficeBuilding,
+  HiChartBar,
+  HiTrendingUp,
 } from "react-icons/hi";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { useGetMonProfilCommercialQuery } from "../../slices/commercialApiSlice";
@@ -106,6 +108,8 @@ const NAV = [
   { to: "/commercial/reservations", label: "Réservations", icon: HiBookmark },
   { to: "/commercial/commandes-speciales", label: "Cdes spéciales", icon: HiStar },
   { to: "/commercial/factures", label: "Factures", icon: HiCurrencyDollar },
+  { to: "/commercial/analyses", label: "Analyses", icon: HiChartBar },
+  { to: "/commercial/prime", label: "Ma prime", icon: HiTrendingUp },
   { to: "/commercial/alertes", label: "Alertes", icon: HiBell },
 ];
 

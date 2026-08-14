@@ -7,7 +7,9 @@
 
 import asyncHandler from "../middleware/asyncHandler.js";
 import SuiviCommercial from "../models/SuiviCommercialModel.js";
+import PrimeCommercial from "../models/PrimeCommercialModel.js";
 import commercialService from "../services/commercialService.js";
+import commercialAnalyseService from "../services/commercialAnalyseService.js";
 import { vueProfil } from "../middleware/commercialAccess.js";
 
 // Relances / alertes déjà enregistrées par CET utilisateur sur CETTE société.
@@ -355,6 +357,113 @@ const getAlertes = asyncHandler(async (req, res) => {
   });
 });
 
+// ══════════ ANALYSE & PRIME (portage du rapport Power BI) ══════════
+
+/**
+ * @desc    Analyse par axe (fournisseur / rayon / client / article)
+ * @route   GET /api/commercial/:nomDossierDBF/analyse
+ * @query   axe, annee, mois, fournisseur, rayon, tiers, limit
+ * @note    Calculs repris ligne à ligne de detail.dbf, remise déduite —
+ *          exactement les colonnes calculées du modèle Power BI.
+ */
+const getAnalyse = asyncHandler(async (req, res) => {
+  const t0 = Date.now();
+  const result = await commercialAnalyseService.analyser(
+    req.entreprise,
+    req.codesCommercial,
+    {
+      axe: req.query.axe || "fournisseur",
+      annee: req.query.annee,
+      mois: req.query.mois,
+      fournisseur: req.query.fournisseur || undefined,
+      rayon: req.query.rayon || undefined,
+      tiers: req.query.tiers || undefined,
+      limit: intParam(req.query.limit, 200),
+    },
+  );
+  res.json({ ...result, _queryTime: `${Date.now() - t0}ms` });
+});
+
+/**
+ * @desc    Valeurs des filtres d'analyse (fournisseurs / rayons / années)
+ * @route   GET /api/commercial/:nomDossierDBF/analyse/filtres
+ */
+const getAnalyseFiltres = asyncHandler(async (req, res) => {
+  const filtres = await commercialAnalyseService.getFiltresAnalyse(
+    req.entreprise,
+    req.codesCommercial,
+  );
+  res.json(filtres);
+});
+
+/** Configuration de prime de l'utilisateur pour cette société (ou défauts). */
+const chargerConfigPrime = async (userId, entrepriseId) => {
+  const doc = await PrimeCommercial.findOne({
+    user: userId,
+    entreprise: entrepriseId,
+  }).lean();
+  return doc || { taux: 0, assiette: "marge", fournisseurPrime: {} };
+};
+
+/**
+ * @desc    Paramètres de prime du commercial (les siens uniquement)
+ * @route   GET /api/commercial/:nomDossierDBF/prime/config
+ */
+const getPrimeConfig = asyncHandler(async (req, res) => {
+  res.json(await chargerConfigPrime(req.user._id, req.entreprise._id));
+});
+
+/**
+ * @desc    Enregistrer SES paramètres de prime (taux, assiette, paliers)
+ * @route   PUT /api/commercial/:nomDossierDBF/prime/config
+ * @note    Chaque commercial renseigne son propre paramétrage — il ne peut ni
+ *          lire ni modifier celui d'un autre (clé user + entreprise).
+ */
+const updatePrimeConfig = asyncHandler(async (req, res) => {
+  const { taux, assiette, fournisseurPrime } = req.body;
+  const maj = {
+    taux: Number(taux) || 0,
+    assiette: assiette === "ca" ? "ca" : "marge",
+  };
+  if (fournisseurPrime !== undefined) {
+    maj.fournisseurPrime = {
+      code: String(fournisseurPrime?.code || "").trim(),
+      libelle: String(fournisseurPrime?.libelle || "").trim(),
+      surTouteLaSociete: fournisseurPrime?.surTouteLaSociete !== false,
+      paliers: (fournisseurPrime?.paliers || [])
+        .map((p) => ({
+          seuil: Number(p.seuil) || 0,
+          montant: Number(p.montant) || 0,
+        }))
+        .filter((p) => p.seuil > 0)
+        .sort((a, b) => a.seuil - b.seuil),
+    };
+  }
+  const doc = await PrimeCommercial.findOneAndUpdate(
+    { user: req.user._id, entreprise: req.entreprise._id },
+    { $set: maj },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+  res.json(doc);
+});
+
+/**
+ * @desc    Suivi de prime : prime portefeuille + prime fournisseur + détail
+ * @route   GET /api/commercial/:nomDossierDBF/prime
+ * @query   annee, mois
+ */
+const getPrime = asyncHandler(async (req, res) => {
+  const t0 = Date.now();
+  const config = await chargerConfigPrime(req.user._id, req.entreprise._id);
+  const result = await commercialAnalyseService.calculerPrime(
+    req.entreprise,
+    req.codesCommercial,
+    config,
+    { annee: req.query.annee, mois: req.query.mois },
+  );
+  res.json({ ...result, _queryTime: `${Date.now() - t0}ms` });
+});
+
 /**
  * @desc    Enregistrer une relance client sur une proforma
  * @route   POST /api/commercial/:nomDossierDBF/relances
@@ -528,6 +637,11 @@ export {
   getProformaLignes,
   getFactures,
   getAlertes,
+  getAnalyse,
+  getAnalyseFiltres,
+  getPrime,
+  getPrimeConfig,
+  updatePrimeConfig,
   enregistrerRelance,
   enregistrerRelancesLot,
   supprimerRelance,

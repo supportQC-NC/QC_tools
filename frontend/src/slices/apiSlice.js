@@ -98,6 +98,8 @@ export const apiSlice = createApi({
     "CommercialFactures",
     "CommercialAlertes",
     "CommercialRelances",
+    "CommercialAnalyse",
+    "CommercialPrime",
     // ========== TAGS INFOBULLES MENU ==========
     "MenuHint",
     "MenuLayout",

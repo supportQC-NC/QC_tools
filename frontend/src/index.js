@@ -113,6 +113,8 @@ import CommercialReservationsScreen from "./screens/commercial/CommercialReserva
 import CommercialSpecialesScreen from "./screens/commercial/CommercialSpecialesScreen";
 import CommercialFacturesScreen from "./screens/commercial/CommercialFacturesScreen";
 import CommercialAlertesScreen from "./screens/commercial/CommercialAlertesScreen";
+import CommercialAnalyseScreen from "./screens/commercial/CommercialAnalyseScreen";
+import CommercialPrimeScreen from "./screens/commercial/CommercialPrimeScreen";
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -178,6 +180,11 @@ const router = createBrowserRouter(
           path="/commercial/factures"
           element={<CommercialFacturesScreen />}
         />
+        <Route
+          path="/commercial/analyses"
+          element={<CommercialAnalyseScreen />}
+        />
+        <Route path="/commercial/prime" element={<CommercialPrimeScreen />} />
         <Route
           path="/commercial/alertes"
           element={<CommercialAlertesScreen />}

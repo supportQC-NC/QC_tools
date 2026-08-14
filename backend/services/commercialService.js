@@ -400,6 +400,9 @@ const buildFactureIndex = async (entreprise) => {
 
   const resas = [];
   const dernierAchat = new Map(); // tiers -> ymd le plus récent
+  // NUMFACT -> indice de ligne : sert à joindre detail.dbf sans relire les
+  // entêtes (voir commercialAnalyseService, analyse par article/rayon/fourn.).
+  const parNumfact = new Map();
 
   const today = new Date();
   const anneeN = today.getFullYear();
@@ -442,6 +445,8 @@ const buildFactureIndex = async (entreprise) => {
         const prev = dernierAchat.get(t);
         if (!prev || cle > prev) dernierAchat.set(t, cle);
       }
+      const numf = safeTrim(f.NUMFACT);
+      if (numf) parNumfact.set(numf, { ymd: cle, tiers: t, repres: safeTrim(f.REPRES), avoir: typ === "A" });
 
       // Colonnes : bornées à N / N-1, comme l'analyse commerciaux existante.
       if (annee !== anneeN && annee !== anneeN1) continue;
@@ -474,13 +479,14 @@ const buildFactureIndex = async (entreprise) => {
     noms,
     resas,
     dernierAchat,
+    parNumfact,
     anneeN,
     anneeN1,
   };
 };
 
 /** Index facture caché (TTL) + verrou anti-scans concurrents. */
-const getIndexFactures = async (entreprise) => {
+export const getIndexFactures = async (entreprise) => {
   const dossier = entreprise.nomDossierDBF;
   const hit = factIndexCache.get(dossier);
   if (hit && Date.now() - hit.loadedAt < RESA_INDEX_TTL) return hit.idx;
@@ -747,10 +753,9 @@ export const getProformasCommercial = async (
       }
       return true;
     });
-    rows.sort((a, b) => (b.joursAnciennete || 0) - (a.joursAnciennete || 0));
-  } else {
-    rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
   }
+  // Tri unique dans tout l'espace commercial : du plus récent au plus ancien.
+  rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 
   const totalRecords = rows.length;
   const totalMontant = rows.reduce((s, r) => s + r.montant, 0);
@@ -1226,7 +1231,7 @@ export const getDashboardSociete = async (
     // Aperçus directement cliquables depuis le dashboard.
     apercus: {
       aRelancer: aRelancer
-        .sort((a, b) => (b.joursAnciennete || 0) - (a.joursAnciennete || 0))
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
         .slice(0, 8),
       reservations: reservations
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
@@ -1347,9 +1352,16 @@ const prechaufferUneFois = async () => {
       isActive: true,
     });
 
+    // Import dynamique : commercialAnalyseService dépend de ce module
+    // (getIndexFactures), un import statique créerait un cycle.
+    const { getIndexDetail } = await import("./commercialAnalyseService.js");
+
     for (const e of entreprises) {
       try {
         await Promise.all([getIndexFactures(e), getIndexProformas(e)]);
+        // Index des lignes de détail (analyses + prime) : le plus lourd
+        // (~165 s), donc surtout pas payé par un utilisateur.
+        await getIndexDetail(e);
       } catch (err) {
         console.error(
           `[Commercial] Préchauffage ${e.nomDossierDBF} échoué:`,

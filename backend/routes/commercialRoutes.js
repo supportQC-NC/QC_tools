@@ -29,6 +29,11 @@ import {
   getProformaLignes,
   getFactures,
   getAlertes,
+  getAnalyse,
+  getAnalyseFiltres,
+  getPrime,
+  getPrimeConfig,
+  updatePrimeConfig,
   enregistrerRelance,
   enregistrerRelancesLot,
   supprimerRelance,
@@ -63,6 +68,14 @@ router.get(
 );
 
 router.get("/:nomDossierDBF/factures", ...scope, getFactures);
+
+// Analyse (portage du rapport Power BI) : axes fournisseur/rayon/client/article.
+router.get("/:nomDossierDBF/analyse", ...scope, getAnalyse);
+router.get("/:nomDossierDBF/analyse/filtres", ...scope, getAnalyseFiltres);
+// Suivi de prime : chaque commercial paramètre et consulte LA SIENNE.
+router.get("/:nomDossierDBF/prime", ...scope, getPrime);
+router.get("/:nomDossierDBF/prime/config", ...scope, getPrimeConfig);
+router.put("/:nomDossierDBF/prime/config", ...scope, updatePrimeConfig);
 
 router.get("/:nomDossierDBF/alertes", ...scope, getAlertes);
 router.post("/:nomDossierDBF/alertes/vues", ...scope, marquerAlertesVues);
