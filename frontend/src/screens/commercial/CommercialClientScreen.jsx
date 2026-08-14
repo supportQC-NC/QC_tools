@@ -56,7 +56,11 @@ const TableDocs = ({ docs, vide }) => {
               <td>{fmtDate(d.date)}</td>
               <td>{d.texte || "—"}</td>
               <td>
-                <ChipCategorie categorie={d.categorie} label={d.etatLabel} />
+                <ChipCategorie
+                  categorie={d.categorie}
+                  label={d.etatLabel}
+                  labelErp={d.etatLabelErp}
+                />
               </td>
               <td className="num">{fmtMontant(d.montant)}</td>
               <td className="num">{fmtNombre(d.joursAnciennete)} j</td>

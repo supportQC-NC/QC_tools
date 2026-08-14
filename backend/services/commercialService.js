@@ -3,29 +3,32 @@
 // ESPACE COMMERCIAL — toute la donnée métier d'un commercial, filtrée sur le
 // couple SOCIÉTÉ + CODE(S) VENDEUR (REPRES).
 //
-// Le module ne duplique AUCUN traitement : il s'appuie sur les caches DBF déjà
-// en place (clients / factures / proformas) et sur les services d'analyse
-// existants :
+// Sources :
 //   - clientCacheService     -> portefeuille (clients.REPRES)
-//   - factureCacheService    -> factures (facture.REPRES)
-//   - proformaCacheService   -> proformas, réservations, commandes spéciales
-//                               (proforma.REPRES + proforma.ETAT)
-//   - commerciauxService     -> CA / marge / top clients (analyse déjà cachée)
+//   - proformaCacheService   -> proformas (proforma.REPRES + proforma.ETAT)
+//   - index facture LOCAL    -> réservations, commandes spéciales, factures,
+//                               CA / marge, dernier achat (voir plus bas)
 //   - resaEntreesService     -> alertes « réservation entrée en stock »
 //
-// Catégories issues de proforma.ETAT — MÊME convention que l'écran Réservations
-// (screens/admin/AdminReservationsScreen.jsx) :
-//     0 = commande spéciale · 1 = réservation · 2 = à préparer · autre = devis
-// Les libellés affichés viennent de entreprise.mappingEtatsProforma quand il
-// est renseigné.
+// ⚠️ L'espace commercial N'UTILISE PAS factureCacheService ni commerciauxService.
+// Tous deux chargent facture.dbf ET detail.dbf (6,2 M lignes) pour TOUS les
+// commerciaux, soit ~140 s à froid, alors que le module n'a besoin que des
+// entêtes de factures. Il construit donc son propre index colonnaire en une
+// seule passe (~40 s en local, davantage sur le partage réseau de production),
+// qui sert à la fois les réservations, les factures, le CA et le dernier achat.
+//
+// Catégories de documents :
+//   - facture.dbf TYPFACT="R" -> réservations (ETAT=1) et commandes spéciales
+//     (ETAT=2), libellés via entreprise.mappingEtatsReservation ;
+//   - proforma.dbf -> devis et commandes à préparer, libellés via
+//     entreprise.mappingEtatsProforma. Attention : chez QC, proforma.ETAT=1 est
+//     libellé « Reservation » alors que ce n'est PAS une réservation ferme.
 
 import path from "path";
 import fs from "fs";
 import { DBFFile } from "dbffile";
 import clientCacheService from "./clientCacheService.js";
-import factureCacheService from "./factureCacheService.js";
 import proformaCacheService from "./proformaCacheService.js";
-import commerciauxService from "./commerciauxService.js";
 import { getResaEntrees } from "./resaEntreesService.js";
 import { sameCode } from "../middleware/commercialAccess.js";
 
@@ -53,6 +56,20 @@ const parseDate = (v) => {
 
 const iso = (d) => (d ? d.toISOString().slice(0, 10) : null);
 
+/** "YYYY-MM-DD" -> 20260814 (clé entière de l'index colonnaire). */
+const ymdInt = (v) => {
+  const d = parseDate(v);
+  if (!d) return null;
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+};
+
+/** 20260814 -> "2026-08-14". */
+const ymdIso = (cle) => {
+  if (!cle) return null;
+  const s = String(cle);
+  return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+};
+
 /** Nombre de jours entiers écoulés depuis `d` (null si date absente). */
 const anciennete = (d) => {
   if (!d) return null;
@@ -62,24 +79,53 @@ const anciennete = (d) => {
 /** Le REPRES d'un enregistrement fait-il partie des codes du commercial ? */
 const estAMoi = (repres, codes) => codes.some((c) => sameCode(c, repres));
 
-// Catégories métier dérivées de proforma.ETAT.
+/** Évolution en % (même convention que l'analyse commerciaux). */
+const evolution = (courant, precedent) => {
+  if (precedent !== 0) return ((courant - precedent) / Math.abs(precedent)) * 100;
+  return courant === 0 ? 0 : 100;
+};
+
+const MOIS = [
+  "janvier",
+  "février",
+  "mars",
+  "avril",
+  "mai",
+  "juin",
+  "juillet",
+  "août",
+  "septembre",
+  "octobre",
+  "novembre",
+  "décembre",
+];
+
+// Catégories des documents PROFORMA.
+//
+// ⚠️ Vocabulaire : le mapping proforma de QC libelle l'ETAT=1 « Reservation »,
+// mais ce n'en est pas une — les réservations (et commandes spéciales) sont
+// EXCLUSIVEMENT les factures TYPFACT="R" (confirmé par le client le 14/08/2026).
+// Afficher « Reservation » sur 685 proformas à côté des 33 vraies réservations
+// rendait l'espace illisible. Dans l'espace commercial, on affiche donc le
+// libellé de CATÉGORIE ci-dessous ; le libellé ERP reste disponible en
+// `etatLabelErp` (infobulle), pour que le commercial retrouve son vocabulaire.
 export const CATEGORIES = {
-  speciale: { etat: 0, label: "Commande spéciale" },
-  reservation: { etat: 1, label: "Réservation" },
-  preparer: { etat: 2, label: "À préparer" },
+  speciale: { etat: 0, label: "Proforma spéciale" },
+  attente: { etat: 1, label: "Proforma en attente" },
+  preparer: { etat: 2, label: "Commande à préparer" },
   devis: { etat: null, label: "Proforma / devis" },
 };
 
 const categorieDeEtat = (etat) => {
   const e = Number(etat);
   if (e === 0) return "speciale";
-  if (e === 1) return "reservation";
+  if (e === 1) return "attente";
   if (e === 2) return "preparer";
   return "devis";
 };
 
-/** Libellé d'état : mapping société prioritaire, sinon libellé de catégorie. */
-const libelleEtat = (entreprise, etat) => {
+/** Libellé tel qu'il apparaît dans l'ERP (mappingEtatsProforma), pour info. */
+const libelleEtatErp = (entreprise, etat) => {
   const mapping = entreprise?.mappingEtatsProforma;
   const key = String(Number(etat));
   if (mapping) {
@@ -87,8 +133,12 @@ const libelleEtat = (entreprise, etat) => {
       typeof mapping.get === "function" ? mapping.get(key) : mapping[key];
     if (safeTrim(val)) return safeTrim(val);
   }
-  return CATEGORIES[categorieDeEtat(etat)].label;
+  return "";
 };
+
+/** Libellé affiché dans l'espace commercial (sans ambiguïté avec les résa). */
+const libelleEtat = (entreprise, etat) =>
+  CATEGORIES[categorieDeEtat(etat)].label;
 
 // Délai (jours) au-delà duquel une proforma non transformée est « à relancer ».
 export const DELAI_RELANCE_DEFAUT = 21;
@@ -124,84 +174,159 @@ export const getPortefeuille = async (entreprise, codes) => {
 };
 
 /**
- * Statistiques CA/marge du portefeuille, reprises de l'analyse commerciaux
- * DÉJÀ calculée et cachée (aucun recalcul spécifique au module).
+ * Statistiques CA / marge du portefeuille, calculées directement sur l'index
+ * colonnaire (plus de dépendance à commerciauxService, qui charge tout
+ * facture.dbf + detail.dbf pour TOUS les commerciaux).
+ *
+ * Sémantique conservée à l'identique de l'analyse commerciaux :
+ *   - factures TYPFACT ∈ {F, A}, les avoirs comptés en négatif ;
+ *   - marge = MONTANT - FACTREV ;
+ *   - N-1 borné au jour/mois d'aujourd'hui (comparaison year-to-date).
+ *
  * @returns {Promise<{parTiers: Map<string,Object>, totaux: Object, top: Array}>}
  */
 export const getStatsPortefeuille = async (entreprise, codes) => {
-  const analyse = await commerciauxService.getAnalyse(entreprise);
-  const miens = (analyse.commerciaux || []).filter((c) =>
-    estAMoi(c.code, codes),
+  const [idx, { clients, tiersSet }] = await Promise.all([
+    getIndexFactures(entreprise),
+    getPortefeuille(entreprise, codes),
+  ]);
+
+  const today = new Date();
+  const cutoffMd = (today.getMonth() + 1) * 100 + today.getDate();
+  const nomParTiers = new Map(
+    clients.map((c) => [safeTrim(c.TIERS), safeTrim(c.NOM)]),
   );
 
-  const parTiers = new Map();
-  miens.forEach((com) => {
-    (com.clients || []).forEach((cl) => {
-      const prev = parTiers.get(cl.tiers);
-      // Un client n'appartient qu'à un seul REPRES : pas de fusion attendue,
-      // mais on additionne par prudence si un code est dupliqué.
-      if (!prev) parTiers.set(cl.tiers, { ...cl });
-      else {
-        prev.caN += cl.caN;
-        prev.caN1 += cl.caN1;
-        prev.margeN += cl.margeN;
-        prev.nbFacture += cl.nbFacture;
-      }
-    });
+  const vide = () => ({
+    caN: 0,
+    caN1: 0,
+    margeN: 0,
+    margeN1: 0,
+    nbFacture: 0,
+    nbFactureN1: 0,
+    mois: new Array(12).fill(0),
+    moisN1: new Array(12).fill(0),
   });
 
-  const totaux = commerciauxService.computeTotaux(miens);
+  const parTiers = new Map();
+  const moisN = new Array(12).fill(0);
+  const moisN1 = new Array(12).fill(0);
+
+  for (let i = 0; i < idx.n; i += 1) {
+    const t = String(idx.tiers[i]);
+    if (!tiersSet.has(t)) continue; // portefeuille du commercial uniquement
+
+    const cle = idx.ymd[i];
+    const annee = Math.floor(cle / 10000);
+    const md = cle % 10000;
+    const mois = Math.floor(md / 100) - 1;
+
+    const signe = idx.avoir[i] ? -1 : 1;
+    const mt = signe * Math.abs(idx.montant[i]);
+    const marge = mt - signe * Math.abs(idx.factrev[i]);
+
+    let st = parTiers.get(t);
+    if (!st) {
+      st = vide();
+      parTiers.set(t, st);
+    }
+
+    if (annee === idx.anneeN) {
+      st.caN += mt;
+      st.margeN += marge;
+      st.nbFacture += 1;
+      st.mois[mois] += mt;
+      moisN[mois] += mt;
+    } else if (md <= cutoffMd) {
+      // N-1 arrêté à la date du jour (year-to-date)
+      st.caN1 += mt;
+      st.margeN1 += marge;
+      st.nbFactureN1 += 1;
+      st.moisN1[mois] += mt;
+      moisN1[mois] += mt;
+    }
+  }
+
+  // Agrégats du portefeuille
+  let caN = 0;
+  let caN1 = 0;
+  let margeN = 0;
+  let margeN1 = 0;
+  let nbFactures = 0;
+  let nbFacturesN1 = 0;
+  let nbClientsNouveaux = 0;
+  let nbClientsPerdus = 0;
+  let nbClientsCroissance = 0;
+  let nbClientsBaisse = 0;
+
+  parTiers.forEach((st, t) => {
+    st.tiers = t;
+    st.nomTiers = nomParTiers.get(t) || "";
+    st.evolCA = evolution(st.caN, st.caN1);
+    st.evolMarge = evolution(st.margeN, st.margeN1);
+    st.pctMarge = st.caN !== 0 ? (st.margeN / st.caN) * 100 : 0;
+    caN += st.caN;
+    caN1 += st.caN1;
+    margeN += st.margeN;
+    margeN1 += st.margeN1;
+    nbFactures += st.nbFacture;
+    nbFacturesN1 += st.nbFactureN1;
+    if (st.caN1 === 0 && st.caN > 0) nbClientsNouveaux += 1;
+    else if (st.caN === 0 && st.caN1 > 0) nbClientsPerdus += 1;
+    else if (st.caN > st.caN1) nbClientsCroissance += 1;
+    else if (st.caN < st.caN1) nbClientsBaisse += 1;
+  });
+
+  // Part de chaque client dans le portefeuille (taux de contribution)
+  parTiers.forEach((st) => {
+    st.tauxContribution = caN !== 0 ? (st.caN / caN) * 100 : 0;
+  });
+
   const top = [...parTiers.values()].sort((a, b) => b.caN - a.caN);
 
   return {
     parTiers,
-    totaux,
     top,
-    anneeN: analyse.anneeN,
-    anneeN1: analyse.anneeN1,
-    dateArret: analyse.dateArret,
-    mois: analyse.mois,
-    moisN: miens.reduce(
-      (acc, c) => acc.map((v, i) => v + (c.moisN?.[i] || 0)),
-      new Array(12).fill(0),
-    ),
-    moisN1: miens.reduce(
-      (acc, c) => acc.map((v, i) => v + (c.moisN1?.[i] || 0)),
-      new Array(12).fill(0),
-    ),
+    anneeN: idx.anneeN,
+    anneeN1: idx.anneeN1,
+    dateArret: `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}`,
+    mois: MOIS,
+    moisN,
+    moisN1,
+    totaux: {
+      caN,
+      caN1,
+      evolCa: evolution(caN, caN1),
+      margeN,
+      margeN1,
+      pctMarge: caN !== 0 ? (margeN / caN) * 100 : 0,
+      nbFactures,
+      nbFacturesN1,
+      nbClients: parTiers.size,
+      panierMoyen: nbFactures !== 0 ? caN / nbFactures : 0,
+      nbClientsNouveaux,
+      nbClientsPerdus,
+      nbClientsCroissance,
+      nbClientsBaisse,
+    },
   };
 };
 
 // ───────────────── Dernière facture par client (clients à recontacter) ──────
 
-const dernieresVentesCache = new Map(); // dossier -> { map, builtAt }
-const DERNIERES_VENTES_TTL = 5 * 60 * 1000;
-
-/** Map TIERS -> { date, montant, numfact } de la dernière facture (TYPFACT F/A). */
+/**
+ * Map TIERS -> { date } de la dernière facture (TYPFACT F/A), toutes années.
+ * Calculée pendant la construction de l'index : aucune lecture supplémentaire.
+ */
 const getDernieresVentes = async (entreprise) => {
-  const key = entreprise.nomDossierDBF;
-  const hit = dernieresVentesCache.get(key);
-  if (hit && Date.now() - hit.builtAt < DERNIERES_VENTES_TTL) return hit.map;
-
-  const cache = await factureCacheService.getFactures(entreprise);
+  const idx = await getIndexFactures(entreprise);
   const map = new Map();
-  for (const f of cache.factureRecords || []) {
-    const typ = safeTrim(f.TYPFACT).toUpperCase();
-    if (typ !== "F" && typ !== "A") continue;
-    const tiers = safeTrim(f.TIERS);
-    if (!tiers) continue;
-    const d = parseDate(f.DATFACT);
-    if (!d) continue;
-    const prev = map.get(tiers);
-    if (!prev || d > prev.date) {
-      map.set(tiers, {
-        date: d,
-        montant: num(f.MONTANT),
-        numfact: safeTrim(f.NUMFACT),
-      });
-    }
-  }
-  dernieresVentesCache.set(key, { map, builtAt: Date.now() });
+  idx.dernierAchat.forEach((cle, tiers) => {
+    const annee = Math.floor(cle / 10000);
+    const mois = Math.floor((cle % 10000) / 100) - 1;
+    const jour = cle % 100;
+    map.set(tiers, { date: new Date(annee, mois, jour) });
+  });
   return map;
 };
 
@@ -222,11 +347,12 @@ const getDernieresVentes = async (entreprise) => {
 const RESA_BATCH = 2000;
 // TTL SEUL, volontairement : facture.dbf est modifié à chaque facture émise.
 // Invalider sur mtime/taille (comme le font les autres caches) ferait repayer
-// le scan complet (~40 s) à presque chaque requête en journée. Une réservation
-// créée à l'instant apparaît donc avec au plus 10 minutes de retard — sans
-// conséquence métier, alors que l'attente, elle, se voit tout de suite.
+// le scan complet à presque chaque requête en journée. Une réservation créée à
+// l'instant apparaît donc avec au plus 10 minutes de retard — sans conséquence
+// métier, alors que l'attente, elle, se voit tout de suite.
 const RESA_INDEX_TTL = 10 * 60 * 1000;
-const resaIndexCache = new Map(); // dossier -> { rows, loadedAt }
+const factIndexCache = new Map(); // dossier -> { idx, loadedAt }
+const factIndexLocks = new Map(); // dossier -> Promise (évite 2 scans parallèles)
 
 const statSafe = (p) => {
   try {
@@ -234,6 +360,143 @@ const statSafe = (p) => {
   } catch {
     return null;
   }
+};
+
+// ── INDEX COLONNAIRE de facture.dbf, pour TOUT l'espace commercial ───────────
+//
+// facture.dbf ≈ 391 Mo / 1,7 M enregistrements, et il est sur un partage réseau
+// en production : une lecture complète coûte ~40 s en local et plus d'une minute
+// en prod. On ne peut donc pas se permettre de le lire plusieurs fois, ni de le
+// charger en objets JS (c'est ce que fait factureCacheService, qui charge en
+// plus detail.dbf — 6,2 M lignes — dont l'espace commercial n'a AUCUN besoin :
+// le CA et la marge se calculent sur les entêtes, via MONTANT et FACTREV).
+//
+// UNE seule passe en streaming alimente donc tout le module :
+//   - `resas`        : entêtes TYPFACT="R" (réservations / commandes spéciales) ;
+//   - colonnes F/A   : TypedArrays (~30 octets/facture) pour la liste des
+//                      factures, le CA, la marge et les évolutions N/N-1 ;
+//   - `dernierAchat` : date de dernière facture par client (clients à relancer).
+//
+// Même principe que l'index colonnaire de frequentationService.
+const buildFactureIndex = async (entreprise) => {
+  const dossier = entreprise.nomDossierDBF;
+  const p = path.join(entreprise.cheminBase, dossier, "facture.dbf");
+  const st = statSafe(p);
+  if (!st) throw new Error(`facture.dbf introuvable: ${p}`);
+
+  const t0 = Date.now();
+  const dbf = await DBFFile.open(p, { readMode: "loose" });
+  const capacite = dbf.recordCount || 2000000;
+
+  // Colonnes des factures/avoirs des années N et N-1.
+  const ymd = new Int32Array(capacite); // 20260814
+  const tiers = new Int32Array(capacite);
+  const repres = new Int16Array(capacite);
+  const montant = new Float64Array(capacite);
+  const factrev = new Float64Array(capacite);
+  const avoir = new Uint8Array(capacite);
+  const numfact = new Array(capacite);
+  const noms = new Array(capacite);
+
+  const resas = [];
+  const dernierAchat = new Map(); // tiers -> ymd le plus récent
+
+  const today = new Date();
+  const anneeN = today.getFullYear();
+  const anneeN1 = anneeN - 1;
+
+  let n = 0;
+  let scanned = 0;
+  let batch;
+  while ((batch = await dbf.readRecords(RESA_BATCH)).length > 0) {
+    scanned += batch.length;
+    for (const f of batch) {
+      const typ = safeTrim(f.TYPFACT).toUpperCase();
+
+      // Réservations / commandes spéciales : entêtes conservés tels quels
+      // (quelques centaines de lignes), toutes années confondues.
+      if (typ === "R") {
+        resas.push({
+          numfact: safeTrim(f.NUMFACT),
+          date: parseDate(f.DATFACT),
+          tiers: safeTrim(f.TIERS),
+          nom: safeTrim(f.NOM),
+          texte: safeTrim(f.TEXTE),
+          montant: num(f.MONTANT),
+          repres: safeTrim(f.REPRES),
+          etat: Number(f.ETAT),
+        });
+        continue;
+      }
+
+      if (typ !== "F" && typ !== "A") continue;
+      const d = parseDate(f.DATFACT);
+      if (!d) continue;
+      const annee = d.getFullYear();
+      const cle =
+        annee * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+
+      // Dernier achat : toutes années (sert au « client à recontacter »).
+      const t = safeTrim(f.TIERS);
+      if (t) {
+        const prev = dernierAchat.get(t);
+        if (!prev || cle > prev) dernierAchat.set(t, cle);
+      }
+
+      // Colonnes : bornées à N / N-1, comme l'analyse commerciaux existante.
+      if (annee !== anneeN && annee !== anneeN1) continue;
+      if (n >= capacite) continue; // sécurité si recordCount sous-estime
+      ymd[n] = cle;
+      tiers[n] = parseInt(t, 10) || 0;
+      repres[n] = parseInt(safeTrim(f.REPRES), 10) || 0;
+      montant[n] = num(f.MONTANT);
+      factrev[n] = num(f.FACTREV);
+      avoir[n] = typ === "A" ? 1 : 0;
+      numfact[n] = safeTrim(f.NUMFACT);
+      noms[n] = safeTrim(f.NOM);
+      n += 1;
+    }
+  }
+
+  console.log(
+    `[Commercial] Index facture ${dossier}: ${n} factures ${anneeN1}-${anneeN} + ${resas.length} réservations (scan ${scanned} en ${Date.now() - t0}ms)`,
+  );
+
+  return {
+    n,
+    ymd: ymd.subarray(0, n),
+    tiers: tiers.subarray(0, n),
+    repres: repres.subarray(0, n),
+    montant: montant.subarray(0, n),
+    factrev: factrev.subarray(0, n),
+    avoir: avoir.subarray(0, n),
+    numfact,
+    noms,
+    resas,
+    dernierAchat,
+    anneeN,
+    anneeN1,
+  };
+};
+
+/** Index facture caché (TTL) + verrou anti-scans concurrents. */
+const getIndexFactures = async (entreprise) => {
+  const dossier = entreprise.nomDossierDBF;
+  const hit = factIndexCache.get(dossier);
+  if (hit && Date.now() - hit.loadedAt < RESA_INDEX_TTL) return hit.idx;
+  if (factIndexLocks.has(dossier)) return factIndexLocks.get(dossier);
+
+  const promesse = (async () => {
+    try {
+      const idx = await buildFactureIndex(entreprise);
+      factIndexCache.set(dossier, { idx, loadedAt: Date.now() });
+      return idx;
+    } finally {
+      factIndexLocks.delete(dossier);
+    }
+  })();
+  factIndexLocks.set(dossier, promesse);
+  return promesse;
 };
 
 /** Libellé d'un état de réservation (mappingEtatsReservation de la société). */
@@ -250,43 +513,53 @@ const libelleEtatResa = (entreprise, etat) => {
 /** Catégorie métier d'une réservation (facture.ETAT). */
 const categorieResa = (etat) => (Number(etat) === 2 ? "speciale" : "reservation");
 
-/** Index des entêtes de réservation (facture.dbf TYPFACT="R"), caché. */
-const getReservationsIndex = async (entreprise) => {
-  const dossier = entreprise.nomDossierDBF;
-  const p = path.join(entreprise.cheminBase, dossier, "facture.dbf");
-  const st = statSafe(p);
-  if (!st) throw new Error(`facture.dbf introuvable: ${p}`);
+/** Entêtes de réservation (TYPFACT="R"), issus de l'index facture unique. */
+const getReservationsIndex = async (entreprise) =>
+  (await getIndexFactures(entreprise)).resas;
 
-  const hit = resaIndexCache.get(dossier);
-  if (hit && Date.now() - hit.loadedAt < RESA_INDEX_TTL) return hit.rows;
+// ── INDEX des ENTÊTES proforma ───────────────────────────────────────────────
+// proformaCacheService charge aussi prodet.dbf (1,13 M lignes, ~14 s en local
+// et bien plus en production) alors que les listes et le tableau de bord n'ont
+// besoin que des entêtes (80 k lignes, ~1 s). On ne retombe sur le cache complet
+// que pour le DÉTAIL d'un document, quand l'utilisateur le demande.
+const proIndexCache = new Map(); // dossier -> { rows, loadedAt }
+const proIndexLocks = new Map();
+
+const buildProformaIndex = async (entreprise) => {
+  const dossier = entreprise.nomDossierDBF;
+  const p = path.join(entreprise.cheminBase, dossier, "proforma.dbf");
+  if (!statSafe(p)) throw new Error(`proforma.dbf introuvable: ${p}`);
 
   const t0 = Date.now();
   const dbf = await DBFFile.open(p, { readMode: "loose" });
   const rows = [];
   let batch;
-  let scanned = 0;
   while ((batch = await dbf.readRecords(RESA_BATCH)).length > 0) {
-    scanned += batch.length;
-    for (const r of batch) {
-      if (safeTrim(r.TYPFACT).toUpperCase() !== "R") continue;
-      rows.push({
-        numfact: safeTrim(r.NUMFACT),
-        date: parseDate(r.DATFACT),
-        tiers: safeTrim(r.TIERS),
-        nom: safeTrim(r.NOM),
-        texte: safeTrim(r.TEXTE),
-        montant: num(r.MONTANT),
-        repres: safeTrim(r.REPRES),
-        etat: Number(r.ETAT),
-      });
-    }
+    for (const r of batch) rows.push(r);
   }
-
-  resaIndexCache.set(dossier, { rows, loadedAt: Date.now() });
   console.log(
-    `[Commercial] Index réservations ${dossier}: ${rows.length} TYPFACT=R sur ${scanned} factures en ${Date.now() - t0}ms`,
+    `[Commercial] Index proforma ${dossier}: ${rows.length} entêtes en ${Date.now() - t0}ms`,
   );
   return rows;
+};
+
+const getIndexProformas = async (entreprise) => {
+  const dossier = entreprise.nomDossierDBF;
+  const hit = proIndexCache.get(dossier);
+  if (hit && Date.now() - hit.loadedAt < RESA_INDEX_TTL) return hit.rows;
+  if (proIndexLocks.has(dossier)) return proIndexLocks.get(dossier);
+
+  const promesse = (async () => {
+    try {
+      const rows = await buildProformaIndex(entreprise);
+      proIndexCache.set(dossier, { rows, loadedAt: Date.now() });
+      return rows;
+    } finally {
+      proIndexLocks.delete(dossier);
+    }
+  })();
+  proIndexLocks.set(dossier, promesse);
+  return promesse;
 };
 
 /**
@@ -396,6 +669,9 @@ const mapProforma = (entreprise, p, suivis) => {
     etat,
     categorie,
     etatLabel: libelleEtat(entreprise, etat),
+    // Libellé d'origine dans l'ERP (ex. « Reservation » pour ETAT=1) : affiché
+    // en infobulle, jamais comme libellé principal (collision avec les résa).
+    etatLabelErp: libelleEtatErp(entreprise, etat),
     dateChantier: iso(parseDate(p.DATCHANT)),
     relanceLe: suivi ? suivi.faitLe : null,
     relanceCanal: suivi ? suivi.canal : "",
@@ -431,8 +707,8 @@ export const getProformasCommercial = async (
     fenetreMois = FENETRE_MOIS_DEFAUT,
   } = opts;
 
-  const cache = await proformaCacheService.getProformas(entreprise);
-  let rows = (cache.proformaRecords || [])
+  const entetes = await getIndexProformas(entreprise);
+  let rows = entetes
     .filter((p) => estAMoi(p.REPRES, codes))
     .map((p) => mapProforma(entreprise, p, suivis));
 
@@ -529,8 +805,8 @@ export const getFacturesCommercial = async (entreprise, codes, opts = {}) => {
 
   // facture.NOM est souvent vide (comptes ouverts) : on retombe sur le nom du
   // client via son TIERS, sinon le commercial lit des lignes anonymes.
-  const [cache, cacheClients] = await Promise.all([
-    factureCacheService.getFactures(entreprise),
+  const [idx, cacheClients] = await Promise.all([
+    getIndexFactures(entreprise),
     clientCacheService.getClients(entreprise),
   ]);
   const nomParTiers = new Map(
@@ -543,17 +819,24 @@ export const getFacturesCommercial = async (entreprise, codes, opts = {}) => {
     .toUpperCase()
     .split("")
     .filter(Boolean);
+  const veutF = !types.length || types.includes("F");
+  const veutA = !types.length || types.includes("A");
 
-  const dDeb = dateDebut ? parseDate(dateDebut) : null;
-  const dFin = dateFin ? parseDate(dateFin) : null;
+  const ymdDeb = dateDebut ? ymdInt(dateDebut) : null;
+  const ymdFin = dateFin ? ymdInt(dateFin) : null;
+  const tiersCible =
+    tiers !== undefined && tiers !== null && String(tiers) !== ""
+      ? String(tiers).trim()
+      : null;
+  const q = search ? search.toLowerCase() : null;
 
-  let rows = [];
-  for (const f of cache.factureRecords || []) {
-    const typ = safeTrim(f.TYPFACT).toUpperCase();
-    if (types.length && !types.includes(typ)) continue;
+  const rows = [];
+  for (let i = 0; i < idx.n; i += 1) {
+    const estAvoir = idx.avoir[i] === 1;
+    if (estAvoir ? !veutA : !veutF) continue;
 
-    const t = safeTrim(f.TIERS);
-    const mien = estAMoi(f.REPRES, codes);
+    const t = String(idx.tiers[i]);
+    const mien = estAMoi(idx.repres[i], codes);
 
     // Périmètre : mes factures, ou les factures d'un client de mon portefeuille.
     if (tiersAutorises) {
@@ -561,38 +844,29 @@ export const getFacturesCommercial = async (entreprise, codes, opts = {}) => {
     } else if (!mien) {
       continue;
     }
+    if (tiersCible && t !== tiersCible) continue;
 
-    if (tiers !== undefined && tiers !== null && String(tiers) !== "") {
-      if (t !== String(tiers).trim()) continue;
+    const cle = idx.ymd[i];
+    if (ymdDeb && cle < ymdDeb) continue;
+    if (ymdFin && cle > ymdFin) continue;
+
+    const numfact = idx.numfact[i];
+    const nom = idx.noms[i] || nomParTiers.get(t) || "";
+    if (q && !numfact.toLowerCase().includes(q) && !nom.toLowerCase().includes(q)) {
+      continue;
     }
 
-    const d = parseDate(f.DATFACT);
-    if (dDeb && (!d || d < dDeb)) continue;
-    if (dFin && (!d || d > dFin)) continue;
-
-    const nom = safeTrim(f.NOM) || nomParTiers.get(t) || "";
-    const numfact = safeTrim(f.NUMFACT);
-    if (search) {
-      const q = search.toLowerCase();
-      if (
-        !numfact.toLowerCase().includes(q) &&
-        !nom.toLowerCase().includes(q) &&
-        !safeTrim(f.TEXTE).toLowerCase().includes(q)
-      ) {
-        continue;
-      }
-    }
-
-    const montant = typ === "A" ? -Math.abs(num(f.MONTANT)) : num(f.MONTANT);
     rows.push({
       numfact,
-      date: iso(d),
-      typfact: typ,
+      date: ymdIso(cle),
+      typfact: estAvoir ? "A" : "F",
       tiers: t,
       nom,
-      texte: safeTrim(f.TEXTE),
-      montant,
-      repres: safeTrim(f.REPRES),
+      texte: "",
+      montant: estAvoir
+        ? -Math.abs(idx.montant[i])
+        : idx.montant[i],
+      repres: String(idx.repres[i]),
       parAutre: !mien,
     });
   }
@@ -749,7 +1023,7 @@ export const getFicheClient = async (
 
   const st = stats.parTiers.get(cible) || null;
   const last = dernieres.get(cible) || null;
-  const parCategorie = { speciale: [], reservation: [], preparer: [], devis: [] };
+  const parCategorie = { speciale: [], attente: [], preparer: [], devis: [] };
   docs.proformas.forEach((p) => parCategorie[p.categorie].push(p));
   // Réservations / commandes spéciales : source facture.dbf TYPFACT="R".
   const resasParCat = { reservation: [], speciale: [] };
@@ -797,7 +1071,11 @@ export const getFicheClient = async (
     commandesSpeciales: resasParCat.speciale,
     // Documents proforma.dbf du client (à préparer + devis).
     aPreparer: parCategorie.preparer,
-    proformas: [...parCategorie.devis, ...parCategorie.reservation],
+    proformas: [
+      ...parCategorie.devis,
+      ...parCategorie.attente,
+      ...parCategorie.speciale,
+    ],
   };
 };
 
@@ -878,9 +1156,9 @@ export const getDashboardSociete = async (
     fenetreMois = FENETRE_MOIS_DEFAUT,
   } = opts;
 
-  const [{ clients }, cacheProforma, resas] = await Promise.all([
+  const [{ clients }, entetes, resas] = await Promise.all([
     getPortefeuille(entreprise, codes),
-    proformaCacheService.getProformas(entreprise),
+    getIndexProformas(entreprise),
     getReservationsCommercial(entreprise, codes, {
       fenetreMois,
       limit: 100000,
@@ -890,7 +1168,7 @@ export const getDashboardSociete = async (
   // Fenêtre glissante : l'ERP ne purge pas, sans borne les compteurs remontent
   // à 2019 et ne veulent plus rien dire.
   const limiteYmd = bornePeriode(fenetreMois);
-  const docs = (cacheProforma.proformaRecords || [])
+  const docs = entetes
     .filter((p) => estAMoi(p.REPRES, codes))
     .map((p) => mapProforma(entreprise, p, suivis))
     .filter((d) => !limiteYmd || (d.date && d.date >= limiteYmd));
@@ -899,7 +1177,11 @@ export const getDashboardSociete = async (
   const preparer = compte("preparer");
   // Documents proforma relançables : devis + « réservations » proforma (ETAT=1),
   // qui sont des documents en attente et non les réservations fermes.
-  const devis = [...compte("devis"), ...compte("reservation")];
+  const devis = [
+    ...compte("devis"),
+    ...compte("attente"),
+    ...compte("speciale"),
+  ];
   // Réservations & commandes spéciales fermes : facture.dbf TYPFACT="R".
   const reservations = resas.reservations.filter(
     (r) => r.categorie === "reservation",
@@ -1033,7 +1315,70 @@ export const getCaSociete = async (entreprise, codes, opts = {}) => {
   };
 };
 
+// ───────────────────────── Préchauffage des index ───────────────────────────
+//
+// Sans lui, c'est un commercial qui paie la reconstruction de l'index facture
+// (~35 s en local, davantage sur le partage réseau de production) toutes les
+// 10 minutes. On le reconstruit donc en tâche de fond, un peu avant l'expiration
+// du TTL, pour les seules sociétés ayant au moins un commercial actif.
+const PRECHAUFFE_MS = 8 * 60 * 1000;
+let prechauffeTimer = null;
+
+const prechaufferUneFois = async () => {
+  try {
+    const { default: Permission } = await import("../models/PermissionModel.js");
+    const { default: Entreprise } = await import(
+      "../models/EntrepriseModel.js"
+    );
+
+    const perms = await Permission.find({ "commercial.actif": true }).select(
+      "commercial",
+    );
+    const ids = new Set();
+    perms.forEach((p) =>
+      (p.commercial?.codes || []).forEach(
+        (l) => l?.entreprise && ids.add(l.entreprise.toString()),
+      ),
+    );
+    if (!ids.size) return;
+
+    const entreprises = await Entreprise.find({
+      _id: { $in: [...ids] },
+      isActive: true,
+    });
+
+    for (const e of entreprises) {
+      try {
+        await Promise.all([getIndexFactures(e), getIndexProformas(e)]);
+      } catch (err) {
+        console.error(
+          `[Commercial] Préchauffage ${e.nomDossierDBF} échoué:`,
+          err.message,
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[Commercial] Préchauffage impossible:", err.message);
+  }
+};
+
+/**
+ * Démarre le préchauffage périodique des index de l'espace commercial.
+ * À appeler depuis server.js, comme startInventaireWatcher().
+ */
+export const startCommercialIndexWarmer = () => {
+  if (prechauffeTimer) return;
+  console.log(
+    `[Commercial] Préchauffage des index toutes les ${PRECHAUFFE_MS / 60000} min`,
+  );
+  // Premier passage différé : on laisse le serveur finir de démarrer.
+  setTimeout(prechaufferUneFois, 15000);
+  prechauffeTimer = setInterval(prechaufferUneFois, PRECHAUFFE_MS);
+  if (typeof prechauffeTimer.unref === "function") prechauffeTimer.unref();
+};
+
 export default {
+  startCommercialIndexWarmer,
   CATEGORIES,
   DELAI_RELANCE_DEFAUT,
   DELAI_CLIENT_INACTIF,

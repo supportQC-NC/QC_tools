@@ -379,6 +379,7 @@ const BlocSociete = ({ bloc, caBloc, caEnCours }) => {
                         <ChipCategorie
                           categorie={p.categorie}
                           label={p.etatLabel}
+                          labelErp={p.etatLabelErp}
                         />
                       </td>
                       <td className="num">{fmtMontant(p.montant)}</td>

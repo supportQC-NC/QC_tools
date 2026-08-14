@@ -350,6 +350,7 @@ const CommercialDocumentsView = ({
                           <ChipCategorie
                             categorie={d.categorie}
                             label={d.etatLabel}
+                            labelErp={d.etatLabelErp}
                           />
                         </td>
                         <td className="num">{fmtMontant(d.montant)}</td>

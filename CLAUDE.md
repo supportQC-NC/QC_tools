@@ -62,7 +62,9 @@ Le service ne duplique rien : il lit les caches existants (`clientCacheService`,
 
 **Deux sources distinctes, ne pas les confondre** (constaté sur les données QC, arbitré avec le client le 14/08/2026) :
 - **Réservations & commandes spéciales** = `facture.dbf` **TYPFACT="R"**, `ETAT` 1 = Réservation Stock, 2 = Commande Spéciale (`entreprise.mappingEtatsReservation`). Même source que « Entrées sur réservation » et que les alertes.
-- **Proformas** = `proforma.dbf`. Ses états réels chez QC sont 1 = « Reservation » (document en attente), 2 = « Commande à preparer », 3/4 = devis. **`ETAT=0` n'existe pas** — l'ancienne convention « 0 = commande spéciale » (commentaire de l'écran Données ▸ Réservations) est fausse.
+- **Proformas** = `proforma.dbf`. Ses états réels chez QC sont 1 (685 doc./12 mois pour un seul commercial), 2 = « Commande à preparer », 3/4 = devis. **`ETAT=0` n'existe pas** — l'ancienne convention « 0 = commande spéciale » (commentaire de l'écran Données ▸ Réservations) est fausse.
+
+⚠️ Le `mappingEtatsProforma` de QC libelle l'ETAT=1 « Reservation », **alors que ce n'en est pas une**. Dans l'espace commercial on affiche donc le libellé de catégorie (`CATEGORIES`, ex. « Proforma en attente ») et non le libellé ERP, gardé en `etatLabelErp` pour l'infobulle. Sans ça, 685 lignes « Reservation » côtoyaient les 33 vraies réservations et l'écran devenait illisible.
 
 L'ERP **ne purge jamais** ces tables : tous les compteurs « en cours » / « à relancer » sont bornés par une **fenêtre glissante de 12 mois** (`FENETRE_MOIS_DEFAUT`, `fenetreMois=0` pour tout l'historique). Sans elle, on remonte à 2019 (4 686 « réservations en cours » au lieu de 33).
 
@@ -73,7 +75,16 @@ L'ERP **ne purge jamais** ces tables : tous les compteurs « en cours » / « à
 
 Le front affiche (1) immédiatement et remplit (2) et (3) en différé. **Ne pas refusionner ces endpoints.**
 
-L'index des réservations (`getReservationsIndex`) fait son propre streaming de `facture.dbf` en ne gardant que les entêtes TYPFACT="R" (~40 s pour 1,7 M factures → 881 lignes), au lieu des ~140 s du cache factures complet. Il est invalidé **par TTL seul (10 min), volontairement pas sur le mtime** : `facture.dbf` change à chaque facture émise, une invalidation sur fichier ferait repayer le scan à presque chaque requête.
+**L'espace commercial n'utilise ni `factureCacheService` ni `commerciauxService`** (tous deux chargent `detail.dbf`, 6,2 M lignes, dont il n'a aucun besoin : CA et marge se calculent sur `MONTANT`/`FACTREV` des entêtes). Il a ses propres index, dans `commercialService.js` :
+
+- `getIndexFactures` — **une seule** passe streaming sur `facture.dbf` vers un index **colonnaire en TypedArrays** (modèle `frequentationService`), qui sert d'un coup : réservations TYPFACT="R", liste des factures, CA/marge N vs N-1, et date de dernier achat par client.
+- `getIndexProformas` — entêtes de `proforma.dbf` seuls (80 k lignes, ~1,5 s) ; `proformaCacheService` n'est plus appelé que pour le détail d'un document.
+
+Les deux sont invalidés **par TTL seul (10 min), volontairement pas sur le mtime** : `facture.dbf` change à chaque facture émise, une invalidation sur fichier ferait repayer le scan à presque chaque requête.
+
+`startCommercialIndexWarmer()` (appelé dans `server.js`) reconstruit ces index toutes les 8 min en tâche de fond, pour les seules sociétés ayant un commercial actif — sinon c'est un utilisateur qui paie le scan (**188 s mesurées en production**, 35 s en local : le partage réseau du VPS est 5× plus lent).
+
+Mesures après refonte (local, index chaud) : dashboard **1,6 s**, factures **56 ms**, CA **31 ms** — contre 137 s pour le seul dashboard à l'origine.
 
 ## Request flow / conventions
 

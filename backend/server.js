@@ -73,6 +73,7 @@ import filialesRoutes from "./routes/filialesRoutes.js";
  import reapproLocalRoutes from "./routes/reapproLocalRoutes.js";
 import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import commercialRoutes from "./routes/commercialRoutes.js";
+import { startCommercialIndexWarmer } from "./services/commercialService.js";
 import topVentesRoutes from "./routes/topVentesRoutes.js";
 import menuHintRoutes from "./routes/menuHintRoutes.js";
 import menuLayoutRoutes from "./routes/menuLayoutRoutes.js";
@@ -353,4 +354,7 @@ server.listen(PORT, () => {
   startMailingScheduler();
   startAiSnapshotScheduler();
   startMeteoScheduler();
+  // Espace commercial : garde les index facture/proforma chauds, sinon c'est un
+  // commercial qui paie la relecture de facture.dbf (~40 s) toutes les 10 min.
+  startCommercialIndexWarmer();
 });

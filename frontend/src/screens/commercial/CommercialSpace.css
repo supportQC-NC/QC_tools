@@ -296,6 +296,11 @@ a.co-kpi:hover {
   background: rgba(124, 58, 237, 0.18);
   color: #c084fc;
 }
+/* Proforma en attente (ETAT=1) — volontairement distinct des réservations. */
+.co-chip-attente {
+  background: rgba(100, 116, 139, 0.25);
+  color: #cbd5e1;
+}
 .co-chip-muted {
   background: var(--admin-bg-tertiary);
   color: var(--admin-text-muted);

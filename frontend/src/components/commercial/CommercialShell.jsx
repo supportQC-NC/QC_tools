@@ -46,9 +46,15 @@ export const fmtPct = (v) => {
   return `${n > 0 ? "+" : ""}${n.toFixed(1)} %`;
 };
 
-// Puce de catégorie de document (proforma.ETAT).
-export const ChipCategorie = ({ categorie, label }) => (
-  <span className={`co-chip co-chip-${categorie || "muted"}`}>
+// Puce de catégorie de document.
+// `labelErp` = libellé d'origine dans l'ERP, montré en infobulle : le mapping
+// proforma de QC nomme l'ETAT=1 « Reservation » alors que les réservations sont
+// exclusivement des factures TYPFACT="R" — on n'affiche donc pas ce mot ici.
+export const ChipCategorie = ({ categorie, label, labelErp }) => (
+  <span
+    className={`co-chip co-chip-${categorie || "muted"}`}
+    title={labelErp ? `État dans l'ERP : ${labelErp}` : undefined}
+  >
     {label || categorie}
   </span>
 );
