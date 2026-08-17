@@ -29,7 +29,12 @@ import fs from "fs";
 import { DBFFile } from "dbffile";
 import clientCacheService from "./clientCacheService.js";
 import proformaCacheService from "./proformaCacheService.js";
-import { getResaEntrees } from "./resaEntreesService.js";
+import {
+  getResaEntrees,
+  getReservationsIndexes,
+  getEntreesParArticle,
+} from "./resaEntreesService.js";
+import articleCacheService from "./articleService.js";
 import { sameCode } from "../middleware/commercialAccess.js";
 
 // ─────────────────────────────── Helpers ────────────────────────────────────
@@ -653,6 +658,189 @@ export const getReservationsCommercial = async (
 };
 
 export { getReservationsIndex };
+
+// ───────────── Disponibilité des réservations (entrées en stock) ─────────────
+//
+// « Est-ce que ce que mon client a réservé est arrivé ? »
+//
+// On croise les LIGNES de la réservation (detail.dbf, via resaEntreesService)
+// avec les ENTRÉES en stock (entrees.dbf). Une ligne est « arrivée » si son
+// article a une entrée POSTÉRIEURE OU ÉGALE à la date de la réservation.
+//
+// ⚠️ PERF : ce croisement lit detail.dbf (6,2 M lignes) — c'est le même index
+// que les alertes, et c'est précisément ce que le reste de l'espace commercial
+// évite. Il a donc son PROPRE endpoint, chargé en différé par le front une fois
+// la liste des réservations affichée. Ne pas le fusionner avec la liste.
+
+// Profondeur du scan des entrées. Fenêtre volontairement FIXE et arrondie au
+// 1er du mois : le cache des entrées est indexé par plage, une plage qui
+// changerait à chaque requête ferait rescanner entrees.dbf à chaque fois.
+export const FENETRE_DISPO_MOIS = 24;
+
+const fenetreEntrees = () => {
+  const debut = new Date();
+  debut.setMonth(debut.getMonth() - FENETRE_DISPO_MOIS);
+  debut.setDate(1);
+  return { start: iso(debut), end: iso(new Date()) };
+};
+
+/** Statut d'un document à partir du compte de lignes arrivées. */
+const statutDispo = (nbLignes, nbArrivees) => {
+  if (!nbLignes) return "inconnu";
+  if (nbArrivees === 0) return "attente";
+  return nbArrivees >= nbLignes ? "complet" : "partiel";
+};
+
+/**
+ * Disponibilité (entrée en stock) des réservations du commercial.
+ * @returns {Promise<{fenetreMois, periode, total, nbComplets, nbPartiels,
+ *                    documents: Object<string, Object>}>}
+ */
+export const getDisponibilitesReservations = async (
+  entreprise,
+  codes,
+  opts = {},
+) => {
+  const { fenetreMois = FENETRE_MOIS_DEFAUT } = opts;
+
+  const periode = fenetreEntrees();
+  const [{ parDocument }, entrees] = await Promise.all([
+    getReservationsIndexes(entreprise),
+    getEntreesParArticle(entreprise, periode),
+  ]);
+
+  const limiteYmd = bornePeriode(fenetreMois); // "YYYY-MM-DD" ou null
+  const limiteBrute = limiteYmd ? limiteYmd.replace(/-/g, "") : null;
+  const debutEntrees = periode.start.replace(/-/g, "");
+
+  const documents = {};
+  let nbComplets = 0;
+  let nbPartiels = 0;
+
+  for (const [numfact, doc] of parDocument) {
+    const { header, lignes } = doc;
+    if (!estAMoi(header.repres, codes)) continue;
+    if (limiteBrute && (!header.datfact || header.datfact < limiteBrute)) {
+      continue;
+    }
+
+    // Réservation antérieure à la profondeur du scan des entrées : on ne peut
+    // rien affirmer, on le dit plutôt que d'afficher « en attente » à tort.
+    if (!header.datfact || header.datfact < debutEntrees) {
+      documents[numfact] = {
+        statut: "inconnu",
+        nbLignes: lignes.length,
+        nbArrivees: 0,
+        dateArrivee: null,
+      };
+      continue;
+    }
+
+    let nbArrivees = 0;
+    let derniereArrivee = "";
+    for (const l of lignes) {
+      const entree = entrees.get(l.nart);
+      if (!entree || entree.dateEntree < header.datfact) continue;
+      nbArrivees += 1;
+      if (entree.dateEntree > derniereArrivee) {
+        derniereArrivee = entree.dateEntree;
+      }
+    }
+
+    const statut = statutDispo(lignes.length, nbArrivees);
+    if (statut === "complet") nbComplets += 1;
+    if (statut === "partiel") nbPartiels += 1;
+
+    documents[numfact] = {
+      statut,
+      nbLignes: lignes.length,
+      nbArrivees,
+      dateArrivee: derniereArrivee ? ymdIso(derniereArrivee) : null,
+    };
+  }
+
+  return {
+    fenetreMois: Number(fenetreMois) || 0,
+    periode,
+    total: Object.keys(documents).length,
+    nbComplets,
+    nbPartiels,
+    documents,
+  };
+};
+
+/**
+ * Lignes d'UNE réservation, avec leur disponibilité article par article.
+ * Renvoie null si le document n'existe pas OU n'appartient pas au commercial
+ * (on ne distingue pas les deux cas : pas de fuite d'information).
+ */
+export const getLignesReservation = async (entreprise, codes, numfact) => {
+  const ref = safeTrim(numfact);
+  const { parDocument } = await getReservationsIndexes(entreprise);
+  const doc = parDocument.get(ref);
+  if (!doc || !estAMoi(doc.header.repres, codes)) return null;
+
+  const periode = fenetreEntrees();
+  const entrees = await getEntreesParArticle(entreprise, periode);
+  const { header } = doc;
+  const dateResa = header.datfact || "";
+  const horsFenetre = !dateResa || dateResa < periode.start.replace(/-/g, "");
+
+  const lignes = [];
+  for (const l of doc.lignes) {
+    let article = null;
+    try {
+      article = await articleCacheService.findByNart(entreprise, l.nart);
+    } catch {
+      article = null;
+    }
+    const entree = entrees.get(l.nart) || null;
+    const arrive =
+      !horsFenetre && !!entree && entree.dateEntree >= dateResa;
+
+    lignes.push({
+      nart: safeTrim(article?.NART) || l.nart,
+      design: safeTrim(article?.DESIGN),
+      gencod: safeTrim(article?.GENCOD),
+      qteResa: l.qteResa,
+      stockTotal:
+        num(article?.S1) +
+        num(article?.S2) +
+        num(article?.S3) +
+        num(article?.S4) +
+        num(article?.S5),
+      arrive,
+      dateEntree: arrive ? ymdIso(entree.dateEntree) : null,
+      qteEntree: arrive ? entree.qteEntree : null,
+      numcde: arrive ? entree.numcde : "",
+    });
+  }
+
+  const nbArrivees = lignes.filter((l) => l.arrive).length;
+  const derniere = lignes
+    .filter((l) => l.dateEntree)
+    .map((l) => l.dateEntree)
+    .sort()
+    .pop();
+
+  return {
+    numfact: ref,
+    date: header.datfact ? ymdIso(header.datfact) : null,
+    tiers: header.tiers == null ? "" : String(header.tiers),
+    nom: header.nom,
+    texte: header.texte,
+    etat: header.etat,
+    categorie: categorieResa(header.etat),
+    etatLabel: libelleEtatResa(entreprise, header.etat),
+    statut: horsFenetre
+      ? "inconnu"
+      : statutDispo(lignes.length, nbArrivees),
+    nbLignes: lignes.length,
+    nbArrivees,
+    dateArrivee: derniere || null,
+    lignes,
+  };
+};
 
 // ──────────────────────────── Proformas / réservations ──────────────────────
 
@@ -1362,6 +1550,11 @@ const prechaufferUneFois = async () => {
         // Index des lignes de détail (analyses + prime) : le plus lourd
         // (~165 s), donc surtout pas payé par un utilisateur.
         await getIndexDetail(e);
+        // Réservations ligne à ligne + entrées en stock : sert la colonne
+        // « Stock » de l'écran Réservations et les alertes. Scan facture.dbf +
+        // detail.dbf (~142 s en local) — même raison de le préchauffer.
+        await getReservationsIndexes(e);
+        await getEntreesParArticle(e, fenetreEntrees());
       } catch (err) {
         console.error(
           `[Commercial] Préchauffage ${e.nomDossierDBF} échoué:`,
@@ -1397,6 +1590,9 @@ export default {
   FENETRE_ALERTES_JOURS,
   FENETRE_MOIS_DEFAUT,
   getReservationsCommercial,
+  getDisponibilitesReservations,
+  getLignesReservation,
+  FENETRE_DISPO_MOIS,
   getPortefeuille,
   getPortefeuilleListe,
   getStatsPortefeuille,

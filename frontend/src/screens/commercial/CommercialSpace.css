@@ -424,6 +424,78 @@ a.co-kpi:hover {
   font-size: 0.75rem;
   color: var(--admin-text-muted);
 }
+.co-hint-bloc {
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--admin-border);
+}
+
+/* ── Réservations : disponibilité + « client prévenu » ── */
+/* Une KPI cliquable (filtre « à prévenir ») : même carte, en <button>. */
+button.co-kpi {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.co-kpi:hover {
+  border-color: #7c3aed;
+}
+
+/* Onglets de type, collés au haut de la carte (façon écran Données). */
+.co-tabs-inline {
+  padding: 0.85rem 1rem 0;
+}
+
+.co-btn-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border-radius: var(--admin-radius-sm);
+  cursor: pointer;
+}
+.co-btn-icone:hover {
+  border-color: #7c3aed;
+}
+
+.co-row-detail td {
+  background: var(--admin-bg-primary);
+  padding: 0;
+}
+.co-resa-detail {
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.co-table-sub {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  overflow: hidden;
+}
+
+.co-prevenir {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.co-prevenir select,
+.co-prevenir input {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.82rem;
+}
+.co-prevenir input {
+  min-width: 220px;
+  flex: 1;
+}
 
 /* ── Pagination ── */
 .co-pagination {

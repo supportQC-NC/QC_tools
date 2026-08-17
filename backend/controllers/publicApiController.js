@@ -13,6 +13,7 @@
 
 import asyncHandler from "../middleware/asyncHandler.js";
 import articleCacheService from "../services/articleService.js";
+import artplusService from "../services/artplusService.js";
 import clientCacheService from "../services/clientCacheService.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import { elaguer } from "../middleware/masquerChampsDbf.js";
@@ -68,15 +69,45 @@ const listeChamps = (q) => {
 // séparés. Recalculer ça côté partenaire serait à la fois pénible et une source
 // de divergence : on livre le résultat, en plus des champs bruts.
 
-const enrichirArticle = (record, entreprise) => {
+const enrichirArticle = (record, entreprise, indexPlus = null) => {
   const stockTotal = articleCacheService.calculateStockTotal(record);
   const promo = articleCacheService.isPromoActive(record);
   const pvte = parseFloat(record.PVTE) || 0;
   const pvpromo = parseFloat(record.PVPROMO) || 0;
   const mapping = entreprise.mappingEntrepots || {};
 
+  // Compléments artplus.dbf : attributs libres + produit de rattachement.
+  // Absents (société sans artplus, ou `?plus=0`) : les clés ne sont tout
+  // simplement pas là, jamais un objet vide trompeur.
+  let plus = null;
+  if (indexPlus?.present) {
+    const nart = String(record.NART || "").trim().toUpperCase();
+    const attributs = indexPlus.parNart.get(nart);
+    const cleProduit = indexPlus.produitParNart.get(nart);
+    const produit = cleProduit ? indexPlus.produits.get(cleProduit) : null;
+    if (attributs || produit) {
+      plus = {
+        _plus: attributs || {},
+        _produit: produit
+          ? {
+              cle: produit.cle,
+              id: produit.id,
+              nom: produit.nom,
+              groupe: produit.groupe,
+              famille: produit.famille,
+              sousFamille: produit.sousFamille,
+              arborescence: produit.arborescence,
+              marque: produit.marque,
+              nbVariantes: produit.narts.length,
+            }
+          : null,
+      };
+    }
+  }
+
   return {
     ...record,
+    ...(plus || {}),
     _stockTotal: stockTotal,
     _stockParEntrepot: {
       S1: { libelle: mapping.S1 || "S1", quantite: parseFloat(record.S1) || 0 },
@@ -92,6 +123,26 @@ const enrichirArticle = (record, entreprise) => {
     _publieWeb: String(record.WEB || "").trim().toUpperCase() === "O",
     _aPhoto: String(record.FOTO || "").trim().toUpperCase() === "F",
   };
+};
+
+/**
+ * Index artplus de la société, sauf si l'appelant l'a désactivé (`?plus=0`).
+ *
+ * Ne remonte JAMAIS d'erreur : les compléments article sont un bonus. Une
+ * société sans artplus.dbf, ou un fichier illisible, ne doit pas faire échouer
+ * une requête « articles » qui fonctionnait la veille.
+ */
+const indexPlusDe = async (req) => {
+  const q = req.query || {};
+  if (q.plus === "0" || q.plus === "false" || q.plus === "non") return null;
+  try {
+    return await artplusService.getIndex(req.entreprise);
+  } catch (err) {
+    console.warn(
+      `[ApiPublique] artplus indisponible pour ${req.entreprise.nomDossierDBF}: ${err.message}`,
+    );
+    return null;
+  }
 };
 
 /** Options de filtrage articles, communes à /articles et /articles/export. */
@@ -180,11 +231,14 @@ const getArticles = asyncHandler(async (req, res) => {
   const limit = entier(req.query.limit, LIMITE_DEFAUT, 1, LIMITE_MAX);
   const champs = listeChamps(req.query.champs);
 
-  const resultat = await articleCacheService.getPaginated(entreprise, {
-    page,
-    limit,
-    ...filtresArticles(req.query),
-  });
+  const [resultat, plus] = await Promise.all([
+    articleCacheService.getPaginated(entreprise, {
+      page,
+      limit,
+      ...filtresArticles(req.query),
+    }),
+    indexPlusDe(req),
+  ]);
 
   res.json({
     societe: societe(entreprise),
@@ -198,7 +252,7 @@ const getArticles = asyncHandler(async (req, res) => {
     },
     _tempsMs: Date.now() - debut,
     articles: resultat.articles.map((a) =>
-      projeter(enrichirArticle(a, entreprise), champs),
+      projeter(enrichirArticle(a, entreprise, plus), champs),
     ),
   });
 });
@@ -220,7 +274,7 @@ const getArticleByNart = asyncHandler(async (req, res) => {
   res.json({
     societe: societe(entreprise),
     article: projeter(
-      enrichirArticle(article, entreprise),
+      enrichirArticle(article, entreprise, await indexPlusDe(req)),
       listeChamps(req.query.champs),
     ),
   });
@@ -243,7 +297,7 @@ const getArticleByGencod = asyncHandler(async (req, res) => {
   res.json({
     societe: societe(entreprise),
     article: projeter(
-      enrichirArticle(article, entreprise),
+      enrichirArticle(article, entreprise, await indexPlusDe(req)),
       listeChamps(req.query.champs),
     ),
   });
@@ -311,6 +365,7 @@ const exportArticles = asyncHandler(async (req, res) => {
   // getPaginated applique les filtres sur l'ensemble du fichier ; on demande
   // une « page » unique assez grande pour tout couvrir.
   const cache = await articleCacheService.getArticles(entreprise);
+  const plus = await indexPlusDe(req);
   const resultat = await articleCacheService.getPaginated(entreprise, {
     page: 1,
     limit: Math.max(cache.records.length, 1),
@@ -326,9 +381,229 @@ const exportArticles = asyncHandler(async (req, res) => {
 
   const masque = req.masqueDbf;
   for (const article of resultat.articles) {
-    let ligne = projeter(enrichirArticle(article, entreprise), champs);
+    let ligne = projeter(enrichirArticle(article, entreprise, plus), champs);
     // Le flux ne passe pas par res.json : l'exclusion de champs doit être
     // appliquée explicitement ici.
+    if (masque && masque.size) ligne = elaguer(ligne, masque);
+    if (!res.write(`${JSON.stringify(ligne)}\n`)) {
+      await new Promise((resolve) => res.once("drain", resolve));
+    }
+  }
+  res.end();
+});
+
+// ===========================================================================
+// PRODUITS & ATTRIBUTS (artplus.dbf)
+// ===========================================================================
+// artplus.dbf apporte ce qui manque à article.dbf pour un usage catalogue :
+// un nom de produit lisible, un classement groupe/famille/sous-famille, et de
+// quoi regrouper les références en PRODUITS À VARIANTES (une même serrure en
+// 5 couleurs = 1 produit, 5 références). Les intitulés d'attributs sont propres
+// à chaque société : voir GET /attributs pour le dictionnaire réel.
+
+/** Prépare une variante pour la réponse (article enrichi + projeté). */
+const vueVariante = (variante, entreprise, champs, avecArticle) => ({
+  nart: variante.nart,
+  attributs: variante.attributs,
+  articleTrouve: variante.articleTrouve,
+  // `_plus` n'est pas réinjecté ici : la variante porte déjà ses attributs,
+  // les répéter dans l'article doublerait la charge utile pour rien.
+  article:
+    avecArticle && variante.article
+      ? projeter(enrichirArticle(variante.article, entreprise), champs)
+      : undefined,
+});
+
+const vueProduitApi = (produit, entreprise, champs, avecArticles) => ({
+  ...produit,
+  variantes: produit.variantes.map((v) =>
+    vueVariante(v, entreprise, champs, avecArticles),
+  ),
+});
+
+const avecArticlesDemande = (q) =>
+  !(q.articles === "0" || q.articles === "false" || q.articles === "non");
+
+/**
+ * @desc    Dictionnaire des attributs artplus de la société + facettes
+ * @route   GET /api/public/v1/:nomDossierDBF/attributs
+ * @note    À lire EN PREMIER par un intégrateur : les intitulés ne sont pas les
+ *          mêmes d'une société à l'autre, et c'est ici qu'on voit lesquels
+ *          jouent le rôle de nom de produit, de classement, etc.
+ */
+const getAttributs = asyncHandler(async (req, res) => {
+  const index = await artplusService.getIndex(req.entreprise);
+  res.json({
+    societe: societe(req.entreprise),
+    fichier: "artplus.dbf",
+    present: index.present,
+    nbEnregistrements: index.dbfInfo.recordCount,
+    derniereModification: index.dbfInfo.lastModified,
+    nbArticles: index.parNart.size,
+    nbProduits: index.produits.size,
+    // Rôle -> clé d'attribut. Ce que l'API a reconnu dans les intitulés.
+    roles: index.roles,
+    attributs: index.intitules.map((i) => ({
+      intitule: i.intitule,
+      cle: i.cle,
+      role: i.role || "",
+      nbLignes: i.nbLignes,
+      nbRemplies: i.nbRemplies,
+    })),
+    facettes: index.facettes,
+  });
+});
+
+/**
+ * @desc    Classement groupe > famille > sous-famille (arbre + comptages)
+ * @route   GET /api/public/v1/:nomDossierDBF/classement
+ */
+const getClassement = asyncHandler(async (req, res) => {
+  const arbre = await artplusService.getClassement(req.entreprise);
+  res.json({
+    societe: societe(req.entreprise),
+    // Faux quand la société n'a pas d'attributs de classement dans artplus.
+    disponible: arbre.disponible,
+    total: arbre.groupes.length,
+    groupes: arbre.groupes,
+  });
+});
+
+/**
+ * @desc    Compléments d'UN article (attributs bruts + normalisés + produit)
+ * @route   GET /api/public/v1/:nomDossierDBF/articles/:nart/attributs
+ */
+const getArticleAttributs = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const detail = await artplusService.getAttributsDetail(
+    entreprise,
+    req.params.nart,
+  );
+  const produit = await artplusService.getProduitDeArticle(
+    entreprise,
+    req.params.nart,
+  );
+
+  res.json({
+    societe: societe(entreprise),
+    nart: String(req.params.nart).trim().toUpperCase(),
+    // Clés stables, exploitables directement.
+    attributs: detail.attributs,
+    // Mêmes valeurs avec l'INTITULE d'origine, dans l'ordre du fichier.
+    attributsBruts: detail.brut,
+    produit: produit
+      ? {
+          cle: produit.cle,
+          id: produit.id,
+          nom: produit.nom,
+          nbVariantes: produit.narts.length,
+          axes: produit.axes,
+          narts: produit.narts,
+        }
+      : null,
+  });
+});
+
+/**
+ * @desc    Liste paginée des PRODUITS (références regroupées par variantes)
+ * @route   GET /api/public/v1/:nomDossierDBF/produits
+ * @query   page, limit, champs, search, groupe, famille, sousFamille,
+ *          arborescence (préfixe accepté), marque, enStock, web, articles
+ */
+const getProduits = asyncHandler(async (req, res) => {
+  const debut = Date.now();
+  const entreprise = req.entreprise;
+  const page = entier(req.query.page, 1, 1, 1_000_000);
+  const limit = entier(req.query.limit, LIMITE_DEFAUT, 1, LIMITE_MAX);
+  const champs = listeChamps(req.query.champs);
+  const avecArticles = avecArticlesDemande(req.query);
+
+  const resultat = await artplusService.listerProduits(entreprise, {
+    page,
+    limit,
+    search: req.query.search || undefined,
+    groupe: req.query.groupe || undefined,
+    famille: req.query.famille || undefined,
+    sousFamille: req.query.sousFamille || undefined,
+    arborescence: req.query.arborescence || undefined,
+    marque: req.query.marque || undefined,
+    enStock: booleen(req.query.enStock),
+    web: booleen(req.query.web),
+  });
+
+  res.json({
+    societe: societe(entreprise),
+    present: resultat.present,
+    pagination: {
+      page: resultat.page,
+      limit: resultat.limit,
+      totalRecords: resultat.totalRecords,
+      totalPages: resultat.totalPages,
+      hasNextPage: resultat.hasNextPage,
+      hasPrevPage: resultat.hasPrevPage,
+    },
+    _tempsMs: Date.now() - debut,
+    produits: resultat.produits.map((p) =>
+      vueProduitApi(p, entreprise, champs, avecArticles),
+    ),
+  });
+});
+
+/**
+ * @desc    Un produit et toutes ses variantes
+ * @route   GET /api/public/v1/:nomDossierDBF/produits/:cle
+ */
+const getProduit = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const produit = await artplusService.getProduit(entreprise, req.params.cle);
+  if (!produit) {
+    res.status(404);
+    throw new Error(`Produit ${req.params.cle} introuvable`);
+  }
+  res.json({
+    societe: societe(entreprise),
+    produit: vueProduitApi(
+      produit,
+      entreprise,
+      listeChamps(req.query.champs),
+      avecArticlesDemande(req.query),
+    ),
+  });
+});
+
+/**
+ * @desc    Export complet des produits en NDJSON (une ligne par produit)
+ * @route   GET /api/public/v1/:nomDossierDBF/produits/export
+ */
+const exportProduits = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const champs = listeChamps(req.query.champs);
+  const avecArticles = avecArticlesDemande(req.query);
+
+  const index = await artplusService.getIndex(entreprise);
+  const resultat = await artplusService.listerProduits(entreprise, {
+    page: 1,
+    limit: Math.max(index.produits.size, 1),
+    search: req.query.search || undefined,
+    groupe: req.query.groupe || undefined,
+    famille: req.query.famille || undefined,
+    sousFamille: req.query.sousFamille || undefined,
+    arborescence: req.query.arborescence || undefined,
+    marque: req.query.marque || undefined,
+    enStock: booleen(req.query.enStock),
+    web: booleen(req.query.web),
+  });
+
+  res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+  res.setHeader("X-Total-Records", String(resultat.totalRecords));
+  res.setHeader(
+    "X-Data-Version",
+    `${new Date(index.dbfInfo.lastModified || 0).getTime()}-${index.parNart.size}`,
+  );
+
+  const masque = req.masqueDbf;
+  for (const produit of resultat.produits) {
+    let ligne = vueProduitApi(produit, entreprise, champs, avecArticles);
     if (masque && masque.size) ligne = elaguer(ligne, masque);
     if (!res.write(`${JSON.stringify(ligne)}\n`)) {
       await new Promise((resolve) => res.once("drain", resolve));
@@ -493,6 +768,12 @@ export {
   getArticlesGroupes,
   getArticlesTgc,
   exportArticles,
+  getArticleAttributs,
+  getAttributs,
+  getClassement,
+  getProduits,
+  getProduit,
+  exportProduits,
   getClients,
   getClientByTiers,
   getClientsStructure,

@@ -67,6 +67,43 @@ export const commercialApiSlice = apiSlice.injectEndpoints({
       providesTags: ["CommercialProformas"],
     }),
 
+    // Entrée en stock des réservations (statut par document).
+    // ⚠️ Requête SÉPARÉE de la liste : elle croise detail.dbf × entrees.dbf et
+    // peut prendre plusieurs dizaines de secondes à froid. Le front affiche la
+    // liste d'abord, puis complète la colonne « Stock » quand elle arrive.
+    getCommercialReservationsDisponibilites: builder.query({
+      query: ({ dossier, fenetreMois }) => ({
+        url: `${URL}/${dossier}/reservations/disponibilites`,
+        params: { fenetreMois },
+      }),
+      providesTags: ["CommercialReservationsDispo"],
+    }),
+
+    // Lignes d'une réservation + disponibilité article par article.
+    getCommercialReservationLignes: builder.query({
+      query: ({ dossier, numfact }) =>
+        `${URL}/${dossier}/reservations/${numfact}/lignes`,
+      providesTags: ["CommercialReservationsDispo"],
+    }),
+
+    // « J'ai prévenu le client que sa réservation est arrivée. »
+    marquerClientPrevenu: builder.mutation({
+      query: ({ dossier, numfact, ...body }) => ({
+        url: `${URL}/${dossier}/reservations/${numfact}/prevenu`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["CommercialProformas", "CommercialReservationsDispo"],
+    }),
+
+    annulerClientPrevenu: builder.mutation({
+      query: ({ dossier, numfact }) => ({
+        url: `${URL}/${dossier}/reservations/${numfact}/prevenu`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["CommercialProformas", "CommercialReservationsDispo"],
+    }),
+
     getCommercialProformaLignes: builder.query({
       query: ({ dossier, numfact }) =>
         `${URL}/${dossier}/proformas/${numfact}/lignes`,
@@ -192,6 +229,10 @@ export const {
   useGetCommercialClientQuery,
   useGetCommercialProformasQuery,
   useGetCommercialReservationsQuery,
+  useGetCommercialReservationsDisponibilitesQuery,
+  useGetCommercialReservationLignesQuery,
+  useMarquerClientPrevenuMutation,
+  useAnnulerClientPrevenuMutation,
   useGetCommercialProformaLignesQuery,
   useGetCommercialFacturesQuery,
   useGetCommercialAnalyseQuery,

@@ -29,6 +29,12 @@ import {
   getArticlesGroupes,
   getArticlesTgc,
   exportArticles,
+  getArticleAttributs,
+  getAttributs,
+  getClassement,
+  getProduits,
+  getProduit,
+  exportProduits,
   getClients,
   getClientByTiers,
   getClientsStructure,
@@ -80,6 +86,17 @@ router.get("/:nomDossierDBF/articles/export", articles, chargerEntrepriseApi, ex
 router.get("/:nomDossierDBF/articles/gencod/:gencod", articles, chargerEntrepriseApi, getArticleByGencod);
 router.get("/:nomDossierDBF/articles", articles, chargerEntrepriseApi, getArticles);
 router.get("/:nomDossierDBF/articles/:nart", articles, chargerEntrepriseApi, getArticleByNart);
+router.get("/:nomDossierDBF/articles/:nart/attributs", articles, chargerEntrepriseApi, getArticleAttributs);
+
+// ---- Produits & attributs (artplus.dbf) ------------------------------------
+// Même ressource que les articles (mêmes données, regroupées) : le scope
+// « articles:read » suffit, inutile de réémettre les clés déjà distribuées.
+router.get("/:nomDossierDBF/attributs", articles, chargerEntrepriseApi, getAttributs);
+router.get("/:nomDossierDBF/classement", articles, chargerEntrepriseApi, getClassement);
+// « export » AVANT /:cle, sinon il serait pris pour une clé de produit.
+router.get("/:nomDossierDBF/produits/export", articles, chargerEntrepriseApi, exportProduits);
+router.get("/:nomDossierDBF/produits", articles, chargerEntrepriseApi, getProduits);
+router.get("/:nomDossierDBF/produits/:cle", articles, chargerEntrepriseApi, getProduit);
 
 // ---- Clients --------------------------------------------------------------
 const clients = requireScope("clients:read");

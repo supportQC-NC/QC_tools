@@ -260,22 +260,156 @@ const getProformas = asyncHandler(async (req, res) => {
  */
 const getReservations = asyncHandler(async (req, res) => {
   const t0 = Date.now();
-  const result = await commercialService.getReservationsCommercial(
+  const [result, prevenus] = await Promise.all([
+    commercialService.getReservationsCommercial(
+      req.entreprise,
+      req.codesCommercial,
+      {
+        categorie: req.query.categorie || undefined,
+        tiers: req.query.tiers || undefined,
+        search: req.query.search || undefined,
+        fenetreMois:
+          req.query.fenetreMois !== undefined
+            ? Number(req.query.fenetreMois)
+            : undefined,
+        page: intParam(req.query.page, 1),
+        limit: intParam(req.query.limit, 50),
+      },
+    ),
+    // « Client prévenu » : suivi personnel, lecture Mongo négligeable.
+    chargerSuivis(req.user._id, req.entreprise._id, "resa_prevenu"),
+  ]);
+
+  const reservations = result.reservations.map((r) => {
+    const suivi = prevenus.get(r.numfact);
+    return {
+      ...r,
+      prevenuLe: suivi ? suivi.faitLe : null,
+      prevenuCanal: suivi ? suivi.canal : "",
+      prevenuNote: suivi ? suivi.note : "",
+    };
+  });
+
+  res.json({
+    ...result,
+    reservations,
+    _queryTime: `${Date.now() - t0}ms`,
+  });
+});
+
+/**
+ * @desc    Disponibilité (entrée en stock) des réservations du commercial
+ * @route   GET /api/commercial/:nomDossierDBF/reservations/disponibilites
+ * @query   fenetreMois (défaut 12, 0 = tout l'historique)
+ * @note    ⚠️ Croisement detail.dbf × entrees.dbf : premier appel long (scan
+ *          streaming), puis caché 10 min. C'est pour ça que c'est un endpoint
+ *          SÉPARÉ de la liste, chargé en différé par le front — ne pas
+ *          fusionner les deux.
+ */
+const getReservationsDisponibilites = asyncHandler(async (req, res) => {
+  const t0 = Date.now();
+  const [dispo, prevenus] = await Promise.all([
+    commercialService.getDisponibilitesReservations(
+      req.entreprise,
+      req.codesCommercial,
+      {
+        fenetreMois:
+          req.query.fenetreMois !== undefined
+            ? Number(req.query.fenetreMois)
+            : undefined,
+      },
+    ),
+    chargerSuivis(req.user._id, req.entreprise._id, "resa_prevenu"),
+  ]);
+
+  // « À prévenir » = quelque chose est arrivé ET le client n'a pas encore été
+  // prévenu (ou l'a été AVANT cette arrivée : nouvelle arrivée = à re-prévenir).
+  let nbAPrevenir = 0;
+  for (const [numfact, d] of Object.entries(dispo.documents)) {
+    const suivi = prevenus.get(numfact);
+    const arrivee = d.dateArrivee ? new Date(`${d.dateArrivee}T00:00:00`) : null;
+    const aPrevenir =
+      (d.statut === "complet" || d.statut === "partiel") &&
+      (!suivi || (arrivee && new Date(suivi.faitLe) < arrivee));
+    d.prevenuLe = suivi ? suivi.faitLe : null;
+    d.aPrevenir = aPrevenir;
+    if (aPrevenir) nbAPrevenir += 1;
+  }
+
+  res.json({ ...dispo, nbAPrevenir, _queryTime: `${Date.now() - t0}ms` });
+});
+
+/**
+ * @desc    Lignes d'UNE réservation + disponibilité article par article
+ * @route   GET /api/commercial/:nomDossierDBF/reservations/:numfact/lignes
+ */
+const getReservationLignes = asyncHandler(async (req, res) => {
+  const t0 = Date.now();
+  const doc = await commercialService.getLignesReservation(
     req.entreprise,
     req.codesCommercial,
-    {
-      categorie: req.query.categorie || undefined,
-      tiers: req.query.tiers || undefined,
-      search: req.query.search || undefined,
-      fenetreMois:
-        req.query.fenetreMois !== undefined
-          ? Number(req.query.fenetreMois)
-          : undefined,
-      page: intParam(req.query.page, 1),
-      limit: intParam(req.query.limit, 50),
-    },
+    req.params.numfact,
   );
-  res.json({ ...result, _queryTime: `${Date.now() - t0}ms` });
+  if (!doc) {
+    res.status(404);
+    throw new Error("Réservation introuvable dans votre portefeuille");
+  }
+  res.json({ ...doc, _queryTime: `${Date.now() - t0}ms` });
+});
+
+/**
+ * @desc    « J'ai prévenu le client que sa réservation est arrivée »
+ * @route   POST /api/commercial/:nomDossierDBF/reservations/:numfact/prevenu
+ * @body    canal, note, tiers, nomClient
+ */
+const marquerClientPrevenu = asyncHandler(async (req, res) => {
+  const reference = String(req.params.numfact || "").trim();
+  if (!reference) {
+    res.status(400);
+    throw new Error("Référence de réservation manquante");
+  }
+  const { canal = "", note = "", tiers = "", nomClient = "" } = req.body || {};
+
+  const suivi = await SuiviCommercial.findOneAndUpdate(
+    {
+      user: req.user._id,
+      entreprise: req.entreprise._id,
+      type: "resa_prevenu",
+      reference,
+    },
+    {
+      $set: {
+        faitLe: new Date(),
+        canal: String(canal).trim(),
+        note: String(note).trim(),
+        tiers: String(tiers).trim(),
+        nomClient: String(nomClient).trim(),
+      },
+    },
+    { new: true, upsert: true },
+  ).lean();
+
+  res.json({
+    numfact: reference,
+    prevenuLe: suivi.faitLe,
+    prevenuCanal: suivi.canal,
+    prevenuNote: suivi.note,
+  });
+});
+
+/**
+ * @desc    Annule le marquage « client prévenu » d'une réservation
+ * @route   DELETE /api/commercial/:nomDossierDBF/reservations/:numfact/prevenu
+ */
+const annulerClientPrevenu = asyncHandler(async (req, res) => {
+  const reference = String(req.params.numfact || "").trim();
+  await SuiviCommercial.deleteOne({
+    user: req.user._id,
+    entreprise: req.entreprise._id,
+    type: "resa_prevenu",
+    reference,
+  });
+  res.json({ numfact: reference, prevenuLe: null });
 });
 
 /**
@@ -634,6 +768,10 @@ export {
   getClient,
   getProformas,
   getReservations,
+  getReservationsDisponibilites,
+  getReservationLignes,
+  marquerClientPrevenu,
+  annulerClientPrevenu,
   getProformaLignes,
   getFactures,
   getAlertes,

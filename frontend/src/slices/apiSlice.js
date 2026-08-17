@@ -95,6 +95,7 @@ export const apiSlice = createApi({
     "CommercialDashboard",
     "CommercialClients",
     "CommercialProformas",
+    "CommercialReservationsDispo",
     "CommercialFactures",
     "CommercialAlertes",
     "CommercialRelances",

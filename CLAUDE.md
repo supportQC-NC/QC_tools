@@ -75,6 +75,15 @@ L'ERP **ne purge jamais** ces tables : tous les compteurs « en cours » / « à
 
 Le front affiche (1) immédiatement et remplit (2) et (3) en différé. **Ne pas refusionner ces endpoints.**
 
+**Écran Réservations / Commandes spéciales du commercial** — même découpage, pour la même raison :
+- `GET /:dossier/reservations` — la liste (entêtes TYPFACT="R", index facture, rapide) ;
+- `GET /:dossier/reservations/disponibilites` — le statut « entré en stock » par document, croisement `detail.dbf` × `entrees.dbf` (`resaEntreesService.getReservationsIndexes` + `getEntreesParArticle`, **142 s à froid en local**) ;
+- `GET /:dossier/reservations/:numfact/lignes` — le détail article par article, à l'ouverture d'une ligne.
+
+Le statut d'une ligne est « arrivé » quand l'article a une entrée **postérieure ou égale à la date de la réservation** ; les réservations plus anciennes que la profondeur du scan des entrées (`FENETRE_DISPO_MOIS` = 24 mois, fenêtre arrondie au 1er du mois pour que la clé de cache soit stable) sont marquées `inconnu` plutôt qu'« en attente ». « Client prévenu » est un suivi **personnel** (`SuiviCommercial` type `resa_prevenu`, référence = NUMFACT) : une nouvelle arrivée postérieure au marquage remet le document « à prévenir ».
+
+L'index des réservations de `resaEntreesService` est lui aussi caché **par TTL seul** (mêmes raisons) et préchauffé par `startCommercialIndexWarmer()`.
+
 **L'espace commercial n'utilise ni `factureCacheService` ni `commerciauxService`** (tous deux chargent `detail.dbf`, 6,2 M lignes, dont il n'a aucun besoin : CA et marge se calculent sur `MONTANT`/`FACTREV` des entêtes). Il a ses propres index, dans `commercialService.js` :
 
 - `getIndexFactures` — **une seule** passe streaming sur `facture.dbf` vers un index **colonnaire en TypedArrays** (modèle `frequentationService`), qui sert d'un coup : réservations TYPFACT="R", liste des factures, CA/marge N vs N-1, et date de dernier achat par client.
@@ -85,6 +94,18 @@ Les deux sont invalidés **par TTL seul (10 min), volontairement pas sur le mtim
 `startCommercialIndexWarmer()` (appelé dans `server.js`) reconstruit ces index toutes les 8 min en tâche de fond, pour les seules sociétés ayant un commercial actif — sinon c'est un utilisateur qui paie le scan (**188 s mesurées en production**, 35 s en local : le partage réseau du VPS est 5× plus lent).
 
 Mesures après refonte (local, index chaud) : dashboard **1,6 s**, factures **56 ms**, CA **31 ms** — contre 137 s pour le seul dashboard à l'origine.
+
+## API partenaire (`/api/public/v1`)
+
+Accès externe **en lecture seule** aux articles, produits et clients d'une société, pour un intégrateur (site marchand SITEC). Documentation destinée au prestataire : `docs/API_PARTENAIRE.md` — **à mettre à jour en même temps que le code**, c'est le contrat.
+
+Ce routeur n'utilise ni `protect` ni `checkEntrepriseAccess` (ils supposent un utilisateur interne avec cookie JWT) mais `apiKeyAuth` → `limiterDebit` → `requireScope` → `chargerEntrepriseApi` (`middleware/apiKeyAuth.js`). Les clés sont gérées **en CLI seulement** (`npm run apikey:list|create|revoke`), jamais par une page d'admin. Deux dimensions comme en interne : `scopes` (`articles:read`, `clients:read`) × `entreprises`.
+
+**`artplus.dbf` — compléments article** (`services/artplusService.js`) : table clé/valeur `{NART, INTITULE, CONTENU}`, **facultative** et **sans schéma imposé** — les intitulés diffèrent par société (qc : 18 dont `02_nom_produit`, `06_groupe`…; sitec : 5 dont `01_DESIGN`). Le service ne code aucune liste en dur : il détecte un **rôle** par convention de nommage (`ROLES`) et expose le dictionnaire réel via `GET /:societe/attributs`.
+
+Elle sert surtout à **regrouper les références en produits à variantes** (une serrure en 5 couleurs = 1 produit, 5 NART) : clé = l'identifiant produit quand la société en tient un (`01_n_produit` chez qc — unicité *vérifiée* au chargement, pas supposée), sinon un slug du nom (tronqué à 80 caractères + empreinte, sans quoi des produits distincts fusionnent). Chargement : qc 637 k lignes en ~2,8 s, sitec ~0,3 s ; cache TTL 10 min + invalidation mtime/taille.
+
+⚠️ Les fichiers DBF sont en jeu de caractères **DOS** et l'API les restitue tels quels (`N°` → `Nø`, `À` → `Aÿ`). C'est un comportement **global** de l'app, pas propre à artplus — ne pas le corriger dans un seul service, ça désaligne les champs entre eux.
 
 ## Request flow / conventions
 

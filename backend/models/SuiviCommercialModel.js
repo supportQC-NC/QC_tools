@@ -9,9 +9,13 @@
 //                          le délai de relance configuré.
 //   - type "alerte"   : « j'ai vu l'alerte commande spéciale disponible XXXXX »
 //                       -> l'alerte passe en « traitée » sur le dashboard.
+//   - type "resa_prevenu" : « j'ai prévenu le client que sa réservation XXXXX
+//                       est arrivée en stock » -> la réservation sort de la
+//                       liste « à prévenir » de l'écran Réservations.
 //
-// `reference` = NUMFACT de la proforma (relance) ou clé d'alerte (voir
-// services/commercialService.js -> cleAlerte).
+// `reference` = NUMFACT de la proforma (relance), NUMFACT de la réservation
+// (resa_prevenu) ou clé d'alerte (voir services/commercialService.js ->
+// cleAlerte).
 
 import mongoose from "mongoose";
 
@@ -30,7 +34,7 @@ const suiviCommercialSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["relance", "alerte"],
+      enum: ["relance", "alerte", "resa_prevenu"],
       required: true,
     },
     reference: { type: String, required: true, trim: true },

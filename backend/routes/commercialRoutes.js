@@ -26,6 +26,10 @@ import {
   getClient,
   getProformas,
   getReservations,
+  getReservationsDisponibilites,
+  getReservationLignes,
+  marquerClientPrevenu,
+  annulerClientPrevenu,
   getProformaLignes,
   getFactures,
   getAlertes,
@@ -61,6 +65,30 @@ router.get("/:nomDossierDBF/clients/:tiers", ...scope, getClient);
 router.get("/:nomDossierDBF/proformas", ...scope, getProformas);
 // Réservations / commandes spéciales : facture.dbf TYPFACT="R" (≠ proformas).
 router.get("/:nomDossierDBF/reservations", ...scope, getReservations);
+// Entrée en stock des articles réservés — endpoint SÉPARÉ (scan DBF lent),
+// chargé en différé une fois la liste affichée. Déclaré AVANT la route
+// paramétrée /:numfact/... pour ne pas être capté par elle.
+router.get(
+  "/:nomDossierDBF/reservations/disponibilites",
+  ...scope,
+  getReservationsDisponibilites,
+);
+router.get(
+  "/:nomDossierDBF/reservations/:numfact/lignes",
+  ...scope,
+  getReservationLignes,
+);
+// Suivi personnel « client prévenu de l'arrivée » (seule écriture : Mongo).
+router.post(
+  "/:nomDossierDBF/reservations/:numfact/prevenu",
+  ...scope,
+  marquerClientPrevenu,
+);
+router.delete(
+  "/:nomDossierDBF/reservations/:numfact/prevenu",
+  ...scope,
+  annulerClientPrevenu,
+);
 router.get(
   "/:nomDossierDBF/proformas/:numfact/lignes",
   ...scope,

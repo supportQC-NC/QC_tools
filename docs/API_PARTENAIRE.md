@@ -11,11 +11,12 @@ Documentation d'intégration destinée à un prestataire externe.
 
 ## 1. Ce que fait cette API
 
-Elle expose, **en lecture seule**, deux bases de l'ERP d'une société du groupe :
+Elle expose, **en lecture seule**, les bases de l'ERP d'une société du groupe :
 
 | Base | Fichier source | Contenu |
 |---|---|---|
 | Articles | `article.dbf` | catalogue, prix, stocks par entrepôt, promotions, classement |
+| Compléments article | `artplus.dbf` | attributs libres (nom de produit, classement, couleur, dimension…) et **regroupement des références en produits à variantes** — voir §5.4 |
 | Clients | `clients.dbf` | fiches clients, coordonnées, conditions commerciales |
 
 **Tous les champs** des fichiers sources sont renvoyés, sous leur **nom d'origine
@@ -96,6 +97,7 @@ des mauvaises surprises.
 | **Booléens DBF** | Le type DBF `L` est renvoyé en `true`/`false` (ex. `TARIFL`). Les autres indicateurs sont des **lettres** : `WEB` vaut `"O"` (oui) ou `""`, `FOTO` vaut `"F"` si une photo existe. |
 | **Monnaie** | Franc Pacifique (XPF), **sans décimale** dans les usages courants. Les prix de vente (`PVTE`, `PVTETTC`, `PVPROMO`) sont des entiers. Les prix d'achat/revient peuvent avoir des décimales. |
 | **Casse** | Les noms de champs DBF sont **toujours en MAJUSCULES**. Les champs ajoutés par l'API sont en `_camelCase` préfixé. |
+| **Caractères** | Les fichiers sources sont encodés en jeu de caractères **DOS** et l'API les restitue tels quels. Deux conséquences visibles : le symbole degré peut remonter en `ø` (`N°37` → `Nø37`), et certains accents ont été perdus à la saisie dans l'ERP (`À` stocké sur deux caractères, restitué `Aÿ`). Ce n'est pas un défaut de transport : la donnée est ainsi dans la base. Prévoyez un nettoyage à l'affichage si nécessaire. |
 | **Fraîcheur** | Les données sont servies depuis un cache mémoire rafraîchi automatiquement (TTL 5 minutes, et invalidation immédiate si le fichier source est réécrit). Un changement dans l'ERP est donc visible en **5 minutes au pire**. |
 
 ---
@@ -136,7 +138,7 @@ X-RateLimit-Reset: 1786423095      (horodatage Unix de remise à zéro)
 En cas de dépassement : `429` + en-tête `Retry-After` (en secondes).
 
 > Pour une synchronisation complète, **n'itérez pas sur des milliers de pages** :
-> utilisez les routes `/export` (§5.4), conçues pour ça — un seul appel.
+> utilisez les routes `/export` (§5.5), conçues pour ça — un seul appel.
 
 ---
 
@@ -199,6 +201,10 @@ plutôt que de coder « S1 = Magasin » en dur.
 ### 5.2 Articles
 
 Scope requis : `articles:read`.
+
+> Ces routes renvoient les **références** de l'ERP, une par ligne de catalogue.
+> Pour la vue **produit** (références regroupées en déclinaisons, classement,
+> attributs), voir §5.4.
 
 #### `GET /:societe/articles` — liste paginée
 
@@ -418,10 +424,165 @@ déroulantes sans parcourir toute la base.
 
 ---
 
-### 5.4 Exports complets (synchronisation)
+### 5.4 Produits & attributs (compléments `artplus`)
+
+Scope requis : `articles:read` — ce sont les **mêmes données que les articles**,
+présentées autrement. Aucune nouvelle clé à demander.
+
+L'ERP raisonne en **références** (`NART`). Un site marchand raisonne en
+**produits** : « verrou de fenêtre à clé » est *un* produit, décliné en argent
+et blanc, à l'unité ou en blister — soit 14 références. Le fichier `artplus.dbf`
+porte ce qui permet de faire le lien : un nom de produit lisible, un classement
+groupe / famille / sous-famille, et les caractéristiques qui distinguent les
+déclinaisons (couleur, dimension, conditionnement…).
+
+> ⚠️ **Les attributs ne sont pas les mêmes d'une société à l'autre.** Ils sont
+> libres et propres à chaque base. Sur `sitec` : `01_DESIGN`, `02_DIMENSION`,
+> `03_MODELE`, `04_INFO`, `05_ARBORESCENCE`. Sur d'autres sociétés du groupe, il
+> y en a 18. **Commencez toujours par `GET /:societe/attributs`** : c'est le
+> dictionnaire réel, et il vous dit quel attribut joue quel rôle. Ne codez pas
+> une liste d'attributs en dur.
+>
+> Si la société n'a pas de fichier `artplus.dbf`, ces routes répondent
+> normalement avec `present: false` et des listes vides — jamais une erreur.
+
+#### `GET /:societe/attributs` — dictionnaire des attributs
+
+À lire en premier. `roles` indique ce que l'API a reconnu : quel attribut est le
+nom du produit, lequel porte le classement, etc. `facettes` donne les valeurs
+distinctes avec leur nombre de produits — de quoi construire des filtres.
+
+```json
+{
+  "societe": {...},
+  "fichier": "artplus.dbf",
+  "present": true,
+  "nbEnregistrements": 28406,
+  "derniereModification": "2026-07-13T03:34:56.321Z",
+  "nbArticles": 5680,
+  "nbProduits": 2946,
+  "roles": { "nom": "design", "arborescence": "arborescence" },
+  "attributs": [
+    { "intitule": "01_DESIGN", "cle": "design", "role": "nom", "nbLignes": 5681, "nbRemplies": 5681 },
+    { "intitule": "02_DIMENSION", "cle": "dimension", "role": "", "nbLignes": 5681, "nbRemplies": 3142 }
+  ],
+  "facettes": {
+    "groupes": [], "familles": [], "sousFamilles": [],
+    "arborescences": [{ "valeur": "1F4", "nb": 71 }]
+  }
+}
+```
+
+Rôles possibles : `produitId`, `nom`, `marque`, `rang`, `arborescence`,
+`groupe`, `famille`, `sousFamille`. Un rôle absent = la société ne renseigne pas
+cette information. `cle` est la forme normalisée de `intitule` (préfixe
+numérique retiré, minuscules) : **c'est elle qui sert de clé** dans `attributs`
+et `_plus`.
+
+#### `GET /:societe/classement` — arbre groupe > famille > sous-famille
+
+Le menu du catalogue, avec le nombre de produits et de références à chaque
+niveau. `disponible: false` si la société ne renseigne pas ce classement (c'est
+le cas de `sitec` : utilisez alors `arborescence`).
+
+```json
+{
+  "societe": {...}, "disponible": true, "total": 9,
+  "groupes": [{
+    "valeur": "OUTILLAGE", "nbProduits": 3769, "nbArticles": 5412,
+    "familles": [{
+      "valeur": "OUTILLAGE A MAIN", "nbProduits": 1577, "nbArticles": 2578,
+      "sousFamilles": [{ "valeur": "PINCES", "nbProduits": 140, "nbArticles": 169 }]
+    }]
+  }]
+}
+```
+
+#### `GET /:societe/produits` — liste paginée des produits
+
+| Paramètre | Effet |
+|---|---|
+| `page`, `limit` | Pagination (`limit` ≤ 500, défaut 100). |
+| `search` | Recherche sur le nom, le classement, les codes article **et** les valeurs de variantes. Les produits dont le **nom** correspond sont remontés en premier. |
+| `groupe`, `famille`, `sousFamille`, `marque` | Égalité, insensible à la casse et aux accents. |
+| `arborescence` | **Préfixe** accepté : `G010` remonte tout le rayon, `G010J03` la seule case. |
+| `enStock=1` | Ne garde que les produits dont **au moins une** variante a du stock. |
+| `web=1` | Idem pour `WEB = "O"`. |
+| `articles=0` | N'inclut pas la fiche article complète dans chaque variante (réponse ~10× plus légère). |
+| `champs` | Projection appliquée aux fiches articles des variantes. |
+
+```json
+{
+  "societe": {...},
+  "present": true,
+  "pagination": { "page": 1, "limit": 2, "totalRecords": 229, "totalPages": 115, "hasNextPage": true, "hasPrevPage": false },
+  "produits": [{
+    "cle": "p10937",
+    "id": "10937",
+    "nom": "CARTE POUR VERROU ELECTRIQUE RL1120",
+    "groupe": "BATIMENT",
+    "famille": "CONTROLE DACCES - SECURITE",
+    "sousFamille": "VERROUILLAGE ELECTRIQUE",
+    "arborescence": "G010H01",
+    "marque": "VACHETTE",
+    "axes": ["tet3_couleur", "tet2_dimension"],
+    "nbVariantes": 1,
+    "variantes": [{
+      "nart": "370020",
+      "attributs": { "nom_produit": "CARTE POUR VERROU ELECTRIQUE RL1120", "ss_famille": "VERROUILLAGE ELECTRIQUE" },
+      "articleTrouve": true,
+      "article": { "NART": "370020", "DESIGN": "CARTE P/VERROU ELECT RL1120", "PVTE": 1351.35, "_stockTotal": 8 }
+    }]
+  }]
+}
+```
+
+- **`cle`** : identifiant du produit, à utiliser tel quel dans l'URL de la fiche.
+  Il est stable tant que la source ne change pas, mais **ce n'est pas une clé
+  ERP** : la clé qui fait foi reste `NART`.
+- **`axes`** : les attributs qui **diffèrent** d'une variante à l'autre. C'est ce
+  qui vous dit sur quoi construire vos sélecteurs (couleur, dimension…).
+  Vide quand le produit n'a qu'une déclinaison.
+- **`variantes[].articleTrouve`** : `false` si le `NART` a des compléments mais
+  n'existe pas (ou plus) dans `article.dbf`. La variante est conservée et
+  signalée plutôt que masquée en silence ; `article` est alors absent.
+- L'ordre des variantes suit le rang du catalogue quand la société le renseigne
+  (rôle `rang`), sinon l'ordre des `NART`.
+
+#### `GET /:societe/produits/:cle` — un produit et toutes ses variantes
+
+Mêmes paramètres `champs` et `articles`. `404` si la clé est inconnue.
+
+#### `GET /:societe/produits/export` — export NDJSON des produits
+
+Un produit complet par ligne. Accepte les mêmes filtres que la liste, ignore
+`page`/`limit`. Voir §5.5 pour le format NDJSON.
+
+#### `GET /:societe/articles/:nart/attributs` — compléments d'une référence
+
+Les attributs d'un article dans les deux formes, plus le produit auquel il
+appartient et la liste de ses références sœurs.
+
+```json
+{
+  "societe": {...},
+  "nart": "110320",
+  "attributs": { "design": "CEINTURE DE SECURITE…", "arborescence": "1J1" },
+  "attributsBruts": [
+    { "intitule": "01_DESIGN", "cle": "design", "role": "nom", "contenu": "CEINTURE DE SECURITE…" },
+    { "intitule": "05_ARBORESCENCE", "cle": "arborescence", "role": "arborescence", "contenu": "1J1" }
+  ],
+  "produit": { "cle": "nceinture-de-securite…", "id": "", "nom": "CEINTURE DE SECURITE…", "nbVariantes": 1, "axes": [], "narts": ["110320"] }
+}
+```
+
+---
+
+### 5.5 Exports complets (synchronisation)
 
 #### `GET /:societe/articles/export`
 #### `GET /:societe/clients/export`
+#### `GET /:societe/produits/export`
 
 Renvoient **l'intégralité** des enregistrements au format **NDJSON**
 (*newline-delimited JSON*) : **un objet JSON complet par ligne**, pas de tableau
@@ -478,6 +639,11 @@ identique partout. Présents sur toutes les routes articles.
 | `_prixVenteHT` | nombre | Prix HT réellement applicable aujourd'hui : `PVPROMO` si `_promoActive` et `PVPROMO > 0`, sinon `PVTE`. |
 | `_publieWeb` | booléen | `WEB` vaut `"O"`. |
 | `_aPhoto` | booléen | `FOTO` vaut `"F"`. |
+| `_plus` | objet | Attributs `artplus` de la référence, par clé normalisée (§5.4). Absent si la société n'a pas de compléments, ou avec `?plus=0`. |
+| `_produit` | objet | Produit de rattachement : `{ cle, id, nom, groupe, famille, sousFamille, arborescence, marque, nbVariantes }`. Sert à passer d'une référence à sa fiche produit. |
+
+> `?plus=0` retire `_plus` et `_produit` de la réponse. Utile pour un export de
+> masse dont vous n'avez pas besoin des compléments.
 
 > **Prix TTC.** Le champ `PVTETTC` est fourni par l'ERP. La conversion utilisée
 > en interne est `PVTETTC = tronquer(PVTE × (1 + ATVA / 100))` (troncature, pas
@@ -694,6 +860,9 @@ Le schéma qui fonctionne bien :
    mettre à jour votre catalogue par comparaison sur `NART`.
 4. Même principe pour les clients (`clients/version` → `clients/export`), à une
    fréquence plus faible : cette base bouge beaucoup moins.
+5. Pour l'arborescence du site, rejouer `GET /:societe/classement` et
+   `GET /:societe/produits/export` dans la même passe : les compléments
+   `artplus` changent au rythme du catalogue, pas des prix.
 
 Points d'attention :
 
@@ -808,7 +977,9 @@ for a in r.json()["articles"]:
 | **Latence de 5 min** | Cache serveur. Une modification ERP est visible en 5 minutes au pire. |
 | **Pas de delta** | Pas d'horodatage par ligne dans les fichiers sources ; seul l'export complet garantit l'exhaustivité. |
 | **Doublons de code-barres** | `GENCOD` n'est pas garanti unique dans l'ERP. `NART` est la seule clé fiable. |
-| **Périmètre v1** | Articles et clients uniquement. Fournisseurs, commandes, factures et proformas existent en interne mais ne sont pas exposés. |
+| **Périmètre v1** | Articles, produits/attributs et clients. Fournisseurs, commandes, factures et proformas existent en interne mais ne sont pas exposés. |
+| **Compléments facultatifs** | `artplus.dbf` n'existe pas dans toutes les sociétés, et son contenu est libre : les attributs disponibles varient. Interrogez `GET /:societe/attributs` plutôt que de supposer un schéma. |
+| **Regroupement produits** | Le regroupement se fait sur l'identifiant produit quand la société en tient un, sinon sur le **nom** du produit. Deux références portant exactement le même nom sont donc vues comme deux variantes d'un même produit. |
 
 ---
 

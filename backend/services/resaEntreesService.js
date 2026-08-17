@@ -74,11 +74,16 @@ const vendeurNom = (entreprise, repres) => {
 };
 
 // ─────────────── Index des réservations (facture + detail, streaming) ────────
-// Map<NART_upper, [{ numfact, qteResa, tiers, repres, etat, nom, texte, datfact }]>
+// Deux vues du MÊME scan (une seule passe, un seul cache) :
+//   - parNart     : Map<NART_upper, [{ numfact, qteResa, tiers, repres, etat, … }]>
+//                   -> « quelles réservations attendent cet article ? » (alertes)
+//   - parDocument : Map<NUMFACT, { header, lignes:[{ nart, qteResa }] }>
+//                   -> « qu'attend cette réservation ? » (espace commercial,
+//                      disponibilité ligne à ligne d'un document)
 const RESA_TTL_MS = 10 * 60 * 1000;
-const resaCache = new Map(); // dossier -> { index, loadedAt, mFact, sFact, mDet, sDet }
+const resaCache = new Map(); // dossier -> { index, loadedAt }
 
-const getReservationsIndex = async (entreprise) => {
+const buildReservationsIndex = async (entreprise) => {
   const dossier = entreprise.nomDossierDBF;
   const factPath = dbfPathFor(entreprise, "facture.dbf");
   const detPath = dbfPathFor(entreprise, "detail.dbf");
@@ -86,18 +91,6 @@ const getReservationsIndex = async (entreprise) => {
   const stD = statSafe(detPath);
   if (!stF) throw new Error(`facture.dbf introuvable: ${factPath}`);
   if (!stD) throw new Error(`detail.dbf introuvable: ${detPath}`);
-
-  const cached = resaCache.get(dossier);
-  if (
-    cached &&
-    Date.now() - cached.loadedAt < RESA_TTL_MS &&
-    cached.mFact === stF.mtime.getTime() &&
-    cached.sFact === stF.size &&
-    cached.mDet === stD.mtime.getTime() &&
-    cached.sDet === stD.size
-  ) {
-    return cached.index;
-  }
 
   const t0 = Date.now();
 
@@ -124,9 +117,11 @@ const getReservationsIndex = async (entreprise) => {
     }
   }
 
-  // Phase 2 : lignes réservées (detail dont NUMFACT ∈ résa, QTE≠0) -> par NART.
+  // Phase 2 : lignes réservées (detail dont NUMFACT ∈ résa, QTE≠0), indexées
+  // dans les DEUX sens (par article et par document) — même passe, même coût.
   const detDbf = await DBFFile.open(detPath, { readMode: "loose" });
-  const index = new Map(); // NART_upper -> [{ numfact, qteResa, ...header }]
+  const parNart = new Map(); // NART_upper -> [{ numfact, qteResa, ...header }]
+  const parDocument = new Map(); // NUMFACT -> { header, lignes: [...] }
   let scannedD = 0;
   while ((batch = await detDbf.readRecords(BATCH)).length > 0) {
     scannedD += batch.length;
@@ -138,24 +133,61 @@ const getReservationsIndex = async (entreprise) => {
       if (Number(r.QTE) === 0) continue;
       const nart = safeTrim(r.NART).toUpperCase();
       if (!nart) continue;
-      if (!index.has(nart)) index.set(nart, []);
-      index.get(nart).push({ ...header, qteResa: num(r.QTE) });
+      if (!parNart.has(nart)) parNart.set(nart, []);
+      parNart.get(nart).push({ ...header, qteResa: num(r.QTE) });
+
+      if (!parDocument.has(numfact)) {
+        parDocument.set(numfact, { header, lignes: [] });
+      }
+      parDocument.get(numfact).lignes.push({ nart, qteResa: num(r.QTE) });
     }
   }
 
-  resaCache.set(dossier, {
-    index,
-    loadedAt: Date.now(),
-    mFact: stF.mtime.getTime(),
-    sFact: stF.size,
-    mDet: stD.mtime.getTime(),
-    sDet: stD.size,
-  });
   console.log(
-    `[ResaEntrees] Réservations ${dossier}: ${resaFactures.size} factures R, ${index.size} NART (scan facture ${scannedF} + detail ${scannedD} en ${Date.now() - t0}ms)`,
+    `[ResaEntrees] Réservations ${dossier}: ${resaFactures.size} factures R, ${parNart.size} NART, ${parDocument.size} documents avec lignes (scan facture ${scannedF} + detail ${scannedD} en ${Date.now() - t0}ms)`,
   );
-  return index;
+  return { parNart, parDocument };
 };
+
+// Verrou anti-scans concurrents : sur les grosses sociétés le scan dure
+// plusieurs dizaines de secondes, deux requêtes simultanées ne doivent pas le
+// payer deux fois.
+const resaLocks = new Map(); // dossier -> Promise
+
+/**
+ * Index des réservations (les deux vues).
+ *
+ * Caché par TTL SEUL, volontairement : facture.dbf et detail.dbf changent à
+ * CHAQUE facture émise. Invalider sur mtime/taille ferait repayer un scan de
+ * ~142 s (en local ; bien plus sur le partage réseau de production) à presque
+ * chaque requête en journée. Une réservation créée à l'instant apparaît donc
+ * avec au plus 10 minutes de retard — sans conséquence métier, alors que
+ * l'attente, elle, se verrait tout de suite. Même arbitrage que l'index
+ * facture de commercialService, qui préchauffe aussi celui-ci en tâche de fond.
+ */
+export const getReservationsIndexes = async (entreprise) => {
+  const dossier = entreprise.nomDossierDBF;
+
+  const cached = resaCache.get(dossier);
+  if (cached && Date.now() - cached.loadedAt < RESA_TTL_MS) return cached.index;
+  if (resaLocks.has(dossier)) return resaLocks.get(dossier);
+
+  const promesse = (async () => {
+    try {
+      const index = await buildReservationsIndex(entreprise);
+      resaCache.set(dossier, { index, loadedAt: Date.now() });
+      return index;
+    } finally {
+      resaLocks.delete(dossier);
+    }
+  })();
+  resaLocks.set(dossier, promesse);
+  return promesse;
+};
+
+/** Vue « par article » (utilisée par le croisement avec les entrées). */
+const getReservationsIndex = async (entreprise) =>
+  (await getReservationsIndexes(entreprise)).parNart;
 
 // ─────────────── Entrées d'une période (streaming entrees.dbf) ───────────────
 const ENTREES_TTL_MS = 5 * 60 * 1000;
@@ -204,6 +236,19 @@ const getEntreesRange = async (entreprise, startYmd, endYmd) => {
     size: st.size,
   });
   return map;
+};
+
+/**
+ * Entrées en stock d'une période, indexées par article (NART majuscule).
+ * Exposé pour l'espace commercial, qui croise ces entrées avec les lignes
+ * d'UNE réservation (et non l'inverse). Dates au format "YYYY-MM-DD".
+ * @returns {Promise<Map<string,{dateEntree:string,numcde:string,qteEntree:number}>>}
+ */
+export const getEntreesParArticle = async (entreprise, { start, end }) => {
+  const startYmd = String(start || "").replace(/-/g, "").slice(0, 8);
+  const endYmd = String(end || "").replace(/-/g, "").slice(0, 8);
+  if (startYmd.length !== 8 || endYmd.length !== 8) return new Map();
+  return getEntreesRange(entreprise, startYmd, endYmd);
 };
 
 /**
@@ -293,4 +338,4 @@ export const getResaEntrees = async (entreprise, { start, end }) => {
   return { periode: { start, end }, total: rows.length, rows };
 };
 
-export default { getResaEntrees };
+export default { getResaEntrees, getReservationsIndexes, getEntreesParArticle };
