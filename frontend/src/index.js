@@ -51,6 +51,7 @@ import CommunicationClientScreen from "./screens/admin/CommunicationClientScreen
 import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
 import AssistantIAScreen from "./screens/user/AssistantIAScreen";
+import VeilleScreen from "./screens/user/VeilleScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
@@ -203,6 +204,11 @@ const router = createBrowserRouter(
       {/* Communication · Assistant IA -> module "assistant_ia" (strictement gaté) */}
       <Route element={<ModuleRoute module="assistant_ia" />}>
         <Route path="/assistant-ia" element={<AssistantIAScreen />} />
+      </Route>
+
+      {/* Communication · Veille IA hebdomadaire -> module "veille" */}
+      <Route element={<ModuleRoute module="veille" />}>
+        <Route path="/veille" element={<VeilleScreen />} />
       </Route>
 
       {/* Communication · Catalogue nouveautés -> module "communication_client" */}

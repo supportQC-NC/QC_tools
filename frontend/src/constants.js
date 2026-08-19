@@ -6,6 +6,7 @@ export const FOURNISSEURS_URL = "/api/fournisseurs";
 export const ARTICLES_URL = "/api/articles";
 export const COMMANDES_URL = "/api/commandes";
 export const ENVOI_CDE_URL = "/api/envoi-cde-fournisseur";
+export const VEILLE_URL = "/api/veille";
 export const TOP_VENTES_URL = "/api/top-ventes";
 export const MENU_HINTS_URL = "/api/menu-hints";
 export const MENU_LAYOUT_URL = "/api/menu-layout";

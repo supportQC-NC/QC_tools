@@ -312,6 +312,12 @@ export const moduleMenuStructure = [
         path: "/assistant-ia",
         icon: HiSparkles,
       },
+      {
+        moduleKey: "veille",
+        label: "Veille",
+        path: "/veille",
+        icon: HiDocumentReport,
+      },
     ],
   },
 ];
@@ -706,6 +712,8 @@ export const DEFAULT_MENU_HINTS = {
   "/edition-promo": "Édition des promotions.",
   "/mailing": "Emailing clients (campagnes).",
   "/assistant-ia": "Assistant IA branché sur les données société.",
+  "/veille":
+    "Veille hebdomadaire rédigée par l'IA : un rapport HTML sur vos thématiques.",
   "/communication-client":
     "Catalogue des nouveautés en stock, envoyé aux clients abonnés.",
 };

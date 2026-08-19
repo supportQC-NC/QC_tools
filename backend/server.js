@@ -75,6 +75,7 @@ import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import commercialRoutes from "./routes/commercialRoutes.js";
 import { startCommercialIndexWarmer } from "./services/commercialService.js";
 import { startReapproProformaScheduler } from "./services/reapproProformaScheduler.js";
+import { startVeilleScheduler } from "./services/veilleScheduler.js";
 import topVentesRoutes from "./routes/topVentesRoutes.js";
 import menuHintRoutes from "./routes/menuHintRoutes.js";
 import menuLayoutRoutes from "./routes/menuLayoutRoutes.js";
@@ -116,6 +117,7 @@ import conversationRoutes from "./routes/conversationRoutes.js";
 import mailingRoutes from "./routes/mailingRoutes.js";
 // ========== ROUTES ASSISTANT IA (chat métier branché sur les données) ==========
 import aiRoutes from "./routes/aiRoutes.js";
+import veilleRoutes from "./routes/veilleRoutes.js";
 // ========== ROUTES DICTIONNAIRE DES RAYONS (étiquettes rayons/sous-zones) ==========
 import dictionnaireRayonsRoutes from "./routes/dictionnaireRayonsRoutes.js";
 // ========== API PARTENAIRE (clé d'API, lecture seule, prestataires externes) ==========
@@ -276,6 +278,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/mailing", mailingRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/veille", veilleRoutes);
 app.use("/api/dictionnaire-rayons", dictionnaireRayonsRoutes);
 // ========== API PARTENAIRE ==========
 // Authentification par clé d'API (X-API-Key), PAS par cookie JWT.
@@ -361,4 +364,6 @@ server.listen(PORT, () => {
   // Listes de réappro : import horaire des proformas dont l'observation
   // commence par « reappro » (CDC §2).
   startReapproProformaScheduler();
+  // Veille : génération hebdomadaire des rapports IA (par utilisateur).
+  startVeilleScheduler();
 });

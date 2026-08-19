@@ -112,6 +112,9 @@ export const apiSlice = createApi({
     "DashboardLayout",
     // ========== TAGS DROITS CHAMP PAR CHAMP (DBF) ==========
     "ChampsDbf",
+    // ========== TAGS VEILLE (rapports IA hebdomadaires) ==========
+    "VeilleConfig",
+    "VeilleRapport",
   ],
   endpoints: (builder) => ({}),
 });

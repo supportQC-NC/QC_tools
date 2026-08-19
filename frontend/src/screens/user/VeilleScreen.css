@@ -1,0 +1,403 @@
+/* Module « Veille » — styles scopés .vei-* */
+
+.vei-wrap {
+  padding: 18px 28px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vei-head h1 {
+  font-size: 1.4rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vei-sub {
+  font-size: 0.85rem;
+  color: var(--admin-text-muted, #94a3b8);
+  margin: 4px 0 16px;
+}
+
+/* ── Messages ───────────────────────────────────────────────────────────── */
+.vei-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.vei-msg code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.8rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.2);
+}
+.vei-msg.ok {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+.vei-msg.err {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+.vei-msg.warn {
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  color: #eab308;
+}
+
+/* ── Mise en page 2 colonnes ────────────────────────────────────────────── */
+.vei-layout {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .vei-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vei-side {
+  background: var(--admin-card, #1e293b);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 12px;
+  padding: 12px;
+  position: sticky;
+  top: 12px;
+}
+.vei-side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.vei-side-head span {
+  flex: 1;
+}
+.vei-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vei-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--admin-text, #e2e8f0);
+  text-align: left;
+  cursor: pointer;
+}
+.vei-item:hover {
+  background: var(--admin-hover, rgba(148, 163, 184, 0.12));
+}
+.vei-item.actif {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(99, 102, 241, 0.55);
+}
+.vei-item-nom {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.vei-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.vei-item-meta svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ── Cartes de réglages ─────────────────────────────────────────────────── */
+.vei-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.vei-card {
+  background: var(--admin-card, #1e293b);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.vei-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  margin: 0 0 14px;
+}
+.vei-pushed {
+  margin-left: auto;
+}
+
+.vei-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.vei-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.vei-grid .vei-field {
+  margin-bottom: 0;
+}
+.vei-field.large {
+  grid-column: span 2;
+}
+@media (max-width: 700px) {
+  .vei-field.large {
+    grid-column: span 1;
+  }
+}
+.vei-field label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.vei-field label svg {
+  width: 14px;
+  height: 14px;
+}
+.vei-field input,
+.vei-field select,
+.vei-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--admin-input-bg, #0f172a);
+  color: var(--admin-text, #e2e8f0);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 7px;
+  font-size: 0.87rem;
+  font-family: inherit;
+}
+.vei-field textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+.vei-field .vei-mono {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+}
+.vei-hint {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted, #94a3b8);
+  line-height: 1.5;
+}
+
+.vei-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 0.87rem;
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+}
+.vei-switch input {
+  width: 16px;
+  height: 16px;
+}
+
+/* Palette de couleurs */
+.vei-couleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.vei-couleur {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vei-couleur input[type="color"] {
+  width: 40px;
+  height: 34px;
+  padding: 2px;
+  cursor: pointer;
+}
+.vei-hex {
+  width: 106px;
+  font-family: ui-monospace, Consolas, monospace;
+  text-transform: uppercase;
+}
+
+/* Options avancées */
+.vei-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--admin-text, #e2e8f0);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+}
+.vei-avance {
+  margin-top: 14px;
+}
+
+/* ── Boutons ────────────────────────────────────────────────────────────── */
+.vei-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 7px;
+  color: var(--admin-text, #e2e8f0);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.vei-btn:hover:not(:disabled) {
+  background: var(--admin-hover, rgba(148, 163, 184, 0.14));
+}
+.vei-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.vei-btn.primary {
+  background: var(--admin-primary, #6366f1);
+  border-color: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+.vei-btn.danger {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+.vei-btn.sm {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+.vei-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.vei-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vei-spacer {
+  flex: 1;
+}
+.vei-next {
+  font-size: 0.8rem;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.vei-next b {
+  color: var(--admin-text, #e2e8f0);
+}
+
+/* ── Tableau des rapports ───────────────────────────────────────────────── */
+.vei-tablewrap {
+  overflow-x: auto;
+}
+.vei-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+.vei-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--admin-border, #334155);
+  color: var(--admin-text-muted, #94a3b8);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vei-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  white-space: nowrap;
+}
+.vei-table td.wrap {
+  white-space: normal;
+  min-width: 220px;
+}
+.vei-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.vei-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.vei-badge svg {
+  width: 13px;
+  height: 13px;
+}
+.vei-badge.ok {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+}
+.vei-badge.err {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+}
+.vei-badge.warn {
+  background: rgba(234, 179, 8, 0.16);
+  color: #eab308;
+}
+.vei-badge.off {
+  background: rgba(148, 163, 184, 0.16);
+  color: #94a3b8;
+}
+.vei-badge.encours {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+}
+
+.vei-empty {
+  padding: 22px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--admin-text-muted, #94a3b8);
+  line-height: 1.5;
+}
+.vei-empty.grand {
+  padding: 60px 22px;
+}
