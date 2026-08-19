@@ -104,6 +104,7 @@ import MesTachesScreen from "./screens/user/MesTachesScreen";
 import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 import MonMenuScreen from "./screens/user/MonMenuScreen";
 import ReceptionManuelleScreen from "./screens/user/ReceptionManuelleScreen";
+import ListesReapproScreen from "./screens/user/ListesReapproScreen";
 import MonDashboardScreen from "./screens/user/MonDashboardScreen";
 import CommercialDashboardScreen from "./screens/commercial/CommercialDashboardScreen";
 import CommercialPortefeuilleScreen from "./screens/commercial/CommercialPortefeuilleScreen";
@@ -217,6 +218,11 @@ const router = createBrowserRouter(
       {/* Gestion · Contrôle réception manuel (fiches papier) */}
       <Route element={<ModuleRoute module="reception_manuelle" />}>
         <Route path="/reception-manuelle" element={<ReceptionManuelleScreen />} />
+      </Route>
+
+      {/* Gestion · Listes de réappro -> module "demande_reappro" */}
+      <Route element={<ModuleRoute module="demande_reappro" />}>
+        <Route path="/demandes-reappro" element={<ListesReapproScreen />} />
       </Route>
 
       {/* Gestion · Historique prix d'achat -> module "historique_pachat" */}

@@ -37,6 +37,8 @@ export const apiSlice = createApi({
     // ====================================
     "Collecteur",
     "AppRelease",
+    // ========== TAGS LISTES DE RÉAPPRO ==========
+    "DemandeReappro",
     // ========== TAGS ABONNEMENTS RAPPORTS ==========
     "ReportSubscription",
     // ========== TAGS ÉQUIPES ==========

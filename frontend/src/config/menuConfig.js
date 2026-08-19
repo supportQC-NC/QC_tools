@@ -210,6 +210,20 @@ export const moduleMenuStructure = [
   // },
   {
     type: "subgroup",
+    label: "Réappro",
+    icon: HiRefresh,
+    collapsible: true,
+    items: [
+      {
+        moduleKey: "demande_reappro",
+        label: "Listes de réappro",
+        path: "/demandes-reappro",
+        icon: HiClipboardList,
+      },
+    ],
+  },
+  {
+    type: "subgroup",
     label: "Réception",
     icon: HiTruck,
     collapsible: true,
@@ -675,6 +689,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/top-articles": "Meilleures ventes par article (facture).",
   "/admin/reappro-local": "Réapprovisionnement local.",
   "/admin/analyse-reappro": "Analyse des réapprovisionnements.",
+  "/demandes-reappro":
+    "Listes de réappro à préparer : urgence, avancement et création manuelle.",
   "/admin/debit-comptant": "Répartition débit / comptant.",
   "/admin/gencod-doublons": "Détection des doublons de gencode.",
   "/admin/performance-dock": "Performance du dock (réceptions).",

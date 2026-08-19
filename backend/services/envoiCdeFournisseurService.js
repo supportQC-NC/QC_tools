@@ -23,7 +23,9 @@ import {
 
 import Entreprise from "../models/EntrepriseModel.js";
 import FournisseurEmail from "../models/FournisseurEmailModel.js";
-import MessageFournisseur from "../models/MessageFournisseurModel.js";
+import MessageFournisseur, {
+  assurerSchemaMessages,
+} from "../models/MessageFournisseurModel.js";
 import ResponsableCc from "../models/ResponsableCcModel.js";
 import EnvoiCdeHistorique from "../models/EnvoiCdeHistoriqueModel.js";
 import EnvoiCdeParametre from "../models/EnvoiCdeParametreModel.js";
@@ -62,14 +64,107 @@ export const DEFAULT_MESSAGE_A =
 export const getDefaultMessage = (langue) =>
   langue === "A" ? DEFAULT_MESSAGE_A : DEFAULT_MESSAGE_F;
 
+// ── Modèles de RELANCE (onglet Historique) ────────────────────────────────────
+// Le sujet est éditable (contrairement à celui d'une commande, figé par fidélité
+// à l'Access). Les {{variables}} sont remplacées à l'envoi, dans le sujet ET dans
+// le corps.
+export const DEFAULT_RELANCE_F =
+  "<p>Bonjour,<br><br>" +
+  "Sauf erreur de notre part, nous n'avons pas encore recu d'accuse de reception " +
+  "pour la (les) commande(s) suivante(s) : <b>{{commandes}}</b>, adressee(s) le {{date_envoi}}.<br><br>" +
+  "Merci de nous confirmer sa (leur) bonne prise en compte ainsi que le delai de livraison prevu, " +
+  "<u><b>en repondant a toutes les personnes en copie de ce mail.</b></u><br><br>" +
+  "Dans l'attente de vous lire.<br>Cordialement</p>";
+
+export const DEFAULT_RELANCE_A =
+  "<p>Hello,<br><br>" +
+  "We have not yet received an acknowledgement of receipt for the following order(s): " +
+  "<b>{{commandes}}</b>, sent on {{date_envoi}}.<br><br>" +
+  "Please confirm that they have been taken into account, along with the expected delivery time, " +
+  "<u><b>replying to all the recipients of this mail.</b></u><br><br>" +
+  "We look forward hearing back from you.</p>";
+
+export const DEFAULT_SUJET_RELANCE_F = "Relance - commande(s) {{commandes}}";
+export const DEFAULT_SUJET_RELANCE_A = "Reminder - order(s) {{commandes}}";
+
+export const getDefaultRelance = (langue) =>
+  langue === "A"
+    ? { message: DEFAULT_RELANCE_A, sujet: DEFAULT_SUJET_RELANCE_A }
+    : { message: DEFAULT_RELANCE_F, sujet: DEFAULT_SUJET_RELANCE_F };
+
+// Variables proposées dans l'éditeur (l'UI lit cette liste pour son menu
+// « Insérer un champ » — un seul endroit à maintenir).
+export const VARIABLES_RELANCE = [
+  { cle: "commandes", label: "N° des commandes", exemple: "12345, 12346" },
+  { cle: "nb_commandes", label: "Nombre de commandes", exemple: "2" },
+  { cle: "fournisseur", label: "Nom du fournisseur", exemple: "BOSCH FRANCE" },
+  { cle: "code_fournisseur", label: "Code fournisseur", exemple: "200" },
+  { cle: "date_envoi", label: "Date du 1er envoi", exemple: "12/08/2026" },
+  { cle: "societe", label: "Nom de la société", exemple: "QUINCAILLERIE CALEDONIENNE" },
+  { cle: "date_du_jour", label: "Date du jour", exemple: "19/08/2026" },
+];
+
+// Remplace {{variable}} par sa valeur (insensible à la casse et aux espaces).
+// Une variable inconnue est laissée telle quelle : l'auteur voit son erreur.
+const appliquerVariables = (texte, vars = {}) =>
+  String(texte || "").replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (m, cle) => {
+    const v = vars[String(cle).toLowerCase()];
+    return v === undefined || v === null ? m : String(v);
+  });
+
+// Nettoyage du HTML saisi dans l'éditeur visuel : on retire ce qui n'a rien à
+// faire dans un email (scripts, iframes, gestionnaires d'événements, liens
+// javascript:). Appliqué à l'ENREGISTREMENT — le serveur ne fait jamais
+// confiance au HTML reçu, même si l'éditeur nettoie déjà de son côté.
+export const nettoyerHtmlMessage = (html) =>
+  String(html || "")
+    .replace(
+      /<\s*(script|style|iframe|object|embed|link|meta|form)\b[\s\S]*?<\s*\/\s*\1\s*>/gi,
+      "",
+    )
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta|form)\b[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
+
+// Charge le modèle (société, type, langue) avec repli : autre langue, puis
+// modèle par défaut. Ne renvoie JAMAIS un corps vide.
+const chargerModele = async (entrepriseId, type, langue) => {
+  await assurerSchemaMessages();
+  let tpl = await MessageFournisseur.findOne({
+    entreprise: entrepriseId,
+    type,
+    langue,
+  }).lean();
+  if (!tpl) {
+    tpl = await MessageFournisseur.findOne({
+      entreprise: entrepriseId,
+      type,
+      langue: langue === "A" ? "F" : "A",
+    }).lean();
+  }
+  const defauts =
+    type === "relance"
+      ? getDefaultRelance(langue)
+      : { message: getDefaultMessage(langue), sujet: "" };
+  return {
+    message: trim(tpl?.message) || defauts.message,
+    sujet: trim(tpl?.sujet) || defauts.sujet,
+  };
+};
+
 // Construit le corps HTML final : on retire les balises html/body du modèle et
-// on ré-enveloppe une seule fois avec la signature.
-const construireCorpsHtml = (message) => {
+// on ré-enveloppe une seule fois avec la signature. `complement` (optionnel)
+// s'insère entre le message et la signature — utilisé par la relance pour le
+// tableau récapitulatif des commandes.
+const construireCorpsHtml = (message, complement = "") => {
   const inner = trim(message)
     .replace(/<\/?html>/gi, "")
     .replace(/<\/?body>/gi, "")
     .trim();
-  return `<html><body>${inner}<br><br>${SIGNATURE_HTML}</body></html>`;
+  const extra = trim(complement) ? `${complement}<br><br>` : "";
+  return `<html><body>${inner}<br><br>${extra}${SIGNATURE_HTML}</body></html>`;
 };
 
 // Échappe le HTML d'un texte SIMPLE saisi par un utilisateur non technicien.
@@ -312,19 +407,9 @@ export const resoudreEnvoi = async (entreprise, numcde) => {
 
   const langue = fe.langue === "A" ? "A" : "F";
 
-  // Modèle de message (langue du fournisseur, avec repli).
-  let tpl = await MessageFournisseur.findOne({
-    entreprise: entreprise._id,
-    langue,
-  }).lean();
-  if (!tpl) {
-    tpl = await MessageFournisseur.findOne({
-      entreprise: entreprise._id,
-      langue: langue === "A" ? "F" : "A",
-    }).lean();
-  }
-  // Repli final : modèle par défaut selon la langue (jamais de corps vide).
-  let messageBrut = tpl?.message || getDefaultMessage(langue);
+  // Modèle de message (langue du fournisseur, avec repli langue puis défaut).
+  let messageBrut = (await chargerModele(entreprise._id, "commande", langue))
+    .message;
 
   // Cas particulier historique : LD + fournisseur 200 -> mention adhérent Weldom.
   const trig = (entreprise.trigramme || "").toUpperCase();
@@ -548,6 +633,307 @@ export const envoyerCommandes = async (entreprise, numcdes = [], user = null) =>
   const nbOk = resultats.filter((r) => r.statut === "envoye").length;
   const nbErr = resultats.length - nbOk;
   return { nbOk, nbErr, testMode: params.testMode, resultats };
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// RELANCE FOURNISSEUR (depuis l'onglet Historique)
+//
+// On coche une ou plusieurs commandes déjà envoyées, et on relance. Les
+// commandes sont REGROUPÉES PAR FOURNISSEUR : un fournisseur relancé sur 3
+// commandes reçoit UN mail listant les 3, pas 3 mails.
+// Le corps vient du modèle « relance » de la langue du fournisseur (onglet
+// Modèles de message), avec ses {{variables}}.
+// ────────────────────────────────────────────────────────────────────────────
+
+// Formate une date DBF (Date ou "AAAAMMJJ") en jj/mm/aaaa.
+const fmtDateFr = (v) => {
+  if (!v) return "";
+  let d = null;
+  if (typeof v === "string" && /^\d{8}$/.test(v)) {
+    d = new Date(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8));
+  } else {
+    const p = new Date(v);
+    if (!isNaN(p.getTime())) d = p;
+  }
+  if (!d || isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString("fr-FR");
+};
+
+// Tableau récapitulatif des commandes relancées, inséré avant la signature.
+// Styles en ligne : les clients mail ignorent les feuilles de style.
+const tableauRelance = (commandes, langue) => {
+  const t =
+    langue === "A"
+      ? { cde: "Order", date: "Order date", lignes: "Lines", envoi: "Sent on" }
+      : { cde: "Commande", date: "Date commande", lignes: "Lignes", envoi: "Envoyée le" };
+  const th =
+    'style="border:1px solid #cccccc;padding:6px 10px;background:#f2f2f2;text-align:left;font-size:13px;"';
+  const td = 'style="border:1px solid #cccccc;padding:6px 10px;font-size:13px;"';
+  const lignes = commandes
+    .map(
+      (c) =>
+        `<tr><td ${td}><b>${c.numcde}</b></td><td ${td}>${fmtDateFr(c.datcde)}</td>` +
+        `<td ${td}>${c.nbLignes || ""}</td><td ${td}>${fmtDateFr(c.dateEnvoi)}</td></tr>`,
+    )
+    .join("");
+  return (
+    '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;">' +
+    `<tr><th ${th}>${t.cde}</th><th ${th}>${t.date}</th><th ${th}>${t.lignes}</th><th ${th}>${t.envoi}</th></tr>` +
+    `${lignes}</table>`
+  );
+};
+
+// Prépare les relances : résout fournisseur, destinataires, sujet et corps.
+// Sert l'aperçu ET l'envoi (aucune duplication de logique).
+export const resoudreRelances = async (entreprise, numcdes = []) => {
+  const liste = [...new Set(numcdes.map((n) => trim(n)).filter(Boolean))];
+  if (!liste.length) return [];
+
+  // Date du PREMIER envoi de chaque commande : c'est celle qu'on rappelle au
+  // fournisseur (« commande adressée le… »), pas celle d'un éventuel renvoi.
+  const envois = await EnvoiCdeHistorique.find({
+    entreprise: entreprise._id,
+    type: "commande",
+    statut: "envoye",
+    numcde: { $in: liste },
+  })
+    .sort({ createdAt: 1 })
+    .select("numcde fournId fournNom createdAt")
+    .lean();
+  const premierEnvoi = new Map();
+  for (const e of envois) if (!premierEnvoi.has(e.numcde)) premierEnvoi.set(e.numcde, e);
+
+  // Regroupement par fournisseur.
+  const groupes = new Map(); // fournId -> { fournId, fournNom, commandes[] }
+  const erreurs = [];
+
+  for (const numcde of liste) {
+    const detail = await getDetailCommande(entreprise, numcde);
+    const histo = premierEnvoi.get(numcde);
+    // La commande peut avoir disparu des DBF (réceptionnée, purgée) : on se
+    // rabat sur le fournisseur mémorisé dans l'historique d'envoi.
+    const fournId = detail ? Number(detail.fourn) : Number(histo?.fournId);
+    if (!fournId && fournId !== 0) {
+      erreurs.push({ numcde, raison: `Fournisseur introuvable pour ${numcde}.` });
+      continue;
+    }
+    const cle = String(fournId);
+    if (!groupes.has(cle)) {
+      groupes.set(cle, {
+        fournId,
+        fournNom: detail?.fournNom || histo?.fournNom || "",
+        commandes: [],
+      });
+    }
+    groupes.get(cle).commandes.push({
+      numcde: detail?.numcde || numcde,
+      datcde: detail?.datcde || null,
+      nbLignes: detail?.nbLignes || 0,
+      dateEnvoi: histo?.createdAt || null,
+      // Lignes conservées pour régénérer les pièces jointes si demandé.
+      lignes: detail?.lignes || null,
+      bateau: detail?.bateau || "",
+    });
+  }
+
+  // Responsable / CC de la société (identique à l'envoi de commande).
+  const resp = await ResponsableCc.findOne({ entreprise: entreprise._id }).lean();
+  const ccResp = resp?.emails || [];
+  const nomSociete = entreprise.nomComplet || entreprise.trigramme || "";
+
+  const resultats = [];
+  for (const g of groupes.values()) {
+    const fe = await FournisseurEmail.findOne({
+      entreprise: entreprise._id,
+      fournId: g.fournId,
+    }).lean();
+
+    const base = {
+      fournId: g.fournId,
+      fournNom: g.fournNom || fe?.fournLbl || "",
+      commandes: g.commandes,
+      numcdes: g.commandes.map((c) => c.numcde),
+    };
+
+    if (!fe || !(fe.emails || []).filter(Boolean).length) {
+      resultats.push({
+        ...base,
+        erreur: `Pas d'email pour le fournisseur ${g.fournId} (${base.fournNom}).`,
+      });
+      continue;
+    }
+
+    const langue = fe.langue === "A" ? "A" : "F";
+    const tpl = await chargerModele(entreprise._id, "relance", langue);
+
+    const vars = {
+      commandes: base.numcdes.join(", "),
+      nb_commandes: base.numcdes.length,
+      fournisseur: base.fournNom,
+      code_fournisseur: g.fournId,
+      date_envoi: fmtDateFr(
+        g.commandes.map((c) => c.dateEnvoi).filter(Boolean)[0] || null,
+      ),
+      societe: nomSociete,
+      date_du_jour: fmtDateFr(new Date()),
+    };
+
+    resultats.push({
+      ...base,
+      langue,
+      destinataires: fe.emails.filter(Boolean),
+      // CC = responsable société + transitaire fournisseur (comme une commande).
+      cc: [...ccResp, ...(fe.emailsTransitaire || [])].filter(Boolean),
+      sujet: appliquerVariables(tpl.sujet, vars),
+      html: construireCorpsHtml(
+        appliquerVariables(tpl.message, vars),
+        tableauRelance(g.commandes, langue),
+      ),
+    });
+  }
+
+  // Les commandes non résolues remontent aussi, pour être affichées à l'écran.
+  for (const e of erreurs) {
+    resultats.push({ fournId: null, fournNom: "", numcdes: [e.numcde], erreur: e.raison });
+  }
+  return resultats;
+};
+
+// Envoie les relances. `avecPieces` rejoint l'Excel + le PDF de chaque commande
+// (utile quand le fournisseur a perdu la commande d'origine).
+export const envoyerRelances = async (
+  entreprise,
+  numcdes = [],
+  { avecPieces = true } = {},
+  user = null,
+) => {
+  const params = await getParametres(entreprise);
+  const groupes = await resoudreRelances(entreprise, numcdes);
+  const logo = logoFromEntreprise(entreprise);
+  const nomSociete = entreprise.nomComplet || entreprise.trigramme;
+  const trig = (entreprise.trigramme || "").toUpperCase();
+
+  const resultats = [];
+  for (const g of groupes) {
+    if (g.erreur) {
+      resultats.push({
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        numcdes: g.numcdes,
+        statut: "erreur",
+        message: g.erreur,
+      });
+      continue;
+    }
+
+    try {
+      // Pièces jointes : une paire Excel/PDF par commande encore lisible en DBF.
+      const attachments = [];
+      if (avecPieces) {
+        for (const c of g.commandes) {
+          if (!c.lignes || !c.lignes.length) continue;
+          const meta = {
+            numcde: c.numcde,
+            fournId: g.fournId,
+            fournNom: g.fournNom,
+            nomSociete,
+            datcde: c.datcde,
+          };
+          const baseName = buildBaseName(trig, c.numcde);
+          const [xls, pdf] = await Promise.all([
+            genererExcelCommande(meta, c.lignes),
+            genererPdfCommande(
+              { ...meta, bateau: c.bateau, logo: logo?.buffer || null },
+              c.lignes,
+            ),
+          ]);
+          attachments.push(
+            {
+              filename: `${baseName}.xlsx`,
+              content: xls,
+              contentType:
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            },
+            { filename: `${baseName}.pdf`, content: pdf, contentType: "application/pdf" },
+          );
+        }
+      }
+
+      const { to, cc, sujet, testMode } = appliquerModeTest(
+        { destinataires: g.destinataires, cc: g.cc, sujet: g.sujet },
+        params,
+      );
+
+      await sendEmail({
+        module: "envoi_cde_fournisseur",
+        email: to,
+        cc: cc.length ? cc : undefined,
+        subject: sujet,
+        html: g.html,
+        attachments: attachments.length ? attachments : undefined,
+      });
+
+      await EnvoiCdeHistorique.create({
+        entreprise: entreprise._id,
+        nomDossierDBF: entreprise.nomDossierDBF,
+        type: "relance",
+        numcde: g.numcdes.join(", "),
+        numcdes: g.numcdes,
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        sujet,
+        langue: g.langue,
+        destinataires: to,
+        cc,
+        destinatairesReels: g.destinataires,
+        nbLignes: g.commandes.reduce((s, c) => s + (c.nbLignes || 0), 0),
+        testMode,
+        envoyePar: user?._id || null,
+        statut: "envoye",
+      });
+
+      resultats.push({
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        numcdes: g.numcdes,
+        statut: "envoye",
+        testMode,
+        destinataires: to,
+      });
+    } catch (err) {
+      try {
+        await EnvoiCdeHistorique.create({
+          entreprise: entreprise._id,
+          nomDossierDBF: entreprise.nomDossierDBF,
+          type: "relance",
+          numcde: g.numcdes.join(", "),
+          numcdes: g.numcdes,
+          fournId: g.fournId,
+          fournNom: g.fournNom,
+          envoyePar: user?._id || null,
+          statut: "erreur",
+          erreur: err.message,
+        });
+      } catch {
+        /* ignore log error */
+      }
+      resultats.push({
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        numcdes: g.numcdes,
+        statut: "erreur",
+        message: err.message,
+      });
+    }
+  }
+
+  const nbOk = resultats.filter((r) => r.statut === "envoye").length;
+  return {
+    nbOk,
+    nbErr: resultats.length - nbOk,
+    testMode: params.testMode,
+    resultats,
+  };
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -900,6 +1286,10 @@ export default {
   getParametres,
   setParametres,
   getDefaultMessage,
+  getDefaultRelance,
+  nettoyerHtmlMessage,
+  resoudreRelances,
+  envoyerRelances,
   importerReference,
   importerReferenceGlobale,
   importerEmailsExcel,

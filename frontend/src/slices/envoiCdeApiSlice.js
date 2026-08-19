@@ -84,6 +84,26 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["EnvoiCdeHistorique"],
     }),
 
+    // ─── Relance des commandes déjà envoyées (onglet Historique) ─────────
+    // L'aperçu est une mutation (POST) : la liste de commandes cochées passe
+    // dans le corps, pas dans l'URL.
+    apercuRelance: builder.mutation({
+      query: ({ nomDossierDBF, numcdes }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/relance/apercu`,
+        method: "POST",
+        body: { numcdes },
+      }),
+    }),
+
+    envoyerRelance: builder.mutation({
+      query: ({ nomDossierDBF, numcdes, avecPieces }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/relance`,
+        method: "POST",
+        body: { numcdes, avecPieces },
+      }),
+      invalidatesTags: ["EnvoiCdeHistorique"],
+    }),
+
     // ─── Emails fournisseurs (CRUD) ──────────────────────────────────────
     getFournisseurEmails: builder.query({
       query: ({ nomDossierDBF, search }) => ({
@@ -172,10 +192,10 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
     }),
 
     upsertMessageFournisseur: builder.mutation({
-      query: ({ nomDossierDBF, langue, message }) => ({
+      query: ({ nomDossierDBF, type, langue, message, sujet }) => ({
         url: `${ENVOI_CDE_URL}/${nomDossierDBF}/messages`,
         method: "PUT",
-        body: { langue, message },
+        body: { type, langue, message, sujet },
       }),
       invalidatesTags: ["MessageFournisseur"],
     }),
@@ -199,9 +219,14 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
 
     // ─── Historique ──────────────────────────────────────────────────────
     getEnvoiHistorique: builder.query({
-      query: ({ nomDossierDBF, page, limit }) => ({
+      query: ({ nomDossierDBF, page, limit, type, search }) => ({
         url: `${ENVOI_CDE_URL}/${nomDossierDBF}/historique`,
-        params: { ...(page && { page }), ...(limit && { limit }) },
+        params: {
+          ...(page && { page }),
+          ...(limit && { limit }),
+          ...(type && { type }),
+          ...(search && { search }),
+        },
       }),
       providesTags: ["EnvoiCdeHistorique"],
     }),
@@ -226,6 +251,8 @@ export const {
   useDeleteEmailsBulkMutation,
   useCompterMasseQuery,
   useEnvoyerMasseMutation,
+  useApercuRelanceMutation,
+  useEnvoyerRelanceMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
   useGetResponsableCcQuery,

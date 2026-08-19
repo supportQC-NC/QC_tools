@@ -292,8 +292,11 @@ export const getMagasinArticlesByGisements = async (entreprise, gisements) => {
 };
 
 /**
- * Résout un NART saisi à la main -> article (avec stock par entrepôt) pour
- * l'ajout manuel à une demande. Renvoie null si le NART est inconnu.
+ * Résout un code saisi à la main -> article (avec stock par entrepôt) pour
+ * l'ajout manuel à une liste de réappro. Le code accepté est, dans l'ordre :
+ * le NART, le GENCOD (code-barres), puis la REFER (référence fournisseur) —
+ * même souplesse que le collecteur, où un gencode inconnu se rattrape par une
+ * saisie NART/REFER. Renvoie null si rien ne correspond.
  */
 export const resolveArticleForReappro = async (entreprise, nart) => {
   const wanted = cleanNart(nart);
@@ -309,7 +312,10 @@ export const resolveArticleForReappro = async (entreprise, nart) => {
       fournByCode.set(String(r.FOURN).trim(), r);
     }
   });
-  const a = articles.find((x) => cleanNart(x.NART) === wanted);
+  const a =
+    articles.find((x) => cleanNart(x.NART) === wanted) ||
+    articles.find((x) => cleanNart(x.GENCOD) === wanted) ||
+    articles.find((x) => cleanNart(x.REFER) === wanted);
   if (!a) return null;
   const fournM =
     a.FOURN != null ? fournByCode.get(String(a.FOURN).trim()) : null;
@@ -319,6 +325,7 @@ export const resolveArticleForReappro = async (entreprise, nart) => {
     fourn: a.FOURN != null ? String(a.FOURN).trim() : "",
     fournNom: fournM ? safeTrim(fournM.NOM) : "",
     gencod: safeTrim(a.GENCOD),
+    refer: safeTrim(a.REFER),
     gisement: gisement(a) || "(sans gisement)",
     ...stockLieux(a),
     stock: stockTotal(a),

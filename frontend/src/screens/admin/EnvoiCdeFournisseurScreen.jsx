@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSelector } from "react-redux";
 import {
   HiMail,
@@ -36,6 +36,8 @@ import {
   useImportEmailsExcelMutation,
   useDeleteEmailsBulkMutation,
   useEnvoyerMasseMutation,
+  useApercuRelanceMutation,
+  useEnvoyerRelanceMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
   useGetResponsableCcQuery,
@@ -44,6 +46,7 @@ import {
 } from "../../slices/envoiCdeApiSlice";
 import { ENVOI_CDE_URL } from "../../constants";
 import Modal from "../../components/ui/Modal/Modal";
+import RichTextEditor from "../../components/ui/RichTextEditor/RichTextEditor";
 import "./EnvoiCdeFournisseurScreen.css";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -213,7 +216,7 @@ const EnvoiCdeFournisseurScreen = () => {
       {tab === "emails" && <EmailsTab dossier={dossier} />}
       {tab === "messages" && <MessagesTab dossier={dossier} />}
       {tab === "responsable" && <ResponsableTab dossier={dossier} />}
-      {tab === "historique" && <HistoriqueTab dossier={dossier} />}
+      {tab === "historique" && <HistoriqueTab dossier={dossier} params={params} />}
     </div>
   );
 };
@@ -1373,78 +1376,198 @@ const EmailModal = ({ initial, onSave, onClose }) => {
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ONGLET MODÈLES DE MESSAGE
+//
+//  Deux axes : le TYPE de mail (envoi de commande / relance) et la LANGUE du
+//  fournisseur. Chaque fournisseur reçoit automatiquement le modèle de SA
+//  langue (champ « Langue » de sa fiche, onglet Emails fournisseurs).
+//
+//  La saisie se fait dans un éditeur visuel : aucune connaissance du HTML
+//  n'est nécessaire (un mode « code » reste dispo pour les habitués).
 // ════════════════════════════════════════════════════════════════════════════
+const TYPES_MESSAGE = [
+  {
+    key: "commande",
+    label: "Envoi de commande",
+    aide:
+      "Mail envoyé avec la commande préparée (onglet « Commandes préparées »). " +
+      "Son objet est calculé automatiquement : nom de la société + n° de commande.",
+  },
+  {
+    key: "relance",
+    label: "Relance",
+    aide:
+      "Mail envoyé depuis l'onglet « Historique » quand on relance une ou " +
+      "plusieurs commandes déjà envoyées. Objet et corps sont libres.",
+  },
+];
+
+// Remplace les {{champs}} par leur exemple, pour l'aperçu du mail final.
+const remplacerVariables = (html, variables) =>
+  String(html || "").replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (m, cle) => {
+    const v = variables.find((x) => x.cle === String(cle).toLowerCase());
+    return v ? v.exemple : m;
+  });
+
 const MessagesTab = ({ dossier }) => {
   const { data } = useGetMessagesFournisseurQuery(dossier);
   const messages = data?.messages || [];
   const defauts = data?.defauts || {};
+  const variables = data?.variablesRelance || [];
   const [upsert, { isLoading }] = useUpsertMessageFournisseurMutation();
+
+  const [type, setType] = useState("commande");
   const [langue, setLangue] = useState("F");
-  const [text, setText] = useState(null);
+  // Brouillon local : null tant que rien n'a été modifié (on affiche alors la
+  // valeur enregistrée, ou le modèle par défaut).
+  const [brouillon, setBrouillon] = useState(null);
   const [msg, setMsg] = useState(null);
 
   const current = useMemo(
-    () => messages.find((m) => m.langue === langue),
-    [messages, langue],
+    () =>
+      messages.find(
+        (m) => (m.type || "commande") === type && m.langue === langue,
+      ),
+    [messages, type, langue],
   );
   const hasOwn = !!current;
-  // Si la société n'a pas de modèle pour cette langue, on pré-remplit le défaut.
-  const value =
-    text === null ? current?.message || defauts[langue] || "" : text;
+
+  const defaut = useMemo(() => {
+    if (type === "relance")
+      return defauts.relance?.[langue] || { message: "", sujet: "" };
+    return { message: defauts.commande?.[langue] || "", sujet: "" };
+  }, [defauts, type, langue]);
+
+  const valeur = brouillon || {
+    message: current?.message || defaut.message,
+    sujet: current?.sujet || defaut.sujet,
+  };
+
+  // Changer de type/langue repart de la valeur enregistrée correspondante.
+  const changer = (patch) => {
+    setBrouillon(null);
+    setMsg(null);
+    if (patch.type !== undefined) setType(patch.type);
+    if (patch.langue !== undefined) setLangue(patch.langue);
+  };
+
+  const majBrouillon = (patch) => setBrouillon({ ...valeur, ...patch });
 
   const handleSave = async () => {
     try {
-      await upsert({ nomDossierDBF: dossier, langue, message: value }).unwrap();
+      await upsert({
+        nomDossierDBF: dossier,
+        type,
+        langue,
+        message: valeur.message,
+        sujet: valeur.sujet,
+      }).unwrap();
       setMsg({ type: "ok", text: "Modèle enregistré." });
-      setText(null);
+      setBrouillon(null);
     } catch (e) {
       setMsg({ type: "err", text: e?.data?.message || "Erreur." });
     }
   };
 
+  const typeInfo = TYPES_MESSAGE.find((t) => t.key === type);
+
   return (
     <div>
       <div className="ecf-langtabs">
+        {TYPES_MESSAGE.map((t) => (
+          <button
+            key={t.key}
+            className={`ecf-btn ${type === t.key ? "primary" : ""}`}
+            onClick={() => changer({ type: t.key })}
+          >
+            {t.label}
+          </button>
+        ))}
+        <span className="ecf-sepv" />
         {["F", "A"].map((l) => (
           <button
             key={l}
             className={`ecf-btn ${langue === l ? "primary" : ""}`}
-            onClick={() => {
-              setLangue(l);
-              setText(null);
-              setMsg(null);
-            }}
+            onClick={() => changer({ langue: l })}
           >
             {l === "F" ? "Français" : "Anglais"}
           </button>
         ))}
       </div>
+
+      <div className="ecf-hint" style={{ marginBottom: 10 }}>
+        {typeInfo?.aide}
+      </div>
+
       {msg && <div className={`ecf-msg ${msg.type}`}>{msg.text}</div>}
       {!hasOwn && (
-        <div className="ecf-msg" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308", border: "1px solid rgba(234,179,8,0.4)" }}>
-          Cette société n'a pas encore de modèle « {langue === "F" ? "Français" : "Anglais"} » —
-          le modèle par défaut est pré-rempli ci-dessous. Enregistrez pour le personnaliser.
+        <div
+          className="ecf-msg"
+          style={{
+            background: "rgba(234,179,8,0.12)",
+            color: "#eab308",
+            border: "1px solid rgba(234,179,8,0.4)",
+          }}
+        >
+          Cette société n'a pas encore de modèle « {typeInfo?.label} /{" "}
+          {langue === "F" ? "Français" : "Anglais"} » — le modèle par défaut est
+          pré-rempli ci-dessous. Modifiez-le puis enregistrez pour le personnaliser.
         </div>
       )}
+
+      {type === "relance" && (
+        <div className="ecf-field">
+          <label>Objet du mail</label>
+          <input
+            value={valeur.sujet}
+            onChange={(e) => majBrouillon({ sujet: e.target.value })}
+            placeholder="Relance - commande(s) {{commandes}}"
+          />
+          <div className="ecf-hint">
+            Les champs entre accolades sont remplacés à l'envoi. Disponibles :{" "}
+            {variables.map((v) => `{{${v.cle}}}`).join(", ")}.
+          </div>
+        </div>
+      )}
+
       <div className="ecf-field">
-        <label>Corps HTML du message (langue {langue})</label>
-        <textarea
-          style={{ minHeight: 280 }}
-          value={value}
-          onChange={(e) => setText(e.target.value)}
+        <label>Corps du message</label>
+        <RichTextEditor
+          value={valeur.message}
+          onChange={(html) => majBrouillon({ message: html })}
+          variables={type === "relance" ? variables : []}
+          minHeight={320}
+          placeholder="Rédigez votre message comme dans un traitement de texte…"
         />
         <div className="ecf-hint">
-          Une signature société est automatiquement ajoutée à l'envoi.
+          Sélectionnez du texte puis utilisez la barre d'outils pour le mettre en
+          forme. La signature de la société
+          {type === "relance" && " et le tableau récapitulatif des commandes"} sont
+          ajoutés automatiquement à l'envoi.
         </div>
       </div>
+
       <div className="ecf-field">
-        <label>Aperçu</label>
-        <div className="ecf-preview" dangerouslySetInnerHTML={{ __html: value }} />
+        <label>Aperçu du mail reçu par le fournisseur</label>
+        <div
+          className="ecf-preview mail"
+          dangerouslySetInnerHTML={{
+            __html: remplacerVariables(valeur.message, variables),
+          }}
+        />
+        <div className="ecf-hint">
+          Les champs automatiques sont affichés ici avec des valeurs d'exemple.
+        </div>
       </div>
+
       <div className="ecf-actions">
         <button className="ecf-btn primary" onClick={handleSave} disabled={isLoading}>
           Enregistrer le modèle
         </button>
+        {brouillon && (
+          <button className="ecf-btn" onClick={() => setBrouillon(null)}>
+            Annuler les modifications
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1495,22 +1618,243 @@ const ResponsableTab = ({ dossier }) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-//  ONGLET HISTORIQUE
+//  ONGLET HISTORIQUE (+ relance des commandes déjà envoyées)
+//
+//  On coche une ou plusieurs commandes envoyées puis « Envoyer une relance ».
+//  Les commandes sont REGROUPÉES PAR FOURNISSEUR : relancer 3 commandes du même
+//  fournisseur envoie UN mail listant les 3, pas 3 mails.
 // ════════════════════════════════════════════════════════════════════════════
-const HistoriqueTab = ({ dossier }) => {
+const TYPE_BADGE = {
+  commande: { cls: "f", label: "commande" },
+  relance: { cls: "test", label: "relance" },
+  masse: { cls: "a", label: "masse" },
+};
+
+const HistoriqueTab = ({ dossier, params }) => {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useGetEnvoiHistoriqueQuery({
+  const [filtreType, setFiltreType] = useState("");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState([]); // n° de commande
+  const [showRelance, setShowRelance] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const { data, isLoading, isFetching, refetch } = useGetEnvoiHistoriqueQuery({
     nomDossierDBF: dossier,
     page,
     limit: 50,
+    type: filtreType || undefined,
+    search: search || undefined,
   });
   const rows = data?.historique || [];
   const totalPages = data ? Math.ceil(data.total / data.limit) : 1;
 
+  // Relançable = une ligne qui porte de vrais n° de commande partis chez le
+  // fournisseur. Une ligne « relance » l'est aussi (on relance une 2e fois) ;
+  // un message groupé ne l'est pas, il ne concerne aucune commande.
+  const relancable = (h) => h.type !== "masse" && h.statut === "envoye" && h.numcde;
+  // Une commande peut avoir plusieurs lignes d'historique (envoi + relances) :
+  // la sélection porte sur le N° de commande, jamais sur la ligne.
+  const numcdesDeLigne = (h) =>
+    (h.numcdes && h.numcdes.length ? h.numcdes : [h.numcde]).filter(Boolean);
+
+  const ligneCochee = (h) =>
+    numcdesDeLigne(h).every((n) => selected.includes(n));
+
+  const toggleLigne = (h) => {
+    const nums = numcdesDeLigne(h);
+    setSelected((s) =>
+      nums.every((n) => s.includes(n))
+        ? s.filter((n) => !nums.includes(n))
+        : [...new Set([...s, ...nums])],
+    );
+  };
+
+  const lignesRelancables = rows.filter(relancable);
+  const toutCoche =
+    lignesRelancables.length > 0 && lignesRelancables.every(ligneCochee);
+  const toggleAll = () => {
+    if (toutCoche) {
+      const nums = lignesRelancables.flatMap(numcdesDeLigne);
+      setSelected((s) => s.filter((n) => !nums.includes(n)));
+    } else {
+      setSelected((s) => [
+        ...new Set([...s, ...lignesRelancables.flatMap(numcdesDeLigne)]),
+      ]);
+    }
+  };
+
   return (
     <div>
       <div className="ecf-toolbar">
+        <input
+          className="ecf-input"
+          placeholder="Rechercher (n° cmd, fournisseur, objet…)"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+        <select
+          className="ecf-input"
+          value={filtreType}
+          onChange={(e) => {
+            setFiltreType(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">Type : tous</option>
+          <option value="commande">Commandes</option>
+          <option value="relance">Relances</option>
+          <option value="masse">Messages groupés</option>
+        </select>
+        <button className="ecf-btn" onClick={() => refetch()} disabled={isFetching}>
+          <HiRefresh /> Rafraîchir
+        </button>
+        <div className="ecf-spacer" />
         <span className="ecf-soc">{data?.total ?? 0} envoi(s)</span>
+        <button
+          className="ecf-btn primary"
+          disabled={selected.length === 0}
+          onClick={() => {
+            setResult(null);
+            setShowRelance(true);
+          }}
+        >
+          <HiPaperAirplane /> Envoyer une relance ({selected.length})
+        </button>
+        {selected.length > 0 && (
+          <button className="ecf-btn" onClick={() => setSelected([])}>
+            <HiX /> Vider
+          </button>
+        )}
+      </div>
+
+      {result && (
+        <div className={`ecf-msg ${result.nbErr ? "err" : "ok"}`}>
+          <b>
+            <HiCheckCircle /> {result.nbOk} relance(s) envoyée(s), {result.nbErr}{" "}
+            erreur(s).
+          </b>
+          {result.testMode && " (mode test)"}
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {(result.resultats || []).map((r, i) => (
+              <li key={i}>
+                {r.fournNom || `Fournisseur ${r.fournId ?? "?"}`} —{" "}
+                {(r.numcdes || []).join(", ")} :{" "}
+                {r.statut === "envoye"
+                  ? `relancé à ${(r.destinataires || []).join(", ")}`
+                  : `erreur — ${r.message}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="ecf-tablewrap">
+        <table className="ecf-table">
+          <thead>
+            <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  className="ecf-checkbox"
+                  checked={toutCoche}
+                  onChange={toggleAll}
+                  title="Tout sélectionner (commandes de cette page)"
+                />
+              </th>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Réf.</th>
+              <th>Fourn.</th>
+              <th>Destinataires</th>
+              <th>Statut</th>
+              <th>Par</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={9} className="ecf-empty">
+                  Chargement…
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="ecf-empty">
+                  Aucun envoi enregistré.
+                </td>
+              </tr>
+            ) : (
+              rows.map((h) => {
+                const badge = TYPE_BADGE[h.type] || TYPE_BADGE.commande;
+                const ok = relancable(h);
+                return (
+                  <tr key={h._id} className={ok && ligneCochee(h) ? "selectionnee" : ""}>
+                    <td>
+                      {ok && (
+                        <input
+                          type="checkbox"
+                          className="ecf-checkbox"
+                          checked={ligneCochee(h)}
+                          onChange={() => toggleLigne(h)}
+                        />
+                      )}
+                    </td>
+                    <td>{new Date(h.createdAt).toLocaleString("fr-FR")}</td>
+                    <td>
+                      <span className={`ecf-badge ${badge.cls}`}>{badge.label}</span>
+                    </td>
+                    <td className="wrap">
+                      {h.type === "masse"
+                        ? `${h.langue} · ${h.nbDestinataires || 0} frs`
+                        : h.numcde}
+                    </td>
+                    <td className="wrap">
+                      {h.fournId ? `${h.fournId} ` : ""}
+                      {h.fournNom || ""}
+                    </td>
+                    <td className="wrap">{(h.destinataires || []).join(", ")}</td>
+                    <td>
+                      {h.statut === "envoye" ? (
+                        <span className="ecf-badge ok">envoyé</span>
+                      ) : (
+                        <span className="ecf-badge err">erreur</span>
+                      )}
+                      {h.testMode && <span className="ecf-badge test"> test</span>}
+                    </td>
+                    <td>
+                      {h.envoyePar
+                        ? `${h.envoyePar.prenom || ""} ${h.envoyePar.nom || ""}`.trim() ||
+                          h.envoyePar.email
+                        : "—"}
+                    </td>
+                    <td>
+                      {ok && (
+                        <button
+                          className="ecf-btn"
+                          title="Relancer cette commande"
+                          onClick={() => {
+                            setSelected(numcdesDeLigne(h));
+                            setResult(null);
+                            setShowRelance(true);
+                          }}
+                        >
+                          <HiPaperAirplane />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="ecf-toolbar" style={{ marginTop: 10 }}>
         <div className="ecf-spacer" />
         <button
           className="ecf-btn"
@@ -1530,70 +1874,194 @@ const HistoriqueTab = ({ dossier }) => {
           Suivant
         </button>
       </div>
-      <div className="ecf-tablewrap">
-        <table className="ecf-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Réf.</th>
-              <th>Fourn.</th>
-              <th>Destinataires</th>
-              <th>Statut</th>
-              <th>Par</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={7} className="ecf-empty">
-                  Chargement…
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="ecf-empty">
-                  Aucun envoi enregistré.
-                </td>
-              </tr>
-            ) : (
-              rows.map((h) => (
-                <tr key={h._id}>
-                  <td>{new Date(h.createdAt).toLocaleString("fr-FR")}</td>
-                  <td>
-                    {h.type === "masse" ? (
-                      <span className="ecf-badge a">masse</span>
-                    ) : (
-                      <span className="ecf-badge f">commande</span>
-                    )}
-                  </td>
-                  <td>{h.type === "masse" ? `${h.langue} · ${h.nbDestinataires || 0} frs` : h.numcde}</td>
-                  <td className="wrap">
-                    {h.fournId ? `${h.fournId} ` : ""}
-                    {h.fournNom || ""}
-                  </td>
-                  <td className="wrap">{(h.destinataires || []).join(", ")}</td>
-                  <td>
-                    {h.statut === "envoye" ? (
-                      <span className="ecf-badge ok">envoyé</span>
-                    ) : (
-                      <span className="ecf-badge err">erreur</span>
-                    )}
-                    {h.testMode && <span className="ecf-badge test"> test</span>}
-                  </td>
-                  <td>
-                    {h.envoyePar
-                      ? `${h.envoyePar.prenom || ""} ${h.envoyePar.nom || ""}`.trim() ||
-                        h.envoyePar.email
-                      : "—"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+
+      {showRelance && (
+        <RelanceModal
+          dossier={dossier}
+          numcdes={selected}
+          testInfo={params}
+          onClose={() => setShowRelance(false)}
+          onDone={(r) => {
+            setResult(r);
+            setShowRelance(false);
+            setSelected([]);
+          }}
+        />
+      )}
     </div>
+  );
+};
+
+// ── Modale de relance : aperçu par fournisseur puis confirmation ─────────────
+const RelanceModal = ({ dossier, numcdes, testInfo, onClose, onDone }) => {
+  const [apercu, { isLoading: chargement }] = useApercuRelanceMutation();
+  const [envoyer, { isLoading: envoi }] = useEnvoyerRelanceMutation();
+  const [data, setData] = useState(null);
+  const [erreur, setErreur] = useState(null);
+  const [avecPieces, setAvecPieces] = useState(true);
+  const [ouvert, setOuvert] = useState(null); // fournId dont l'aperçu est déplié
+
+  // Aperçu calculé côté serveur : c'est EXACTEMENT ce qui partira.
+  useEffect(() => {
+    let annule = false;
+    apercu({ nomDossierDBF: dossier, numcdes })
+      .unwrap()
+      .then((r) => {
+        if (!annule) setData(r);
+      })
+      .catch((e) => {
+        if (!annule) setErreur(e?.data?.message || "Impossible de préparer la relance.");
+      });
+    return () => {
+      annule = true;
+    };
+  }, [dossier, numcdes, apercu]);
+
+  const groupes = data?.groupes || [];
+  const valides = groupes.filter((g) => !g.erreur);
+  const enErreur = groupes.filter((g) => g.erreur);
+
+  const confirmer = async () => {
+    try {
+      const r = await envoyer({
+        nomDossierDBF: dossier,
+        numcdes,
+        avecPieces,
+      }).unwrap();
+      onDone(r);
+    } catch (e) {
+      setErreur(e?.data?.message || "Erreur d'envoi.");
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal lg">
+      <h3>
+        <HiPaperAirplane /> Relance — {numcdes.length} commande(s)
+        <button className="ecf-btn ecf-spacer" onClick={onClose}>
+          <HiX />
+        </button>
+      </h3>
+
+      {testInfo?.testMode ? (
+        <div className="ecf-testbanner on" style={{ marginBottom: 10 }}>
+          <HiShieldCheck /> Mode test : les relances partiront vers{" "}
+          {(testInfo.testEmails || []).join(", ")} — aucun fournisseur ne sera
+          contacté.
+        </div>
+      ) : (
+        <div className="ecf-testbanner off" style={{ marginBottom: 10 }}>
+          <HiExclamation /> Mode réel : les relances partiront réellement aux
+          fournisseurs.
+        </div>
+      )}
+
+      {erreur && <div className="ecf-msg err">{erreur}</div>}
+
+      {chargement && !data ? (
+        <div className="ecf-empty">Préparation de la relance…</div>
+      ) : (
+        <>
+          {enErreur.length > 0 && (
+            <div className="ecf-msg err">
+              <b>
+                <HiExclamation /> {enErreur.length} fournisseur(s) ne seront pas
+                relancés :
+              </b>
+              <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                {enErreur.map((g, i) => (
+                  <li key={i}>
+                    {(g.numcdes || []).join(", ")} — {g.erreur}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="ecf-recip" style={{ marginBottom: 10 }}>
+            <span className="tag">
+              {valides.length} mail(s) — les commandes d'un même fournisseur sont
+              regroupées dans un seul message.
+            </span>
+          </div>
+
+          <label className="ecf-check">
+            <input
+              type="checkbox"
+              className="ecf-checkbox"
+              checked={avecPieces}
+              onChange={(e) => setAvecPieces(e.target.checked)}
+            />
+            Joindre à nouveau chaque commande (Excel + PDF)
+          </label>
+
+          <div className="ecf-relance-liste">
+            {valides.map((g) => (
+              <div className="ecf-relance-card" key={g.fournId}>
+                <div className="ecf-relance-head">
+                  <b>
+                    {g.fournId} — {g.fournNom || "(sans nom)"}
+                  </b>
+                  <span className={`ecf-badge ${g.langue === "A" ? "a" : "f"}`}>
+                    {g.langue === "A" ? "Anglais" : "Français"}
+                  </span>
+                  <span className="ecf-recip tag">
+                    {(g.numcdes || []).length} commande(s) :{" "}
+                    {(g.numcdes || []).join(", ")}
+                  </span>
+                  <button
+                    className="ecf-btn ecf-spacer"
+                    onClick={() => setOuvert(ouvert === g.fournId ? null : g.fournId)}
+                  >
+                    <HiEye /> {ouvert === g.fournId ? "Masquer" : "Aperçu"}
+                  </button>
+                </div>
+                <div className="ecf-recip">
+                  <div>
+                    <span className="tag">Objet :</span> {g.envoi?.sujet}
+                  </div>
+                  <div>
+                    <span className="tag">À :</span> {(g.envoi?.to || []).join(", ")}
+                  </div>
+                  {(g.envoi?.cc || []).length > 0 && (
+                    <div>
+                      <span className="tag">Copie :</span>{" "}
+                      {(g.envoi.cc || []).join(", ")}
+                    </div>
+                  )}
+                  {g.envoi?.testMode && (
+                    <div>
+                      <span className="tag">En réel :</span>{" "}
+                      {(g.destinatairesReels || []).join(", ")}
+                    </div>
+                  )}
+                </div>
+                {ouvert === g.fournId && (
+                  <div
+                    className="ecf-preview mail"
+                    dangerouslySetInnerHTML={{ __html: g.html }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="ecf-actions">
+        <button className="ecf-btn" onClick={onClose}>
+          Annuler
+        </button>
+        <button
+          className="ecf-btn primary"
+          onClick={confirmer}
+          disabled={envoi || valides.length === 0}
+        >
+          <HiPaperAirplane />{" "}
+          {envoi ? "Envoi…" : `Envoyer ${valides.length} relance(s)`}
+        </button>
+      </div>
+    </Modal>
   );
 };
 

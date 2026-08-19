@@ -17,6 +17,8 @@ import {
   importReferenceGlobal,
   compterMasse,
   envoyerMasseCtrl,
+  apercuRelance,
+  envoyerRelanceCtrl,
   modeleExcelEmails,
   importEmailsExcel,
   deleteEmailsBulk,
@@ -61,6 +63,10 @@ router.put("/:nomDossierDBF/parametres", ...write, updateParametresCtrl);
 router.get("/:nomDossierDBF/apercu/:numcde", ...read, apercu);
 router.post("/:nomDossierDBF/verifier", ...read, verifier);
 router.post("/:nomDossierDBF/envoyer", ...write, envoyer);
+
+// ─── Relance des commandes déjà envoyées (onglet Historique) ───────────────
+router.post("/:nomDossierDBF/relance/apercu", ...read, apercuRelance);
+router.post("/:nomDossierDBF/relance", ...write, envoyerRelanceCtrl);
 
 // ─── Import de la base de référence (migrée depuis Access) ─────────────────
 router.post("/:nomDossierDBF/import-reference", ...write, importReference);

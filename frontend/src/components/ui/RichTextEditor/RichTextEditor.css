@@ -1,0 +1,296 @@
+/* Éditeur de mail visuel — styles scopés .rte-* */
+/* La zone de saisie imite une FEUILLE BLANCHE : c'est ce que verra le
+   destinataire dans son client mail, pas le thème sombre de l'application. */
+
+.rte {
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 8px;
+  overflow: visible;
+  background: var(--admin-card, #1e293b);
+}
+
+/* ── Barre d'outils ─────────────────────────────────────────────────────── */
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--admin-bg-alt, #0f172a);
+  border-bottom: 1px solid var(--admin-border, #334155);
+  border-radius: 8px 8px 0 0;
+  position: relative;
+}
+
+.rte-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 7px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--admin-text, #e2e8f0);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  justify-content: center;
+}
+.rte-btn:hover:not(:disabled) {
+  background: var(--admin-hover, rgba(148, 163, 184, 0.14));
+  border-color: var(--admin-border, #334155);
+}
+.rte-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rte-btn.actif {
+  background: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+.rte-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.rte-mini {
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.7;
+}
+.rte-txt {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.rte-swatch {
+  font-weight: 700;
+  border-bottom: 3px solid #b91c1c;
+  line-height: 1;
+  padding-bottom: 1px;
+}
+
+.rte-select {
+  height: 30px;
+  padding: 0 6px;
+  background: var(--admin-input-bg, #0f172a);
+  color: var(--admin-text, #e2e8f0);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.rte-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--admin-border, #334155);
+}
+.rte-spacer {
+  flex: 1;
+}
+
+/* ── Menus déroulants (couleurs, champs) ────────────────────────────────── */
+.rte-pop {
+  position: relative;
+}
+.rte-pop-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  min-width: 190px;
+  margin-top: 4px;
+  padding: 8px;
+  background: var(--admin-card, #1e293b);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.rte-pop-menu.large {
+  min-width: 260px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.rte-pop:hover .rte-pop-menu,
+.rte-pop.ouvert .rte-pop-menu {
+  display: block;
+}
+.rte-pop-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted, #94a3b8);
+  margin: 2px 0 6px;
+}
+.rte-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.rte-color {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+.rte-color:hover {
+  outline: 2px solid var(--admin-primary, #6366f1);
+}
+.rte-color-none {
+  background: repeating-linear-gradient(
+    45deg,
+    #fff,
+    #fff 4px,
+    #cbd5e1 4px,
+    #cbd5e1 8px
+  );
+}
+
+.rte-varitem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.82rem;
+}
+.rte-varitem:hover {
+  background: var(--admin-hover, rgba(148, 163, 184, 0.14));
+}
+.rte-varlbl {
+  flex: 1;
+}
+.rte-varex {
+  font-size: 0.72rem;
+  color: var(--admin-text-muted, #94a3b8);
+  font-style: italic;
+}
+
+/* ── Barre d'adresse (lien / image) ─────────────────────────────────────── */
+.rte-urlbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(99, 102, 241, 0.1);
+  border-bottom: 1px solid var(--admin-border, #334155);
+  font-size: 0.8rem;
+  color: var(--admin-text, #e2e8f0);
+}
+.rte-urlbar input {
+  flex: 1;
+  min-width: 160px;
+  height: 28px;
+  padding: 0 8px;
+  background: var(--admin-input-bg, #0f172a);
+  color: var(--admin-text, #e2e8f0);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 5px;
+  font-size: 0.82rem;
+}
+.rte-urlok,
+.rte-urlno {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 5px;
+  border: 1px solid var(--admin-border, #334155);
+  background: transparent;
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.rte-urlok {
+  background: var(--admin-primary, #6366f1);
+  border-color: var(--admin-primary, #6366f1);
+  color: #fff;
+}
+
+/* ── Feuille de saisie ──────────────────────────────────────────────────── */
+.rte-sheet-wrap {
+  position: relative;
+  background: #f1f5f9;
+  padding: 14px;
+  border-radius: 0 0 8px 8px;
+}
+.rte-sheet {
+  background: #ffffff;
+  color: #1f2937;
+  padding: 22px 26px;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+  outline: none;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+.rte-sheet:focus {
+  box-shadow: 0 0 0 2px var(--admin-primary, #6366f1);
+}
+.rte-sheet a {
+  color: #1d4ed8;
+}
+.rte-sheet h1 { font-size: 1.6em; margin: 0.4em 0; }
+.rte-sheet h2 { font-size: 1.35em; margin: 0.4em 0; }
+.rte-sheet h3 { font-size: 1.15em; margin: 0.4em 0; }
+.rte-sheet p { margin: 0 0 0.8em; }
+.rte-sheet ul,
+.rte-sheet ol {
+  margin: 0 0 0.8em;
+  padding-left: 24px;
+}
+.rte-sheet img {
+  max-width: 100%;
+  height: auto;
+}
+.rte-sheet table {
+  border-collapse: collapse;
+}
+.rte-sheet hr {
+  border: none;
+  border-top: 1px solid #d4d4d4;
+  margin: 12px 0;
+}
+
+.rte-placeholder {
+  position: absolute;
+  top: 36px;
+  left: 40px;
+  color: #9aa4b2;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* ── Mode code HTML ─────────────────────────────────────────────────────── */
+.rte-code {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: var(--admin-input-bg, #0f172a);
+  color: var(--admin-text, #e2e8f0);
+  border: none;
+  border-radius: 0 0 8px 8px;
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.rte-off {
+  opacity: 0.65;
+}

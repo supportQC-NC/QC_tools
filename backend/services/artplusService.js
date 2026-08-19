@@ -638,6 +638,74 @@ class ArtplusService {
     };
   }
 
+  /**
+   * Replie une liste d'articles (références) en liste de PRODUITS : une entrée
+   * par produit, portant la référence à afficher et les autres déclinaisons.
+   *
+   * C'est ce qui permet à une liste de catalogue de montrer « verrou de fenêtre
+   * à clé » une seule fois au lieu de ses 14 références. Le repli s'applique
+   * APRÈS filtrage : `narts` ne contient que les déclinaisons qui ont passé les
+   * filtres (chercher « blanc » ne fait pas réapparaître les noires).
+   *
+   * L'ordre d'entrée est conservé (première occurrence = position du produit) :
+   * la liste ne se réorganise pas dans le dos de l'appelant. Au sein d'un
+   * produit, la référence mise en avant est la première du catalogue (rôle
+   * `rang`), pas la première rencontrée dans le fichier.
+   *
+   * Un article sans compléments artplus est son propre produit : jamais de
+   * regroupement « au hasard ».
+   *
+   * @returns {Promise<Array<{article, narts: string[], nbVariantesProduit: number}>>}
+   */
+  async grouperArticles(entreprise, articles) {
+    const index = await this.getIndex(entreprise);
+    if (!index.present) {
+      return articles.map((a) => ({
+        article: a,
+        narts: [safeTrim(a.NART).toUpperCase()],
+        nbVariantesProduit: 1,
+      }));
+    }
+
+    const cleRang = index.roles.rang;
+    const rangDe = (nart) => {
+      if (!cleRang) return Number.MAX_SAFE_INTEGER;
+      const v = parseFloat((index.parNart.get(nart) || {})[cleRang]);
+      return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+    };
+
+    const groupes = new Map(); // clé produit -> entrée
+    for (const article of articles) {
+      const nart = safeTrim(article.NART).toUpperCase();
+      // Sans compléments, l'article ne peut être regroupé avec rien : clé
+      // dédiée, impossible à confondre avec une clé de produit.
+      const cle = index.produitParNart.get(nart) || `#${nart}`;
+
+      const existant = groupes.get(cle);
+      if (!existant) {
+        groupes.set(cle, {
+          article,
+          rang: rangDe(nart),
+          narts: [nart],
+          nbVariantesProduit: index.produits.get(cle)?.narts.length || 1,
+        });
+        continue;
+      }
+      existant.narts.push(nart);
+      const rang = rangDe(nart);
+      if (rang < existant.rang) {
+        existant.article = article;
+        existant.rang = rang;
+      }
+    }
+
+    return [...groupes.values()].map((g) => ({
+      article: g.article,
+      narts: g.narts.sort((a, b) => rangDe(a) - rangDe(b) || a.localeCompare(b)),
+      nbVariantesProduit: g.nbVariantesProduit,
+    }));
+  }
+
   /** Un produit par sa clé (`p<id>`, `n<slug-du-nom>` ou `a<NART>`). */
   async getProduit(entreprise, cle) {
     const index = await this.getIndex(entreprise);

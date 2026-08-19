@@ -20,13 +20,23 @@ import {
   supprimerEmails,
   compterCiblesMasse,
   envoyerMasse,
+  resoudreRelances,
+  envoyerRelances,
+  nettoyerHtmlMessage,
   DEFAULT_MESSAGE_F,
   DEFAULT_MESSAGE_A,
+  DEFAULT_RELANCE_F,
+  DEFAULT_RELANCE_A,
+  DEFAULT_SUJET_RELANCE_F,
+  DEFAULT_SUJET_RELANCE_A,
+  VARIABLES_RELANCE,
 } from "../services/envoiCdeFournisseurService.js";
 import { genererModeleEmailsExcel } from "../services/envoiCdeReportService.js";
 
 import FournisseurEmail from "../models/FournisseurEmailModel.js";
-import MessageFournisseur from "../models/MessageFournisseurModel.js";
+import MessageFournisseur, {
+  assurerSchemaMessages,
+} from "../models/MessageFournisseurModel.js";
 import ResponsableCc from "../models/ResponsableCcModel.js";
 import EnvoiCdeHistorique from "../models/EnvoiCdeHistoriqueModel.js";
 
@@ -318,27 +328,101 @@ export const deleteEmail = asyncHandler(async (req, res) => {
 
 // GET /:nomDossierDBF/messages
 export const getMessages = asyncHandler(async (req, res) => {
+  await assurerSchemaMessages();
   const messages = await MessageFournisseur.find({
     entreprise: req.entreprise._id,
   }).lean();
-  // On renvoie aussi les modèles par défaut : l'UI pré-remplit les langues qui
-  // n'ont pas encore de modèle propre pour la société.
+  // On renvoie aussi les modèles par défaut : l'UI pré-remplit les (type, langue)
+  // qui n'ont pas encore de modèle propre pour la société.
   res.json({
     messages,
-    defauts: { F: DEFAULT_MESSAGE_F, A: DEFAULT_MESSAGE_A },
+    defauts: {
+      commande: { F: DEFAULT_MESSAGE_F, A: DEFAULT_MESSAGE_A },
+      relance: {
+        F: { message: DEFAULT_RELANCE_F, sujet: DEFAULT_SUJET_RELANCE_F },
+        A: { message: DEFAULT_RELANCE_A, sujet: DEFAULT_SUJET_RELANCE_A },
+      },
+    },
+    // Champs insérables dans le sujet/corps d'une relance (menu de l'éditeur).
+    variablesRelance: VARIABLES_RELANCE,
   });
 });
 
-// PUT /:nomDossierDBF/messages   body: { langue, message }
+// PUT /:nomDossierDBF/messages   body: { type, langue, message, sujet }
 export const upsertMessage = asyncHandler(async (req, res) => {
-  const { langue, message } = req.body;
+  await assurerSchemaMessages();
+  const { type, langue, message, sujet } = req.body;
   const lang = langue === "A" ? "A" : "F";
+  const typ = type === "relance" ? "relance" : "commande";
+  const set = { message: nettoyerHtmlMessage(message) };
+  // Le sujet n'a de sens que pour la relance (celui d'une commande est calculé).
+  if (typ === "relance") set.sujet = String(sujet || "").trim();
   const doc = await MessageFournisseur.findOneAndUpdate(
-    { entreprise: req.entreprise._id, langue: lang },
-    { $set: { message: message || "" } },
+    { entreprise: req.entreprise._id, type: typ, langue: lang },
+    { $set: set },
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
   res.json(doc);
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// RELANCES (depuis l'onglet Historique)
+// ────────────────────────────────────────────────────────────────────────────
+
+// POST /:nomDossierDBF/relance/apercu   body: { numcdes: [] }
+// Renvoie ce qui partirait, groupé par fournisseur (aperçu avant envoi).
+export const apercuRelance = asyncHandler(async (req, res) => {
+  const { numcdes = [] } = req.body;
+  if (!Array.isArray(numcdes) || numcdes.length === 0) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const groupes = await resoudreRelances(req.entreprise, numcdes);
+  const params = await getParametres(req.entreprise);
+
+  res.json({
+    testMode: params.testMode,
+    testEmails: params.testEmails,
+    groupes: groupes.map((g) => {
+      if (g.erreur) {
+        return { fournId: g.fournId, fournNom: g.fournNom, numcdes: g.numcdes, erreur: g.erreur };
+      }
+      const envoi = appliquerModeTest(
+        { destinataires: g.destinataires, cc: g.cc, sujet: g.sujet },
+        params,
+      );
+      return {
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        langue: g.langue,
+        numcdes: g.numcdes,
+        // Les lignes de commande ne servent qu'aux pièces jointes : inutile de
+        // les faire transiter jusqu'à l'écran d'aperçu.
+        commandes: g.commandes.map(({ lignes, ...c }) => c),
+        sujet: g.sujet,
+        html: g.html,
+        destinatairesReels: g.destinataires,
+        ccReels: g.cc,
+        envoi: { to: envoi.to, cc: envoi.cc, sujet: envoi.sujet, testMode: envoi.testMode },
+      };
+    }),
+  });
+});
+
+// POST /:nomDossierDBF/relance   body: { numcdes: [], avecPieces? }
+export const envoyerRelanceCtrl = asyncHandler(async (req, res) => {
+  const { numcdes = [], avecPieces } = req.body;
+  if (!Array.isArray(numcdes) || numcdes.length === 0) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const result = await envoyerRelances(
+    req.entreprise,
+    numcdes,
+    { avecPieces: avecPieces !== false },
+    req.user,
+  );
+  res.json(result);
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -370,10 +454,15 @@ export const upsertResponsable = asyncHandler(async (req, res) => {
 
 // GET /:nomDossierDBF/historique
 export const getHistorique = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 50 } = req.query;
+  const { page = 1, limit = 50, type, search } = req.query;
   const p = parseInt(page) || 1;
   const l = parseInt(limit) || 50;
   const filter = { entreprise: req.entreprise._id };
+  if (["commande", "relance", "masse"].includes(type)) filter.type = type;
+  if (search) {
+    const rx = new RegExp(String(search).trim(), "i");
+    filter.$or = [{ numcde: rx }, { fournNom: rx }, { sujet: rx }];
+  }
   const [rows, total] = await Promise.all([
     EnvoiCdeHistorique.find(filter)
       .populate("envoyePar", "nom prenom email")

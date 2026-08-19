@@ -145,6 +145,44 @@ const indexPlusDe = async (req) => {
   }
 };
 
+/**
+ * Déclinaisons de la référence demandée — la fiche article d'un site marchand
+ * doit pouvoir proposer « la même chose en blanc, en 45 mm, en blister ».
+ *
+ * Renvoie `null` quand la référence est seule de son produit : l'ABSENCE de
+ * `_variantes` signifie « pas de déclinaison », ce qui est plus clair qu'un
+ * tableau à un élément que l'appelant devrait interpréter.
+ * La liste inclut la référence demandée (repérée par `estReferenceDemandee`),
+ * dans l'ordre du catalogue : c'est directement le sélecteur à afficher.
+ */
+const chargerVariantes = async (record, entreprise, indexPlus, champs) => {
+  if (!indexPlus?.present) return null;
+  const nart = String(record.NART || "").trim().toUpperCase();
+  const cleProduit = indexPlus.produitParNart.get(nart);
+  const produit = cleProduit ? indexPlus.produits.get(cleProduit) : null;
+  if (!produit || produit.narts.length < 2) return null;
+
+  const cache = await articleCacheService.getArticles(entreprise);
+  return produit.narts.map((n) => {
+    const i = cache.indexByNart.get(n);
+    const autre = i !== undefined ? cache.records[i] : null;
+    return {
+      nart: n,
+      estReferenceDemandee: n === nart,
+      attributs: indexPlus.parNart.get(n) || {},
+      articleTrouve: Boolean(autre),
+      // Pas de `_plus`/`_produit`/`_variantes` ici : la variante porte déjà ses
+      // attributs, et on ne veut surtout pas d'imbrication récursive.
+      article: autre
+        ? projeter(enrichirArticle(autre, entreprise), champs)
+        : undefined,
+    };
+  });
+};
+
+const avecVariantesDemande = (q) =>
+  !(q.variantes === "0" || q.variantes === "false" || q.variantes === "non");
+
 /** Options de filtrage articles, communes à /articles et /articles/export. */
 const filtresArticles = (q) => ({
   search: q.search || undefined,
@@ -230,18 +268,71 @@ const getArticles = asyncHandler(async (req, res) => {
   const page = entier(req.query.page, 1, 1, 1_000_000);
   const limit = entier(req.query.limit, LIMITE_DEFAUT, 1, LIMITE_MAX);
   const champs = listeChamps(req.query.champs);
+  const q = req.query;
+  const grouper = !(q.grouper === "0" || q.grouper === "false" || q.grouper === "non");
 
-  const [resultat, plus] = await Promise.all([
-    articleCacheService.getPaginated(entreprise, {
-      page,
-      limit,
-      ...filtresArticles(req.query),
-    }),
-    indexPlusDe(req),
-  ]);
+  const plus = await indexPlusDe(req);
+
+  // ── Liste repliée par produit (comportement par défaut) ───────────────────
+  // Une référence par produit, pas les 14 déclinaisons d'un même verrou : c'est
+  // une liste de catalogue, pas un inventaire. Le détail des déclinaisons se
+  // récupère sur la fiche (`/articles/:nart`, champ `_variantes`).
+  // `?grouper=0` rend la liste brute, une ligne par référence.
+  if (grouper && plus?.present) {
+    const cache = await articleCacheService.getArticles(entreprise);
+    // Le repli doit voir TOUTES les références retenues par les filtres, sinon
+    // il ne dédoublonnerait qu'à l'intérieur de la page courante.
+    const filtres = await articleCacheService.getPaginated(entreprise, {
+      page: 1,
+      limit: Math.max(cache.records.length, 1),
+      ...filtresArticles(q),
+    });
+    const groupes = await artplusService.grouperArticles(
+      entreprise,
+      filtres.articles,
+    );
+
+    const totalRecords = groupes.length;
+    const totalPages = Math.ceil(totalRecords / limit) || 1;
+    const debutTranche = (page - 1) * limit;
+    const tranche = groupes.slice(debutTranche, debutTranche + limit);
+
+    return res.json({
+      societe: societe(entreprise),
+      groupe: true,
+      pagination: {
+        page,
+        limit,
+        // Nombre de PRODUITS. `totalReferences` garde le compte des références
+        // sous-jacentes : sans lui, on croirait le catalogue amputé.
+        totalRecords,
+        totalReferences: filtres.totalRecords,
+        totalPages,
+        hasNextPage: debutTranche + limit < totalRecords,
+        hasPrevPage: page > 1,
+      },
+      _tempsMs: Date.now() - debut,
+      articles: tranche.map((g) => {
+        const enrichi = enrichirArticle(g.article, entreprise, plus);
+        // Les déclinaisons retenues par les filtres (codes seuls : la liste
+        // reste légère, la fiche donne le détail).
+        enrichi._variantesNarts = g.narts;
+        enrichi._nbVariantesListe = g.narts.length;
+        enrichi._nbVariantesProduit = g.nbVariantesProduit;
+        return projeter(enrichi, champs);
+      }),
+    });
+  }
+
+  const resultat = await articleCacheService.getPaginated(entreprise, {
+    page,
+    limit,
+    ...filtresArticles(q),
+  });
 
   res.json({
     societe: societe(entreprise),
+    groupe: false,
     pagination: {
       page: resultat.page,
       limit: resultat.limit,
@@ -271,12 +362,16 @@ const getArticleByNart = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error(`Article ${req.params.nart} introuvable`);
   }
+  const champs = listeChamps(req.query.champs);
+  const plus = await indexPlusDe(req);
+  const enrichi = enrichirArticle(article, entreprise, plus);
+  if (avecVariantesDemande(req.query)) {
+    const variantes = await chargerVariantes(article, entreprise, plus, champs);
+    if (variantes) enrichi._variantes = variantes;
+  }
   res.json({
     societe: societe(entreprise),
-    article: projeter(
-      enrichirArticle(article, entreprise, await indexPlusDe(req)),
-      listeChamps(req.query.champs),
-    ),
+    article: projeter(enrichi, champs),
   });
 });
 
@@ -294,12 +389,16 @@ const getArticleByGencod = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error(`Aucun article pour le code-barres ${req.params.gencod}`);
   }
+  const champs = listeChamps(req.query.champs);
+  const plus = await indexPlusDe(req);
+  const enrichi = enrichirArticle(article, entreprise, plus);
+  if (avecVariantesDemande(req.query)) {
+    const variantes = await chargerVariantes(article, entreprise, plus, champs);
+    if (variantes) enrichi._variantes = variantes;
+  }
   res.json({
     societe: societe(entreprise),
-    article: projeter(
-      enrichirArticle(article, entreprise, await indexPlusDe(req)),
-      listeChamps(req.query.champs),
-    ),
+    article: projeter(enrichi, champs),
   });
 });
 

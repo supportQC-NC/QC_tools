@@ -34,6 +34,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Listes de réappro (création, suivi, préparation collecteur)
+      demande_reappro: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Proformas
       proforma: {
         read: { type: Boolean, default: false },

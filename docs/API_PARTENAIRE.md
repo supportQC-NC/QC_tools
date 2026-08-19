@@ -147,6 +147,48 @@ En cas de dépassement : `429` + en-tête `Retry-After` (en secondes).
 Dans les URL ci-dessous, `:societe` est l'identifiant de la société.
 Pour ce projet : **`sitec`** (trigramme `SIT`).
 
+### Index — toutes les routes
+
+**Toutes les routes sont en `GET`.** Il n'en existe aucune autre : pas de
+`POST`, `PUT`, `DELETE`, ni de route non documentée. Préfixe commun :
+`https://robot-nc.com/api/public/v1`.
+
+| # | Route | Scope | Renvoie | § |
+|---|---|---|---|---|
+| 1 | `/ping` | *(clé valide)* | Validité de la clé, scopes, sociétés, quota, votre IP | 5.1 |
+| 2 | `/societes` | *(clé valide)* | Sociétés accessibles + libellés d'entrepôts | 5.1 |
+| 3 | `/:societe/articles` | `articles:read` | Liste paginée, **repliée par produit** | 5.2 |
+| 4 | `/:societe/articles/:nart` | `articles:read` | Une référence + ses **déclinaisons** | 5.2 |
+| 5 | `/:societe/articles/gencod/:gencod` | `articles:read` | Idem, par code-barres | 5.2 |
+| 6 | `/:societe/articles/:nart/attributs` | `articles:read` | Compléments `artplus` d'une référence | 5.4 |
+| 7 | `/:societe/articles/structure` | `articles:read` | Schéma de `article.dbf` (champs, types, tailles) | 5.2 |
+| 8 | `/:societe/articles/version` | `articles:read` | Empreinte du jeu de données (sondage) | 5.2 |
+| 9 | `/:societe/articles/groupes` | `articles:read` | Valeurs de `GROUPE` avec comptage | 5.2 |
+| 10 | `/:societe/articles/tgc` | `articles:read` | Valeurs distinctes de `TAXES` | 5.2 |
+| 11 | `/:societe/articles/export` | `articles:read` | **NDJSON** — toutes les références | 5.5 |
+| 12 | `/:societe/attributs` | `articles:read` | Dictionnaire des attributs `artplus` + facettes | 5.4 |
+| 13 | `/:societe/classement` | `articles:read` | Arbre groupe > famille > sous-famille | 5.4 |
+| 14 | `/:societe/produits` | `articles:read` | Liste paginée des produits + variantes détaillées | 5.4 |
+| 15 | `/:societe/produits/:cle` | `articles:read` | Un produit et toutes ses variantes | 5.4 |
+| 16 | `/:societe/produits/export` | `articles:read` | **NDJSON** — tous les produits | 5.5 |
+| 17 | `/:societe/clients` | `clients:read` | Liste paginée des clients | 5.3 |
+| 18 | `/:societe/clients/:tiers` | `clients:read` | Un client par numéro de tiers | 5.3 |
+| 19 | `/:societe/clients/structure` | `clients:read` | Schéma de `clients.dbf` | 5.3 |
+| 20 | `/:societe/clients/version` | `clients:read` | Empreinte du jeu de données clients | 5.3 |
+| 21 | `/:societe/clients/filtres` | `clients:read` | Valeurs distinctes des champs filtrables | 5.3 |
+| 22 | `/:societe/clients/export` | `clients:read` | **NDJSON** — tous les clients | 5.5 |
+
+**Paramètres communs à plusieurs routes**
+
+| Paramètre | Routes | Effet |
+|---|---|---|
+| `page`, `limit` | 3, 14, 17 | Pagination. `limit` ≤ 500, défaut 100. |
+| `champs` | 3-6, 11, 14-16, 17-18, 22 | Projection des champs renvoyés. |
+| `grouper=0` | 3 | Désactive le repli par produit : une ligne par référence. |
+| `variantes=0` | 4, 5 | N'ajoute pas `_variantes` à la fiche. |
+| `articles=0` | 14-16 | N'inclut pas la fiche article complète dans chaque variante. |
+| `plus=0` | 3-5, 11 | N'ajoute pas les compléments `artplus` (`_plus`, `_produit`). |
+
 ### 5.1 Méta
 
 #### `GET /ping`
@@ -206,7 +248,23 @@ Scope requis : `articles:read`.
 > Pour la vue **produit** (références regroupées en déclinaisons, classement,
 > attributs), voir §5.4.
 
-#### `GET /:societe/articles` — liste paginée
+#### `GET /:societe/articles` — liste paginée, **une ligne par produit**
+
+> ### 🡒 Comportement à connaître avant tout
+>
+> Cette liste est **repliée par produit** : un article décliné en 14 références
+> (couleurs, dimensions, conditionnements) **n'apparaît qu'une fois**. La ligne
+> renvoyée est la première déclinaison au sens du catalogue, et elle indique les
+> codes de ses variantes dans `_variantesNarts`.
+>
+> Pour obtenir le détail des déclinaisons, appelez la fiche de la référence :
+> **`GET /:societe/articles/:nart`** (ou `/gencod/:gencod`) renvoie alors
+> `_variantes`. C'est le parcours prévu : *liste = produits*, *fiche = la
+> référence et ses déclinaisons*.
+>
+> `?grouper=0` rétablit la liste brute, **une ligne par référence** — utile pour
+> un inventaire ou un rapprochement de stock. `/articles/export` (§5.5) est
+> **toujours** brut, c'est un export de synchronisation.
 
 **Paramètres de pagination**
 
@@ -215,6 +273,19 @@ Scope requis : `articles:read`.
 | `page` | `1` | Numéro de page (1-indexé). |
 | `limit` | `100` | Taille de page, **maximum 500**. |
 | `champs` | *(tous)* | Projection : liste de champs séparés par des virgules. Ex. `champs=NART,DESIGN,PVTE,_stockTotal`. Réduit fortement le volume transféré. |
+| `grouper` | `1` | `0` désactive le repli par produit. |
+| `plus` | `1` | `0` retire `_plus` et `_produit`. Le repli est alors sans objet et la liste redevient brute. |
+
+**Ce que la pagination compte**
+
+| Champ | Repli actif (défaut) | `grouper=0` |
+|---|---|---|
+| `totalRecords` | nombre de **produits** | nombre de références |
+| `totalReferences` | nombre de **références** sous-jacentes | *(absent)* |
+| `groupe` | `true` | `false` |
+
+Sur une base réelle : 100 770 références se replient en **83 591 produits**
+(la plupart des articles n'ont pas de déclinaison, ils restent donc seuls).
 
 **Paramètres de filtrage** (cumulables ; tous les filtres s'appliquent au
 fichier entier *avant* pagination)
@@ -248,31 +319,87 @@ curl -H "X-API-Key: VOTRE_CLE" \
 ```json
 {
   "societe": { "nomDossierDBF": "sitec", "trigramme": "SIT", "nomComplet": "Sitec" },
+  "groupe": true,
   "pagination": {
-    "page": 1, "limit": 3, "totalRecords": 4921, "totalPages": 1641,
-    "hasNextPage": true, "hasPrevPage": false
+    "page": 1, "limit": 3, "totalRecords": 4108, "totalReferences": 4921,
+    "totalPages": 1370, "hasNextPage": true, "hasPrevPage": false
   },
   "_tempsMs": 22,
   "articles": [
     { "NART": "800391", "DESIGN": "CAGOULE SOUDURE MIG/MMA OPTOELECT VARIABLE 9/13",
-      "GENCOD": "8423246234749", "PVTE": 10800, "_stockTotal": 5, "_prixVenteHT": 10800 }
+      "GENCOD": "8423246234749", "PVTE": 10800, "_stockTotal": 5, "_prixVenteHT": 10800,
+      "_variantesNarts": ["800391", "800392", "800393"],
+      "_nbVariantesListe": 3, "_nbVariantesProduit": 3 }
   ]
 }
 ```
 
-#### `GET /:societe/articles/:nart` — un article par code
+Les trois champs de repli :
+
+| Champ | Sens |
+|---|---|
+| `_variantesNarts` | Codes des déclinaisons **retenues par vos filtres**, ordre catalogue, la ligne affichée en tête. |
+| `_nbVariantesListe` | Taille de la liste ci-dessus. |
+| `_nbVariantesProduit` | Nombre **total** de déclinaisons du produit, filtres ignorés. Un écart avec le précédent signifie que des déclinaisons ont été écartées par un filtre (rupture de stock, non publiée…). |
+
+#### `GET /:societe/articles/:nart` — une référence et ses déclinaisons
 
 `:nart` = code article (`NART`). Insensible à la casse.
-`404` si inconnu. Accepte `champs`.
+`404` si inconnu. Accepte `champs`, `plus`, `variantes`.
+
+Si la référence appartient à un produit à **plusieurs** déclinaisons, la réponse
+porte `_variantes` : le sélecteur de variantes de votre fiche produit, prêt à
+l'emploi.
 
 ```bash
 curl -H "X-API-Key: VOTRE_CLE" \
   https://robot-nc.com/api/public/v1/sitec/articles/800391
 ```
 
-#### `GET /:societe/articles/gencod/:gencod` — un article par code-barres
+```json
+{
+  "societe": {...},
+  "article": {
+    "NART": "320134", "DESIGN": "VIS TH 8.8 ZING 10X20", "PVTE": 38,
+    "_stockTotal": 297,
+    "_plus": { "nom_produit": "VIS TETE HEXAGONALE TOTALEMENT FILETEE CLASSE 8.8 ZINGUE",
+               "tet1_diametre": "10 MM", "tet2_dimension": "20 MM" },
+    "_produit": { "cle": "p10", "id": "10", "nom": "VIS TETE HEXAGONALE…",
+                  "groupe": "FIXATIONS", "famille": "VIS METAUX",
+                  "sousFamille": "VIS A PAS MECANIQUE", "nbVariantes": 82 },
+    "_variantes": [
+      { "nart": "320145", "estReferenceDemandee": false, "articleTrouve": true,
+        "attributs": { "tet1_diametre": "10 MM", "tet2_dimension": "100 MM" },
+        "article": { "NART": "320145", "PVTE": 105, "_stockTotal": 116 } },
+      { "nart": "320134", "estReferenceDemandee": true, "articleTrouve": true,
+        "attributs": { "tet1_diametre": "10 MM", "tet2_dimension": "20 MM" },
+        "article": { "NART": "320134", "PVTE": 38, "_stockTotal": 297 } }
+    ]
+  }
+}
+```
+
+- `_variantes` **inclut la référence demandée**, repérée par
+  `estReferenceDemandee: true` — inutile de la réinsérer vous-même.
+- **`_variantes` est absent quand la référence est seule de son produit.** Son
+  absence signifie « pas de déclinaison » : ne testez pas une longueur.
+- Sur quoi portent les différences ? `_produit` vous donne le produit, et
+  `GET /:societe/produits/:cle` renvoie `axes`, la liste des attributs qui
+  varient (couleur, dimension…). C'est là-dessus qu'il faut construire les
+  sélecteurs, pas sur une comparaison maison des attributs.
+- `articleTrouve: false` : la déclinaison a des compléments mais n'existe pas
+  (ou plus) dans `article.dbf` ; `article` est alors absent.
+- `champs` s'applique aussi aux fiches des variantes. `?variantes=0` supprime le
+  bloc (réponse nettement plus légère sur les gros produits : jusqu'à 82
+  déclinaisons).
+- Les fiches à l'intérieur de `_variantes` ne portent **pas** de `_plus`,
+  `_produit` ni `_variantes` : pas d'imbrication récursive.
+
+#### `GET /:societe/articles/gencod/:gencod` — une référence par code-barres
 
 `:gencod` = EAN (`GENCOD`). `404` si aucun article ne porte ce code.
+**Réponse identique à la route précédente**, `_variantes` compris : scanner un
+code-barres donne directement la référence *et* ses déclinaisons.
 
 ```bash
 curl -H "X-API-Key: VOTRE_CLE" \
@@ -589,8 +716,13 @@ Renvoient **l'intégralité** des enregistrements au format **NDJSON**
 englobant. Le flux est envoyé au fil de l'eau — vous pouvez le traiter sans
 charger toute la réponse en mémoire.
 
-Ces routes acceptent les mêmes filtres que les listes correspondantes, ainsi que
-`champs`. Elles ignorent `page` et `limit`.
+Elles acceptent `champs` et ignorent `page` / `limit`. Les filtres reconnus :
+
+| Export | Filtres acceptés |
+|---|---|
+| `articles/export` | Tous ceux de la liste articles (§5.2), plus `plus`. **Jamais replié par produit** : une ligne par référence, quel que soit `grouper`. |
+| `produits/export` | Tous ceux de la liste produits (§5.4) : `search`, `groupe`, `famille`, `sousFamille`, `arborescence`, `marque`, `enStock`, `web`, `articles`. |
+| `clients/export` | **`search`, `categorie`, `type`, `groupe` uniquement** — les autres filtres de la liste clients ne sont pas repris ici. |
 
 En-têtes de réponse utiles :
 
@@ -641,9 +773,14 @@ identique partout. Présents sur toutes les routes articles.
 | `_aPhoto` | booléen | `FOTO` vaut `"F"`. |
 | `_plus` | objet | Attributs `artplus` de la référence, par clé normalisée (§5.4). Absent si la société n'a pas de compléments, ou avec `?plus=0`. |
 | `_produit` | objet | Produit de rattachement : `{ cle, id, nom, groupe, famille, sousFamille, arborescence, marque, nbVariantes }`. Sert à passer d'une référence à sa fiche produit. |
+| `_variantes` | tableau | **Fiche seule** (`/articles/:nart`, `/articles/gencod/:gencod`). Les déclinaisons du produit, référence demandée comprise. **Absent** s'il n'y en a pas. |
+| `_variantesNarts` | tableau | **Liste repliée** (`/articles`). Codes des déclinaisons retenues par les filtres. |
+| `_nbVariantesListe` | nombre | **Liste repliée.** Taille de `_variantesNarts`. |
+| `_nbVariantesProduit` | nombre | **Liste repliée.** Total des déclinaisons du produit, filtres ignorés. |
 
 > `?plus=0` retire `_plus` et `_produit` de la réponse. Utile pour un export de
-> masse dont vous n'avez pas besoin des compléments.
+> masse dont vous n'avez pas besoin des compléments. Il désactive aussi le repli
+> par produit de la liste, qui en dépend.
 
 > **Prix TTC.** Le champ `PVTETTC` est fourni par l'ERP. La conversion utilisée
 > en interne est `PVTETTC = tronquer(PVTE × (1 + ATVA / 100))` (troncature, pas

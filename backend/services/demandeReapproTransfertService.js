@@ -22,6 +22,21 @@ const dossierCollectSec = (entreprise) =>
   safeTrim(entreprise?.cheminExportInventaire) ||
   "/mnt/rcommun/STOCK/collect_sec";
 
+// Partie variable du NOM du fichier, au choix de l'utilisateur (le CONTENU, lui,
+// ne change jamais). Défaut historique = le gisement ; on y retombe dès que le
+// mode choisi ne donne rien (liste manuelle sans proforma, libellé libre vide).
+const libelleTransfert = (demande) => {
+  const gisement = safeTrim(demande?.gisement);
+  switch (demande?.nommageTransfert) {
+    case "proforma":
+      return safeTrim(demande?.sourceRef) || gisement;
+    case "libre":
+      return safeTrim(demande?.nomTransfertLibre) || gisement;
+    default:
+      return gisement;
+  }
+};
+
 // NART(13, gauche) | QTE(8, zéros) | 000
 const construireContenu = (lignes) => {
   let contenu = "";
@@ -55,9 +70,10 @@ export const ecrireTransfertMagasin = async (demande, lignes) => {
   const stamp = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(
     d.getDate(),
   )}_${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+  const libelle = libelleTransfert(demande);
   const nomTsf =
     sanitizeFileName(
-      `tsf_reappro_mag_${demande.entreprise}_${demande.gisement}_${stamp}`,
+      `tsf_reappro_mag_${demande.entreprise}_${libelle}_${stamp}`,
     ) + ".dat";
 
   const dir = dossierCollectSec(entreprise);

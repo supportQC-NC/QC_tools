@@ -4,6 +4,8 @@ import {
   createReappro,
   getReapproEnCours,
   scanArticleReappro,
+  rechercheParCodeReappro,
+  rechercheParRefReappro,
   addLigneReappro,
   updateLigneReappro,
   deleteLigneReappro,
@@ -47,6 +49,14 @@ router
 router
   .route("/:id/scan")
   .post(protect, checkModuleAccess("reapro", "write"), scanArticleReappro);
+
+// Identifier un article inconnu (code article / référence fournisseur)
+router
+  .route("/:id/recherche-code")
+  .post(protect, checkModuleAccess("reapro", "write"), rechercheParCodeReappro);
+router
+  .route("/:id/recherche-ref")
+  .post(protect, checkModuleAccess("reapro", "write"), rechercheParRefReappro);
 
 // Gérer les lignes du réappro
 router

@@ -731,6 +731,82 @@ const suivreChaineRenvois = async (entreprise, article) => {
   };
 };
 
+const safeTrim = (v) => (v == null ? "" : String(v).trim());
+
+/**
+ * Libellés d'entrepôts affichés sur le terminal (mapping par société).
+ */
+const getStocksLabels = (entreprise) =>
+  entreprise.mappingEntrepots || {
+    S1: "Magasin",
+    S2: "S2",
+    S3: "S3",
+    S4: "S4",
+    S5: "S5",
+  };
+
+/**
+ * Fiche article renvoyée au terminal (scan OU identification manuelle).
+ * `codeSaisi` sert de repli au NART quand rien n'a été trouvé.
+ */
+const buildArticleInfo = (entreprise, codeSaisi, resultatRenvoi) => {
+  const stocksLabels = getStocksLabels(entreprise);
+
+  if (!resultatRenvoi?.articleFinal) {
+    return {
+      nart: codeSaisi,
+      gencod: "",
+      designation: "Article inconnu",
+      refer: "",
+      stocks: { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 },
+      stocksLabels,
+      isUnknown: true,
+      isRenvoi: false,
+      articleOriginal: null,
+      chaineRenvois: null,
+      nombreRenvois: 0,
+    };
+  }
+
+  const articleFinal = resultatRenvoi.articleFinal;
+  return {
+    nart: safeTrim(articleFinal.NART) || codeSaisi,
+    gencod: safeTrim(articleFinal.GENCOD),
+    designation: safeTrim(articleFinal.DESIGN),
+    refer: safeTrim(articleFinal.REFER),
+    stocks: {
+      S1: parseFloat(articleFinal.S1) || 0,
+      S2: parseFloat(articleFinal.S2) || 0,
+      S3: parseFloat(articleFinal.S3) || 0,
+      S4: parseFloat(articleFinal.S4) || 0,
+      S5: parseFloat(articleFinal.S5) || 0,
+    },
+    stocksLabels,
+    isUnknown: false,
+    isRenvoi: resultatRenvoi.isRenvoi,
+    articleOriginal: resultatRenvoi.articleOriginal,
+    chaineRenvois: resultatRenvoi.chaineRenvois,
+    nombreRenvois: resultatRenvoi.nombreRenvois,
+  };
+};
+
+/**
+ * Charge le réappro de la route et vérifie qu'il est encore ouvert.
+ */
+const loadReapproActif = async (req, res) => {
+  const reappro = await Reappro.findById(req.params.id);
+  if (!reappro) {
+    res.status(404);
+    throw new Error("Réappro non trouvé");
+  }
+  if (reappro.status !== "en_cours") {
+    res.status(400);
+    throw new Error("Ce réappro est déjà terminé");
+  }
+  const entreprise = await Entreprise.findById(reappro.entreprise);
+  return { reappro, entreprise };
+};
+
 /**
  * @desc    Scanner un article pour réappro - Affiche les infos et stocks
  * @route   POST /api/reappros/:id/scan
@@ -740,52 +816,14 @@ const scanArticleReappro = asyncHandler(async (req, res) => {
   const { code } = req.body;
   const startTime = Date.now();
 
-  const reappro = await Reappro.findById(req.params.id);
-  if (!reappro) {
-    res.status(404);
-    throw new Error("Réappro non trouvé");
-  }
-
-  if (reappro.status !== "en_cours") {
-    res.status(400);
-    throw new Error("Ce réappro est déjà terminé");
-  }
-
-  const entreprise = await Entreprise.findById(reappro.entreprise);
+  const { reappro, entreprise } = await loadReapproActif(req, res);
   const dbfPath = path.join(
     entreprise.cheminBase,
     entreprise.nomDossierDBF,
     "article.dbf",
   );
 
-  // Labels personnalisés par entreprise (mapping)
-  const stocksLabels = entreprise.mappingEntrepots || {
-    S1: "Magasin",
-    S2: "S2",
-    S3: "S3",
-    S4: "S4",
-    S5: "S5",
-  };
-
-  let articleInfo = {
-    nart: code,
-    gencod: "",
-    designation: "Article inconnu",
-    refer: "",
-    stocks: {
-      S1: 0,
-      S2: 0,
-      S3: 0,
-      S4: 0,
-      S5: 0,
-    },
-    stocksLabels,
-    isUnknown: true,
-    isRenvoi: false,
-    articleOriginal: null,
-    chaineRenvois: null,
-    nombreRenvois: 0,
-  };
+  let articleInfo = buildArticleInfo(entreprise, code, null);
 
   if (fs.existsSync(dbfPath)) {
     try {
@@ -798,27 +836,7 @@ const scanArticleReappro = asyncHandler(async (req, res) => {
       if (article) {
         // Suivre la chaîne de renvois si nécessaire
         const resultatRenvoi = await suivreChaineRenvois(entreprise, article);
-        const articleFinal = resultatRenvoi.articleFinal;
-
-        articleInfo = {
-          nart: articleFinal.NART ? articleFinal.NART.trim() : code,
-          gencod: articleFinal.GENCOD ? articleFinal.GENCOD.trim() : "",
-          designation: articleFinal.DESIGN ? articleFinal.DESIGN.trim() : "",
-          refer: articleFinal.REFER ? articleFinal.REFER.trim() : "",
-          stocks: {
-            S1: parseFloat(articleFinal.S1) || 0,
-            S2: parseFloat(articleFinal.S2) || 0,
-            S3: parseFloat(articleFinal.S3) || 0,
-            S4: parseFloat(articleFinal.S4) || 0,
-            S5: parseFloat(articleFinal.S5) || 0,
-          },
-          stocksLabels,
-          isUnknown: false,
-          isRenvoi: resultatRenvoi.isRenvoi,
-          articleOriginal: resultatRenvoi.articleOriginal,
-          chaineRenvois: resultatRenvoi.chaineRenvois,
-          nombreRenvois: resultatRenvoi.nombreRenvois,
-        };
+        articleInfo = buildArticleInfo(entreprise, code, resultatRenvoi);
       }
     } catch (error) {
       console.error("Erreur recherche article:", error);
@@ -831,6 +849,102 @@ const scanArticleReappro = asyncHandler(async (req, res) => {
     reapproId: reappro._id,
     articleInfo,
     _queryTime: `${queryTime}ms`,
+  });
+});
+
+/**
+ * @desc    Identifier un article inconnu par son code article (NART).
+ * @route   POST /api/reappros/:id/recherche-code
+ * @body    { nart }
+ * @access  Private (module reapro, write)
+ */
+const rechercheParCodeReappro = asyncHandler(async (req, res) => {
+  const { nart } = req.body;
+  const { reappro, entreprise } = await loadReapproActif(req, res);
+
+  const nartTrim = safeTrim(nart);
+  if (!nartTrim) {
+    res.status(400);
+    throw new Error("Le code article est requis");
+  }
+
+  let article = null;
+  try {
+    article = await articleCacheService.findByNart(entreprise, nartTrim);
+  } catch (error) {
+    console.error("Erreur recherche code article:", error);
+  }
+
+  if (!article) {
+    // `motif` permet au terminal de distinguer « code réellement inconnu »
+    // d'un 404 d'Express (route absente = serveur pas à jour).
+    res.status(404).json({ message: "Code article inconnu", motif: "code_inconnu" });
+    return;
+  }
+
+  const resultatRenvoi = await suivreChaineRenvois(entreprise, article);
+  res.json({
+    reapproId: reappro._id,
+    articleInfo: buildArticleInfo(entreprise, nartTrim, resultatRenvoi),
+  });
+});
+
+/**
+ * @desc    Identifier un article inconnu par sa référence fournisseur (REFER).
+ *          Une même référence peut exister chez plusieurs fournisseurs :
+ *          dans ce cas on renvoie la liste des candidats (`choix`) et
+ *          l'opérateur tranche, l'écran relançant une recherche par code.
+ * @route   POST /api/reappros/:id/recherche-ref
+ * @body    { refer }
+ * @access  Private (module reapro, write)
+ */
+const rechercheParRefReappro = asyncHandler(async (req, res) => {
+  const { refer } = req.body;
+  const { reappro, entreprise } = await loadReapproActif(req, res);
+
+  const referTrim = safeTrim(refer);
+  if (!referTrim) {
+    res.status(400);
+    throw new Error("La référence fournisseur est requise");
+  }
+
+  let candidats = [];
+  try {
+    // Balayage exact sur le cache déjà chargé : search() tronque AVANT le
+    // filtre sur REFER, la bonne référence pourrait passer à la trappe.
+    const cache = await articleCacheService.getArticles(entreprise);
+    const cible = referTrim.toUpperCase();
+    candidats = cache.records.filter(
+      (a) => safeTrim(a.REFER).toUpperCase() === cible,
+    );
+  } catch (error) {
+    console.error("Erreur recherche référence:", error);
+  }
+
+  if (candidats.length === 0) {
+    res
+      .status(404)
+      .json({ message: "Référence fournisseur inconnue", motif: "code_inconnu" });
+    return;
+  }
+
+  if (candidats.length === 1) {
+    const resultatRenvoi = await suivreChaineRenvois(entreprise, candidats[0]);
+    return res.json({
+      reapproId: reappro._id,
+      articleInfo: buildArticleInfo(entreprise, referTrim, resultatRenvoi),
+    });
+  }
+
+  res.json({
+    reapproId: reappro._id,
+    choix: candidats.slice(0, 20).map((a) => ({
+      nart: safeTrim(a.NART),
+      gencod: safeTrim(a.GENCOD),
+      designation: safeTrim(a.DESIGN),
+      refer: safeTrim(a.REFER),
+      fourn: a.FOURN ?? null,
+    })),
   });
 });
 
@@ -1186,6 +1300,8 @@ export {
   createReappro,
   getReapproEnCours,
   scanArticleReappro,
+  rechercheParCodeReappro,
+  rechercheParRefReappro,
   addLigneReappro,
   updateLigneReappro,
   deleteLigneReappro,

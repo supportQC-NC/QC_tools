@@ -516,3 +516,67 @@
   font-size: 0.95rem;
   font-weight: 700;
 }
+
+/* ═══════════ MODÈLES DE MESSAGE (type × langue) ═══════════ */
+/* Séparateur vertical entre le choix du TYPE et le choix de la LANGUE. */
+.ecf-sepv {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 6px;
+  background: var(--admin-border, #334155);
+}
+.ecf-langtabs {
+  flex-wrap: wrap;
+  align-items: center;
+}
+/* Aperçu du mail : plus haut que l'aperçu générique, la relance embarque le
+   tableau récapitulatif des commandes. */
+.ecf-preview.mail {
+  max-height: 420px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 18px 22px;
+}
+.ecf-preview.mail table {
+  border-collapse: collapse;
+}
+.ecf-preview.mail img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ═══════════ HISTORIQUE : sélection + relance ═══════════ */
+.ecf-table tr.selectionnee > td {
+  background: rgba(99, 102, 241, 0.12);
+}
+.ecf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--admin-text, #e2e8f0);
+  cursor: pointer;
+}
+.ecf-relance-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.ecf-relance-card {
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--admin-bg-alt, #0f172a);
+}
+.ecf-relance-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}

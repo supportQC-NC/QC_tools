@@ -74,6 +74,7 @@ import filialesRoutes from "./routes/filialesRoutes.js";
 import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import commercialRoutes from "./routes/commercialRoutes.js";
 import { startCommercialIndexWarmer } from "./services/commercialService.js";
+import { startReapproProformaScheduler } from "./services/reapproProformaScheduler.js";
 import topVentesRoutes from "./routes/topVentesRoutes.js";
 import menuHintRoutes from "./routes/menuHintRoutes.js";
 import menuLayoutRoutes from "./routes/menuLayoutRoutes.js";
@@ -357,4 +358,7 @@ server.listen(PORT, () => {
   // Espace commercial : garde les index facture/proforma chauds, sinon c'est un
   // commercial qui paie la relecture de facture.dbf (~40 s) toutes les 10 min.
   startCommercialIndexWarmer();
+  // Listes de réappro : import horaire des proformas dont l'observation
+  // commence par « reappro » (CDC §2).
+  startReapproProformaScheduler();
 });
