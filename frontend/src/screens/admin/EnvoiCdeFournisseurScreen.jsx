@@ -17,6 +17,8 @@ import {
   HiShieldCheck,
   HiDownload,
   HiUpload,
+  HiBadgeCheck,
+  HiClock,
 } from "react-icons/hi";
 import { selectGlobalDossier, selectGlobalEntreprise } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -38,6 +40,10 @@ import {
   useEnvoyerMasseMutation,
   useApercuRelanceMutation,
   useEnvoyerRelanceMutation,
+  useGetListeArQuery,
+  useApercuArMutation,
+  useConfirmerArMutation,
+  useAnnulerArMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
   useGetResponsableCcQuery,
@@ -62,8 +68,12 @@ const fmtDate = (v) => {
   if (!d || isNaN(d.getTime())) return String(v);
   return d.toLocaleDateString("fr-FR");
 };
-const fmtMoney = (n) =>
-  (Number(n) || 0).toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " F";
+// Montant + devise de la commande (cmdref.CDVISE) — aucune conversion n'est
+// faite nulle part, on affiche la devise telle qu'elle est dans l'ERP.
+const fmtMoney = (n, devise = "F") =>
+  (Number(n) || 0).toLocaleString("fr-FR", { maximumFractionDigits: 0 }) +
+  " " +
+  (devise || "F");
 
 // Affiche le champ BATEAU : "OK" en vert, "P/VERIF" en orange, sinon texte brut.
 const renderBateau = (b) => {
@@ -124,6 +134,7 @@ const EnvoiCdeFournisseurScreen = () => {
 
   const tabs = [
     { key: "commandes", label: "Commandes préparées", icon: HiClipboardList },
+    { key: "ar", label: "Accusés de réception", icon: HiBadgeCheck },
     { key: "masse", label: "Message en masse", icon: HiMail },
     { key: "emails", label: "Emails fournisseurs", icon: HiUserGroup },
     { key: "messages", label: "Modèles de message", icon: HiDocumentText },
@@ -212,6 +223,7 @@ const EnvoiCdeFournisseurScreen = () => {
       </div>
 
       {tab === "commandes" && <CommandesTab dossier={dossier} params={params} />}
+      {tab === "ar" && <ArTab dossier={dossier} params={params} />}
       {tab === "masse" && <MasseTab dossier={dossier} params={params} />}
       {tab === "emails" && <EmailsTab dossier={dossier} />}
       {tab === "messages" && <MessagesTab dossier={dossier} />}
@@ -381,7 +393,9 @@ const CommandesTab = ({ dossier, params }) => {
               <th>État</th>
               <th>Bateau</th>
               <th className="ecf-right">Lignes</th>
-              <th className="ecf-right">Coût achat prév.</th>
+              <th className="ecf-right" title="Σ (quantité × prix d'achat) de chaque ligne">
+                Montant total
+              </th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -418,7 +432,9 @@ const CommandesTab = ({ dossier, params }) => {
                   <td>{c.ETAT_LABEL || c.ETAT}</td>
                   <td>{renderBateau(c.BATEAU)}</td>
                   <td className="ecf-right">{c.NB_LIGNES}</td>
-                  <td className="ecf-right">{fmtMoney(c.COUT_ACHAT_PREV)}</td>
+                  <td className="ecf-right">
+                    {fmtMoney(c.MONTANT_TOTAL, c.DEVISE)}
+                  </td>
                   <td>
                     <button
                       className="ecf-btn"
@@ -493,7 +509,8 @@ const DetailModal = ({ dossier, numcde, onClose }) => {
             {" · "}
             <span className="tag">Lignes :</span> {data.nbLignes}
             {" · "}
-            <span className="tag">Coût achat prév. :</span> {fmtMoney(data.montantPrev)}
+            <span className="tag">Montant total :</span>{" "}
+            <b>{fmtMoney(data.montantTotal, data.devise)}</b>
           </div>
           <div className="ecf-tablewrap">
             <table className="ecf-table">
@@ -506,6 +523,8 @@ const DetailModal = ({ dossier, numcde, onClose }) => {
                   <th>Référence</th>
                   <th>Gencode</th>
                   <th className="ecf-right">Qté</th>
+                  <th className="ecf-right">Prix achat</th>
+                  <th className="ecf-right">Montant</th>
                 </tr>
               </thead>
               <tbody>
@@ -518,9 +537,23 @@ const DetailModal = ({ dossier, numcde, onClose }) => {
                     <td>{l.REFER}</td>
                     <td>{l.GENCOD}</td>
                     <td className="ecf-right">{l.QTE}</td>
+                    <td className="ecf-right">{fmtMoney(l.PRIX, data.devise)}</td>
+                    <td className="ecf-right">
+                      {fmtMoney(l.MONTANT_LIGNE, data.devise)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={8} className="ecf-right">
+                    <b>Montant total</b>
+                  </td>
+                  <td className="ecf-right">
+                    <b>{fmtMoney(data.montantTotal, data.devise)}</b>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </>
@@ -571,6 +604,8 @@ const ApercuModal = ({ dossier, numcde, onClose }) => {
             <div>
               <span className="tag">Langue :</span> {data.langue} ·{" "}
               <span className="tag">Lignes :</span> {data.nbLignes} ·{" "}
+              <span className="tag">Montant total :</span>{" "}
+              {fmtMoney(data.montantTotal, data.devise)} ·{" "}
               <span className="tag">PJ :</span> Excel + PDF + logo société
             </div>
           </div>
@@ -637,6 +672,516 @@ const SendModal = ({ commandes, testInfo, sending, onConfirm, onClose }) => (
     </div>
   </Modal>
 );
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ONGLET ACCUSÉS DE RÉCEPTION (AR)
+//
+//  Toute commande envoyée est « en attente d'AR » jusqu'à ce que le fournisseur
+//  confirme. On coche les commandes confirmées, on vérifie (ou corrige) leur
+//  MONTANT TOTAL, et un mail de confirmation part au fournisseur.
+//
+//  Contrairement à la relance, PAS de regroupement par fournisseur : un AR porte
+//  sur une commande et sur son montant.
+// ════════════════════════════════════════════════════════════════════════════
+const ArTab = ({ dossier, params }) => {
+  const [statut, setStatut] = useState("en_attente");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState([]); // n° de commande
+  const [montants, setMontants] = useState({}); // numcde -> montant corrigé (saisi)
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const { data, isLoading, isFetching, refetch } = useGetListeArQuery({
+    nomDossierDBF: dossier,
+    statut: statut || undefined,
+    search: search || undefined,
+    page,
+    limit: 50,
+  });
+  const [annuler, { isLoading: annulation }] = useAnnulerArMutation();
+
+  const rows = data?.commandes || [];
+  const totalPages = data ? Math.ceil(data.total / data.limit) || 1 : 1;
+
+  const toggle = (numcde) =>
+    setSelected((s) =>
+      s.includes(numcde) ? s.filter((n) => n !== numcde) : [...s, numcde],
+    );
+  const toutCoche = rows.length > 0 && rows.every((r) => selected.includes(r.numcde));
+  const toggleAll = () =>
+    setSelected(
+      toutCoche
+        ? selected.filter((n) => !rows.some((r) => r.numcde === n))
+        : [...new Set([...selected, ...rows.map((r) => r.numcde)])],
+    );
+
+  // Montant affiché : la saisie en cours, sinon celui retenu/calculé côté serveur.
+  const montantDe = (r) =>
+    montants[r.numcde] !== undefined ? montants[r.numcde] : r.montantTotal ?? 0;
+
+  // Payload de confirmation : n° + montant retenu pour chaque commande cochée.
+  const selection = useMemo(
+    () =>
+      rows
+        .filter((r) => selected.includes(r.numcde))
+        .map((r) => ({
+          numcde: r.numcde,
+          montantTotal: Number(montantDe(r)) || 0,
+          fournNom: r.fournNom,
+          devise: r.devise,
+        })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, selected, montants],
+  );
+
+  const handleAnnuler = async (numcde) => {
+    const ok = window.confirm(
+      `Repasser la commande ${numcde} en « AR en attente » ?\n\nAucun mail n'est envoyé.`,
+    );
+    if (!ok) return;
+    setResult(null);
+    await annuler({ nomDossierDBF: dossier, numcdes: [numcde] });
+  };
+
+  return (
+    <div>
+      <div className="ecf-toolbar">
+        <input
+          className="ecf-input"
+          placeholder="Rechercher (n° cmd, fournisseur…)"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
+        <select
+          className="ecf-input"
+          value={statut}
+          onChange={(e) => {
+            setStatut(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="en_attente">AR en attente</option>
+          <option value="confirme">AR confirmés</option>
+          <option value="">Toutes les commandes envoyées</option>
+        </select>
+        <button className="ecf-btn" onClick={() => refetch()} disabled={isFetching}>
+          <HiRefresh /> Rafraîchir
+        </button>
+        <div className="ecf-spacer" />
+        <span className="ecf-soc">
+          {data?.total ?? 0} commande(s) · {data?.nbAttente ?? 0} en attente d'AR
+        </span>
+        <button
+          className="ecf-btn primary"
+          disabled={selection.length === 0}
+          onClick={() => {
+            setResult(null);
+            setShowConfirm(true);
+          }}
+        >
+          <HiBadgeCheck /> Confirmer l'AR ({selection.length})
+        </button>
+        {selected.length > 0 && (
+          <button className="ecf-btn" onClick={() => setSelected([])}>
+            <HiX /> Vider
+          </button>
+        )}
+      </div>
+
+      <div className="ecf-hint" style={{ marginBottom: 10 }}>
+        Le montant total est calculé ligne à ligne (quantité × prix d'achat). Vous
+        pouvez le corriger directement dans le tableau avant de confirmer — par
+        exemple si le fournisseur a confirmé un prix révisé ou une rupture.
+      </div>
+
+      {result && (
+        <div className={`ecf-msg ${result.nbErr ? "err" : "ok"}`}>
+          <b>
+            <HiCheckCircle /> {result.nbConfirmes} AR confirmé(s) — {result.nbOk}{" "}
+            mail(s) envoyé(s)
+            {result.nbSansMail ? `, ${result.nbSansMail} sans mail` : ""}
+            {result.nbErr ? `, ${result.nbErr} erreur(s)` : ""}.
+          </b>
+          {result.testMode && " (mode test)"}
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {(result.resultats || []).map((r, i) => (
+              <li key={i}>
+                Cmd {r.numcde} ({r.fournNom || "?"}) —{" "}
+                {fmtMoney(r.montantTotal, r.devise)} :{" "}
+                {r.statut === "envoye"
+                  ? `mail envoyé à ${(r.destinataires || []).join(", ")}`
+                  : r.statut === "confirme_sans_mail"
+                    ? `confirmé sans mail — ${r.message}`
+                    : `erreur — ${r.message}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="ecf-tablewrap">
+        <table className="ecf-table">
+          <thead>
+            <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  className="ecf-checkbox"
+                  checked={toutCoche}
+                  onChange={toggleAll}
+                />
+              </th>
+              <th>N° Cmd</th>
+              <th>Fourn.</th>
+              <th>Nom fournisseur</th>
+              <th>Date cmd</th>
+              <th>Envoyée le</th>
+              <th className="ecf-right">Lignes</th>
+              <th className="ecf-right" title="Σ (quantité × prix d'achat) de chaque ligne">
+                Montant total
+              </th>
+              <th>AR</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={10} className="ecf-empty">
+                  Chargement…
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="ecf-empty">
+                  {statut === "en_attente"
+                    ? "Aucune commande en attente d'accusé de réception."
+                    : "Aucune commande."}
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => {
+                const saisi = montants[r.numcde] !== undefined;
+                const ecart =
+                  Math.abs(Number(montantDe(r)) - (r.montantCalcule || 0)) > 0.009;
+                return (
+                  <tr
+                    key={r.numcde}
+                    className={selected.includes(r.numcde) ? "selectionnee" : ""}
+                  >
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="ecf-checkbox"
+                        checked={selected.includes(r.numcde)}
+                        onChange={() => toggle(r.numcde)}
+                      />
+                    </td>
+                    <td>
+                      <b>{r.numcde}</b>
+                      {r.archivee && (
+                        <>
+                          {" "}
+                          <span
+                            className="ecf-badge test"
+                            title="Commande absente des fichiers ERP (archivée)"
+                          >
+                            archivée
+                          </span>
+                        </>
+                      )}
+                    </td>
+                    <td>{r.fournId}</td>
+                    <td className="wrap">{r.fournNom}</td>
+                    <td>{fmtDate(r.datcde)}</td>
+                    <td>{fmtDate(r.dateEnvoi)}</td>
+                    <td className="ecf-right">{r.nbLignes || "—"}</td>
+                    <td className="ecf-right">
+                      <input
+                        className="ecf-input ecf-montant"
+                        type="number"
+                        step="0.01"
+                        value={montantDe(r)}
+                        onChange={(e) =>
+                          setMontants((m) => ({ ...m, [r.numcde]: e.target.value }))
+                        }
+                        title={`Calculé : ${fmtMoney(r.montantCalcule, r.devise)}`}
+                      />{" "}
+                      <span className="ecf-recip tag">{r.devise}</span>
+                      {(ecart || r.montantCorrige) && (
+                        <div className="ecf-hint">
+                          calculé : {fmtMoney(r.montantCalcule, r.devise)}
+                          {saisi ? " (corrigé)" : ""}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {r.statut === "confirme" ? (
+                        <span
+                          className="ecf-badge ok"
+                          title={
+                            r.confirmePar
+                              ? `Par ${`${r.confirmePar.prenom || ""} ${
+                                  r.confirmePar.nom || ""
+                                }`.trim() || r.confirmePar.email}`
+                              : ""
+                          }
+                        >
+                          <HiCheckCircle /> confirmé {fmtDate(r.dateConfirmation)}
+                        </span>
+                      ) : (
+                        <span className="ecf-badge test">
+                          <HiClock /> en attente
+                        </span>
+                      )}
+                      {r.statut === "confirme" && !r.mailEnvoye && (
+                        <span className="ecf-badge err" title="Aucun mail n'est parti">
+                          sans mail
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {r.statut === "confirme" && (
+                        <button
+                          className="ecf-btn"
+                          title="Repasser en attente d'AR"
+                          disabled={annulation}
+                          onClick={() => handleAnnuler(r.numcde)}
+                        >
+                          <HiX />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="ecf-toolbar" style={{ marginTop: 10 }}>
+        <div className="ecf-spacer" />
+        <button className="ecf-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          Précédent
+        </button>
+        <span className="ecf-soc">
+          {page} / {totalPages}
+        </span>
+        <button
+          className="ecf-btn"
+          disabled={page >= totalPages}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Suivant
+        </button>
+      </div>
+
+      {showConfirm && (
+        <ArModal
+          dossier={dossier}
+          commandes={selection}
+          testInfo={params}
+          onClose={() => setShowConfirm(false)}
+          onDone={(r) => {
+            setResult(r);
+            setShowConfirm(false);
+            setSelected([]);
+            setMontants({});
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ── Modale de confirmation d'AR : aperçu par commande puis confirmation ──────
+const ArModal = ({ dossier, commandes, testInfo, onClose, onDone }) => {
+  const [apercu, { isLoading: chargement }] = useApercuArMutation();
+  const [confirmer, { isLoading: envoi }] = useConfirmerArMutation();
+  const [data, setData] = useState(null);
+  const [erreur, setErreur] = useState(null);
+  const [envoyerMail, setEnvoyerMail] = useState(true);
+  const [ouvert, setOuvert] = useState(null); // numcde dont l'aperçu est déplié
+
+  // Aperçu calculé côté serveur : c'est EXACTEMENT ce qui partira.
+  useEffect(() => {
+    let annule = false;
+    apercu({
+      nomDossierDBF: dossier,
+      commandes: commandes.map((c) => ({
+        numcde: c.numcde,
+        montantTotal: c.montantTotal,
+      })),
+    })
+      .unwrap()
+      .then((r) => {
+        if (!annule) setData(r);
+      })
+      .catch((e) => {
+        if (!annule)
+          setErreur(e?.data?.message || "Impossible de préparer la confirmation.");
+      });
+    return () => {
+      annule = true;
+    };
+  }, [dossier, commandes, apercu]);
+
+  const lignes = data?.commandes || [];
+  const valides = lignes.filter((c) => !c.erreur);
+  const enErreur = lignes.filter((c) => c.erreur);
+
+  const valider = async () => {
+    try {
+      const r = await confirmer({
+        nomDossierDBF: dossier,
+        commandes: commandes.map((c) => ({
+          numcde: c.numcde,
+          montantTotal: c.montantTotal,
+        })),
+        envoyerMail,
+      }).unwrap();
+      onDone(r);
+    } catch (e) {
+      setErreur(e?.data?.message || "Erreur de confirmation.");
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal lg">
+      <h3>
+        <HiBadgeCheck /> Confirmer l'AR — {commandes.length} commande(s)
+        <button className="ecf-btn ecf-spacer" onClick={onClose}>
+          <HiX />
+        </button>
+      </h3>
+
+      {envoyerMail &&
+        (testInfo?.testMode ? (
+          <div className="ecf-testbanner on" style={{ marginBottom: 10 }}>
+            <HiShieldCheck /> Mode test : les confirmations partiront vers{" "}
+            {(testInfo.testEmails || []).join(", ")} — aucun fournisseur ne sera
+            contacté.
+          </div>
+        ) : (
+          <div className="ecf-testbanner off" style={{ marginBottom: 10 }}>
+            <HiExclamation /> Mode réel : les confirmations partiront réellement aux
+            fournisseurs.
+          </div>
+        ))}
+
+      {erreur && <div className="ecf-msg err">{erreur}</div>}
+
+      {chargement && !data ? (
+        <div className="ecf-empty">Préparation des confirmations…</div>
+      ) : (
+        <>
+          {enErreur.length > 0 && (
+            <div className="ecf-msg err">
+              <b>
+                <HiExclamation /> {enErreur.length} commande(s) seront confirmées{" "}
+                <u>sans mail</u> :
+              </b>
+              <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                {enErreur.map((c, i) => (
+                  <li key={i}>
+                    {c.numcde} — {c.erreur}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <label className="ecf-check">
+            <input
+              type="checkbox"
+              className="ecf-checkbox"
+              checked={envoyerMail}
+              onChange={(e) => setEnvoyerMail(e.target.checked)}
+            />
+            Envoyer le mail de confirmation au fournisseur (sinon l'AR est
+            simplement enregistré)
+          </label>
+
+          <div className="ecf-relance-liste">
+            {valides.map((c) => (
+              <div className="ecf-relance-card" key={c.numcde}>
+                <div className="ecf-relance-head">
+                  <b>
+                    Cmd {c.numcde} — {c.fournNom || "(sans nom)"}
+                  </b>
+                  <span className={`ecf-badge ${c.langue === "A" ? "a" : "f"}`}>
+                    {c.langue === "A" ? "Anglais" : "Français"}
+                  </span>
+                  <span className="ecf-recip tag">
+                    Montant : <b>{fmtMoney(c.montantTotal, c.devise)}</b>
+                    {c.montantCorrige &&
+                      ` (calculé : ${fmtMoney(c.montantCalcule, c.devise)})`}
+                  </span>
+                  <button
+                    className="ecf-btn ecf-spacer"
+                    onClick={() => setOuvert(ouvert === c.numcde ? null : c.numcde)}
+                  >
+                    <HiEye /> {ouvert === c.numcde ? "Masquer" : "Aperçu"}
+                  </button>
+                </div>
+                {envoyerMail && (
+                  <div className="ecf-recip">
+                    <div>
+                      <span className="tag">Objet :</span> {c.envoi?.sujet}
+                    </div>
+                    <div>
+                      <span className="tag">À :</span> {(c.envoi?.to || []).join(", ")}
+                    </div>
+                    {(c.envoi?.cc || []).length > 0 && (
+                      <div>
+                        <span className="tag">Copie :</span> {(c.envoi.cc || []).join(", ")}
+                      </div>
+                    )}
+                    {c.envoi?.testMode && (
+                      <div>
+                        <span className="tag">En réel :</span>{" "}
+                        {(c.destinatairesReels || []).join(", ")}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {ouvert === c.numcde && (
+                  <div
+                    className="ecf-preview mail"
+                    dangerouslySetInnerHTML={{ __html: c.html }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="ecf-actions">
+        <button className="ecf-btn" onClick={onClose}>
+          Annuler
+        </button>
+        <button
+          className="ecf-btn success"
+          onClick={valider}
+          disabled={envoi || lignes.length === 0}
+        >
+          <HiBadgeCheck />{" "}
+          {envoi
+            ? "Confirmation…"
+            : envoyerMail
+              ? `Confirmer et envoyer (${valides.length})`
+              : `Confirmer sans mail (${lignes.length})`}
+        </button>
+      </div>
+    </Modal>
+  );
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ONGLET MESSAGE EN MASSE (vœux / annonces — texte simple FR/EN)
@@ -1399,6 +1944,14 @@ const TYPES_MESSAGE = [
       "Mail envoyé depuis l'onglet « Historique » quand on relance une ou " +
       "plusieurs commandes déjà envoyées. Objet et corps sont libres.",
   },
+  {
+    key: "ar",
+    label: "Confirmation d'AR",
+    aide:
+      "Mail envoyé depuis l'onglet « Accusés de réception » quand le " +
+      "fournisseur a confirmé la commande. Objet et corps sont libres, et le " +
+      "champ {{montant_total}} reprend le montant retenu à la confirmation.",
+  },
 ];
 
 // Remplace les {{champs}} par leur exemple, pour l'aperçu du mail final.
@@ -1412,7 +1965,6 @@ const MessagesTab = ({ dossier }) => {
   const { data } = useGetMessagesFournisseurQuery(dossier);
   const messages = data?.messages || [];
   const defauts = data?.defauts || {};
-  const variables = data?.variablesRelance || [];
   const [upsert, { isLoading }] = useUpsertMessageFournisseurMutation();
 
   const [type, setType] = useState("commande");
@@ -1432,10 +1984,18 @@ const MessagesTab = ({ dossier }) => {
   const hasOwn = !!current;
 
   const defaut = useMemo(() => {
-    if (type === "relance")
-      return defauts.relance?.[langue] || { message: "", sujet: "" };
+    if (type === "relance" || type === "ar")
+      return defauts[type]?.[langue] || { message: "", sujet: "" };
     return { message: defauts.commande?.[langue] || "", sujet: "" };
   }, [defauts, type, langue]);
+
+  // Champs insérables : propres à chaque type de mail (l'objet d'une commande
+  // est calculé, il n'a donc aucune variable).
+  const variables = useMemo(() => {
+    if (type === "relance") return data?.variablesRelance || [];
+    if (type === "ar") return data?.variablesAr || [];
+    return [];
+  }, [data, type]);
 
   const valeur = brouillon || {
     message: current?.message || defaut.message,
@@ -1514,13 +2074,17 @@ const MessagesTab = ({ dossier }) => {
         </div>
       )}
 
-      {type === "relance" && (
+      {type !== "commande" && (
         <div className="ecf-field">
           <label>Objet du mail</label>
           <input
             value={valeur.sujet}
             onChange={(e) => majBrouillon({ sujet: e.target.value })}
-            placeholder="Relance - commande(s) {{commandes}}"
+            placeholder={
+              type === "ar"
+                ? "Confirmation AR - commande {{commande}} - {{montant_total}}"
+                : "Relance - commande(s) {{commandes}}"
+            }
           />
           <div className="ecf-hint">
             Les champs entre accolades sont remplacés à l'envoi. Disponibles :{" "}
@@ -1534,15 +2098,17 @@ const MessagesTab = ({ dossier }) => {
         <RichTextEditor
           value={valeur.message}
           onChange={(html) => majBrouillon({ message: html })}
-          variables={type === "relance" ? variables : []}
+          variables={variables}
           minHeight={320}
           placeholder="Rédigez votre message comme dans un traitement de texte…"
         />
         <div className="ecf-hint">
           Sélectionnez du texte puis utilisez la barre d'outils pour le mettre en
           forme. La signature de la société
-          {type === "relance" && " et le tableau récapitulatif des commandes"} sont
-          ajoutés automatiquement à l'envoi.
+          {type === "relance" && " et le tableau récapitulatif des commandes"}
+          {type === "ar" &&
+            " et le tableau récapitulatif de la commande (avec son montant total)"}{" "}
+          sont ajoutés automatiquement à l'envoi.
         </div>
       </div>
 
@@ -1627,6 +2193,7 @@ const ResponsableTab = ({ dossier }) => {
 const TYPE_BADGE = {
   commande: { cls: "f", label: "commande" },
   relance: { cls: "test", label: "relance" },
+  ar: { cls: "ok", label: "AR" },
   masse: { cls: "a", label: "masse" },
 };
 
@@ -1651,7 +2218,9 @@ const HistoriqueTab = ({ dossier, params }) => {
   // Relançable = une ligne qui porte de vrais n° de commande partis chez le
   // fournisseur. Une ligne « relance » l'est aussi (on relance une 2e fois) ;
   // un message groupé ne l'est pas, il ne concerne aucune commande.
-  const relancable = (h) => h.type !== "masse" && h.statut === "envoye" && h.numcde;
+  // (une confirmation d'AR n'est pas relançable : le fournisseur a déjà répondu)
+  const relancable = (h) =>
+    ["commande", "relance"].includes(h.type) && h.statut === "envoye" && h.numcde;
   // Une commande peut avoir plusieurs lignes d'historique (envoi + relances) :
   // la sélection porte sur le N° de commande, jamais sur la ligne.
   const numcdesDeLigne = (h) =>
@@ -1706,6 +2275,7 @@ const HistoriqueTab = ({ dossier, params }) => {
           <option value="">Type : tous</option>
           <option value="commande">Commandes</option>
           <option value="relance">Relances</option>
+          <option value="ar">Confirmations d'AR</option>
           <option value="masse">Messages groupés</option>
         </select>
         <button className="ecf-btn" onClick={() => refetch()} disabled={isFetching}>

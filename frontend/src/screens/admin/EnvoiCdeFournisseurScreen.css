@@ -97,6 +97,14 @@
   color: var(--admin-text, #e2e8f0);
   font-size: 0.88rem;
 }
+/* Saisie du montant total d'un AR, dans le tableau : compacte et alignée à
+   droite comme les autres colonnes chiffrées. */
+.ecf-montant {
+  width: 110px;
+  padding: 4px 6px;
+  text-align: right;
+  font-size: 0.85rem;
+}
 .ecf-btn {
   padding: 8px 14px;
   border-radius: 6px;

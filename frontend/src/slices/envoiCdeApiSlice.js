@@ -104,6 +104,48 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["EnvoiCdeHistorique"],
     }),
 
+    // ─── Accusés de réception (onglet dédié) ─────────────────────────────
+    getListeAr: builder.query({
+      query: ({ nomDossierDBF, statut, search, page, limit }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/ar`,
+        params: {
+          ...(statut && { statut }),
+          ...(search && { search }),
+          ...(page && { page }),
+          ...(limit && { limit }),
+        },
+      }),
+      providesTags: ["EnvoiCdeAr"],
+      keepUnusedDataFor: 30,
+    }),
+
+    // Aperçu = mutation (POST) : les montants retenus voyagent dans le corps.
+    apercuAr: builder.mutation({
+      query: ({ nomDossierDBF, commandes }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/ar/apercu`,
+        method: "POST",
+        body: { commandes },
+      }),
+    }),
+
+    confirmerAr: builder.mutation({
+      query: ({ nomDossierDBF, commandes, envoyerMail }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/ar/confirmer`,
+        method: "POST",
+        body: { commandes, envoyerMail },
+      }),
+      invalidatesTags: ["EnvoiCdeAr", "EnvoiCdeHistorique"],
+    }),
+
+    annulerAr: builder.mutation({
+      query: ({ nomDossierDBF, numcdes }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/ar/annuler`,
+        method: "POST",
+        body: { numcdes },
+      }),
+      invalidatesTags: ["EnvoiCdeAr"],
+    }),
+
     // ─── Emails fournisseurs (CRUD) ──────────────────────────────────────
     getFournisseurEmails: builder.query({
       query: ({ nomDossierDBF, search }) => ({
@@ -253,6 +295,10 @@ export const {
   useEnvoyerMasseMutation,
   useApercuRelanceMutation,
   useEnvoyerRelanceMutation,
+  useGetListeArQuery,
+  useApercuArMutation,
+  useConfirmerArMutation,
+  useAnnulerArMutation,
   useGetMessagesFournisseurQuery,
   useUpsertMessageFournisseurMutation,
   useGetResponsableCcQuery,

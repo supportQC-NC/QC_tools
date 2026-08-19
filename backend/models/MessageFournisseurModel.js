@@ -7,7 +7,10 @@
 //   - "commande" : le mail qui accompagne l'envoi d'une commande préparée
 //                  (sujet calculé, fidèle à l'Access — le champ `sujet` est ignoré) ;
 //   - "relance"  : le mail de relance envoyé depuis l'onglet Historique
-//                  (sujet éditable, variables {{commandes}}, {{fournisseur}}…).
+//                  (sujet éditable, variables {{commandes}}, {{fournisseur}}…) ;
+//   - "ar"       : le mail de confirmation d'accusé de réception, envoyé depuis
+//                  l'onglet « Accusés de réception » quand le fournisseur a
+//                  confirmé la commande (sujet éditable, variable {{montant_total}}).
 //
 // Le HTML est envoyé tel quel comme corps de l'email (une signature société y est
 // ajoutée à l'envoi). Il est saisi via un éditeur visuel côté web : personne n'a
@@ -24,12 +27,12 @@ const messageFournisseurSchema = new mongoose.Schema(
     // Type de message. Défaut "commande" = comportement historique du module.
     type: {
       type: String,
-      enum: ["commande", "relance"],
+      enum: ["commande", "relance", "ar"],
       default: "commande",
       required: true,
     },
     langue: { type: String, enum: ["F", "A"], required: true },
-    // Sujet du mail — utilisé UNIQUEMENT par les relances (le sujet d'une
+    // Sujet du mail — utilisé par les relances et les AR (le sujet d'une
     // commande reste calculé à l'envoi pour rester fidèle à l'Access).
     sujet: { type: String, default: "" },
     // Corps HTML du message.

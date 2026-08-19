@@ -22,6 +22,10 @@ import {
   envoyerMasse,
   resoudreRelances,
   envoyerRelances,
+  getListeAr,
+  resoudreAr,
+  confirmerAr,
+  annulerAr,
   nettoyerHtmlMessage,
   DEFAULT_MESSAGE_F,
   DEFAULT_MESSAGE_A,
@@ -29,7 +33,12 @@ import {
   DEFAULT_RELANCE_A,
   DEFAULT_SUJET_RELANCE_F,
   DEFAULT_SUJET_RELANCE_A,
+  DEFAULT_AR_F,
+  DEFAULT_AR_A,
+  DEFAULT_SUJET_AR_F,
+  DEFAULT_SUJET_AR_A,
   VARIABLES_RELANCE,
+  VARIABLES_AR,
 } from "../services/envoiCdeFournisseurService.js";
 import { genererModeleEmailsExcel } from "../services/envoiCdeReportService.js";
 
@@ -154,6 +163,8 @@ export const apercu = asyncHandler(async (req, res) => {
     html: r.html,
     nbLignes: r.detail.nbLignes,
     montantPrev: r.detail.montantPrev,
+    montantTotal: r.detail.montantTotal,
+    devise: r.detail.devise,
     // Ce qui serait envoyé en production :
     destinatairesReels: r.destinataires,
     ccReels: r.cc,
@@ -342,9 +353,14 @@ export const getMessages = asyncHandler(async (req, res) => {
         F: { message: DEFAULT_RELANCE_F, sujet: DEFAULT_SUJET_RELANCE_F },
         A: { message: DEFAULT_RELANCE_A, sujet: DEFAULT_SUJET_RELANCE_A },
       },
+      ar: {
+        F: { message: DEFAULT_AR_F, sujet: DEFAULT_SUJET_AR_F },
+        A: { message: DEFAULT_AR_A, sujet: DEFAULT_SUJET_AR_A },
+      },
     },
-    // Champs insérables dans le sujet/corps d'une relance (menu de l'éditeur).
+    // Champs insérables dans le sujet/corps (menu « Insérer un champ »).
     variablesRelance: VARIABLES_RELANCE,
+    variablesAr: VARIABLES_AR,
   });
 });
 
@@ -353,10 +369,11 @@ export const upsertMessage = asyncHandler(async (req, res) => {
   await assurerSchemaMessages();
   const { type, langue, message, sujet } = req.body;
   const lang = langue === "A" ? "A" : "F";
-  const typ = type === "relance" ? "relance" : "commande";
+  const typ = ["relance", "ar"].includes(type) ? type : "commande";
   const set = { message: nettoyerHtmlMessage(message) };
-  // Le sujet n'a de sens que pour la relance (celui d'une commande est calculé).
-  if (typ === "relance") set.sujet = String(sujet || "").trim();
+  // Le sujet n'a de sens que pour la relance et l'AR (celui d'une commande est
+  // calculé à l'envoi, par fidélité à l'Access d'origine).
+  if (typ !== "commande") set.sujet = String(sujet || "").trim();
   const doc = await MessageFournisseur.findOneAndUpdate(
     { entreprise: req.entreprise._id, type: typ, langue: lang },
     { $set: set },
@@ -426,6 +443,95 @@ export const envoyerRelanceCtrl = asyncHandler(async (req, res) => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// ACCUSÉS DE RÉCEPTION (onglet dédié)
+// ────────────────────────────────────────────────────────────────────────────
+
+// Normalise le corps { commandes: [{numcde, montantTotal?}] } — accepte aussi
+// une simple liste de n° de commande.
+const toCommandesAr = (body = {}) => {
+  const { commandes, numcdes } = body;
+  if (Array.isArray(commandes) && commandes.length) {
+    return commandes
+      .map((c) =>
+        typeof c === "string"
+          ? { numcde: c }
+          : { numcde: String(c?.numcde || "").trim(), montantTotal: c?.montantTotal },
+      )
+      .filter((c) => c.numcde);
+  }
+  if (Array.isArray(numcdes)) {
+    return numcdes.map((n) => ({ numcde: String(n || "").trim() })).filter((c) => c.numcde);
+  }
+  return [];
+};
+
+// GET /:nomDossierDBF/ar?statut=&search=&page=&limit=
+export const listAr = asyncHandler(async (req, res) => {
+  const { statut, search, page, limit } = req.query;
+  const data = await getListeAr(req.entreprise, { statut, search, page, limit });
+  res.json(data);
+});
+
+// POST /:nomDossierDBF/ar/apercu   body: { commandes: [{numcde, montantTotal?}] }
+export const apercuAr = asyncHandler(async (req, res) => {
+  const commandes = toCommandesAr(req.body);
+  if (!commandes.length) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const prepares = await resoudreAr(req.entreprise, commandes);
+  const params = await getParametres(req.entreprise);
+
+  res.json({
+    testMode: params.testMode,
+    testEmails: params.testEmails,
+    commandes: prepares.map((a) => {
+      if (a.erreur) return a;
+      const envoi = appliquerModeTest(
+        { destinataires: a.destinataires, cc: a.cc, sujet: a.sujet },
+        params,
+      );
+      return {
+        ...a,
+        destinatairesReels: a.destinataires,
+        ccReels: a.cc,
+        envoi: { to: envoi.to, cc: envoi.cc, sujet: envoi.sujet, testMode: envoi.testMode },
+      };
+    }),
+  });
+});
+
+// POST /:nomDossierDBF/ar/confirmer  body: { commandes: [...], envoyerMail? }
+export const confirmerArCtrl = asyncHandler(async (req, res) => {
+  const commandes = toCommandesAr(req.body);
+  if (!commandes.length) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const result = await confirmerAr(
+    req.entreprise,
+    commandes,
+    { envoyerMail: req.body.envoyerMail !== false },
+    req.user,
+  );
+  res.json(result);
+});
+
+// POST /:nomDossierDBF/ar/annuler   body: { numcdes: [] }
+export const annulerArCtrl = asyncHandler(async (req, res) => {
+  const { numcdes = [] } = req.body;
+  if (!Array.isArray(numcdes) || numcdes.length === 0) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const result = await annulerAr(req.entreprise, numcdes);
+  res.json({
+    message: `${result.modifies} accusé(s) de réception repassé(s) en attente.`,
+    ...result,
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // RESPONSABLE / CC
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -458,7 +564,7 @@ export const getHistorique = asyncHandler(async (req, res) => {
   const p = parseInt(page) || 1;
   const l = parseInt(limit) || 50;
   const filter = { entreprise: req.entreprise._id };
-  if (["commande", "relance", "masse"].includes(type)) filter.type = type;
+  if (["commande", "relance", "ar", "masse"].includes(type)) filter.type = type;
   if (search) {
     const rx = new RegExp(String(search).trim(), "i");
     filter.$or = [{ numcde: rx }, { fournNom: rx }, { sujet: rx }];

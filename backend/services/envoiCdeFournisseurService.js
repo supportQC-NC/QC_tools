@@ -29,6 +29,7 @@ import MessageFournisseur, {
 import ResponsableCc from "../models/ResponsableCcModel.js";
 import EnvoiCdeHistorique from "../models/EnvoiCdeHistoriqueModel.js";
 import EnvoiCdeParametre from "../models/EnvoiCdeParametreModel.js";
+import EnvoiCdeAr from "../models/EnvoiCdeArModel.js";
 
 const ETAT_PREPAREE = 1;
 
@@ -92,6 +93,36 @@ export const getDefaultRelance = (langue) =>
     ? { message: DEFAULT_RELANCE_A, sujet: DEFAULT_SUJET_RELANCE_A }
     : { message: DEFAULT_RELANCE_F, sujet: DEFAULT_SUJET_RELANCE_F };
 
+// ── Modèles de CONFIRMATION D'AR (onglet Accusés de réception) ───────────────
+// Envoyé au fournisseur quand IL a confirmé la commande : on lui accuse à notre
+// tour réception de son AR, en rappelant le MONTANT TOTAL retenu.
+export const DEFAULT_AR_F =
+  "<p>Bonjour,<br><br>" +
+  "Nous accusons bonne reception de votre confirmation pour la commande " +
+  "<b>{{commande}}</b> du {{date_commande}}, d'un montant total de " +
+  "<b>{{montant_total}}</b>.<br><br>" +
+  "Merci de nous informer sans delai de toute modification de prix, de quantite " +
+  "ou de delai de livraison.<br><br>" +
+  "Cordialement</p>";
+
+export const DEFAULT_AR_A =
+  "<p>Hello,<br><br>" +
+  "We hereby acknowledge your confirmation of order <b>{{commande}}</b> dated " +
+  "{{date_commande}}, for a total amount of <b>{{montant_total}}</b>.<br><br>" +
+  "Please inform us immediately of any change in price, quantity or delivery " +
+  "time.<br><br>" +
+  "Best regards</p>";
+
+export const DEFAULT_SUJET_AR_F =
+  "Confirmation AR - commande {{commande}} - {{montant_total}}";
+export const DEFAULT_SUJET_AR_A =
+  "Order acknowledgement - order {{commande}} - {{montant_total}}";
+
+export const getDefaultAr = (langue) =>
+  langue === "A"
+    ? { message: DEFAULT_AR_A, sujet: DEFAULT_SUJET_AR_A }
+    : { message: DEFAULT_AR_F, sujet: DEFAULT_SUJET_AR_F };
+
 // Variables proposées dans l'éditeur (l'UI lit cette liste pour son menu
 // « Insérer un champ » — un seul endroit à maintenir).
 export const VARIABLES_RELANCE = [
@@ -102,6 +133,25 @@ export const VARIABLES_RELANCE = [
   { cle: "date_envoi", label: "Date du 1er envoi", exemple: "12/08/2026" },
   { cle: "societe", label: "Nom de la société", exemple: "QUINCAILLERIE CALEDONIENNE" },
   { cle: "date_du_jour", label: "Date du jour", exemple: "19/08/2026" },
+];
+
+// Champs insérables dans un mail de confirmation d'AR.
+export const VARIABLES_AR = [
+  { cle: "commande", label: "N° de la commande", exemple: "333022" },
+  {
+    cle: "montant_total",
+    label: "Montant total (devise incluse)",
+    exemple: "1 248 F",
+  },
+  { cle: "montant", label: "Montant total (nombre seul)", exemple: "1 248" },
+  { cle: "devise", label: "Devise de la commande", exemple: "F" },
+  { cle: "date_commande", label: "Date de la commande", exemple: "12/08/2026" },
+  { cle: "date_envoi", label: "Date d'envoi de la commande", exemple: "13/08/2026" },
+  { cle: "nb_lignes", label: "Nombre de lignes", exemple: "17" },
+  { cle: "fournisseur", label: "Nom du fournisseur", exemple: "BOSCH FRANCE" },
+  { cle: "code_fournisseur", label: "Code fournisseur", exemple: "200" },
+  { cle: "societe", label: "Nom de la société", exemple: "QUINCAILLERIE CALEDONIENNE" },
+  { cle: "date_du_jour", label: "Date du jour", exemple: "20/08/2026" },
 ];
 
 // Remplace {{variable}} par sa valeur (insensible à la casse et aux espaces).
@@ -147,7 +197,9 @@ const chargerModele = async (entrepriseId, type, langue) => {
   const defauts =
     type === "relance"
       ? getDefaultRelance(langue)
-      : { message: getDefaultMessage(langue), sujet: "" };
+      : type === "ar"
+        ? getDefaultAr(langue)
+        : { message: getDefaultMessage(langue), sujet: "" };
   return {
     message: trim(tpl?.message) || defauts.message,
     sujet: trim(tpl?.sujet) || defauts.sujet,
@@ -186,6 +238,62 @@ const construireCorpsTexte = (texte) => {
 
 // Sentinelle du filtre « bateau vide ».
 export const BATEAU_VIDE = "__vide__";
+
+// ────────────────────────────────────────────────────────────────────────────
+// MONTANT TOTAL D'UNE COMMANDE  (Σ QTE × prix d'achat de la ligne)
+//
+// ⚠️ Ordre des sources VÉRIFIÉ sur les données de production (qc, cmdetail.dbf) :
+//   1. cmdetail.MONTANT — prix d'achat unitaire RÉELLEMENT commandé, dans la
+//      devise de la commande (cmdref.CDVISE). C'est celui qu'on annonce au
+//      fournisseur ;
+//   2. cmdetail.PACHAT — coût RENDU local (fret + taxes) : il vaut 0/null tant
+//      que la commande n'est pas réceptionnée, donc sur 100 % des commandes
+//      préparées. C'est pour ça que le total « coût achat prév. » de l'ERP
+//      (`montantPrev`) affichait 0 partout ;
+//   3. article.PACHAT — repli si la ligne ne porte aucun prix.
+// (Le module « Historique prix d'achat » prend l'ordre INVERSE : lui cherche le
+// coût rendu, pas le prix commandé — ne pas aligner les deux.)
+// ────────────────────────────────────────────────────────────────────────────
+const prixLigneCommande = async (entreprise, ligne) => {
+  const prix = Number(ligne.MONTANT) || Number(ligne.PACHAT) || 0;
+  if (prix) return prix;
+  if (!ligne.NART) return 0;
+  try {
+    const art = await articleCacheService.findByNart(entreprise, ligne.NART);
+    return Number(art?.PACHAT) || 0;
+  } catch {
+    return 0;
+  }
+};
+
+// Total d'un lot de lignes brutes (enregistrements cmdetail).
+export const calculerMontantLignes = async (entreprise, lignesBrutes = []) => {
+  let total = 0;
+  for (const l of lignesBrutes) {
+    total += (Number(l.QTE) || 0) * (await prixLigneCommande(entreprise, l));
+  }
+  return Math.round(total * 100) / 100;
+};
+
+// Total d'une commande depuis son n°. Renvoie 0 si la commande n'a plus de
+// lignes lisibles (commande archivée par l'ERP).
+export const calculerMontantCommande = async (entreprise, numcde) => {
+  try {
+    const lignes = await commandeCacheService.getDetailsByNumcde(entreprise, numcde);
+    return calculerMontantLignes(entreprise, lignes || []);
+  } catch {
+    return 0;
+  }
+};
+
+// Devise d'affichage : les commandes locales n'ont pas de CDVISE renseigné.
+const deviseCommande = (entete) => trim(entete?.CDVISE) || "F";
+
+// Montant formaté pour un mail (séparateur d'espace insécable + devise).
+export const formaterMontant = (montant, devise = "F") =>
+  `${(Number(montant) || 0).toLocaleString("fr-FR", {
+    maximumFractionDigits: 2,
+  })} ${devise || "F"}`.trim();
 
 // Liste des commandes préparées (ETAT=1), enrichie du nom fournisseur.
 // - tri par défaut : BATEAU = "OK" en tête, puis le reste (par date décroissante) ;
@@ -232,6 +340,10 @@ export const getCommandesPreparees = async (entreprise, options = {}) => {
         ETAT: c.ETAT,
         ETAT_LABEL: libelleEtat(c.ETAT),
         COUT_ACHAT_PREV: c.TOTAL_DETAIL || 0,
+        // Montant total réel de la commande (Σ QTE × prix ligne) : le
+        // COUT_ACHAT_PREV de l'ERP vaut 0 tant que rien n'est réceptionné.
+        MONTANT_TOTAL: await calculerMontantCommande(entreprise, trim(c.NUMCDE)),
+        DEVISE: deviseCommande(c),
         NB_LIGNES: c.NB_LIGNES_DETAIL || 0,
       };
     }),
@@ -307,6 +419,11 @@ export const getDetailCommande = async (entreprise, numcde) => {
       } catch {
         art = null;
       }
+      // Prix retenu pour le montant total (cf. prixLigneCommande). Il est exposé
+      // à part de PACHAT pour ne RIEN changer aux pièces jointes Excel/PDF, qui
+      // impriment le PACHAT de la fiche article depuis l'origine du module.
+      const qte = Number(l.QTE) || 0;
+      const prix = Number(l.MONTANT) || Number(l.PACHAT) || Number(art?.PACHAT) || 0;
       return {
         NL: Number(l.NL) || 0,
         NART: trim(l.NART),
@@ -314,14 +431,19 @@ export const getDetailCommande = async (entreprise, numcde) => {
         DESIFRN: trim(art?.DESIFRN),
         REFER: trim(art?.REFER || l.REFER),
         GENCOD: trim(art?.GENCOD),
-        QTE: Number(l.QTE) || 0,
+        QTE: qte,
         // Prix d'achat depuis la fiche article (article.PACHAT).
         PACHAT: Number(art?.PACHAT) || 0,
+        // Prix d'achat commandé + montant de la ligne (QTE × prix).
+        PRIX: prix,
+        MONTANT_LIGNE: Math.round(qte * prix * 100) / 100,
       };
     }),
   );
 
   const totaux = await commandeCacheService.getTotalsByNumcde(entreprise, numcde);
+  const montantTotal =
+    Math.round(lignes.reduce((s, l) => s + l.MONTANT_LIGNE, 0) * 100) / 100;
 
   return {
     numcde: trim(entete.NUMCDE),
@@ -330,7 +452,11 @@ export const getDetailCommande = async (entreprise, numcde) => {
     datcde: entete.DATCDE,
     bateau: trim(entete.BATEAU),
     observ: trim(entete.OBSERV),
+    // Total ERP « coût rendu » : 0 tant que la commande n'est pas réceptionnée.
     montantPrev: totaux.totalQtePachat || 0,
+    // Montant total exploitable = Σ (QTE × prix d'achat de la ligne).
+    montantTotal,
+    devise: deviseCommande(entete),
     nbLignes: lignes.length,
     lignes,
   };
@@ -600,6 +726,8 @@ export const envoyerCommandes = async (entreprise, numcdes = [], user = null) =>
         destinatairesReels: r.destinataires,
         nbLignes: r.detail.nbLignes,
         montantPrev: r.detail.montantPrev,
+        montantTotal: r.detail.montantTotal,
+        devise: r.detail.devise,
         testMode,
         envoyePar: user?._id || null,
         statut: "envoye",
@@ -934,6 +1062,431 @@ export const envoyerRelances = async (
     testMode: params.testMode,
     resultats,
   };
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// ACCUSÉS DE RÉCEPTION (AR)
+//
+// Le fournisseur confirme la commande (mail, téléphone…) : on marque l'AR reçu
+// depuis l'onglet « Accusés de réception », et un mail de confirmation lui part
+// avec le MONTANT TOTAL retenu.
+//
+// Contrairement à la relance, on ne regroupe PAS par fournisseur : un AR porte
+// sur UNE commande et sur SON montant — deux commandes confirmées font deux
+// mails, chacun avec son montant.
+// ────────────────────────────────────────────────────────────────────────────
+
+// ⚠️ Quelques DATCDE de l'ERP sont aberrantes (saisies fausses : années 766,
+// 1466, 1966… — 12 commandes sur 449 chez QC). On ne les écrit PAS dans un mail
+// destiné au fournisseur : on retombe alors sur la date d'envoi de la commande.
+// Les écrans, eux, continuent d'afficher la date telle qu'elle est dans l'ERP.
+const dateFiable = (v) => {
+  const d = v instanceof Date ? v : new Date(v);
+  return !isNaN(d.getTime()) && d.getFullYear() >= 1990 && d.getFullYear() <= 2100;
+};
+
+// Tableau récapitulatif inséré avant la signature du mail d'AR.
+const tableauAr = (cde, langue) => {
+  const t =
+    langue === "A"
+      ? { cde: "Order", date: "Order date", lignes: "Lines", montant: "Total amount" }
+      : { cde: "Commande", date: "Date commande", lignes: "Lignes", montant: "Montant total" };
+  const th =
+    'style="border:1px solid #cccccc;padding:6px 10px;background:#f2f2f2;text-align:left;font-size:13px;"';
+  const td = 'style="border:1px solid #cccccc;padding:6px 10px;font-size:13px;"';
+  return (
+    '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;">' +
+    `<tr><th ${th}>${t.cde}</th><th ${th}>${t.date}</th><th ${th}>${t.lignes}</th>` +
+    `<th ${th}>${t.montant}</th></tr>` +
+    `<tr><td ${td}><b>${cde.numcde}</b></td><td ${td}>${fmtDateFr(cde.datcde)}</td>` +
+    `<td ${td}>${cde.nbLignes || ""}</td>` +
+    `<td ${td}><b>${formaterMontant(cde.montantTotal, cde.devise)}</b></td></tr></table>`
+  );
+};
+
+// Liste de suivi : toutes les commandes déjà envoyées, avec leur statut d'AR.
+// La source des commandes est l'HISTORIQUE des envois (type "commande"), pas les
+// DBF : une commande réceptionnée quitte l'état « préparée » mais son AR reste à
+// suivre. Le montant n'est calculé que pour la page affichée (lecture DBF).
+export const getListeAr = async (entreprise, options = {}) => {
+  const { statut = "", search = "", page = 1, limit = 50 } = options;
+
+  const envois = await EnvoiCdeHistorique.aggregate([
+    {
+      $match: {
+        entreprise: entreprise._id,
+        type: "commande",
+        statut: "envoye",
+      },
+    },
+    { $sort: { createdAt: 1 } },
+    {
+      $group: {
+        _id: "$numcde",
+        dateEnvoi: { $first: "$createdAt" },
+        dernierEnvoi: { $last: "$createdAt" },
+        fournId: { $last: "$fournId" },
+        fournNom: { $last: "$fournNom" },
+        nbEnvois: { $sum: 1 },
+      },
+    },
+    { $sort: { dateEnvoi: -1 } },
+  ]);
+
+  const suivis = await EnvoiCdeAr.find({ entreprise: entreprise._id })
+    .populate("confirmePar", "nom prenom email")
+    .lean();
+  const parNumcde = new Map(suivis.map((s) => [s.numcde, s]));
+
+  let rows = envois.map((e) => {
+    const s = parNumcde.get(e._id);
+    return {
+      numcde: e._id,
+      fournId: s?.fournId ?? e.fournId,
+      fournNom: s?.fournNom || e.fournNom || "",
+      dateEnvoi: e.dateEnvoi,
+      dernierEnvoi: e.dernierEnvoi,
+      nbEnvois: e.nbEnvois,
+      statut: s?.statut === "confirme" ? "confirme" : "en_attente",
+      montantRetenu: s?.montantTotal ?? null,
+      montantCorrige: !!s?.montantCorrige,
+      dateConfirmation: s?.dateConfirmation || null,
+      confirmePar: s?.confirmePar || null,
+      mailEnvoye: !!s?.mailEnvoye,
+    };
+  });
+
+  if (statut === "en_attente" || statut === "confirme") {
+    rows = rows.filter((r) => r.statut === statut);
+  }
+  if (search) {
+    const rx = new RegExp(String(search).trim(), "i");
+    rows = rows.filter(
+      (r) => rx.test(r.numcde) || rx.test(r.fournNom) || rx.test(String(r.fournId ?? "")),
+    );
+  }
+
+  const total = rows.length;
+  const nbAttente = rows.filter((r) => r.statut === "en_attente").length;
+  const p = Math.max(1, parseInt(page) || 1);
+  const l = Math.max(1, parseInt(limit) || 50);
+  const pageRows = rows.slice((p - 1) * l, p * l);
+
+  // Enrichissement DBF (date, lignes, montant calculé) pour la page seulement.
+  const commandes = [];
+  for (const r of pageRows) {
+    let entete = null;
+    try {
+      entete = await commandeCacheService.findByNumcde(entreprise, r.numcde);
+    } catch {
+      entete = null;
+    }
+    // Une seule lecture des lignes : elle sert au comptage ET au montant.
+    let lignes = [];
+    try {
+      lignes = (await commandeCacheService.getDetailsByNumcde(entreprise, r.numcde)) || [];
+    } catch {
+      lignes = [];
+    }
+    const nbLignes = lignes.length;
+    const montantCalcule = entete ? await calculerMontantLignes(entreprise, lignes) : 0;
+    commandes.push({
+      ...r,
+      datcde: entete?.DATCDE || null,
+      bateau: trim(entete?.BATEAU),
+      etat: entete?.ETAT ?? null,
+      devise: deviseCommande(entete),
+      nbLignes,
+      montantCalcule,
+      // Montant à afficher/proposer : celui retenu à la confirmation s'il existe.
+      montantTotal: r.montantRetenu ?? montantCalcule,
+      // La commande n'est plus dans les DBF (archivage annuel de l'ERP).
+      archivee: !entete,
+    });
+  }
+
+  return { total, nbAttente, page: p, limit: l, commandes };
+};
+
+// Résout ce qui partira pour chaque AR (sert l'aperçu ET l'envoi).
+// `commandes` = [{ numcde, montantTotal? }] — montantTotal absent => recalculé.
+export const resoudreAr = async (entreprise, commandes = []) => {
+  const resp = await ResponsableCc.findOne({ entreprise: entreprise._id }).lean();
+  const ccResp = resp?.emails || [];
+  const nomSociete = entreprise.nomComplet || entreprise.trigramme || "";
+
+  // Date du 1er envoi de chaque commande (rappelée dans le mail).
+  const numcdes = commandes.map((c) => trim(c.numcde)).filter(Boolean);
+  const envois = await EnvoiCdeHistorique.find({
+    entreprise: entreprise._id,
+    type: "commande",
+    statut: "envoye",
+    numcde: { $in: numcdes },
+  })
+    .sort({ createdAt: 1 })
+    .select("numcde fournId fournNom createdAt")
+    .lean();
+  const premierEnvoi = new Map();
+  for (const e of envois) if (!premierEnvoi.has(e.numcde)) premierEnvoi.set(e.numcde, e);
+
+  const resultats = [];
+  for (const c of commandes) {
+    const numcde = trim(c.numcde);
+    if (!numcde) continue;
+
+    const detail = await getDetailCommande(entreprise, numcde);
+    const histo = premierEnvoi.get(numcde);
+    const suivi = await EnvoiCdeAr.findOne({
+      entreprise: entreprise._id,
+      numcde,
+    }).lean();
+
+    const fournId = detail
+      ? Number(detail.fourn)
+      : Number(histo?.fournId ?? suivi?.fournId);
+    const fournNom = detail?.fournNom || histo?.fournNom || suivi?.fournNom || "";
+    const montantCalcule = detail ? detail.montantTotal : (suivi?.montantCalcule ?? 0);
+    // Montant retenu : celui saisi par l'opérateur, sinon le calcul.
+    const saisi = c.montantTotal;
+    const montantTotal =
+      saisi === undefined || saisi === null || saisi === ""
+        ? montantCalcule
+        : Math.round((Number(saisi) || 0) * 100) / 100;
+    const devise = detail?.devise || suivi?.devise || "F";
+
+    const dateEnvoi = histo?.createdAt || null;
+    const base = {
+      numcde,
+      fournId: isNaN(fournId) ? null : fournId,
+      fournNom,
+      // Date annoncée au fournisseur (cf. dateFiable).
+      datcde: dateFiable(detail?.datcde) ? detail.datcde : dateEnvoi,
+      nbLignes: detail?.nbLignes || 0,
+      dateEnvoi,
+      montantCalcule,
+      montantTotal,
+      montantCorrige: Math.abs(montantTotal - montantCalcule) > 0.009,
+      devise,
+      archivee: !detail,
+    };
+
+    if (base.fournId === null) {
+      resultats.push({ ...base, erreur: `Fournisseur introuvable pour ${numcde}.` });
+      continue;
+    }
+
+    const fe = await FournisseurEmail.findOne({
+      entreprise: entreprise._id,
+      fournId: base.fournId,
+    }).lean();
+
+    if (!fe || !(fe.emails || []).filter(Boolean).length) {
+      resultats.push({
+        ...base,
+        fournNom: fournNom || fe?.fournLbl || "",
+        erreur: `Pas d'email pour le fournisseur ${base.fournId} (${fournNom}).`,
+      });
+      continue;
+    }
+
+    const langue = fe.langue === "A" ? "A" : "F";
+    const tpl = await chargerModele(entreprise._id, "ar", langue);
+
+    const vars = {
+      commande: numcde,
+      montant_total: formaterMontant(montantTotal, devise),
+      montant: (montantTotal || 0).toLocaleString("fr-FR", {
+        maximumFractionDigits: 2,
+      }),
+      devise,
+      date_commande: fmtDateFr(base.datcde),
+      date_envoi: fmtDateFr(base.dateEnvoi),
+      nb_lignes: base.nbLignes,
+      fournisseur: base.fournNom,
+      code_fournisseur: base.fournId,
+      societe: nomSociete,
+      date_du_jour: fmtDateFr(new Date()),
+    };
+
+    resultats.push({
+      ...base,
+      langue,
+      destinataires: fe.emails.filter(Boolean),
+      // CC = responsable société + transitaire fournisseur (comme une commande).
+      cc: [...ccResp, ...(fe.emailsTransitaire || [])].filter(Boolean),
+      sujet: appliquerVariables(tpl.sujet, vars),
+      html: construireCorpsHtml(
+        appliquerVariables(tpl.message, vars),
+        tableauAr(base, langue),
+      ),
+    });
+  }
+  return resultats;
+};
+
+// Confirme les AR : on ENREGISTRE d'abord (l'AR est un fait constaté), puis on
+// tente le mail. Un échec d'envoi ne fait pas perdre la confirmation.
+export const confirmerAr = async (
+  entreprise,
+  commandes = [],
+  { envoyerMail = true } = {},
+  user = null,
+) => {
+  const params = await getParametres(entreprise);
+  const prepares = await resoudreAr(entreprise, commandes);
+
+  const resultats = [];
+  for (const a of prepares) {
+    // Enregistrement du suivi (même si le fournisseur n'a pas d'email : l'AR
+    // reste un fait à tracer, seul le mail est impossible).
+    await EnvoiCdeAr.findOneAndUpdate(
+      { entreprise: entreprise._id, numcde: a.numcde },
+      {
+        $set: {
+          nomDossierDBF: entreprise.nomDossierDBF,
+          fournId: a.fournId,
+          fournNom: a.fournNom,
+          statut: "confirme",
+          montantTotal: a.montantTotal,
+          montantCalcule: a.montantCalcule,
+          montantCorrige: a.montantCorrige,
+          devise: a.devise,
+          dateConfirmation: new Date(),
+          confirmePar: user?._id || null,
+        },
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+
+    if (a.erreur) {
+      resultats.push({
+        numcde: a.numcde,
+        fournNom: a.fournNom,
+        montantTotal: a.montantTotal,
+        statut: "confirme_sans_mail",
+        message: a.erreur,
+      });
+      continue;
+    }
+
+    if (!envoyerMail) {
+      resultats.push({
+        numcde: a.numcde,
+        fournNom: a.fournNom,
+        montantTotal: a.montantTotal,
+        statut: "confirme_sans_mail",
+        message: "Confirmation enregistrée sans envoi de mail.",
+      });
+      continue;
+    }
+
+    const { to, cc, sujet, testMode } = appliquerModeTest(
+      { destinataires: a.destinataires, cc: a.cc, sujet: a.sujet },
+      params,
+    );
+
+    try {
+      await sendEmail({
+        module: "envoi_cde_fournisseur",
+        email: to,
+        cc: cc.length ? cc : undefined,
+        subject: sujet,
+        html: a.html,
+      });
+
+      await EnvoiCdeAr.updateOne(
+        { entreprise: entreprise._id, numcde: a.numcde },
+        { $set: { mailEnvoye: true } },
+      );
+
+      await EnvoiCdeHistorique.create({
+        entreprise: entreprise._id,
+        nomDossierDBF: entreprise.nomDossierDBF,
+        type: "ar",
+        numcde: a.numcde,
+        numcdes: [a.numcde],
+        fournId: a.fournId,
+        fournNom: a.fournNom,
+        sujet,
+        langue: a.langue,
+        destinataires: to,
+        cc,
+        destinatairesReels: a.destinataires,
+        nbLignes: a.nbLignes,
+        montantTotal: a.montantTotal,
+        devise: a.devise,
+        testMode,
+        envoyePar: user?._id || null,
+        statut: "envoye",
+      });
+
+      resultats.push({
+        numcde: a.numcde,
+        fournNom: a.fournNom,
+        montantTotal: a.montantTotal,
+        devise: a.devise,
+        statut: "envoye",
+        testMode,
+        destinataires: to,
+      });
+    } catch (err) {
+      try {
+        await EnvoiCdeHistorique.create({
+          entreprise: entreprise._id,
+          nomDossierDBF: entreprise.nomDossierDBF,
+          type: "ar",
+          numcde: a.numcde,
+          numcdes: [a.numcde],
+          fournId: a.fournId,
+          fournNom: a.fournNom,
+          montantTotal: a.montantTotal,
+          devise: a.devise,
+          envoyePar: user?._id || null,
+          statut: "erreur",
+          erreur: err.message,
+        });
+      } catch {
+        /* ignore log error */
+      }
+      resultats.push({
+        numcde: a.numcde,
+        fournNom: a.fournNom,
+        montantTotal: a.montantTotal,
+        statut: "erreur",
+        message: err.message,
+      });
+    }
+  }
+
+  const nbOk = resultats.filter((r) => r.statut === "envoye").length;
+  const nbSansMail = resultats.filter((r) => r.statut === "confirme_sans_mail").length;
+  return {
+    nbOk,
+    nbSansMail,
+    nbErr: resultats.filter((r) => r.statut === "erreur").length,
+    nbConfirmes: resultats.length,
+    testMode: params.testMode,
+    resultats,
+  };
+};
+
+// Repasse des AR « en attente » (erreur de saisie). Le montant déjà retenu est
+// conservé : il resservira de proposition à la prochaine confirmation.
+export const annulerAr = async (entreprise, numcdes = []) => {
+  const liste = [...new Set(numcdes.map((n) => trim(n)).filter(Boolean))];
+  if (!liste.length) return { modifies: 0 };
+  const r = await EnvoiCdeAr.updateMany(
+    { entreprise: entreprise._id, numcde: { $in: liste } },
+    {
+      $set: {
+        statut: "en_attente",
+        dateConfirmation: null,
+        confirmePar: null,
+        mailEnvoye: false,
+      },
+    },
+  );
+  return { modifies: r.modifiedCount || 0 };
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1287,9 +1840,15 @@ export default {
   setParametres,
   getDefaultMessage,
   getDefaultRelance,
+  getDefaultAr,
   nettoyerHtmlMessage,
   resoudreRelances,
   envoyerRelances,
+  calculerMontantCommande,
+  getListeAr,
+  resoudreAr,
+  confirmerAr,
+  annulerAr,
   importerReference,
   importerReferenceGlobale,
   importerEmailsExcel,

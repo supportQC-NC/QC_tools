@@ -90,6 +90,7 @@ export const apiSlice = createApi({
     "ResponsableCc",
     "EnvoiCdeHistorique",
     "EnvoiCdeParametre",
+    "EnvoiCdeAr",
     // ========== TAGS COMMERCIAUX ==========
     "TopVentes",
     // ========== TAGS ESPACE COMMERCIAL (portefeuille du commercial) ==========

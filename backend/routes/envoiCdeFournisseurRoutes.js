@@ -19,6 +19,10 @@ import {
   envoyerMasseCtrl,
   apercuRelance,
   envoyerRelanceCtrl,
+  listAr,
+  apercuAr,
+  confirmerArCtrl,
+  annulerArCtrl,
   modeleExcelEmails,
   importEmailsExcel,
   deleteEmailsBulk,
@@ -67,6 +71,12 @@ router.post("/:nomDossierDBF/envoyer", ...write, envoyer);
 // ─── Relance des commandes déjà envoyées (onglet Historique) ───────────────
 router.post("/:nomDossierDBF/relance/apercu", ...read, apercuRelance);
 router.post("/:nomDossierDBF/relance", ...write, envoyerRelanceCtrl);
+
+// ─── Accusés de réception fournisseur (onglet dédié) ───────────────────────
+router.get("/:nomDossierDBF/ar", ...read, listAr);
+router.post("/:nomDossierDBF/ar/apercu", ...read, apercuAr);
+router.post("/:nomDossierDBF/ar/confirmer", ...write, confirmerArCtrl);
+router.post("/:nomDossierDBF/ar/annuler", ...write, annulerArCtrl);
 
 // ─── Import de la base de référence (migrée depuis Access) ─────────────────
 router.post("/:nomDossierDBF/import-reference", ...write, importReference);

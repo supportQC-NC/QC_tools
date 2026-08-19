@@ -14,10 +14,10 @@ const envoiCdeHistoriqueSchema = new mongoose.Schema(
     nomDossierDBF: { type: String, default: "" },
 
     // Type d'envoi : commande fournisseur, relance d'une ou plusieurs commandes,
-    // ou message groupé (vœux/annonces).
+    // confirmation d'accusé de réception, ou message groupé (vœux/annonces).
     type: {
       type: String,
-      enum: ["commande", "relance", "masse"],
+      enum: ["commande", "relance", "ar", "masse"],
       default: "commande",
     },
     // Pour un envoi en masse : nombre de destinataires réels concernés.
@@ -43,7 +43,14 @@ const envoiCdeHistoriqueSchema = new mongoose.Schema(
     destinatairesReels: { type: [String], default: [] },
 
     nbLignes: { type: Number, default: 0 },
+    // Total « coût achat prévisionnel » de l'ERP (cmdetail.PACHAT = coût rendu) :
+    // il vaut 0 tant que la commande n'est pas réceptionnée. Conservé pour les
+    // anciens documents — c'est `montantTotal` qui porte la valeur exploitable.
     montantPrev: { type: Number, default: 0 },
+    // Montant total de la commande = Σ (QTE × prix d'achat de la ligne), dans la
+    // devise de la commande. C'est ce montant qui est annoncé dans le mail d'AR.
+    montantTotal: { type: Number, default: 0 },
+    devise: { type: String, default: "" },
 
     // Envoi effectué en mode test (redirigé vers les adresses de test).
     testMode: { type: Boolean, default: false },
