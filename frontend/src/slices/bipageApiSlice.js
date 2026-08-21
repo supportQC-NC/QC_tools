@@ -46,11 +46,58 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Bipage"],
     }),
+
+    // ─── Import depuis les proformas de l'ERP ──────────────────────────────
+    getProformasBipage: builder.query({
+      query: ({ entrepriseId, dateDebut, dateFin, clients }) => {
+        const params = new URLSearchParams();
+        if (dateDebut) params.set("dateDebut", dateDebut);
+        if (dateFin) params.set("dateFin", dateFin);
+        if (clients) params.set("clients", clients);
+        const qs = params.toString();
+        return `${BASE}/${entrepriseId}/proformas${qs ? `?${qs}` : ""}`;
+      },
+      keepUnusedDataFor: 30,
+    }),
+
+    importProformasBipage: builder.mutation({
+      query: ({ entrepriseId, numfacts }) => ({
+        url: `${BASE}/${entrepriseId}/import-proformas`,
+        method: "POST",
+        body: { numfacts },
+      }),
+      invalidatesTags: ["Bipage"],
+    }),
+
+    // ─── Import depuis un fichier Excel ───────────────────────────────────
+    // ⚠️ Le NOM du fichier porte l'agent / la zone / l'emplacement : on le
+    // transmet tel quel dans le FormData.
+    // `mode` voyage en query (pas en champ de formulaire) : il reste lisible
+    // côté serveur quel que soit l'ordre des parties du multipart.
+    importExcelBipage: builder.mutation({
+      query: ({ entrepriseId, file, mode }) => {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+        return {
+          url: `${BASE}/${entrepriseId}/import-excel?mode=${mode === "deduction" ? "deduction" : "inventaire"}`,
+          method: "POST",
+          body: formData,
+        };
+      },
+      invalidatesTags: ["Bipage"],
+    }),
   }),
 });
+
+/** URL du modèle Excel d'import (relative à BASE_URL). */
+export const getModeleExcelBipageUrl = (entrepriseId) =>
+  `${BASE}/${entrepriseId}/modele-excel`;
 
 export const {
   useGetBipagesQuery,
   useUpdateBipageMutation,
   useRecommencerZoneMutation,
+  useLazyGetProformasBipageQuery,
+  useImportProformasBipageMutation,
+  useImportExcelBipageMutation,
 } = bipageApiSlice;

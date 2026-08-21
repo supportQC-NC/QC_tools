@@ -11,6 +11,12 @@ import {
   getInventaireDirs,
   emplacementDir,
 } from "../services/ficheControleService.js";
+import {
+  getProformasEligibles,
+  importerProformas,
+  genererModeleExcelBipage,
+  importerExcelBipage,
+} from "../services/bipageImportService.js";
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -369,4 +375,125 @@ const recommencerZone = asyncHandler(async (req, res) => {
   });
 });
 
-export { getBipages, updateBipage, exportCsv, recommencerZone };
+// ===========================================
+// IMPORTS DE BIPAGES (proforma ERP / fichier Excel)
+// ===========================================
+
+/** Session d'inventaire ACTIVE — cible obligatoire de tout import. */
+const sessionActiveOuErreur = async (entreprise, res) => {
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error(
+      "Aucun inventaire actif : initialisez-en un avant d'importer des bipages.",
+    );
+  }
+  return session;
+};
+
+/**
+ * @desc    Proformas candidates à l'intégration (plage de dates + clients).
+ * @route   GET /api/bipages/:entrepriseId/proformas?dateDebut=&dateFin=&clients=9900,9901
+ * @access  Private (module bipage, read)
+ */
+const listProformasBipage = asyncHandler(async (req, res) => {
+  const { dateDebut, dateFin, clients } = req.query;
+  const listeClients = clients
+    ? String(clients)
+        .split(/[;,]/)
+        .map((c) => c.trim())
+        .filter(Boolean)
+    : [];
+  const data = await getProformasEligibles(req.entreprise, {
+    dateDebut,
+    dateFin,
+    clients: listeClients,
+  });
+  res.json(data);
+});
+
+/**
+ * @desc    Intègre les proformas choisies dans l'inventaire actif.
+ * @route   POST /api/bipages/:entrepriseId/import-proformas   body { numfacts: [] }
+ * @access  Private (module bipage, write)
+ */
+const importProformasBipage = asyncHandler(async (req, res) => {
+  const { numfacts = [] } = req.body;
+  if (!Array.isArray(numfacts) || numfacts.length === 0) {
+    res.status(400);
+    throw new Error("Aucune proforma sélectionnée.");
+  }
+  const session = await sessionActiveOuErreur(req.entreprise, res);
+  const result = await importerProformas(req.entreprise, session, numfacts);
+  res.json({
+    message: `${result.importees} proforma(s) intégrée(s), ${result.lignes} ligne(s).`,
+    ...result,
+  });
+});
+
+/**
+ * @desc    Modèle Excel d'import de bipages.
+ * @route   GET /api/bipages/:entrepriseId/modele-excel
+ * @access  Private (module bipage, read)
+ */
+const modeleExcelBipage = asyncHandler(async (req, res) => {
+  const buffer = await genererModeleExcelBipage();
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  // Nom d'exemple VALIDE sous Windows : « < » et « > » y sont interdits, un
+  // gabarit littéral donnerait un fichier impossible à enregistrer.
+  // L'utilisateur renomme ensuite avec sa zone (mode d'emploi dans l'onglet Aide).
+  res.setHeader(
+    "Content-Disposition",
+    'attachment; filename="bipage_12_A_1_MAGASIN.xlsx"',
+  );
+  res.send(Buffer.from(buffer));
+});
+
+/**
+ * @desc    Import d'un fichier Excel de bipage (multipart, champ "file").
+ *          C'est le NOM du fichier qui porte l'agent, la zone et l'emplacement.
+ * @route   POST /api/bipages/:entrepriseId/import-excel
+ * @access  Private (module bipage, write)
+ */
+const importExcelBipage = asyncHandler(async (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    res.status(400);
+    throw new Error("Aucun fichier reçu.");
+  }
+  // Mode passé en query (et non en champ de formulaire) : il reste lisible quel
+  // que soit l'ordre des parties du multipart.
+  const mode = req.query.mode === "deduction" ? "deduction" : "inventaire";
+
+  const session = await sessionActiveOuErreur(req.entreprise, res);
+  const result = await importerExcelBipage(
+    req.entreprise,
+    session,
+    req.file.originalname,
+    req.file.buffer,
+    mode,
+  );
+  res.json({
+    message:
+      `${mode === "deduction" ? "DÉDUCTION" : "Comptage"} — zone ${result.zoneCode} ` +
+      `(${result.emplacement}) : ${result.lignes} ligne(s), ${result.unites} unité(s)` +
+      `${result.nonTrouves ? `, dont ${result.nonTrouves} article(s) non trouvé(s)` : ""}.`,
+    ...result,
+  });
+});
+
+export {
+  getBipages,
+  updateBipage,
+  exportCsv,
+  recommencerZone,
+  listProformasBipage,
+  importProformasBipage,
+  modeleExcelBipage,
+  importExcelBipage,
+};

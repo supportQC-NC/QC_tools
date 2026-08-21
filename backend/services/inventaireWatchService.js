@@ -7,6 +7,13 @@ import Entreprise from "../models/EntrepriseModel.js";
 import Zone from "../models/ZoneModel.js";
 import FicheControle from "../models/FicheControleModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
+import InventaireCollecte from "../models/InventaireCollecteModel.js";
+// Enregistre le modèle User pour le populate ci-dessous.
+// ⚠️ La casse EXACTE du chemin compte : sous Windows, "userModel.js" et
+// "UserModel.js" désignent le même fichier mais forment deux specifiers ESM
+// distincts → le module est évalué deux fois et mongoose lève
+// « Cannot overwrite `User` model once compiled ».
+import "../models/UserModel.js";
 import {
   config,
   parseDat,
@@ -266,6 +273,29 @@ const traiterFichier = async (
   const lignesDat = parseDat(content);
   const { rows, stats } = await construireLignes(entreprise, lignesDat);
 
+  // Agent : le .DAT ne porte aucune identité, mais la COLLECTE qui l'a produit
+  // sait quel compte utilisateur a bipé la zone. On reprend son nom/prénom.
+  let agentNom = "";
+  try {
+    const collecte = await InventaireCollecte.findOne({
+      entreprise: entreprise._id,
+      session: session._id,
+      zoneCode,
+      zoneType: zone.type || "",
+      status: "exporte",
+    })
+      .sort({ exportedAt: -1 })
+      .populate("user", "nom prenom email");
+    if (collecte?.user) {
+      const u = collecte.user;
+      agentNom =
+        `${(u.prenom || "").trim()} ${(u.nom || "").trim()}`.trim() ||
+        (u.email || "");
+    }
+  } catch {
+    agentNom = "";
+  }
+
   // Persistance des lignes pour l'écran "Détail des bipages"
   // (remplace les lignes éventuelles de ce même fichier).
   await LigneBipage.deleteMany({
@@ -288,6 +318,9 @@ const traiterFichier = async (
         observation: "",
         stock: typeof r.stock === "number" ? r.stock : null,
         found: !r.nonTrouve,
+        source: "dat",
+        sourceRef: nomFinal,
+        agentNom,
       })),
     );
   }

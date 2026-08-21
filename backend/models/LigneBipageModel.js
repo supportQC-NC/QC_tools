@@ -39,6 +39,35 @@ const ligneBipageSchema = new mongoose.Schema(
     designation: { type: String, default: "" },
     stock: { type: Number, default: null },
     found: { type: Boolean, default: false },
+
+    // ── Provenance de la ligne ────────────────────────────────────────────
+    // "dat" : fichier déposé par le collecteur (cas historique) ;
+    // "proforma" : intégrée depuis une proforma de l'ERP ;
+    // "excel" : importée depuis un fichier Excel.
+    source: {
+      type: String,
+      enum: ["dat", "proforma", "excel"],
+      default: "dat",
+    },
+    // N° de proforma ou nom du fichier Excel d'origine.
+    sourceRef: { type: String, default: "" },
+
+    // Mode de comptage :
+    // "inventaire" : comptage normal, quantités positives ;
+    // "deduction"  : quantités NÉGATIVES — les ventes réalisées dans une partie
+    //                du magasin restée ouverte entre le début et la fin de
+    //                l'inventaire, à retrancher du comptage.
+    modeImport: {
+      type: String,
+      enum: ["inventaire", "deduction"],
+      default: "inventaire",
+    },
+
+    // Agent qui a bipé : code vendeur (REPRES pour une proforma, bloc du nom de
+    // fichier pour un Excel) et son identité au moment de l'import. Le .DAT du
+    // collecteur ne porte pas cette information : elle y reste vide.
+    agentCode: { type: String, default: "" },
+    agentNom: { type: String, default: "" },
   },
   { timestamps: true },
 );
