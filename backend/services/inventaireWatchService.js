@@ -16,7 +16,7 @@ import {
   estFichierDat,
   getInventaireDirs,
   resoudreCheminPdf,
-  emplacementDir,
+  sanitizeName,
 } from "./ficheControleService.js";
 
 let isRunning = false;
@@ -60,9 +60,9 @@ export const imprimerPdf = async (filePath) => {
  * Plus robuste que rename sur un partage réseau SMB.
  * Les erreurs NE SONT PAS avalées : elles remontent à l'appelant.
  */
-export const deplacerVers = (srcPath, destDir) => {
+export const deplacerVers = (srcPath, destDir, nouveauNom = "") => {
   fs.mkdirSync(destDir, { recursive: true });
-  const dest = path.join(destDir, path.basename(srcPath));
+  const dest = path.join(destDir, nouveauNom || path.basename(srcPath));
   // Déplacement "sur lui-même" (même fichier, éventuellement à la casse près sous
   // Windows) → NO-OP. Sinon le unlink(dest) ci-dessous effacerait la source.
   const norm = (p) =>
@@ -95,74 +95,90 @@ const traiterFichier = async (
   folderName,
 ) => {
   const filePath = path.join(currentDir, fileName);
-  const stat = fs.statSync(filePath);
 
-  // Résolution de la zone. Le nom de fichier = code de zone (peut contenir "_",
-  // ex. "B_5d"). L'emplacement vient du SOUS-DOSSIER (folderName) quand le
-  // fichier y est déjà ; à la RACINE (folderName vide) on résout par code seul.
-  // On récupère toutes les zones du code puis on départage par le sous-dossier.
-  // Exact puis insensible à la casse.
+  // ── LECTURE DU NOM DE FICHIER ────────────────────────────────────────────
+  // Le collecteur dépose "stock.dat <zone>_<EMPLACEMENT>" à la racine.
+  // Le code de zone est TOUT ce qui précède le DERNIER "_" (les codes en
+  // contiennent eux-mêmes : A_1, B_5d) ; ce qui suit dit où est le rayon
+  // (MAGASIN / DOCK).
+  // Un fichier déjà rangé dans un sous-dossier a été renommé au passage
+  // précédent : son nom ne porte plus que le code, et l'emplacement vient du
+  // dossier qui le contient.
   const rawZoneToken = extraireCodeZone(fileName) || "";
   let zoneCode = rawZoneToken;
-  let zone = null;
+  let emplacement = folderName || "";
 
-  // Cherche les zones d'un code : exact, puis insensible à la casse.
-  const chercherZones = async (code) => {
-    if (!code) return [];
-    const exact = await Zone.find({ entreprise: entreprise._id, code });
-    if (exact.length) return exact;
-    return Zone.find({
-      entreprise: entreprise._id,
-      code: new RegExp(`^${escapeRegex(code)}$`, "i"),
-    });
-  };
-
-  if (rawZoneToken) {
-    const zones = await chercherZones(rawZoneToken);
-    if (zones.length === 1) {
-      zone = zones[0];
-    } else if (zones.length > 1) {
-      // Plusieurs zones même code (MAGASIN + DOCK) : départageables par le
-      // sous-dossier quand le fichier y est déjà.
-      zone = folderName
-        ? zones.find((z) => emplacementDir(z.type) === folderName) || null
-        : null;
-    }
-
-    // Rien trouvé, ou ambigu à la racine : le nom porte peut-être le suffixe
-    // d'emplacement posé au dépôt ("stock.dat A_1_DOCK"). On ne retient cette
-    // lecture que si le suffixe correspond VRAIMENT à l'emplacement d'une zone
-    // de ce code — un code contenant "_" (A_1, B_5d) ne peut donc pas être
-    // découpé par erreur.
-    if (!zone) {
-      const m = rawZoneToken.match(/^(.+)_([^_]+)$/);
-      if (m) {
-        const [, codeSansSuffixe, suffixe] = m;
-        const candidates = await chercherZones(codeSansSuffixe);
-        const trouve = candidates.find(
-          (z) =>
-            emplacementDir(z.type).toLowerCase() === suffixe.toLowerCase(),
-        );
-        if (trouve) {
-          zone = trouve;
-          zoneCode = codeSansSuffixe;
-        }
+  if (!folderName) {
+    const sep = rawZoneToken.lastIndexOf("_");
+    if (sep > 0) {
+      const codeCandidat = rawZoneToken.slice(0, sep);
+      const empCandidat = rawZoneToken.slice(sep + 1);
+      // ⚠️ On ne coupe QUE si ce qui suit le dernier "_" est bien un emplacement
+      // utilisé par cette société (MAGASIN, DOCK…). Sinon un fichier sans
+      // suffixe ("stock.dat A_1") serait charcuté en zone "A" / emplacement "1".
+      const emplacementConnu = await Zone.exists({
+        entreprise: entreprise._id,
+        type: new RegExp(`^${escapeRegex(empCandidat)}$`, "i"),
+      });
+      if (emplacementConnu) {
+        zoneCode = codeCandidat;
+        emplacement = empCandidat;
       }
     }
   }
 
-  // Zone introuvable (ou code dupliqué déposé à la racine, ambigu) → on déplace
-  // le .DAT dans zone_non_trouvee (du sous-dossier courant, ou de la racine).
-  if (!zone) {
-    const zoneInconnue = path.join(
-      folderName ? currentDir : base,
-      config.zoneInconnueDirName,
-    );
+  // ── RANGEMENT : bon dossier d'emplacement + nom réduit au code de zone ────
+  const dossierEmplacement = emplacement
+    ? sanitizeName(emplacement)
+    : config.sansEmplacementDirName;
+  const targetDir = path.join(base, dossierEmplacement);
+  const nomFinal = `stock.dat ${zoneCode}`;
+
+  let workFilePath = filePath;
+  if (
+    path.resolve(currentDir) !== path.resolve(targetDir) ||
+    fileName !== nomFinal
+  ) {
     try {
-      deplacerVers(filePath, zoneInconnue);
+      workFilePath = deplacerVers(filePath, targetDir, nomFinal);
+    } catch (err) {
+      return {
+        status: "erreur",
+        message: `Rangement dans "${dossierEmplacement}" impossible : ${err.message}`,
+      };
+    }
+  }
+
+  // ── LA ZONE EXISTE-T-ELLE ? ──────────────────────────────────────────────
+  // Oui → le fichier reste où il vient d'être rangé. Non → zone_non_trouvee.
+  let zone = await Zone.findOne(
+    emplacement
+      ? { entreprise: entreprise._id, code: zoneCode, type: emplacement }
+      : { entreprise: entreprise._id, code: zoneCode },
+  );
+  if (!zone) {
+    // Repli insensible à la casse avant de déclarer la zone introuvable.
+    const rx = new RegExp(`^${escapeRegex(zoneCode)}$`, "i");
+    zone = await Zone.findOne(
+      emplacement
+        ? {
+            entreprise: entreprise._id,
+            code: rx,
+            type: new RegExp(`^${escapeRegex(emplacement)}$`, "i"),
+          }
+        : { entreprise: entreprise._id, code: rx },
+    );
+  }
+
+  if (!zone) {
+    const zoneInconnue = path.join(base, config.zoneInconnueDirName);
+    try {
+      deplacerVers(workFilePath, zoneInconnue);
       return {
         status: "zone_inconnue",
-        message: `zone "${zoneCode || "?"}" introuvable → déplacé dans ${config.zoneInconnueDirName}`,
+        message: `zone "${zoneCode || "?"}"${
+          emplacement ? ` (${emplacement})` : ""
+        } introuvable → déplacé dans ${config.zoneInconnueDirName}`,
       };
     } catch (err) {
       return {
@@ -172,28 +188,17 @@ const traiterFichier = async (
     }
   }
 
-  // Le fichier est traité LÀ OÙ IL EST, sans jamais être déplacé avant
-  // traitement :
-  //  - déposé à la racine (cas normal depuis le 21/08/2026) → PDF et archives
-  //    à la racine, pour que le dossier de l'inventaire reste lisible ;
-  //  - déjà dans un sous-dossier d'emplacement (fichiers déposés entre le 03
-  //    et le 21/08) → traité sur place dans ce sous-dossier.
-  // `emplacement` ne sert plus qu'à la clé logique en base.
-  const emplacement = folderName || emplacementDir(zone.type);
-  const targetDir = folderName ? path.join(base, folderName) : base;
-  const dirs = {
-    base: targetDir,
-    archiveDat: path.join(targetDir, config.archiveDatDirName),
-    archivePdf: path.join(targetDir, config.archivePdfDirName),
-  };
-  fs.mkdirSync(dirs.archiveDat, { recursive: true });
-  fs.mkdirSync(dirs.archivePdf, { recursive: true });
+  const dirs = { base: targetDir };
 
-  const workFilePath = filePath;
+  // Le fichier a pu être déplacé/renommé juste au-dessus : on relit sa date et
+  // sa taille SUR PLACE. Sans ça, la copie changeant la date, le contrôle
+  // « déjà traité » plus bas échouerait à chaque passage et le fichier serait
+  // retraité en boucle (il n'est plus archivé après impression).
+  const statFinal = fs.statSync(workFilePath);
 
   // Clé LOGIQUE en BDD, préfixée par l'emplacement → 2 fiches distinctes pour un
   // même code présent à 2 emplacements, sans changer les index uniques.
-  const logicalName = `${emplacement}/${fileName}`;
+  const logicalName = `${dossierEmplacement}/${nomFinal}`;
 
   // Déjà traité et inchangé ?
   const existing = await FicheControle.findOne({
@@ -202,8 +207,8 @@ const traiterFichier = async (
   });
   if (
     existing &&
-    existing.datMtimeMs === stat.mtimeMs &&
-    existing.datSize === stat.size
+    existing.datMtimeMs === statFinal.mtimeMs &&
+    existing.datSize === statFinal.size
   ) {
     return { status: "inchange", message: "déjà traité" };
   }
@@ -222,8 +227,8 @@ const traiterFichier = async (
       },
       {
         $set: {
-          datMtimeMs: stat.mtimeMs,
-          datSize: stat.size,
+          datMtimeMs: statFinal.mtimeMs,
+          datSize: statFinal.size,
           printed: false,
           printedAt: null,
           printError: "",
@@ -243,8 +248,8 @@ const traiterFichier = async (
         inventaireNom: session.nom,
         inventaireSlug: session.dossierSlug || session.nom,
         datFileName: logicalName,
-        datMtimeMs: stat.mtimeMs,
-        datSize: stat.size,
+        datMtimeMs: statFinal.mtimeMs,
+        datSize: statFinal.size,
         zoneCode,
         printed: false,
       });
@@ -295,14 +300,18 @@ const traiterFichier = async (
     date,
   };
 
-  const pdfFileName = `${fileName.replace(/\.dat$/i, "")}.pdf`;
+  // Le PDF prend le nom FINAL du .DAT (donc sans le suffixe d'emplacement) et
+  // se pose à côté de lui, dans le dossier de l'emplacement.
+  const pdfFileName = `${nomFinal.replace(/\.dat$/i, "")}.pdf`;
   const workPath = path.join(dirs.base, pdfFileName);
   await ecrirePDF({ header, rows, outPath: workPath });
 
   let printed = false;
   let printError = "";
-  let archived = false;
-  let finalPath = workPath;
+  // Le fichier n'est plus jamais déplacé : il reste à sa place dans le dossier
+  // de l'inventaire (cf. commentaire plus bas). `archived` reste donc à false.
+  const archived = false;
+  const finalPath = workPath;
 
   if (config.autoprint) {
     try {
@@ -313,23 +322,12 @@ const traiterFichier = async (
     }
   }
 
-  // Archivage (uniquement si imprimé) : PDF → archive_pdf, .DAT → archive_dat.
-  // Les échecs de déplacement sont REMONTÉS dans printError (plus jamais avalés).
-  if (printed) {
-    try {
-      finalPath = deplacerVers(workPath, dirs.archivePdf);
-    } catch (err) {
-      printError = `Imprimée mais PDF non archivé : ${err.message}`;
-    }
-    try {
-      deplacerVers(workFilePath, dirs.archiveDat);
-      archived = true;
-    } catch (err) {
-      printError = printError
-        ? `${printError} ; .DAT non archivé : ${err.message}`
-        : `Imprimée mais .DAT non archivé : ${err.message}`;
-    }
-  }
+  // PLUS D'ARCHIVAGE : le .DAT et le PDF restent dans le dossier de
+  // l'inventaire. Un programme EXTERNE surveille ce dossier — les déplacer vers
+  // archive_dat/archive_pdf les lui faisait disparaître, et c'est précisément le
+  // symptôme « rien n'est posté dans le dossier ». Le retraitement en boucle est
+  // évité par le contrôle mtime/taille plus haut (statut « inchangé »), pas par
+  // le déplacement du fichier.
 
   await FicheControle.findOneAndUpdate(
     { session: session._id, datFileName: logicalName },
@@ -340,8 +338,8 @@ const traiterFichier = async (
         inventaireNom: session.nom,
         inventaireSlug: session.dossierSlug || session.nom,
         datFileName: logicalName,
-        datMtimeMs: stat.mtimeMs,
-        datSize: stat.size,
+        datMtimeMs: statFinal.mtimeMs,
+        datSize: statFinal.size,
         zoneCode,
         zoneLibelle: header.zoneLibelle,
         zoneType: header.zoneType,
@@ -363,9 +361,7 @@ const traiterFichier = async (
     message: `zone ${zoneCode || "?"} · ${stats.total} ligne(s)${
       config.autoprint
         ? printed
-          ? archived
-            ? " · imprimée + archivée"
-            : ` · imprimée (archivage : ${printError || "?"})`
+          ? " · imprimée"
           : ` · NON imprimée (${printError})`
         : ""
     }`,
