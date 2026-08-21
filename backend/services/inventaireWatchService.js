@@ -103,28 +103,51 @@ const traiterFichier = async (
   // On récupère toutes les zones du code puis on départage par le sous-dossier.
   // Exact puis insensible à la casse.
   const rawZoneToken = extraireCodeZone(fileName) || "";
-  const zoneCode = rawZoneToken;
+  let zoneCode = rawZoneToken;
   let zone = null;
 
-  if (rawZoneToken) {
-    let zones = await Zone.find({
+  // Cherche les zones d'un code : exact, puis insensible à la casse.
+  const chercherZones = async (code) => {
+    if (!code) return [];
+    const exact = await Zone.find({ entreprise: entreprise._id, code });
+    if (exact.length) return exact;
+    return Zone.find({
       entreprise: entreprise._id,
-      code: rawZoneToken,
+      code: new RegExp(`^${escapeRegex(code)}$`, "i"),
     });
-    if (!zones.length) {
-      zones = await Zone.find({
-        entreprise: entreprise._id,
-        code: new RegExp(`^${escapeRegex(rawZoneToken)}$`, "i"),
-      });
-    }
+  };
+
+  if (rawZoneToken) {
+    const zones = await chercherZones(rawZoneToken);
     if (zones.length === 1) {
       zone = zones[0];
     } else if (zones.length > 1) {
-      // Plusieurs zones même code (MAGASIN + DOCK) : départageables uniquement
-      // si le fichier est DÉJÀ dans un sous-dossier d'emplacement.
+      // Plusieurs zones même code (MAGASIN + DOCK) : départageables par le
+      // sous-dossier quand le fichier y est déjà.
       zone = folderName
         ? zones.find((z) => emplacementDir(z.type) === folderName) || null
         : null;
+    }
+
+    // Rien trouvé, ou ambigu à la racine : le nom porte peut-être le suffixe
+    // d'emplacement posé au dépôt ("stock.dat A_1_DOCK"). On ne retient cette
+    // lecture que si le suffixe correspond VRAIMENT à l'emplacement d'une zone
+    // de ce code — un code contenant "_" (A_1, B_5d) ne peut donc pas être
+    // découpé par erreur.
+    if (!zone) {
+      const m = rawZoneToken.match(/^(.+)_([^_]+)$/);
+      if (m) {
+        const [, codeSansSuffixe, suffixe] = m;
+        const candidates = await chercherZones(codeSansSuffixe);
+        const trouve = candidates.find(
+          (z) =>
+            emplacementDir(z.type).toLowerCase() === suffixe.toLowerCase(),
+        );
+        if (trouve) {
+          zone = trouve;
+          zoneCode = codeSansSuffixe;
+        }
+      }
     }
   }
 
@@ -149,13 +172,15 @@ const traiterFichier = async (
     }
   }
 
-  // Emplacement = le SOUS-DOSSIER où le fichier se trouve DÉJÀ (folderName) ;
-  // à la RACINE seulement (folderName vide), on le déduit de la zone résolue.
-  // → un fichier déjà rangé dans un sous-dossier est traité SUR PLACE (aucun
-  //   déplacement) ; seul un fichier trouvé à la racine est rangé. Ça évite un
-  //   "déplacement sur lui-même" (qui, sous Windows, supprimait le .DAT).
+  // Le fichier est traité LÀ OÙ IL EST, sans jamais être déplacé avant
+  // traitement :
+  //  - déposé à la racine (cas normal depuis le 21/08/2026) → PDF et archives
+  //    à la racine, pour que le dossier de l'inventaire reste lisible ;
+  //  - déjà dans un sous-dossier d'emplacement (fichiers déposés entre le 03
+  //    et le 21/08) → traité sur place dans ce sous-dossier.
+  // `emplacement` ne sert plus qu'à la clé logique en base.
   const emplacement = folderName || emplacementDir(zone.type);
-  const targetDir = path.join(base, emplacement);
+  const targetDir = folderName ? path.join(base, folderName) : base;
   const dirs = {
     base: targetDir,
     archiveDat: path.join(targetDir, config.archiveDatDirName),
@@ -164,20 +189,7 @@ const traiterFichier = async (
   fs.mkdirSync(dirs.archiveDat, { recursive: true });
   fs.mkdirSync(dirs.archivePdf, { recursive: true });
 
-  // Fichier déposé à la RACINE → on le range dans son sous-dossier d'emplacement
-  // AVANT traitement. (Fichier déjà en sous-dossier : currentDir === targetDir,
-  // donc aucun déplacement.)
-  let workFilePath = filePath;
-  if (path.resolve(currentDir) !== path.resolve(targetDir)) {
-    try {
-      workFilePath = deplacerVers(filePath, targetDir);
-    } catch (err) {
-      return {
-        status: "erreur",
-        message: `Rangement dans "${emplacement}" impossible : ${err.message}`,
-      };
-    }
-  }
+  const workFilePath = filePath;
 
   // Clé LOGIQUE en BDD, préfixée par l'emplacement → 2 fiches distinctes pour un
   // même code présent à 2 emplacements, sans changer les index uniques.

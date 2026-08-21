@@ -1028,9 +1028,14 @@ const genererContenuFichier = (lignes) => {
 // Le code de zone est censé être unique (il encode déjà l'emplacement au besoin,
 // ex. "B_5d") ; deux collectes du même code dans une session écriraient le même
 // fichier (la dernière prime).
-const nomFichierZone = (zoneCode) => {
-  const code = String(zoneCode).trim().replace(/[\\/:*?"<>|]/g, "_");
-  return `stock.dat ${code}`;
+// Nom du .DAT déposé. `suffixeEmplacement` n'est utilisé QUE pour départager
+// deux zones qui portent le même code à deux emplacements (cf. exportCollecte) :
+// dans tous les autres cas le nom reste "stock.dat <code>", tel quel.
+const nomFichierZone = (zoneCode, suffixeEmplacement = "") => {
+  const nettoyer = (v) => String(v).trim().replace(/[\\/:*?"<>|]/g, "_");
+  const code = nettoyer(zoneCode);
+  const suffixe = suffixeEmplacement ? `_${nettoyer(suffixeEmplacement)}` : "";
+  return `stock.dat ${code}${suffixe}`;
 };
 
 /**
@@ -1551,19 +1556,31 @@ const exportCollecte = asyncHandler(async (req, res) => {
   }
 
   const contenu = genererContenuFichier(collecte.lignes);
-  const nomFichier = nomFichierZone(collecte.zoneCode);
 
   // Dossier de dépôt (en prod : montage ; en dev : session active sinon repli)
   const { dossier: dossierBase, mode, session } = await resoudreDossierDepot(
     collecte.entreprise,
   );
 
-  // Dépôt TOUJOURS dans un sous-dossier par EMPLACEMENT (zone.type) — jamais à
-  // la racine. Le nom de fichier reste "pur" (stock.dat <code>) ; un même code
-  // présent à 2 emplacements (MAGASIN/DOCK) ne se télescope pas. Zone sans
-  // emplacement → sous-dossier par défaut. Le watcher déduit l'emplacement du
-  // nom du sous-dossier (via emplacementDir, même source de vérité).
-  const dossier = path.join(dossierBase, emplacementDir(collecte.zoneType));
+  // Dépôt À LA RACINE du dossier de l'inventaire : c'est là que l'équipe ouvre
+  // le dossier et s'attend à voir ses .DAT. (Le dépôt dans un sous-dossier par
+  // emplacement, en place du 03/08 au 21/08/2026, rendait les fichiers
+  // invisibles pour qui regardait la racine.)
+  //
+  // ⚠️ Un même code de zone peut exister à DEUX emplacements (chez QC, A_1 est
+  // à la fois "Ventilateurs muraux / MAGASIN" et "EPI GANTS / DOCK") : à la
+  // racine, deux fichiers de même nom s'écraseraient et le watcher ne pourrait
+  // pas savoir de quelle zone il s'agit. DANS CE CAS SEULEMENT, on suffixe le
+  // nom par l'emplacement (stock.dat A_1_DOCK) — le watcher sait le relire.
+  const dossier = dossierBase;
+  const nbZonesMemeCode = await Zone.countDocuments({
+    entreprise: collecte.entreprise._id,
+    code: collecte.zoneCode,
+  });
+  const nomFichier = nomFichierZone(
+    collecte.zoneCode,
+    nbZonesMemeCode > 1 ? emplacementDir(collecte.zoneType) : "",
+  );
 
   try {
     if (!fs.existsSync(dossier)) {
