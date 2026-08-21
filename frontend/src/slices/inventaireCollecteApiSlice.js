@@ -11,7 +11,35 @@ export const inventaireCollecteApiSlice = apiSlice.injectEndpoints({
       query: (entrepriseId) => `${BASE}/recap-zones/${entrepriseId}`,
       providesTags: ["InventaireZone"],
     }),
+
+    // ─── Suivi bipage ────────────────────────────────────────────────────
+    // Qui a bipé quelle zone, quand, combien de temps, avec quelles
+    // observations (agent sur le collecteur + suivi depuis le web).
+    getSuiviBipage: builder.query({
+      query: ({ entrepriseId, session, statut, search }) => ({
+        url: `${BASE}/suivi-bipage/${entrepriseId}`,
+        params: {
+          ...(session && { session }),
+          ...(statut && { statut }),
+          ...(search && { search }),
+        },
+      }),
+      providesTags: ["SuiviBipage"],
+    }),
+
+    updateObservationBipage: builder.mutation({
+      query: ({ entrepriseId, id, observation }) => ({
+        url: `${BASE}/suivi-bipage/${entrepriseId}/${id}/observation`,
+        method: "PATCH",
+        body: { observation },
+      }),
+      invalidatesTags: ["SuiviBipage"],
+    }),
   }),
 });
 
-export const { useGetRecapZonesQuery } = inventaireCollecteApiSlice;
+export const {
+  useGetRecapZonesQuery,
+  useGetSuiviBipageQuery,
+  useUpdateObservationBipageMutation,
+} = inventaireCollecteApiSlice;

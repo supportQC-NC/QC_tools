@@ -17,6 +17,7 @@ export const apiSlice = createApi({
     "FicheControle",
     "Surveillance",
     "Bipage",
+    "SuiviBipage",
     "Reappro",
     "ArticlePhoto",
     "Filiale",

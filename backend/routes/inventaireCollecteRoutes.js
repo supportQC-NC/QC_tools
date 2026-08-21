@@ -14,8 +14,14 @@ import {
   getRecapZones,
   getRecapZonePdf,
   deleteCollecte,
+  getSuiviBipage,
+  updateObservationCollecte,
 } from "../controllers/inventaireCollecteController.js";
 import { protect } from "../middleware/authMiddleware.js";
+import {
+  checkEntrepriseAccess,
+  checkModuleAccess,
+} from "../middleware/checkEntrepriseAccess.js";
 
 const router = express.Router();
 
@@ -28,6 +34,27 @@ router.route("/en-cours/:entrepriseId").get(protect, getCollectesEnCours);
 router.route("/recap-zones/:entrepriseId").get(protect, getRecapZones);
 // PDF "fiche de contrôle" d'UNE zone (même moteur que les fiches de contrôle)
 router.route("/recap-zones/:entrepriseId/pdf").get(protect, getRecapZonePdf);
+
+// ─── Suivi bipage (écran web) ──────────────────────────────────────────────
+// Contrairement au reste du routeur (appelé par le collecteur, `protect` seul),
+// ces routes sont des routes d'ADMINISTRATION : elles sont gardées par le
+// module « inventaire » et par l'accès société.
+router
+  .route("/suivi-bipage/:entrepriseId")
+  .get(
+    protect,
+    checkEntrepriseAccess,
+    checkModuleAccess("inventaire", "read"),
+    getSuiviBipage,
+  );
+router
+  .route("/suivi-bipage/:entrepriseId/:id/observation")
+  .patch(
+    protect,
+    checkEntrepriseAccess,
+    checkModuleAccess("inventaire", "write"),
+    updateObservationCollecte,
+  );
 router.route("/").post(protect, createCollecte);
 
 router.route("/:id").get(protect, getCollecteById).delete(protect, deleteCollecte);

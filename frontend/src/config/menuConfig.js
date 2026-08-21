@@ -173,6 +173,11 @@ export const moduleMenuStructure = [
         path: "/admin/recap-zones",
         icon: HiViewGrid,
       },
+      {
+        label: "Suivi bipage",
+        path: "/admin/suivi-bipage",
+        icon: HiClock,
+      },
     ],
   },
   {
@@ -678,6 +683,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/zones": "Fiches d'inventaire par zone.",
   "/admin/inventaire-progression": "Progression de l'inventaire en cours.",
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
+  "/admin/suivi-bipage":
+    "Qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
   "/admin/fiches-controle": "Fiches de contrôle d'inventaire.",
   "/admin/inventaire-proforma": "Inventaire à partir d'une proforma.",
   // Commerciaux

@@ -1,0 +1,387 @@
+/* src/screens/admin/AdminSuiviBipageScreen.css
+ *
+ * Tout est scopé sous .suivi-bipage : les classes utilitaires du domaine admin
+ * (.admin-table, .filter-select, .btn-primary…) sont redéfinies par chaque
+ * écran dans son propre fichier — et comme les imports CSS de CRA sont GLOBAUX,
+ * une définition non scopée écraserait celle des autres écrans.
+ */
+.suivi-bipage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.suivi-bipage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.suivi-bipage-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.suivi-bipage-header h1 svg {
+  color: #8b5cf6;
+}
+
+.suivi-bipage-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suivi-bipage .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.suivi-bipage .btn-icon:hover:not(:disabled) {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+.suivi-bipage .btn-icon:disabled,
+.suivi-bipage .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.suivi-bipage .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #8b5cf6;
+  color: #fff;
+  transition: all 0.2s;
+}
+.suivi-bipage .btn-primary:hover:not(:disabled) {
+  background: #7c4ef0;
+}
+
+.suivi-bipage-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+.suivi-bipage-placeholder svg {
+  font-size: 40px;
+  color: #8b5cf6;
+  opacity: 0.6;
+}
+
+.suivi-bipage .admin-loading {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.suivi-bipage-msg {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 6px;
+}
+
+/* ── Barre d'outils ─────────────────────────────────────────────────────── */
+.suivi-bipage-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.suivi-bipage .filter-select {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+.suivi-bipage .search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+.suivi-bipage .search-box svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.suivi-bipage .search-box input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 100%;
+}
+
+.suivi-bipage-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Bandeau de chiffres clés ───────────────────────────────────────────── */
+.suivi-bipage-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.suivi-bipage-kpis .kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.suivi-bipage-kpis .kpi-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.suivi-bipage-kpis .kpi-val svg {
+  color: #10b981;
+  font-size: 18px;
+}
+.suivi-bipage-kpis .kpi-lbl {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* ── Synthèse par agent ─────────────────────────────────────────────────── */
+.suivi-bipage-agents h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+.suivi-bipage-agents h2 svg {
+  color: #8b5cf6;
+}
+
+.suivi-bipage-agents .agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.suivi-bipage-agents .agent-card {
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.suivi-bipage-agents .agent-nom {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.suivi-bipage-agents .agent-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.suivi-bipage-agents .agent-stats b {
+  color: var(--text-primary);
+}
+
+/* ── Tableau ────────────────────────────────────────────────────────────── */
+.suivi-bipage-tablewrap {
+  overflow: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.suivi-bipage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.suivi-bipage-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.suivi-bipage-table tbody td {
+  padding: 9px 12px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.suivi-bipage-table tbody tr:hover {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.suivi-bipage-table tbody tr.en-cours {
+  background: rgba(234, 179, 8, 0.06);
+}
+
+.suivi-bipage-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.suivi-bipage-table .strong {
+  font-weight: 600;
+}
+.suivi-bipage-table .dim {
+  color: var(--text-muted);
+}
+.suivi-bipage-table .vide {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.suivi-bipage-table .zone-code {
+  font-weight: 600;
+}
+.suivi-bipage-table .zone-lbl,
+.suivi-bipage-table .jour {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.suivi-bipage-table .badge-encours {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+/* ── Observations ───────────────────────────────────────────────────────── */
+.suivi-bipage-table .obs-cell {
+  min-width: 260px;
+}
+
+.suivi-bipage-table .obs-agent {
+  padding: 5px 8px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: rgba(139, 92, 246, 0.1);
+  border-left: 3px solid #8b5cf6;
+  border-radius: 4px;
+}
+.suivi-bipage-table .obs-agent b {
+  color: #a78bfa;
+}
+
+.suivi-bipage-table .obs-suivi {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.suivi-bipage-table .obs-suivi svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.suivi-bipage-table .obs-suivi input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.suivi-bipage-table .obs-meta {
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.suivi-bipage-legende {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.suivi-bipage-legende b {
+  color: var(--text-secondary);
+}

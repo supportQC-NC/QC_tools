@@ -1590,6 +1590,11 @@ const exportCollecte = asyncHandler(async (req, res) => {
   collecte.cheminExport = cheminFichier;
   collecte.modeExport = mode;
   collecte.exportedAt = new Date();
+  // Observation facultative saisie par l'agent dans la modale de dépôt du
+  // collecteur ; elle remonte telle quelle dans l'écran « Suivi bipage ».
+  if (req.body && req.body.observation !== undefined) {
+    collecte.observationAgent = String(req.body.observation || "").trim();
+  }
   if (session) {
     collecte.session = session._id;
     collecte.sessionNom = session.nom;
@@ -1981,10 +1986,234 @@ const getSessionActive = asyncHandler(async (req, res) => {
   });
 });
 
+// ===========================================
+// SUIVI BIPAGE (écran web « Suivi bipage »)
+// ===========================================
+
+// Au-delà de ce silence entre deux scans, on considère que l'agent a fait autre
+// chose (pause, appel, réappro) : l'intervalle n'entre pas dans le temps de
+// bipage EFFECTIF. Même seuil et même raisonnement que le module réappro.
+const PAUSE_BIPAGE_MS = 5 * 60 * 1000;
+
+/**
+ * Temps d'un bipage, reconstitué a posteriori depuis les horodatages.
+ *
+ * - `brut`   : entrée dans la zone (createdAt) → dépôt (exportedAt). Il inclut
+ *              les pauses et les reprises : une zone ouverte le matin et
+ *              déposée le soir affiche 8 h de brut pour 20 min de travail.
+ * - `actif`  : somme des intervalles entre événements consécutifs, ceux de plus
+ *              de PAUSE_BIPAGE_MS exclus. La chaîne part de l'entrée dans la
+ *              zone et va jusqu'au dépôt : un bipage d'un seul article n'est
+ *              donc pas compté 0.
+ *
+ * ⚠️ `lignes[].scannedAt` porte la date du DERNIER scan de la ligne (rescanner
+ * un article déjà compté cumule la quantité et rafraîchit la date) : le nombre
+ * d'événements est donc un minorant du nombre réel de scans.
+ */
+const calculerTempsBipage = (collecte) => {
+  const scans = (collecte.lignes || [])
+    .map((l) => (l.scannedAt ? new Date(l.scannedAt).getTime() : null))
+    .filter((t) => t && !isNaN(t))
+    .sort((a, b) => a - b);
+
+  const debut = collecte.createdAt ? new Date(collecte.createdAt).getTime() : null;
+  const fin = collecte.exportedAt ? new Date(collecte.exportedAt).getTime() : null;
+
+  // Chaîne complète des événements : entrée → scans → dépôt. Le tri est une
+  // sécurité : les horloges du serveur et du collecteur peuvent diverger, et un
+  // jalon dans le désordre produirait un intervalle négatif silencieux.
+  const jalons = [debut, ...scans, fin]
+    .filter((t) => t && !isNaN(t))
+    .sort((a, b) => a - b);
+  let actifMs = 0;
+  for (let i = 1; i < jalons.length; i += 1) {
+    const delta = jalons[i] - jalons[i - 1];
+    if (delta > 0 && delta <= PAUSE_BIPAGE_MS) actifMs += delta;
+  }
+
+  const dernierEvenement = fin || (scans.length ? scans[scans.length - 1] : null);
+  const brutMs = debut && dernierEvenement ? Math.max(0, dernierEvenement - debut) : 0;
+
+  return {
+    premierScanAt: scans.length ? new Date(scans[0]) : null,
+    dernierScanAt: scans.length ? new Date(scans[scans.length - 1]) : null,
+    nbScans: scans.length,
+    tempsActifMs: actifMs,
+    tempsBrutMs: brutMs,
+  };
+};
+
+const nomUtilisateur = (u) => {
+  if (!u) return "";
+  const complet = `${u.prenom || ""} ${u.nom || ""}`.trim();
+  return complet || u.email || "";
+};
+
+/**
+ * @desc    Suivi des bipages : qui a bipé quelle zone, quand, combien de temps,
+ *          et l'observation laissée par l'agent ou par le suivi.
+ * @route   GET /api/inventaires-collecte/suivi-bipage/:entrepriseId
+ * @query   session=active|toutes|<id> · statut=en_cours|exporte · search=
+ * @access  Private (module inventaire, read)
+ */
+const getSuiviBipage = asyncHandler(async (req, res) => {
+  const { entrepriseId } = req.params;
+  const { session: sessionFiltre = "active", statut = "", search = "" } = req.query;
+
+  const entreprise = await Entreprise.findById(entrepriseId);
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  // Sessions connues (sélecteur de l'écran). ⚠️ Réinitialiser un inventaire
+  // purge les collectes : en pratique seule la session courante a des bipages.
+  const sessions = await InventaireZoneSession.find({ entreprise: entreprise._id })
+    .select("nom statut createdAt archivedAt")
+    .sort({ createdAt: -1 })
+    .lean();
+  const sessionActive = sessions.find((s) => s.statut === "actif") || null;
+
+  const filtre = { entreprise: entreprise._id };
+  if (sessionFiltre === "active") {
+    // Même convention que le récap par zone : borné à la session active, ou
+    // aux collectes hors session s'il n'y en a pas.
+    filtre.session = sessionActive ? sessionActive._id : null;
+  } else if (sessionFiltre && sessionFiltre !== "toutes") {
+    filtre.session = sessionFiltre;
+  }
+  if (statut === "en_cours" || statut === "exporte") filtre.status = statut;
+
+  const collectes = await InventaireCollecte.find(filtre)
+    .populate("user", "nom prenom email")
+    .populate("observationPar", "nom prenom email")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  let bipages = collectes.map((c) => {
+    const temps = calculerTempsBipage(c);
+    return {
+      _id: c._id,
+      zoneCode: c.zoneCode,
+      zoneLibelle: c.zoneLibelle,
+      zoneType: c.zoneType,
+      sessionNom: c.sessionNom,
+      status: c.status,
+      agent: c.user
+        ? { _id: c.user._id, nom: nomUtilisateur(c.user), email: c.user.email }
+        : null,
+      debutAt: c.createdAt,
+      finAt: c.exportedAt,
+      ...temps,
+      totalArticles: c.totalArticles || 0,
+      totalQuantite: c.totalQuantite || 0,
+      fichierExport: c.fichierExport || "",
+      observationAgent: c.observationAgent || "",
+      observation: c.observation || "",
+      observationPar: c.observationPar ? nomUtilisateur(c.observationPar) : "",
+      observationAt: c.observationAt || null,
+    };
+  });
+
+  if (search) {
+    const rx = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    bipages = bipages.filter(
+      (b) =>
+        rx.test(b.zoneCode || "") ||
+        rx.test(b.zoneLibelle || "") ||
+        rx.test(b.agent?.nom || "") ||
+        rx.test(b.observationAgent || "") ||
+        rx.test(b.observation || ""),
+    );
+  }
+
+  // Synthèse par agent : c'est la lecture la plus utile de l'écran (qui a bipé
+  // combien de zones, en combien de temps).
+  const parAgent = new Map();
+  for (const b of bipages) {
+    const cle = b.agent?._id ? String(b.agent._id) : "?";
+    if (!parAgent.has(cle)) {
+      parAgent.set(cle, {
+        user: b.agent?._id || null,
+        nom: b.agent?.nom || "(inconnu)",
+        nbBipages: 0,
+        nbTermines: 0,
+        totalArticles: 0,
+        totalQuantite: 0,
+        tempsActifMs: 0,
+      });
+    }
+    const a = parAgent.get(cle);
+    a.nbBipages += 1;
+    if (b.status === "exporte") a.nbTermines += 1;
+    a.totalArticles += b.totalArticles;
+    a.totalQuantite += b.totalQuantite;
+    a.tempsActifMs += b.tempsActifMs;
+  }
+  const agents = [...parAgent.values()].sort((x, y) => y.nbBipages - x.nbBipages);
+
+  res.json({
+    session: sessionActive
+      ? { _id: sessionActive._id, nom: sessionActive.nom, createdAt: sessionActive.createdAt }
+      : null,
+    sessions: sessions.map((s) => ({
+      _id: s._id,
+      nom: s.nom,
+      statut: s.statut,
+      createdAt: s.createdAt,
+    })),
+    seuilPauseMs: PAUSE_BIPAGE_MS,
+    totaux: {
+      nbBipages: bipages.length,
+      nbTermines: bipages.filter((b) => b.status === "exporte").length,
+      nbEnCours: bipages.filter((b) => b.status === "en_cours").length,
+      totalArticles: bipages.reduce((s, b) => s + b.totalArticles, 0),
+      totalQuantite: bipages.reduce((s, b) => s + b.totalQuantite, 0),
+      tempsActifMs: bipages.reduce((s, b) => s + b.tempsActifMs, 0),
+    },
+    agents,
+    bipages,
+  });
+});
+
+/**
+ * @desc    Écrire l'observation « suivi » d'un bipage (depuis le web).
+ *          N'écrase JAMAIS l'observation laissée par l'agent sur le collecteur.
+ * @route   PATCH /api/inventaires-collecte/suivi-bipage/:entrepriseId/:id/observation
+ * @access  Private (module inventaire, write)
+ */
+const updateObservationCollecte = asyncHandler(async (req, res) => {
+  const collecte = await InventaireCollecte.findById(req.params.id);
+  if (!collecte) {
+    res.status(404);
+    throw new Error("Bipage non trouvé");
+  }
+  // L'id du bipage vient du client : on vérifie qu'il appartient bien à la
+  // société dont l'accès a été validé par checkEntrepriseAccess.
+  if (String(collecte.entreprise) !== String(req.params.entrepriseId)) {
+    res.status(403);
+    throw new Error("Ce bipage n'appartient pas à cette société.");
+  }
+
+  collecte.observation = String(req.body.observation || "").trim();
+  collecte.observationPar = req.user._id;
+  collecte.observationAt = new Date();
+  await collecte.save();
+
+  res.json({
+    _id: collecte._id,
+    observation: collecte.observation,
+    observationPar: nomUtilisateur(req.user),
+    observationAt: collecte.observationAt,
+  });
+});
+
 export {
   resoudreZone,
   getSessionActive,
   createCollecte,
+  getSuiviBipage,
+  updateObservationCollecte,
   getCollectesEnCours,
   getCollecteById,
   scanArticleCollecte,

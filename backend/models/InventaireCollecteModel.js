@@ -135,6 +135,33 @@ const inventaireCollecteSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ── Observations (écran « Suivi bipage ») ────────────────────────────
+    // Deux champs VOLONTAIREMENT distincts : le mot de l'agent est une trace
+    // terrain qu'un superviseur ne doit pas pouvoir écraser en éditant la
+    // sienne depuis le web.
+    //
+    // Saisie par l'agent sur le collecteur, au moment du dépôt (facultative).
+    observationAgent: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    // Saisie depuis l'interface web, après coup, par le suivi.
+    observation: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    observationPar: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    observationAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
