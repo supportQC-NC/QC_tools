@@ -152,17 +152,66 @@ export const parseWorkbookRows = async (buffer) => {
   return parseWorksheetZones(ws).rows;
 };
 
-// Fusionne les lignes importées dans le dictionnaire existant (clé = gism1,
-// insensible à la casse). Les rayons existants sont mis à jour (seuls les champs
-// non vides de l'import écrasent), les nouveaux ajoutés, les autres conservés.
-// Renvoie { rows, ajoutes, misAJour }.
-export const mergeDictionnaire = (existing, imported) => {
-  const keyOf = (g) => safeTrim(g).toUpperCase();
+// Clé d'identité d'un rayon : GISM1 (insensible à la casse) + EMPLACEMENT.
+// ⚠️ L'emplacement fait partie de la clé — c'est l'identité d'une zone côté Mongo
+// (index unique { entreprise, code, type }) et le dédoublonnage de
+// zoneFicheService. Un même code existe légitimement en MAGASIN ET en DOCK
+// (ex. QC : A_1 = « EPI GANTS » au dock et « Ventilateurs muraux » en magasin) ;
+// une clé sur le seul GISM1 les fusionnait silencieusement, le dernier écrasant
+// l'autre (53 rayons DOCK perdus sur l'import QC du 24/08/2026).
+const dicoKeyOf = (r) =>
+  `${safeTrim(r?.gism1).toUpperCase()}|${normEmplacement(r?.emplacement)}`;
+
+// Normalise une ligne importée.
+const normImportedRow = (imp) => ({
+  gism1: safeTrim(imp?.gism1),
+  libelle: safeTrim(imp?.libelle),
+  metrage: Math.max(0, Math.round(Number(imp?.metrage) || 0)),
+  priorite: normPriorite(imp?.priorite),
+  emplacement: normEmplacement(imp?.emplacement),
+});
+
+// Intègre les lignes importées dans le dictionnaire existant.
+// Deux modes (voir option `remplacer`) :
+//   - fusion (défaut)  : les rayons existants sont mis à jour (seuls les champs
+//     non vides de l'import écrasent), les nouveaux ajoutés, **les autres
+//     conservés** — pour compléter un dictionnaire avec un fichier partiel.
+//     ⚠️ Un rayon qui change d'emplacement crée une 2e entrée (la clé inclut
+//     l'emplacement) ; utiliser le mode « remplacer » pour une resynchro.
+//   - remplacer        : le fichier importé DEVIENT le dictionnaire ; les rayons
+//     absents du fichier sont supprimés. C'est le mode d'une régénération
+//     complète (script d'extraction).
+// Renvoie { rows, ajoutes, misAJour, supprimes }.
+export const mergeDictionnaire = (existing, imported, options = {}) => {
+  const remplacer = options?.remplacer === true;
+
+  const cleanExisting = (Array.isArray(existing) ? existing : []).filter((r) =>
+    safeTrim(r?.gism1),
+  );
+  const clesExistantes = new Set(cleanExisting.map(dicoKeyOf));
+
   const byKey = new Map();
   const order = [];
-  for (const r of Array.isArray(existing) ? existing : []) {
-    const k = keyOf(r?.gism1);
-    if (!k) continue;
+
+  if (remplacer) {
+    // Le fichier fait foi : on repart de zéro (doublons du fichier = dernier gagne).
+    for (const imp of Array.isArray(imported) ? imported : []) {
+      if (!safeTrim(imp?.gism1)) continue;
+      const k = dicoKeyOf(imp);
+      if (!byKey.has(k)) order.push(k);
+      byKey.set(k, normImportedRow(imp));
+    }
+    const misAJour = order.filter((k) => clesExistantes.has(k)).length;
+    return {
+      rows: order.map((k) => byKey.get(k)),
+      ajoutes: order.length - misAJour,
+      misAJour,
+      supprimes: [...clesExistantes].filter((k) => !byKey.has(k)).length,
+    };
+  }
+
+  for (const r of cleanExisting) {
+    const k = dicoKeyOf(r);
     if (!byKey.has(k)) order.push(k);
     byKey.set(k, { ...r });
   }
@@ -170,34 +219,27 @@ export const mergeDictionnaire = (existing, imported) => {
   let ajoutes = 0;
   let misAJour = 0;
   for (const imp of Array.isArray(imported) ? imported : []) {
-    const k = keyOf(imp?.gism1);
-    if (!k) continue;
+    if (!safeTrim(imp?.gism1)) continue;
+    const k = dicoKeyOf(imp);
+    const norm = normImportedRow(imp);
     if (byKey.has(k)) {
       const cur = byKey.get(k);
-      const libelle = safeTrim(imp?.libelle);
       byKey.set(k, {
         ...cur,
+        ...norm,
         // le libellé n'écrase que s'il est renseigné dans l'import
-        libelle: libelle || cur.libelle,
-        metrage: Math.max(0, Math.round(Number(imp?.metrage) || 0)),
-        priorite: imp?.priorite ?? cur.priorite ?? null,
-        emplacement: normEmplacement(imp?.emplacement),
+        libelle: norm.libelle || cur.libelle,
+        priorite: norm.priorite ?? cur.priorite ?? null,
       });
       misAJour += 1;
     } else {
       order.push(k);
-      byKey.set(k, {
-        gism1: safeTrim(imp?.gism1),
-        libelle: safeTrim(imp?.libelle),
-        metrage: Math.max(0, Math.round(Number(imp?.metrage) || 0)),
-        priorite: imp?.priorite ?? null,
-        emplacement: normEmplacement(imp?.emplacement),
-      });
+      byKey.set(k, norm);
       ajoutes += 1;
     }
   }
 
-  return { rows: order.map((k) => byKey.get(k)), ajoutes, misAJour };
+  return { rows: order.map((k) => byKey.get(k)), ajoutes, misAJour, supprimes: 0 };
 };
 
 // Construit la liste PLATE (zones + sous-zones) écrite dans le fichier :

@@ -72,6 +72,8 @@ const AdminDictionnaireRayonsScreen = () => {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Mode de l'import Excel : false = fusion (défaut), true = remplacement total.
+  const [remplacerImport, setRemplacerImport] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState(null);
@@ -254,7 +256,7 @@ const AdminDictionnaireRayonsScreen = () => {
     }
   };
 
-  // ── Import de masse (fusion depuis un Excel) ─────────────────────────────────
+  // ── Import de masse depuis un Excel (fusion ou remplacement) ─────────────────
   const onPickImport = () => fileInputRef.current?.click();
 
   const onImportFile = async (e) => {
@@ -262,12 +264,25 @@ const AdminDictionnaireRayonsScreen = () => {
     e.target.value = ""; // permet de réimporter le même fichier
     if (!file) return;
     if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
+    // Le remplacement supprime des rayons : on confirme explicitement.
+    if (
+      remplacerImport &&
+      // eslint-disable-next-line no-alert
+      !window.confirm(
+        `Remplacer TOUT le dictionnaire par « ${file.name} » ?\n\n` +
+          `Les rayons actuellement présents qui ne figurent pas dans le fichier ` +
+          `seront SUPPRIMÉS du dictionnaire.`,
+      )
+    ) {
+      return;
+    }
     setError("");
     setInfo(null);
     setImporting(true);
     try {
       const form = new FormData();
       form.append("file", file);
+      form.append("remplacer", remplacerImport ? "1" : "0");
       const res = await fetch(
         `${BASE_URL}/api/dictionnaire-rayons/${nomDossierDBF}/import`,
         { method: "POST", credentials: "include", body: form },
@@ -276,7 +291,7 @@ const AdminDictionnaireRayonsScreen = () => {
       const data = await res.json();
       setInfo(data.message || "Import effectué.");
       setExists(true);
-      load(); // recharge le dictionnaire fusionné
+      load(); // recharge le dictionnaire mis à jour
     } catch (err) {
       setError(err.message || "Impossible d'importer le fichier.");
     } finally {
@@ -365,7 +380,12 @@ const AdminDictionnaireRayonsScreen = () => {
           chaque rayon en sous-zones (<code>_A</code>, <code>_B</code>…) : un
           rayon de métrage 8 donne 8 sous-zones, un rayon de métrage 0 en donne 1
           (<code>_A</code>). Vous pouvez aussi <strong>importer</strong> un Excel
-          (fusion par GISM1) ou <strong>télécharger</strong> une copie du fichier.
+          — en <em>fusion</em> (mise à jour + ajout, les rayons absents du fichier
+          sont conservés) ou en <em>remplacement</em> si vous cochez «&nbsp;Remplacer
+          tout le dictionnaire&nbsp;» (le fichier devient le dictionnaire complet) —
+          ou <strong>télécharger</strong> une copie du fichier. Un rayon est
+          identifié par son GISM1 <strong>et son emplacement</strong> : le même code
+          peut exister en <code>MAGASIN</code> et en <code>DOCK</code>.
         </p>
       </div>
 
@@ -420,10 +440,31 @@ const AdminDictionnaireRayonsScreen = () => {
                   className="dicr-btn"
                   onClick={onPickImport}
                   disabled={importing}
-                  title="Importer un Excel (fusion : mise à jour + ajout par GISM1)"
+                  title={
+                    remplacerImport
+                      ? "Importer un Excel EN REMPLACEMENT : le fichier devient le dictionnaire, les rayons absents sont supprimés"
+                      : "Importer un Excel (fusion : mise à jour + ajout par GISM1 + emplacement ; les rayons absents sont conservés)"
+                  }
                 >
-                  <HiUpload /> {importing ? "Import…" : "Importer un Excel"}
+                  <HiUpload />{" "}
+                  {importing
+                    ? "Import…"
+                    : remplacerImport
+                      ? "Importer (remplacer)"
+                      : "Importer un Excel"}
                 </button>
+                <label
+                  className="dicr-import-mode"
+                  title="Coché : le fichier importé devient le dictionnaire complet — les rayons qui n'y figurent pas sont SUPPRIMÉS. Décoché : fusion, les rayons absents du fichier sont conservés."
+                >
+                  <input
+                    type="checkbox"
+                    checked={remplacerImport}
+                    onChange={(e) => setRemplacerImport(e.target.checked)}
+                    disabled={importing}
+                  />
+                  Remplacer tout le dictionnaire
+                </label>
                 <button
                   type="button"
                   className="dicr-btn"

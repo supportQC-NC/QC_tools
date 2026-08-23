@@ -388,6 +388,37 @@
   cursor: not-allowed;
 }
 
+/* Mode de l'import Excel (fusion / remplacement) */
+.dicr-import-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dicr-import-mode:hover {
+  color: var(--text-primary);
+}
+
+.dicr-import-mode input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.dicr-import-mode:has(input:checked) {
+  color: #ffb4b4;
+  border-color: rgba(255, 107, 107, 0.55);
+  border-style: solid;
+  background: rgba(255, 107, 107, 0.08);
+}
+
 .dicr-actions {
   display: flex;
   justify-content: flex-end;

@@ -130,16 +130,27 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
   await generateGisementLabelsPDF({ items, codeType, stream: res });
 });
 
-// @desc    Import de masse : fusionne un fichier Excel dans le dictionnaire
-//          (mise à jour des rayons existants par GISM1 + ajout des nouveaux).
+// @desc    Import de masse d'un fichier Excel dans le dictionnaire.
+//          Deux modes selon le champ « remplacer » :
+//            - absent/0 : FUSION (maj des rayons existants + ajout des nouveaux,
+//              les rayons absents du fichier sont conservés) ;
+//            - 1        : REMPLACEMENT (le fichier devient le dictionnaire, les
+//              rayons absents sont supprimés) — cas d'une régénération complète.
+//          Identité d'un rayon = GISM1 + EMPLACEMENT (un même code peut exister
+//          en MAGASIN et en DOCK).
 // @route   POST /api/dictionnaire-rayons/:nomDossierDBF/import
-// @body    multipart/form-data, champ « file » (.xlsx)
+// @body    multipart/form-data, champ « file » (.xlsx) + « remplacer » (0|1)
 // @access  Private (export_gisements_admin, write) + accès entreprise
 export const importDictionnaire = asyncHandler(async (req, res) => {
   if (!req.file?.buffer) {
     res.status(400);
     throw new Error("Aucun fichier reçu (champ « file » attendu).");
   }
+
+  // multipart → tout arrive en chaîne.
+  const remplacer = ["1", "true", "on", "oui"].includes(
+    (req.body?.remplacer ?? "").toString().trim().toLowerCase(),
+  );
 
   let importedRows;
   try {
@@ -156,9 +167,10 @@ export const importDictionnaire = asyncHandler(async (req, res) => {
   }
 
   const { rows: existing } = await readDictionnaire(req.entreprise);
-  const { rows: merged, ajoutes, misAJour } = mergeDictionnaire(
+  const { rows: merged, ajoutes, misAJour, supprimes } = mergeDictionnaire(
     existing,
     importedRows,
+    { remplacer },
   );
 
   try {
@@ -166,11 +178,16 @@ export const importDictionnaire = asyncHandler(async (req, res) => {
       req.entreprise,
       merged,
     );
+    const message = remplacer
+      ? `Dictionnaire remplacé : ${ajoutes} rayon(s) ajouté(s), ${misAJour} conservé(s), ${supprimes} supprimé(s) (${zoneCount} au total).`
+      : `Import fusionné : ${misAJour} rayon(s) mis à jour, ${ajoutes} ajouté(s) (${zoneCount} au total).`;
     res.json({
-      message: `Import fusionné : ${misAJour} rayon(s) mis à jour, ${ajoutes} ajouté(s) (${zoneCount} au total).`,
+      message,
       fichier,
+      remplacer,
       ajoutes,
       misAJour,
+      supprimes,
       total: zoneCount,
       rowCount,
     });

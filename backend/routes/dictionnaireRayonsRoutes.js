@@ -50,7 +50,7 @@ router.get(
 // Enregistrement (remplace le fichier)
 router.put("/:nomDossierDBF", protect, checkEntrepriseAccess, canWrite, saveDictionnaire);
 
-// Import de masse (fusion) depuis un Excel uploadé
+// Import de masse depuis un Excel uploadé (fusion, ou remplacement si remplacer=1)
 router.post(
   "/:nomDossierDBF/import",
   protect,
