@@ -99,14 +99,14 @@ const logoBuffer = (entreprise) => {
 // de la largeur va à « Observation ».
 // Aucune colonne « Qté cdée » : le comptage est toujours à l'aveugle.
 // ---------------------------------------------------------------------------
-const DESIGNATION_W = 330;
+const DESIGNATION_W = 320;
 
 const buildColonnes = () => {
   const cols = [
     { key: "check", label: "", w: 16, align: "center" },
     { key: "nl", label: "NL", w: 22, align: "center" },
     { key: "nart", label: "CODE", w: 44, align: "left" },
-    { key: "flag", label: "", w: 14, align: "center" },
+    { key: "flag", label: "", w: 24, align: "center" },
     { key: "designation", label: "DÉSIGNATION", w: DESIGNATION_W, align: "left" },
     { key: "gencod", label: "GENCODE", w: 58, align: "left" },
     { key: "refer", label: "RÉF. FRN", w: 52, align: "left" },
@@ -263,6 +263,12 @@ const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, optio
     ],
     ["Lignes à contrôler", String(lignes.length)],
     ["Nouveautés", String(lignes.filter((l) => l.estNouveau).length)],
+    [
+      "Réservations",
+      options?.resaDisponible === false
+        ? "n/d"
+        : String(lignes.filter((l) => l.estReserve).length),
+    ],
   ];
   const zoneX = M + 175;
   const zoneW = CW - 175 - 12;
@@ -427,11 +433,19 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index) => {
 
   cell("nl", ligne.nl ? fmtNb(ligne.nl) : "", { size: 6.8, color: GRIS_LABEL });
   cell("nart", ligne.nart, { bold: true });
-  // Repère : N = nouveauté (jamais vendue), ? = article absent de la base.
-  cell("flag", ligne.inconnu ? "?" : ligne.estNouveau ? "N" : "", {
+  // Repères cumulables : R = réservé pour un client (à mettre de côté),
+  // N = nouveauté (jamais vendue), ? = article absent de la base.
+  const reperes = [
+    ligne.inconnu ? "?" : "",
+    ligne.estNouveau ? "N" : "",
+    ligne.estReserve ? "R" : "",
+  ].join("");
+  cell("flag", reperes, {
     bold: true,
     size: 7.5,
-    color: ligne.inconnu ? "#b91c1c" : "#b45309",
+    // La réservation prime à l'affichage : c'est elle qui change le geste de
+    // l'agent (mettre de côté au lieu de ranger).
+    color: ligne.estReserve ? "#1d4ed8" : ligne.inconnu ? "#b91c1c" : "#b45309",
   });
   cell("designation", ligne.designation);
   cell("gencod", ligne.gencod, { size: 7, color: GRIS_LABEL });
@@ -446,10 +460,10 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index) => {
  * @param {object} p
  * @param {object} p.entreprise    document Entreprise (logo, couleurs, nom)
  * @param {object} p.commande      entête { numcde, fournisseurNom, bateau, arrivee, datcde, etat, etatLabel }
- * @param {Array}  p.lignes        [{ nl, nart, designation, refer, gencod, estNouveau, inconnu }]
+ * @param {Array}  p.lignes        [{ nl, nart, designation, refer, gencod, estNouveau, estReserve, inconnu }]
  *                                 (la quantité commandée n'est jamais imprimée)
  * @param {Array}  p.commentaires  lignes de commentaire de la commande (NART « ! »)
- * @param {object} p.options       { editePar:string }
+ * @param {object} p.options       { editePar:string, resaDisponible?:boolean }
  * @param {WritableStream} p.stream
  * @returns {Promise<{nbPages:number, nbLignes:number}>}
  */
@@ -512,8 +526,13 @@ export const genererFicheReceptionPDF = async ({
 
   // ── Pieds de page (numérotation connue une fois toutes les pages écrites) ──
   const range = doc.bufferedPageRange();
+  // Si l'index des réservations n'a pas répondu, on le DIT sur le papier :
+  // une fiche sans « R » ne doit jamais laisser croire qu'il n'y a aucune
+  // réservation.
   const legende =
-    "N = nouveauté · ? = article inconnu · comptage à l'aveugle (quantité commandée jamais imprimée)";
+    options?.resaDisponible === false
+      ? "ATTENTION : réservations non disponibles à l'édition (aucun repère R) · N = nouveauté · ? = article inconnu · comptage à l'aveugle"
+      : "R = réservé pour un client (mettre de côté) · N = nouveauté · ? = article inconnu · comptage à l'aveugle (quantité commandée jamais imprimée)";
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(range.start + i);
     const fy = PAGE_H - M - 10;

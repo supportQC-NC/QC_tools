@@ -486,6 +486,12 @@ const ApercuCommande = ({
           </div>
           <div className="rm-stat">
             <span className="rm-stat-value">
+              {data?.resaDisponible === false ? "—" : fmtInt(data?.nbReservations)}
+            </span>
+            <span className="rm-stat-label">Réservations</span>
+          </div>
+          <div className="rm-stat">
+            <span className="rm-stat-value">
               {fmtInt(data?.suivi?.nbImpressions)}
             </span>
             <span className="rm-stat-label">Impressions</span>
@@ -506,6 +512,13 @@ const ApercuCommande = ({
         {isError && (
           <div className="rm-alert rm-alert-err">
             {error?.data?.message || "Erreur lors du chargement de la commande."}
+          </div>
+        )}
+
+        {data?.resaDisponible === false && (
+          <div className="rm-alert rm-alert-warn">
+            Réservations en cours de calcul : la fiche sortira sans les repères
+            « R ». Réactualisez dans une minute pour les obtenir.
           </div>
         )}
 
@@ -543,6 +556,14 @@ const ApercuCommande = ({
                     <td className="rm-mono">{l.nart}</td>
                     <td>
                       {l.designation || <em className="rm-muted">—</em>}
+                      {l.estReserve && (
+                        <span
+                          className="rm-tag rm-tag-resa"
+                          title="Réservé pour un client — à mettre de côté"
+                        >
+                          R
+                        </span>
+                      )}
                       {l.estNouveau && <span className="rm-tag rm-tag-new">N</span>}
                       {l.inconnu && (
                         <span className="rm-tag rm-tag-unknown" title="Article absent de la base">

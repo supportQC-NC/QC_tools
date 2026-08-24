@@ -11,6 +11,7 @@ import path from "path";
 import commandeCacheService from "./commandeService.js";
 import fournissCacheService from "./fournissCacheService.js";
 import articleCacheService from "./articleService.js";
+import { getReservationsIndexes } from "./resaEntreesService.js";
 
 // Seuil d'état des commandes éligibles au contrôle (identique au module scanné).
 export const ETAT_MIN_RECEPTION = 4;
@@ -50,7 +51,6 @@ const comparerParDesignation = (a, b) => {
   return a.nl - b.nl;
 };
 
-
 // Nouveauté : aucune vente sur les 12 derniers mois (V1..V12 tous à 0).
 const estNouveauArticle = (art) => {
   if (!art) return false;
@@ -60,6 +60,68 @@ const estNouveauArticle = (art) => {
     if (v !== 0) return false;
   }
   return true;
+};
+
+// ──────────────────────── Réservations (repère « R ») ───────────────────────
+// Un article porte un « R » quand il est réservé pour un client (facture.dbf
+// TYPFACT="R" × detail.dbf) : à la réception, la marchandise doit être mise de
+// côté et non rangée en rayon.
+//
+// ⚠️ L'ERP ne purge JAMAIS ces tables : sans borne on remonterait à 2019 et
+// presque toutes les lignes seraient marquées. On ne retient donc que les
+// réservations des 12 derniers mois — même convention que l'espace commercial.
+const FENETRE_RESA_MOIS = 12;
+
+// L'index des réservations est partagé avec l'espace commercial (qui le
+// préchauffe en tâche de fond) mais son scan à froid dure plusieurs dizaines de
+// secondes. On ne fait jamais attendre une impression : passé ce délai la fiche
+// sort SANS les « R », le scan continue et alimente le cache pour la suivante.
+const RESA_ATTENTE_MS = 8000;
+
+const borneResaYmd = () => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - FENETRE_RESA_MOIS);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
+
+/**
+ * NART (majuscules) ayant au moins une réservation récente.
+ * @returns {Promise<Set<string>|null>} null = information indisponible
+ *          (index pas encore chaud ou DBF illisible) — on n'affiche alors
+ *          aucun « R » plutôt que de faux négatifs silencieux ligne à ligne.
+ */
+const getNartsReserves = async (entreprise) => {
+  let timer = null;
+  const attente = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), RESA_ATTENTE_MS);
+    if (typeof timer.unref === "function") timer.unref();
+  });
+
+  try {
+    const index = await Promise.race([
+      getReservationsIndexes(entreprise).catch((e) => {
+        console.warn(
+          `[ReceptionManuelle] Réservations indisponibles (${entreprise.nomDossierDBF}) : ${e.message}`,
+        );
+        return null;
+      }),
+      attente,
+    ]);
+    if (!index?.parNart) return null;
+
+    const limite = borneResaYmd();
+    const set = new Set();
+    for (const [nart, resas] of index.parNart) {
+      // Date illisible : on garde la réservation (un « R » en trop se voit au
+      // quai, une réservation ratée part en rayon et le client ne l'a pas).
+      if (resas.some((r) => !r.datfact || r.datfact >= limite)) set.add(nart);
+    }
+    return set;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 };
 
 // Libellé d'état depuis le mapping personnalisé de l'entreprise (Map ou objet).
@@ -185,20 +247,32 @@ export const listerCommandes = async (entreprise, options = {}) => {
 
 /**
  * Entête + lignes d'une commande, enrichies pour la fiche papier :
- * gencode (repère visuel pour l'agent) et flag « nouveauté ».
+ * gencode (repère visuel pour l'agent) et flags « nouveauté » / « réservé ».
  * Les lignes de commentaire (NART contenant "!") sont séparées des articles.
  *
- * @returns {Promise<{entete, commentaires, lignes}>} entete = null si introuvable
+ * @returns {Promise<{entete, commentaires, lignes, resaDisponible}>}
+ *          entete = null si introuvable ; resaDisponible = false quand l'index
+ *          des réservations n'a pas répondu à temps (aucun « R » sur la fiche).
  */
 export const getCommandeComplete = async (entreprise, numcde) => {
   const record = await commandeCacheService.findByNumcde(entreprise, numcde);
-  if (!record) return { entete: null, commentaires: [], lignes: [] };
+  if (!record) {
+    return {
+      entete: null,
+      commentaires: [],
+      lignes: [],
+      resaDisponible: true,
+    };
+  }
 
   const lignesBrutes = await commandeCacheService.getDetailsByNumcde(
     entreprise,
     numcde,
   );
-  const artCache = await articleCacheService.getArticles(entreprise);
+  const [artCache, nartsReserves] = await Promise.all([
+    articleCacheService.getArticles(entreprise),
+    getNartsReserves(entreprise),
+  ]);
 
   const commentaires = [];
   const lignes = [];
@@ -213,7 +287,8 @@ export const getCommandeComplete = async (entreprise, numcde) => {
     }
 
     const nart = safeTrim(l.NART);
-    const idx = artCache.indexByNart.get(nart.toUpperCase());
+    const cle = nart.toUpperCase();
+    const idx = artCache.indexByNart.get(cle);
     const art = idx !== undefined ? artCache.records[idx] : null;
 
     lignes.push({
@@ -224,6 +299,7 @@ export const getCommandeComplete = async (entreprise, numcde) => {
       gencod: safeTrim(art?.GENCOD),
       qteCommandee: parseFloat(l.QTE) || 0,
       estNouveau: estNouveauArticle(art),
+      estReserve: nartsReserves ? nartsReserves.has(cle) : false,
       inconnu: !art, // article absent de la base (à signaler au contrôle)
     });
   }
@@ -248,6 +324,7 @@ export const getCommandeComplete = async (entreprise, numcde) => {
     },
     commentaires,
     lignes,
+    resaDisponible: nartsReserves !== null,
   };
 };
 

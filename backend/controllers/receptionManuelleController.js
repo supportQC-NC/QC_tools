@@ -116,10 +116,8 @@ const getCommandeDetails = asyncHandler(async (req, res) => {
   const startTime = Date.now();
   assertCommandeFiles(entreprise, res);
 
-  const { entete, commentaires, lignes } = await getCommandeComplete(
-    entreprise,
-    req.params.numcde,
-  );
+  const { entete, commentaires, lignes, resaDisponible } =
+    await getCommandeComplete(entreprise, req.params.numcde);
   if (!entete) {
     res.status(404);
     throw new Error("Commande introuvable dans cette société");
@@ -139,6 +137,10 @@ const getCommandeDetails = asyncHandler(async (req, res) => {
       lignes.reduce((s, l) => s + (Number(l.qteCommandee) || 0), 0),
     ),
     nbNouveautes: lignes.filter((l) => l.estNouveau).length,
+    nbReservations: lignes.filter((l) => l.estReserve).length,
+    // false = index des réservations pas encore chaud : la fiche sort sans
+    // les « R », il faut réactualiser dans un instant.
+    resaDisponible,
     suivi: formatSuivi(fiche),
     _queryTime: `${Date.now() - startTime}ms`,
     lignes,
@@ -156,10 +158,8 @@ const genererFiche = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   assertCommandeFiles(entreprise, res);
 
-  const { entete, commentaires, lignes } = await getCommandeComplete(
-    entreprise,
-    req.params.numcde,
-  );
+  const { entete, commentaires, lignes, resaDisponible } =
+    await getCommandeComplete(entreprise, req.params.numcde);
   if (!entete) {
     res.status(404);
     throw new Error("Commande introuvable dans cette société");
@@ -217,7 +217,7 @@ const genererFiche = asyncHandler(async (req, res) => {
     commande: entete,
     lignes,
     commentaires,
-    options: { editePar: nom },
+    options: { editePar: nom, resaDisponible },
     stream: res,
   });
 });

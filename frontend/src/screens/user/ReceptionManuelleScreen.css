@@ -210,6 +210,11 @@
   border: 1px solid var(--admin-danger);
   color: #fca5a5;
 }
+.rm-alert-warn {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid var(--admin-warning);
+  color: #fcd34d;
+}
 
 /* ── Tableau ── */
 .rm-table-wrap {
@@ -310,6 +315,10 @@
 .rm-tag-new {
   background: var(--admin-warning-light);
   color: #fbbf24;
+}
+.rm-tag-resa {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
 }
 .rm-tag-unknown {
   background: rgba(239, 68, 68, 0.16);
