@@ -29,6 +29,28 @@ const dateToIso = (d) =>
 // Une ligne de détail est un commentaire si son NART contient "!".
 const estCommentaire = (record) => safeTrim(record?.NART).includes("!");
 
+// Les lignes de la fiche papier sont TOUJOURS classées par DÉSIGNATION, jamais
+// par NL : l'agent contrôle en parcourant les articles par nom, pas dans
+// l'ordre de saisie de la commande.
+// Comparateur alphabétique FR, insensible casse/accents, chiffres en ordre
+// naturel (« BOULON 2 » avant « BOULON 10 »). Les lignes sans désignation
+// partent en fin de liste ; à désignation égale on retombe sur le NL.
+const comparerParDesignation = (a, b) => {
+  const da = safeTrim(a.designation);
+  const db = safeTrim(b.designation);
+  if (!da || !db) {
+    if (da !== db) return da ? -1 : 1;
+  } else {
+    const cmp = da.localeCompare(db, "fr", {
+      sensitivity: "base",
+      numeric: true,
+    });
+    if (cmp !== 0) return cmp;
+  }
+  return a.nl - b.nl;
+};
+
+
 // Nouveauté : aucune vente sur les 12 derniers mois (V1..V12 tous à 0).
 const estNouveauArticle = (art) => {
   if (!art) return false;
@@ -206,7 +228,7 @@ export const getCommandeComplete = async (entreprise, numcde) => {
     });
   }
 
-  lignes.sort((a, b) => a.nl - b.nl);
+  lignes.sort(comparerParDesignation);
 
   const fourn =
     record.FOURN !== undefined && record.FOURN !== null ? record.FOURN : null;
