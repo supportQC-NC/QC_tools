@@ -200,6 +200,27 @@
   color: #a5b4fc;
 }
 
+/* Marqueur d'en-tête : cette colonne a une infobulle explicative (title) */
+.tv-table th .tv-aide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.55;
+  cursor: help;
+  vertical-align: middle;
+}
+.tv-table th:hover .tv-aide {
+  opacity: 1;
+}
+
 /* Repère « article qui renvoie vers un autre » (article.GENDOUBL renseigné) */
 .tv-tag-renvoi {
   display: inline-flex;

@@ -45,6 +45,20 @@ export const fmtPct = (n, decimals = 1) =>
   n === null || n === undefined ? "—" : `${Number(n).toFixed(decimals)} %`;
 
 /**
+ * Coefficient multiplicateur (PV / PR), 2 décimales, virgule française.
+ * `null`/`undefined` → `"—"`. Ex. `fmtCoef(1.6666)` → `"1,67"`.
+ * @param {*} n
+ * @returns {string}
+ */
+export const fmtCoef = (n) =>
+  n === null || n === undefined || !Number.isFinite(Number(n))
+    ? "—"
+    : Number(n).toLocaleString("fr-FR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+/**
  * Date courte fr-FR. Ex. `"05/08/2026"`. Entrée vide/invalide → `"—"`.
  * Accepte une `Date`, une chaîne ISO ou un timestamp.
  * @param {Date|string|number} value

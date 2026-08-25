@@ -9,6 +9,8 @@
 //   ca_annee     = vente_annee × PVTE
 //   taux_marque  = (PVTE − PREV) / PVTE  (en %, taux de marque HT sur prix de vente)
 //                  Articles à coût 0/absent exclus des sommes de marge.
+//   coef         = PVTE / PREV  (coefficient multiplicateur : même marge que le
+//                  taux de marque, rapportée au prix de revient au lieu du PV)
 //   jour_rupture = ΣRUP1..RUP12
 //   stock_total = ΣS1..S5 (mag = S1, dock = S2..S5)
 //
@@ -85,6 +87,10 @@ const metrics = (rec) => {
     coutMarge: coutValide ? venteAnnee * prev : 0,
     // Taux de marque HT = (PV - PR) / PV, en %. Null si coût/PV manquant.
     tauxMarque: coutValide ? round2(((pvte - prev) / pvte) * 100) : null,
+    // Coefficient multiplicateur = PV / PR (ex. 1,67 pour 600 -> 1 000). Même
+    // condition de validité que la marque : les deux décrivent la même marge,
+    // l'une rapportée au prix de vente, l'autre au prix de revient.
+    coef: coutValide ? Math.round((pvte / prev) * 100) / 100 : null,
     jourRupture: sumFields(rec, "RUP", 1, 12),
     stockMag,
     stockDock,
@@ -174,6 +180,10 @@ export const getSynthese = async (entreprise, options = {}) => {
       // calculé sur les seuls articles à coût connu (g.caMarge / g.coutMarge).
       tauxMarqueMoy:
         g.caMarge > 0 ? round2(((g.caMarge - g.coutMarge) / g.caMarge) * 100) : null,
+      // Coefficient moyen du groupe = ΣCA / Σcoût (pondéré par les ventes, donc
+      // cohérent avec la marque moyenne ci-dessus : ce n'est PAS la moyenne des
+      // coefficients article par article).
+      coefMoy: g.coutMarge > 0 ? round2(g.caMarge / g.coutMarge) : null,
     });
   }
 
@@ -201,6 +211,7 @@ const SORT_FIELDS = new Set([
   "caAnnee",
   "venteAnnee",
   "tauxMarque",
+  "coef",
   "jourRupture",
   "stockTotal",
   "pvte",
@@ -258,6 +269,7 @@ export const getDetail = async (entreprise, options = {}) => {
       venteMoisMoy: m.venteMoisMoy,
       caAnnee: m.caAnnee,
       tauxMarque: m.tauxMarque,
+      coef: m.coef,
       jourRupture: m.jourRupture,
       pvte: m.pvte,
       prev: m.prev,
