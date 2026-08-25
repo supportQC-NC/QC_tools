@@ -104,6 +104,9 @@ const RichTextEditor = ({
     if (value !== dernierHtml.current) {
       editorRef.current.innerHTML = value || "";
       dernierHtml.current = value || "";
+      // Le contenu vient d'être remplacé : la position mémorisée pointe sur des
+      // nœuds détachés, elle ne vaut plus rien.
+      selection.current = null;
     }
     setVide(htmlEstVide(value));
   }, [value, mode]);
@@ -114,6 +117,7 @@ const RichTextEditor = ({
     if (mode !== "visuel" || !editorRef.current) return;
     editorRef.current.innerHTML = value || "";
     dernierHtml.current = value || "";
+    selection.current = null; // nœuds remplacés : ancienne position caduque
     try {
       document.execCommand("styleWithCSS", false, false);
     } catch {
@@ -132,6 +136,19 @@ const RichTextEditor = ({
   }, [onChange]);
 
   // ── Sélection : mémorisée avant d'ouvrir un champ (lien, image, couleur) ──
+  //
+  // ⚠️ Cette position mémorisée est le point d'insertion des champs, des liens
+  // et des images. Elle doit donc être VÉRIFIÉE avant usage : une range dont
+  // les nœuds ne sont plus dans l'éditeur (contenu réécrit depuis `value`,
+  // texte supprimé depuis) ferait insérer dans un nœud détaché — l'insertion
+  // part alors dans le vide, l'utilisateur reclique, et on se retrouve avec des
+  // champs en double dès que la position redevient valide.
+  const rangeUtilisable = useCallback((r) => {
+    const zone = editorRef.current;
+    if (!r || !zone || !zone.isConnected) return false;
+    return zone.contains(r.startContainer) && zone.contains(r.endContainer);
+  }, []);
+
   const memoriserSelection = useCallback(() => {
     const sel = window.getSelection();
     if (
@@ -144,14 +161,44 @@ const RichTextEditor = ({
     }
   }, []);
 
-  const restaurerSelection = useCallback(() => {
-    editorRef.current?.focus();
-    const r = selection.current;
-    if (!r) return;
+  // Place le curseur à la FIN du contenu. Repli quand aucune position valide
+  // n'est mémorisée (typiquement : l'utilisateur clique « Champ » sans avoir
+  // encore cliqué dans la zone de saisie). Sans ce repli, le clic ne produisait
+  // rien du tout — d'où les clics répétés.
+  const caretEnFin = useCallback(() => {
+    const zone = editorRef.current;
+    if (!zone) return null;
+    // On descend dans le dernier bloc : sinon le texte atterrit APRÈS le
+    // dernier <p>, à la racine de la zone — valide, mais hors du paragraphe.
+    let cible = zone;
+    while (
+      cible.lastChild &&
+      cible.lastChild.nodeType === Node.ELEMENT_NODE &&
+      !["BR", "HR", "IMG", "TABLE"].includes(cible.lastChild.tagName)
+    ) {
+      cible = cible.lastChild;
+    }
+    const r = document.createRange();
+    r.selectNodeContents(cible);
+    r.collapse(false);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(r);
+    selection.current = r.cloneRange();
+    return r;
   }, []);
+
+  const restaurerSelection = useCallback(() => {
+    editorRef.current?.focus();
+    const r = selection.current;
+    if (!rangeUtilisable(r)) {
+      caretEnFin();
+      return;
+    }
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }, [rangeUtilisable, caretEnFin]);
 
   // ── Commandes ─────────────────────────────────────────────────────────────
   const exec = useCallback(
@@ -178,12 +225,42 @@ const RichTextEditor = ({
     [restaurerSelection, exec],
   );
 
-  const insererHtml = useCallback(
-    (html) => {
+  /**
+   * Insère un TEXTE brut (un champ « {{cle}} ») au point d'insertion.
+   *
+   * Volontairement en API Range plutôt qu'en `execCommand("insertHTML")` :
+   *   - un champ est du texte, pas du HTML — rien à faire analyser au
+   *     navigateur, donc aucune surprise de découpage de nœuds ;
+   *   - on REMÉMORISE la position juste après le texte inséré. Sans ça, la
+   *     position mémorisée restait celle d'AVANT la première insertion : les
+   *     clics suivants réinséraient au même endroit, et une range devenue
+   *     invalide (texte supprimé entre-temps) faisait repartir l'insertion
+   *     dans le vide puis réapparaître le champ en double.
+   */
+  const insererChamp = useCallback(
+    (texte) => {
+      if (disabled) return;
       restaurerSelection();
-      exec("insertHTML", html);
+
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      if (!rangeUtilisable(range)) return;
+
+      range.deleteContents(); // remplace la sélection éventuelle
+      const noeud = document.createTextNode(texte);
+      range.insertNode(noeud);
+
+      const apres = document.createRange();
+      apres.setStartAfter(noeud);
+      apres.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(apres);
+      selection.current = apres.cloneRange();
+
+      emettre();
     },
-    [restaurerSelection, exec],
+    [disabled, restaurerSelection, rangeUtilisable, emettre],
   );
 
   // ── Collage nettoyé ───────────────────────────────────────────────────────
@@ -397,7 +474,7 @@ const RichTextEditor = ({
                   className="rte-varitem"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
-                    insererHtml(`{{${v.cle}}}`);
+                    insererChamp(`{{${v.cle}}}`);
                     setMenuVariables(false);
                   }}
                 >
