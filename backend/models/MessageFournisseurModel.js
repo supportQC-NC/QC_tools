@@ -10,7 +10,10 @@
 //                  (sujet éditable, variables {{commandes}}, {{fournisseur}}…) ;
 //   - "ar"       : le mail de confirmation d'accusé de réception, envoyé depuis
 //                  l'onglet « Accusés de réception » quand le fournisseur a
-//                  confirmé la commande (sujet éditable, variable {{montant_total}}).
+//                  confirmé la commande (sujet éditable, variable {{montant_total}}) ;
+//   - "facture"  : la demande de FACTURE, envoyée après la confirmation du
+//                  fournisseur, depuis le même onglet (sujet éditable, mêmes
+//                  variables que la relance + le montant confirmé).
 //
 // Le HTML est envoyé tel quel comme corps de l'email (une signature société y est
 // ajoutée à l'envoi). Il est saisi via un éditeur visuel côté web : personne n'a
@@ -27,7 +30,7 @@ const messageFournisseurSchema = new mongoose.Schema(
     // Type de message. Défaut "commande" = comportement historique du module.
     type: {
       type: String,
-      enum: ["commande", "relance", "ar"],
+      enum: ["commande", "relance", "ar", "facture"],
       default: "commande",
       required: true,
     },

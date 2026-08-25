@@ -104,6 +104,25 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["EnvoiCdeHistorique"],
     }),
 
+    // ─── Demande de facture (commandes dont l'AR est confirmé) ───────────
+    apercuDemandeFacture: builder.mutation({
+      query: ({ nomDossierDBF, numcdes }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/facture/apercu`,
+        method: "POST",
+        body: { numcdes },
+      }),
+    }),
+
+    envoyerDemandeFacture: builder.mutation({
+      query: ({ nomDossierDBF, numcdes, avecPieces }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/facture`,
+        method: "POST",
+        body: { numcdes, avecPieces },
+      }),
+      // La liste des AR affiche « facture demandée le… » : elle doit se rafraîchir.
+      invalidatesTags: ["EnvoiCdeHistorique", "EnvoiCdeAr"],
+    }),
+
     // ─── Accusés de réception (onglet dédié) ─────────────────────────────
     getListeAr: builder.query({
       query: ({ nomDossierDBF, statut, search, page, limit }) => ({
@@ -295,6 +314,8 @@ export const {
   useEnvoyerMasseMutation,
   useApercuRelanceMutation,
   useEnvoyerRelanceMutation,
+  useApercuDemandeFactureMutation,
+  useEnvoyerDemandeFactureMutation,
   useGetListeArQuery,
   useApercuArMutation,
   useConfirmerArMutation,

@@ -123,6 +123,35 @@ export const getDefaultAr = (langue) =>
     ? { message: DEFAULT_AR_A, sujet: DEFAULT_SUJET_AR_A }
     : { message: DEFAULT_AR_F, sujet: DEFAULT_SUJET_AR_F };
 
+// ── Modèles de DEMANDE DE FACTURE (onglet Accusés de réception) ─────────────
+// Envoyé APRÈS la confirmation du fournisseur : il a accusé réception de la
+// commande, on lui réclame maintenant la facture. Comme la relance, les
+// commandes d'un même fournisseur sont regroupées dans UN mail.
+export const DEFAULT_FACTURE_F =
+  "<p>Bonjour,<br><br>" +
+  "Vous nous avez confirme la (les) commande(s) suivante(s) : <b>{{commandes}}</b>.<br><br>" +
+  "Merci de nous adresser la facture correspondante, " +
+  "<u><b>en repondant a toutes les personnes en copie de ce mail.</b></u><br><br>" +
+  "Merci d'y faire figurer notre (nos) numero(s) de commande.<br><br>" +
+  "Dans l'attente de vous lire.<br>Cordialement</p>";
+
+export const DEFAULT_FACTURE_A =
+  "<p>Hello,<br><br>" +
+  "You have confirmed the following order(s): <b>{{commandes}}</b>.<br><br>" +
+  "Please send us the corresponding invoice, " +
+  "<u><b>replying to all the recipients of this mail.</b></u><br><br>" +
+  "Kindly quote our order number(s) on the invoice.<br><br>" +
+  "We look forward hearing back from you.</p>";
+
+export const DEFAULT_SUJET_FACTURE_F =
+  "Demande de facture - commande(s) {{commandes}}";
+export const DEFAULT_SUJET_FACTURE_A = "Invoice request - order(s) {{commandes}}";
+
+export const getDefaultFacture = (langue) =>
+  langue === "A"
+    ? { message: DEFAULT_FACTURE_A, sujet: DEFAULT_SUJET_FACTURE_A }
+    : { message: DEFAULT_FACTURE_F, sujet: DEFAULT_SUJET_FACTURE_F };
+
 // Variables proposées dans l'éditeur (l'UI lit cette liste pour son menu
 // « Insérer un champ » — un seul endroit à maintenir).
 export const VARIABLES_RELANCE = [
@@ -152,6 +181,28 @@ export const VARIABLES_AR = [
   { cle: "code_fournisseur", label: "Code fournisseur", exemple: "200" },
   { cle: "societe", label: "Nom de la société", exemple: "QUINCAILLERIE CALEDONIENNE" },
   { cle: "date_du_jour", label: "Date du jour", exemple: "20/08/2026" },
+];
+
+// Champs insérables dans une demande de facture. Mêmes repères que la relance,
+// plus ce que la confirmation a apporté : le montant retenu et sa date.
+export const VARIABLES_FACTURE = [
+  { cle: "commandes", label: "N° des commandes", exemple: "12345, 12346" },
+  { cle: "nb_commandes", label: "Nombre de commandes", exemple: "2" },
+  { cle: "fournisseur", label: "Nom du fournisseur", exemple: "BOSCH FRANCE" },
+  { cle: "code_fournisseur", label: "Code fournisseur", exemple: "200" },
+  {
+    cle: "montant_total",
+    label: "Montant total confirmé (devise incluse)",
+    exemple: "1 248 F",
+  },
+  {
+    cle: "date_confirmation",
+    label: "Date de confirmation (AR)",
+    exemple: "20/08/2026",
+  },
+  { cle: "date_envoi", label: "Date du 1er envoi", exemple: "12/08/2026" },
+  { cle: "societe", label: "Nom de la société", exemple: "QUINCAILLERIE CALEDONIENNE" },
+  { cle: "date_du_jour", label: "Date du jour", exemple: "25/08/2026" },
 ];
 
 // Remplace {{variable}} par sa valeur (insensible à la casse et aux espaces).
@@ -199,7 +250,9 @@ const chargerModele = async (entrepriseId, type, langue) => {
       ? getDefaultRelance(langue)
       : type === "ar"
         ? getDefaultAr(langue)
-        : { message: getDefaultMessage(langue), sujet: "" };
+        : type === "facture"
+          ? getDefaultFacture(langue)
+          : { message: getDefaultMessage(langue), sujet: "" };
   return {
     message: trim(tpl?.message) || defauts.message,
     sujet: trim(tpl?.sujet) || defauts.sujet,
@@ -1138,10 +1191,35 @@ export const getListeAr = async (entreprise, options = {}) => {
     .lean();
   const parNumcde = new Map(suivis.map((s) => [s.numcde, s]));
 
+  // Demandes de facture déjà parties. Elles regroupent plusieurs commandes dans
+  // un même envoi ($unwind de `numcdes`), et n'ont AUCUN état dédié : cet
+  // historique est la seule source de vérité du « déjà demandée ».
+  const demandes = await EnvoiCdeHistorique.aggregate([
+    {
+      $match: {
+        entreprise: entreprise._id,
+        type: "facture",
+        statut: "envoye",
+      },
+    },
+    { $unwind: "$numcdes" },
+    {
+      $group: {
+        _id: "$numcdes",
+        derniereDemande: { $max: "$createdAt" },
+        nbDemandes: { $sum: 1 },
+      },
+    },
+  ]);
+  const parDemande = new Map(demandes.map((d) => [d._id, d]));
+
   let rows = envois.map((e) => {
     const s = parNumcde.get(e._id);
+    const f = parDemande.get(e._id);
     return {
       numcde: e._id,
+      factureDemandeeLe: f?.derniereDemande || null,
+      nbDemandesFacture: f?.nbDemandes || 0,
       fournId: s?.fournId ?? e.fournId,
       fournNom: s?.fournNom || e.fournNom || "",
       dateEnvoi: e.dateEnvoi,
@@ -1158,6 +1236,10 @@ export const getListeAr = async (entreprise, options = {}) => {
 
   if (statut === "en_attente" || statut === "confirme") {
     rows = rows.filter((r) => r.statut === statut);
+  } else if (statut === "facture_a_demander") {
+    // File de travail du module : confirmé par le fournisseur, facture pas
+    // encore réclamée.
+    rows = rows.filter((r) => r.statut === "confirme" && !r.factureDemandeeLe);
   }
   if (search) {
     const rx = new RegExp(String(search).trim(), "i");
@@ -1168,6 +1250,10 @@ export const getListeAr = async (entreprise, options = {}) => {
 
   const total = rows.length;
   const nbAttente = rows.filter((r) => r.statut === "en_attente").length;
+  // Confirmées dont la facture n'a pas encore été réclamée (compteur du bandeau).
+  const nbFactureADemander = rows.filter(
+    (r) => r.statut === "confirme" && !r.factureDemandeeLe,
+  ).length;
   const p = Math.max(1, parseInt(page) || 1);
   const l = Math.max(1, parseInt(limit) || 50);
   const pageRows = rows.slice((p - 1) * l, p * l);
@@ -1205,7 +1291,7 @@ export const getListeAr = async (entreprise, options = {}) => {
     });
   }
 
-  return { total, nbAttente, page: p, limit: l, commandes };
+  return { total, nbAttente, nbFactureADemander, page: p, limit: l, commandes };
 };
 
 // Résout ce qui partira pour chaque AR (sert l'aperçu ET l'envoi).
@@ -1487,6 +1573,360 @@ export const annulerAr = async (entreprise, numcdes = []) => {
     },
   );
   return { modifies: r.modifiedCount || 0 };
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// DEMANDE DE FACTURE (onglet Accusés de réception)
+//
+// Une fois que le fournisseur A CONFIRMÉ la commande (AR reçu), on lui réclame
+// la facture. Construit comme la relance — commandes REGROUPÉES PAR FOURNISSEUR,
+// un seul mail listant tout ce qu'il doit facturer — mais avec deux différences :
+//   - seules les commandes dont l'AR est CONFIRMÉ sont éligibles (c'est le sens
+//     même de la demande : on ne réclame pas la facture d'une commande dont on
+//     ne sait pas encore si le fournisseur l'a acceptée) ;
+//   - le tableau rappelle le MONTANT RETENU à la confirmation, pour que le
+//     fournisseur facture ce montant-là et qu'un écart se voie tout de suite.
+//
+// Il n'y a AUCUN état Mongo propre à ce mail : « facture déjà demandée » se lit
+// dans l'historique des envois (type "facture"), seule source de vérité.
+// ────────────────────────────────────────────────────────────────────────────
+
+// Somme des montants d'un groupe, PAR DEVISE : un fournisseur peut avoir des
+// commandes en EUR et en USD, additionner les deux donnerait un montant faux.
+const totalParDevise = (commandes) => {
+  const parDevise = new Map();
+  for (const c of commandes) {
+    const d = trim(c.devise) || "F";
+    parDevise.set(d, (parDevise.get(d) || 0) + (Number(c.montantTotal) || 0));
+  }
+  return [...parDevise.entries()]
+    .map(([devise, montant]) => formaterMontant(montant, devise))
+    .join(" + ");
+};
+
+// Tableau récapitulatif des commandes à facturer, inséré avant la signature.
+const tableauFacture = (commandes, langue) => {
+  const t =
+    langue === "A"
+      ? {
+          cde: "Order",
+          date: "Order date",
+          conf: "Confirmed on",
+          montant: "Confirmed amount",
+        }
+      : {
+          cde: "Commande",
+          date: "Date commande",
+          conf: "Confirmée le",
+          montant: "Montant confirmé",
+        };
+  const th =
+    'style="border:1px solid #cccccc;padding:6px 10px;background:#f2f2f2;text-align:left;font-size:13px;"';
+  const td = 'style="border:1px solid #cccccc;padding:6px 10px;font-size:13px;"';
+  const lignes = commandes
+    .map(
+      (c) =>
+        `<tr><td ${td}><b>${c.numcde}</b></td><td ${td}>${fmtDateFr(c.datcde)}</td>` +
+        `<td ${td}>${fmtDateFr(c.dateConfirmation)}</td>` +
+        `<td ${td}><b>${formaterMontant(c.montantTotal, c.devise)}</b></td></tr>`,
+    )
+    .join("");
+  return (
+    '<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;">' +
+    `<tr><th ${th}>${t.cde}</th><th ${th}>${t.date}</th><th ${th}>${t.conf}</th>` +
+    `<th ${th}>${t.montant}</th></tr>${lignes}</table>`
+  );
+};
+
+// Prépare les demandes de facture : sert l'aperçu ET l'envoi.
+export const resoudreDemandesFacture = async (entreprise, numcdes = []) => {
+  const liste = [...new Set(numcdes.map((n) => trim(n)).filter(Boolean))];
+  if (!liste.length) return [];
+
+  // AR de ces commandes : c'est lui qui décide de l'éligibilité et qui porte le
+  // montant retenu.
+  const suivis = await EnvoiCdeAr.find({
+    entreprise: entreprise._id,
+    numcde: { $in: liste },
+  }).lean();
+  const parNumcde = new Map(suivis.map((s) => [s.numcde, s]));
+
+  // Date du premier envoi de la commande (rappel possible dans le modèle).
+  const envois = await EnvoiCdeHistorique.find({
+    entreprise: entreprise._id,
+    type: "commande",
+    statut: "envoye",
+    numcde: { $in: liste },
+  })
+    .sort({ createdAt: 1 })
+    .select("numcde fournId fournNom createdAt")
+    .lean();
+  const premierEnvoi = new Map();
+  for (const e of envois) if (!premierEnvoi.has(e.numcde)) premierEnvoi.set(e.numcde, e);
+
+  const groupes = new Map(); // fournId -> { fournId, fournNom, commandes[] }
+  const erreurs = [];
+
+  for (const numcde of liste) {
+    const suivi = parNumcde.get(numcde);
+    if (!suivi || suivi.statut !== "confirme") {
+      erreurs.push({
+        numcde,
+        raison: `La commande ${numcde} n'a pas d'AR confirmé : on ne peut pas encore réclamer sa facture.`,
+      });
+      continue;
+    }
+
+    const detail = await getDetailCommande(entreprise, numcde);
+    const histo = premierEnvoi.get(numcde);
+    const fournId = Number(
+      detail ? detail.fourn : (suivi.fournId ?? histo?.fournId),
+    );
+    if (isNaN(fournId)) {
+      erreurs.push({ numcde, raison: `Fournisseur introuvable pour ${numcde}.` });
+      continue;
+    }
+
+    const cle = String(fournId);
+    if (!groupes.has(cle)) {
+      groupes.set(cle, {
+        fournId,
+        fournNom: detail?.fournNom || suivi.fournNom || histo?.fournNom || "",
+        commandes: [],
+      });
+    }
+    groupes.get(cle).commandes.push({
+      numcde,
+      // Date fiable uniquement (quelques DATCDE de l'ERP sont aberrantes).
+      datcde: dateFiable(detail?.datcde) ? detail.datcde : histo?.createdAt || null,
+      nbLignes: detail?.nbLignes || 0,
+      dateEnvoi: histo?.createdAt || null,
+      dateConfirmation: suivi.dateConfirmation || null,
+      // Montant RETENU à la confirmation : c'est celui qu'on attend sur la facture.
+      montantTotal: Number(suivi.montantTotal) || 0,
+      devise: suivi.devise || detail?.devise || "F",
+      lignes: detail?.lignes || null,
+      bateau: detail?.bateau || "",
+    });
+  }
+
+  const resp = await ResponsableCc.findOne({ entreprise: entreprise._id }).lean();
+  const ccResp = resp?.emails || [];
+  const nomSociete = entreprise.nomComplet || entreprise.trigramme || "";
+
+  const resultats = [];
+  for (const g of groupes.values()) {
+    const fe = await FournisseurEmail.findOne({
+      entreprise: entreprise._id,
+      fournId: g.fournId,
+    }).lean();
+
+    const base = {
+      fournId: g.fournId,
+      fournNom: g.fournNom || fe?.fournLbl || "",
+      commandes: g.commandes,
+      numcdes: g.commandes.map((c) => c.numcde),
+      montantTotalLibelle: totalParDevise(g.commandes),
+    };
+
+    if (!fe || !(fe.emails || []).filter(Boolean).length) {
+      resultats.push({
+        ...base,
+        erreur: `Pas d'email pour le fournisseur ${g.fournId} (${base.fournNom}).`,
+      });
+      continue;
+    }
+
+    const langue = fe.langue === "A" ? "A" : "F";
+    const tpl = await chargerModele(entreprise._id, "facture", langue);
+
+    const vars = {
+      commandes: base.numcdes.join(", "),
+      nb_commandes: base.numcdes.length,
+      fournisseur: base.fournNom,
+      code_fournisseur: g.fournId,
+      montant_total: base.montantTotalLibelle,
+      // Confirmation la plus RÉCENTE du lot : c'est celle qui déclenche la demande.
+      date_confirmation: fmtDateFr(
+        g.commandes
+          .map((c) => c.dateConfirmation)
+          .filter(Boolean)
+          .sort((a, b) => new Date(b) - new Date(a))[0] || null,
+      ),
+      date_envoi: fmtDateFr(
+        g.commandes.map((c) => c.dateEnvoi).filter(Boolean)[0] || null,
+      ),
+      societe: nomSociete,
+      date_du_jour: fmtDateFr(new Date()),
+    };
+
+    resultats.push({
+      ...base,
+      langue,
+      destinataires: fe.emails.filter(Boolean),
+      // CC = responsable société + transitaire fournisseur (comme une commande).
+      cc: [...ccResp, ...(fe.emailsTransitaire || [])].filter(Boolean),
+      sujet: appliquerVariables(tpl.sujet, vars),
+      html: construireCorpsHtml(
+        appliquerVariables(tpl.message, vars),
+        tableauFacture(g.commandes, langue),
+      ),
+    });
+  }
+
+  // Les commandes refusées remontent aussi, pour être affichées à l'écran.
+  for (const e of erreurs) {
+    resultats.push({
+      fournId: null,
+      fournNom: "",
+      numcdes: [e.numcde],
+      erreur: e.raison,
+    });
+  }
+  return resultats;
+};
+
+// Envoie les demandes de facture. `avecPieces` rejoint l'Excel + le PDF de la
+// commande : par défaut NON — le fournisseur a déjà la commande, il lui manque
+// seulement la facture.
+export const envoyerDemandesFacture = async (
+  entreprise,
+  numcdes = [],
+  { avecPieces = false } = {},
+  user = null,
+) => {
+  const params = await getParametres(entreprise);
+  const groupes = await resoudreDemandesFacture(entreprise, numcdes);
+  const logo = logoFromEntreprise(entreprise);
+  const nomSociete = entreprise.nomComplet || entreprise.trigramme;
+  const trig = (entreprise.trigramme || "").toUpperCase();
+
+  const resultats = [];
+  for (const g of groupes) {
+    if (g.erreur) {
+      resultats.push({
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        numcdes: g.numcdes,
+        statut: "erreur",
+        message: g.erreur,
+      });
+      continue;
+    }
+
+    try {
+      const attachments = [];
+      if (avecPieces) {
+        for (const c of g.commandes) {
+          if (!c.lignes || !c.lignes.length) continue;
+          const meta = {
+            numcde: c.numcde,
+            fournId: g.fournId,
+            fournNom: g.fournNom,
+            nomSociete,
+            datcde: c.datcde,
+          };
+          const baseName = buildBaseName(trig, c.numcde);
+          const [xls, pdf] = await Promise.all([
+            genererExcelCommande(meta, c.lignes),
+            genererPdfCommande(
+              { ...meta, bateau: c.bateau, logo: logo?.buffer || null },
+              c.lignes,
+            ),
+          ]);
+          attachments.push(
+            {
+              filename: `${baseName}.xlsx`,
+              content: xls,
+              contentType:
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            },
+            { filename: `${baseName}.pdf`, content: pdf, contentType: "application/pdf" },
+          );
+        }
+      }
+
+      const { to, cc, sujet, testMode } = appliquerModeTest(
+        { destinataires: g.destinataires, cc: g.cc, sujet: g.sujet },
+        params,
+      );
+
+      await sendEmail({
+        module: "envoi_cde_fournisseur",
+        email: to,
+        cc: cc.length ? cc : undefined,
+        subject: sujet,
+        html: g.html,
+        attachments: attachments.length ? attachments : undefined,
+      });
+
+      await EnvoiCdeHistorique.create({
+        entreprise: entreprise._id,
+        nomDossierDBF: entreprise.nomDossierDBF,
+        type: "facture",
+        numcde: g.numcdes.join(", "),
+        numcdes: g.numcdes,
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        sujet,
+        langue: g.langue,
+        destinataires: to,
+        cc,
+        destinatairesReels: g.destinataires,
+        nbLignes: g.commandes.reduce((s, c) => s + (c.nbLignes || 0), 0),
+        montantTotal: g.commandes.reduce(
+          (s, c) => s + (Number(c.montantTotal) || 0),
+          0,
+        ),
+        devise: g.commandes[0]?.devise || "",
+        testMode,
+        envoyePar: user?._id || null,
+        statut: "envoye",
+      });
+
+      resultats.push({
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        numcdes: g.numcdes,
+        montantTotalLibelle: g.montantTotalLibelle,
+        statut: "envoye",
+        testMode,
+        destinataires: to,
+      });
+    } catch (err) {
+      try {
+        await EnvoiCdeHistorique.create({
+          entreprise: entreprise._id,
+          nomDossierDBF: entreprise.nomDossierDBF,
+          type: "facture",
+          numcde: g.numcdes.join(", "),
+          numcdes: g.numcdes,
+          fournId: g.fournId,
+          fournNom: g.fournNom,
+          envoyePar: user?._id || null,
+          statut: "erreur",
+          erreur: err.message,
+        });
+      } catch {
+        /* ignore log error */
+      }
+      resultats.push({
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        numcdes: g.numcdes,
+        statut: "erreur",
+        message: err.message,
+      });
+    }
+  }
+
+  const nbOk = resultats.filter((r) => r.statut === "envoye").length;
+  return {
+    nbOk,
+    nbErr: resultats.length - nbOk,
+    testMode: params.testMode,
+    resultats,
+  };
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1841,9 +2281,12 @@ export default {
   getDefaultMessage,
   getDefaultRelance,
   getDefaultAr,
+  getDefaultFacture,
   nettoyerHtmlMessage,
   resoudreRelances,
   envoyerRelances,
+  resoudreDemandesFacture,
+  envoyerDemandesFacture,
   calculerMontantCommande,
   getListeAr,
   resoudreAr,

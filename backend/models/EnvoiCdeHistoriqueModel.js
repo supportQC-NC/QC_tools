@@ -14,10 +14,11 @@ const envoiCdeHistoriqueSchema = new mongoose.Schema(
     nomDossierDBF: { type: String, default: "" },
 
     // Type d'envoi : commande fournisseur, relance d'une ou plusieurs commandes,
-    // confirmation d'accusé de réception, ou message groupé (vœux/annonces).
+    // confirmation d'accusé de réception, demande de facture (après confirmation
+    // du fournisseur), ou message groupé (vœux/annonces).
     type: {
       type: String,
-      enum: ["commande", "relance", "ar", "masse"],
+      enum: ["commande", "relance", "ar", "facture", "masse"],
       default: "commande",
     },
     // Pour un envoi en masse : nombre de destinataires réels concernés.

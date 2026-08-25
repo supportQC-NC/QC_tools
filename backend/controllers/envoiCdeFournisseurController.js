@@ -22,6 +22,8 @@ import {
   envoyerMasse,
   resoudreRelances,
   envoyerRelances,
+  resoudreDemandesFacture,
+  envoyerDemandesFacture,
   getListeAr,
   resoudreAr,
   confirmerAr,
@@ -37,8 +39,13 @@ import {
   DEFAULT_AR_A,
   DEFAULT_SUJET_AR_F,
   DEFAULT_SUJET_AR_A,
+  DEFAULT_FACTURE_F,
+  DEFAULT_FACTURE_A,
+  DEFAULT_SUJET_FACTURE_F,
+  DEFAULT_SUJET_FACTURE_A,
   VARIABLES_RELANCE,
   VARIABLES_AR,
+  VARIABLES_FACTURE,
 } from "../services/envoiCdeFournisseurService.js";
 import { genererModeleEmailsExcel } from "../services/envoiCdeReportService.js";
 
@@ -357,10 +364,15 @@ export const getMessages = asyncHandler(async (req, res) => {
         F: { message: DEFAULT_AR_F, sujet: DEFAULT_SUJET_AR_F },
         A: { message: DEFAULT_AR_A, sujet: DEFAULT_SUJET_AR_A },
       },
+      facture: {
+        F: { message: DEFAULT_FACTURE_F, sujet: DEFAULT_SUJET_FACTURE_F },
+        A: { message: DEFAULT_FACTURE_A, sujet: DEFAULT_SUJET_FACTURE_A },
+      },
     },
     // Champs insérables dans le sujet/corps (menu « Insérer un champ »).
     variablesRelance: VARIABLES_RELANCE,
     variablesAr: VARIABLES_AR,
+    variablesFacture: VARIABLES_FACTURE,
   });
 });
 
@@ -369,7 +381,7 @@ export const upsertMessage = asyncHandler(async (req, res) => {
   await assurerSchemaMessages();
   const { type, langue, message, sujet } = req.body;
   const lang = langue === "A" ? "A" : "F";
-  const typ = ["relance", "ar"].includes(type) ? type : "commande";
+  const typ = ["relance", "ar", "facture"].includes(type) ? type : "commande";
   const set = { message: nettoyerHtmlMessage(message) };
   // Le sujet n'a de sens que pour la relance et l'AR (celui d'une commande est
   // calculé à l'envoi, par fidélité à l'Access d'origine).
@@ -437,6 +449,75 @@ export const envoyerRelanceCtrl = asyncHandler(async (req, res) => {
     req.entreprise,
     numcdes,
     { avecPieces: avecPieces !== false },
+    req.user,
+  );
+  res.json(result);
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// DEMANDES DE FACTURE (onglet Accusés de réception, commandes confirmées)
+// ────────────────────────────────────────────────────────────────────────────
+
+// POST /:nomDossierDBF/facture/apercu   body: { numcdes: [] }
+// Même forme de réponse que l'aperçu de relance : groupé par fournisseur, avec
+// les commandes refusées (AR non confirmé) remontées comme erreurs.
+export const apercuDemandeFacture = asyncHandler(async (req, res) => {
+  const { numcdes = [] } = req.body;
+  if (!Array.isArray(numcdes) || numcdes.length === 0) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const groupes = await resoudreDemandesFacture(req.entreprise, numcdes);
+  const params = await getParametres(req.entreprise);
+
+  res.json({
+    testMode: params.testMode,
+    testEmails: params.testEmails,
+    groupes: groupes.map((g) => {
+      if (g.erreur) {
+        return {
+          fournId: g.fournId,
+          fournNom: g.fournNom,
+          numcdes: g.numcdes,
+          erreur: g.erreur,
+        };
+      }
+      const envoi = appliquerModeTest(
+        { destinataires: g.destinataires, cc: g.cc, sujet: g.sujet },
+        params,
+      );
+      return {
+        fournId: g.fournId,
+        fournNom: g.fournNom,
+        langue: g.langue,
+        numcdes: g.numcdes,
+        montantTotalLibelle: g.montantTotalLibelle,
+        // Les lignes ne servent qu'aux pièces jointes : inutile de les faire
+        // transiter jusqu'à l'écran d'aperçu.
+        commandes: g.commandes.map(({ lignes, ...c }) => c),
+        sujet: g.sujet,
+        html: g.html,
+        destinatairesReels: g.destinataires,
+        ccReels: g.cc,
+        envoi: { to: envoi.to, cc: envoi.cc, sujet: envoi.sujet, testMode: envoi.testMode },
+      };
+    }),
+  });
+});
+
+// POST /:nomDossierDBF/facture   body: { numcdes: [], avecPieces? }
+// ⚠️ Pièces jointes par défaut ABSENTES (contrairement à la relance) : le
+// fournisseur a déjà la commande, on ne lui réclame que la facture.
+export const envoyerDemandeFactureCtrl = asyncHandler(async (req, res) => {
+  const { numcdes = [], avecPieces } = req.body;
+  if (!Array.isArray(numcdes) || numcdes.length === 0) {
+    res.status(400);
+    throw new Error("Aucune commande sélectionnée.");
+  }
+  const result = await envoyerDemandesFacture(
+    req.entreprise,
+    numcdes,
+    { avecPieces: avecPieces === true },
     req.user,
   );
   res.json(result);

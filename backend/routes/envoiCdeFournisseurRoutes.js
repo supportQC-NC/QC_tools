@@ -19,6 +19,8 @@ import {
   envoyerMasseCtrl,
   apercuRelance,
   envoyerRelanceCtrl,
+  apercuDemandeFacture,
+  envoyerDemandeFactureCtrl,
   listAr,
   apercuAr,
   confirmerArCtrl,
@@ -71,6 +73,10 @@ router.post("/:nomDossierDBF/envoyer", ...write, envoyer);
 // ─── Relance des commandes déjà envoyées (onglet Historique) ───────────────
 router.post("/:nomDossierDBF/relance/apercu", ...read, apercuRelance);
 router.post("/:nomDossierDBF/relance", ...write, envoyerRelanceCtrl);
+
+// ─── Demande de facture (commandes dont l'AR est confirmé) ─────────────────
+router.post("/:nomDossierDBF/facture/apercu", ...read, apercuDemandeFacture);
+router.post("/:nomDossierDBF/facture", ...write, envoyerDemandeFactureCtrl);
 
 // ─── Accusés de réception fournisseur (onglet dédié) ───────────────────────
 router.get("/:nomDossierDBF/ar", ...read, listAr);
