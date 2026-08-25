@@ -338,10 +338,14 @@ const DetailModal = ({ dossier, drill, onClose }) => {
                     {a.design}
                     {a.renvoi && (
                       <span
-                        className="tv-tag-renvoi"
-                        title="Article en renvoi fournisseur"
+                        className={`tv-tag-renvoi${a.renvoi.trouve ? "" : " orphelin"}`}
+                        title={
+                          a.renvoi.trouve
+                            ? `Renvoie vers l'article ${a.renvoi.nart} — ${a.renvoi.design}`
+                            : `Renvoie vers ${a.renvoi.ref}, introuvable dans article.dbf`
+                        }
                       >
-                        <HiSwitchHorizontal /> Renvoi
+                        <HiSwitchHorizontal /> vers {a.renvoi.nart}
                       </span>
                     )}
                   </td>

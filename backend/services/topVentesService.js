@@ -24,10 +24,35 @@ const num = (v) => {
 const trim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
-// Article « en renvoi » (retour fournisseur) : champ RENV de article.dbf, seule
-// valeur renseignée par l'ERP = "O". Même convention que la fiche article
-// (AdminArticleInfosScreen) — ne pas inventer d'autre code ici.
-const estRenvoi = (rec) => trim(rec?.RENV).toUpperCase() === "O";
+// Article « en renvoi » = article qui RENVOIE vers un autre article : son champ
+// GENDOUBL porte alors la référence de l'article cible (souvent un doublon créé
+// par erreur, ou une référence remplacée). Leur désignation commence en général
+// par "**", parfois "**VOIR <NART>".
+//
+// ⚠️ Ne PAS confondre avec le champ RENV ("O") : ce sont deux choses sans
+// rapport (mesuré sur QC : 13 224 articles avec GENDOUBL, 9 645 avec RENV="O",
+// et seulement 5 articles dans les deux cas).
+//
+// GENDOUBL est en C13 comme un gencode, mais il contient presque toujours un
+// NART (QC : 13 219 cibles trouvées par NART contre 4 par GENCOD) — on tente
+// donc le NART d'abord, le gencode ensuite.
+const cibleRenvoi = (rec, cache) => {
+  const ref = trim(rec?.GENDOUBL);
+  if (!ref) return null;
+
+  let idx = cache.indexByNart.get(ref.toUpperCase());
+  if (idx === undefined) idx = cache.indexByGencod.get(ref);
+  const cible = idx !== undefined ? cache.records[idx] : null;
+
+  return {
+    // Référence brute : conservée telle quelle quand la cible n'existe plus
+    // dans article.dbf (QC : 1 cas), sinon l'écran n'afficherait rien.
+    ref,
+    nart: cible ? trim(cible.NART) : ref,
+    design: cible ? trim(cible.DESIGN) : "",
+    trouve: Boolean(cible),
+  };
+};
 
 // Somme d'une série de champs préfixés (V1..V12, RUP1..RUP12, S1..S5).
 const sumFields = (rec, prefix, from, to) => {
@@ -210,10 +235,10 @@ export const getDetail = async (entreprise, options = {}) => {
     } else if (trim(rec.GISM1).toUpperCase() !== codeStr) {
       continue;
     }
-    const renvoi = estRenvoi(rec);
-    if (renvoi) nbRenvois += 1;
-    if (filtreRenvoi === "1" && !renvoi) continue;
-    if (filtreRenvoi === "0" && renvoi) continue;
+    const renvoiVers = cibleRenvoi(rec, cache);
+    if (renvoiVers) nbRenvois += 1;
+    if (filtreRenvoi === "1" && !renvoiVers) continue;
+    if (filtreRenvoi === "0" && renvoiVers) continue;
     if (search) {
       const hay = `${trim(rec.NART)} ${trim(rec.DESIGN)} ${trim(rec.REFER)} ${trim(
         rec.GENCOD,
@@ -240,7 +265,8 @@ export const getDetail = async (entreprise, options = {}) => {
       stockDock: m.stockDock,
       stockTotal: m.stockTotal,
       encde: m.encde,
-      renvoi,
+      // Renvoi vers un autre article : null si l'article n'en est pas un.
+      renvoi: renvoiVers,
     });
   }
 

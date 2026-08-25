@@ -200,7 +200,7 @@
   color: #a5b4fc;
 }
 
-/* Repère « article en renvoi fournisseur » (article.RENV = "O") */
+/* Repère « article qui renvoie vers un autre » (article.GENDOUBL renseigné) */
 .tv-tag-renvoi {
   display: inline-flex;
   align-items: center;
@@ -213,6 +213,11 @@
   white-space: nowrap;
   background: rgba(245, 158, 11, 0.16);
   color: #fbbf24;
+}
+/* Cible du renvoi absente de article.dbf : on le signale sans crier. */
+.tv-tag-renvoi.orphelin {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
 }
 .tv-renvoi-count {
   color: #fbbf24;

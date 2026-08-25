@@ -12,7 +12,8 @@ export const synthese = asyncHandler(async (req, res) => {
 });
 
 // GET /:nomDossierDBF/detail?type=fournisseur|rayon&code=&search=&sort=&dir=&limit=&renvoi=
-// renvoi : "1" = uniquement les articles en renvoi, "0" = les exclure.
+// renvoi : "1" = uniquement les articles qui renvoient vers un autre article
+// (GENDOUBL renseigné), "0" = les exclure.
 export const detail = asyncHandler(async (req, res) => {
   const { type, code, search, sort, dir, limit, renvoi } = req.query;
   const data = await getDetail(req.entreprise, {
