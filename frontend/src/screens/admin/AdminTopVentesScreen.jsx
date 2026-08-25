@@ -9,6 +9,7 @@ import {
   HiX,
   HiChevronUp,
   HiChevronDown,
+  HiSwitchHorizontal,
 } from "react-icons/hi";
 import { selectGlobalDossier, selectGlobalEntreprise } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -221,6 +222,8 @@ const DetailModal = ({ dossier, drill, onClose }) => {
   const [sort, setSort] = useState("caAnnee");
   const [dir, setDir] = useState("desc");
   const [search, setSearch] = useState("");
+  // "" = tous, "1" = uniquement les renvois, "0" = sans les renvois.
+  const [renvoi, setRenvoi] = useState("");
 
   const { data, isLoading, isFetching } = useGetTopVenteDetailQuery({
     nomDossierDBF: dossier,
@@ -228,6 +231,7 @@ const DetailModal = ({ dossier, drill, onClose }) => {
     code: drill.code,
     sort,
     dir,
+    renvoi,
   });
 
   const onSort = (field) => {
@@ -270,9 +274,28 @@ const DetailModal = ({ dossier, drill, onClose }) => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <select
+          className="tv-input"
+          value={renvoi}
+          onChange={(e) => setRenvoi(e.target.value)}
+          title="Articles en renvoi fournisseur"
+        >
+          <option value="">Renvois : tous les articles</option>
+          <option value="1">Uniquement les renvois</option>
+          <option value="0">Sans les renvois</option>
+        </select>
         <div className="tv-spacer" />
         <span className="tv-soc">
-          {data?.total ?? 0} article(s){isFetching ? " · …" : ""}
+          {data?.total ?? 0} article(s)
+          {data?.nbRenvois > 0 && (
+            <>
+              {" · "}
+              <span className="tv-renvoi-count">
+                {data.nbRenvois} en renvoi
+              </span>
+            </>
+          )}
+          {isFetching ? " · …" : ""}
         </span>
       </div>
 
@@ -311,7 +334,17 @@ const DetailModal = ({ dossier, drill, onClose }) => {
                   <td>
                     <b>{a.nart}</b>
                   </td>
-                  <td className="wrap">{a.design}</td>
+                  <td className="wrap">
+                    {a.design}
+                    {a.renvoi && (
+                      <span
+                        className="tv-tag-renvoi"
+                        title="Article en renvoi fournisseur"
+                      >
+                        <HiSwitchHorizontal /> Renvoi
+                      </span>
+                    )}
+                  </td>
                   {drill.type === "fournisseur" && (
                     <td className="wrap">{a.rayon || a.gism1 || "—"}</td>
                   )}

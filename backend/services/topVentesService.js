@@ -24,6 +24,11 @@ const num = (v) => {
 const trim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 const round2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
+// Article « en renvoi » (retour fournisseur) : champ RENV de article.dbf, seule
+// valeur renseignée par l'ERP = "O". Même convention que la fiche article
+// (AdminArticleInfosScreen) — ne pas inventer d'autre code ici.
+const estRenvoi = (rec) => trim(rec?.RENV).toUpperCase() === "O";
+
 // Somme d'une série de champs préfixés (V1..V12, RUP1..RUP12, S1..S5).
 const sumFields = (rec, prefix, from, to) => {
   let s = 0;
@@ -180,6 +185,8 @@ export const getDetail = async (entreprise, options = {}) => {
   const type = options.type === "rayon" ? "rayon" : "fournisseur";
   const code = options.code;
   const search = trim(options.search).toLowerCase();
+  // "1" = uniquement les renvois, "0" = les exclure, absent = tout.
+  const filtreRenvoi = trim(options.renvoi);
   const sort = SORT_FIELDS.has(options.sort) ? options.sort : "caAnnee";
   const dir = options.dir === "asc" ? 1 : -1;
   const limit = Math.min(parseInt(options.limit) || 1000, 5000);
@@ -194,12 +201,19 @@ export const getDetail = async (entreprise, options = {}) => {
 
   const codeStr = String(code).toUpperCase();
   let rows = [];
+  // Compté sur tout le groupe, avant recherche et avant filtre : le compteur
+  // reste stable quand on bascule « uniquement les renvois » / « les exclure ».
+  let nbRenvois = 0;
   for (const rec of records) {
     if (type === "fournisseur") {
       if (String(rec.FOURN) !== String(code)) continue;
     } else if (trim(rec.GISM1).toUpperCase() !== codeStr) {
       continue;
     }
+    const renvoi = estRenvoi(rec);
+    if (renvoi) nbRenvois += 1;
+    if (filtreRenvoi === "1" && !renvoi) continue;
+    if (filtreRenvoi === "0" && renvoi) continue;
     if (search) {
       const hay = `${trim(rec.NART)} ${trim(rec.DESIGN)} ${trim(rec.REFER)} ${trim(
         rec.GENCOD,
@@ -226,6 +240,7 @@ export const getDetail = async (entreprise, options = {}) => {
       stockDock: m.stockDock,
       stockTotal: m.stockTotal,
       encde: m.encde,
+      renvoi,
     });
   }
 
@@ -236,7 +251,7 @@ export const getDetail = async (entreprise, options = {}) => {
     return (av - bv) * dir;
   });
 
-  return { total, articles: rows.slice(0, limit) };
+  return { total, nbRenvois, articles: rows.slice(0, limit) };
 };
 
 export default { getSynthese, getDetail };

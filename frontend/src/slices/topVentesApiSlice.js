@@ -16,7 +16,7 @@ export const topVentesApiSlice = apiSlice.injectEndpoints({
     }),
 
     getTopVenteDetail: builder.query({
-      query: ({ nomDossierDBF, type, code, search, sort, dir }) => ({
+      query: ({ nomDossierDBF, type, code, search, sort, dir, renvoi }) => ({
         url: `${TOP_VENTES_URL}/${nomDossierDBF}/detail`,
         params: {
           type,
@@ -24,6 +24,8 @@ export const topVentesApiSlice = apiSlice.injectEndpoints({
           ...(search && { search }),
           ...(sort && { sort }),
           ...(dir && { dir }),
+          // "1" = uniquement les renvois, "0" = les exclure, absent = tout.
+          ...(renvoi !== undefined && renvoi !== "" && { renvoi }),
         },
       }),
       providesTags: ["TopVentes"],
