@@ -2130,6 +2130,162 @@ export const supprimerEmails = async (entreprise, { ids, all } = {}) => {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
+// PURGE DE L'HISTORIQUE DES ENVOIS
+//
+// Rien ne purge l'historique automatiquement : au bout de quelques mois l'onglet
+// « Historique » ne montre plus que de vieilles commandes soldées. La purge est
+// donc MANUELLE et toujours bornée par une date (« antérieurs au … »).
+//
+// ⚠️ L'historique n'est pas qu'un journal : les lignes de type "commande" sont
+// la SOURCE de l'onglet « Accusés de réception » (getListeAr) et donnent la date
+// du 1er envoi rappelée dans les relances / demandes de facture. Purger une
+// commande la retire donc du suivi d'AR — d'où l'option `garderArNonConfirme`
+// (activée par défaut) qui épargne les commandes dont l'AR n'est pas confirmé.
+// ────────────────────────────────────────────────────────────────────────────
+export const TYPES_HISTORIQUE = ["commande", "relance", "ar", "facture", "masse"];
+
+// Les tout premiers envois enregistrés n'ont PAS de champ `type` (il est arrivé
+// après) : l'écran les affiche comme des commandes, la purge doit faire pareil,
+// sinon ces lignes seraient impurgeables. `$in: [..., null]` couvre aussi bien
+// le champ absent que le champ à null.
+export const FILTRE_TYPE_COMMANDE = { type: { $in: ["commande", null] } };
+
+// Filtre Mongo de la purge — partagé par l'aperçu et la suppression pour que le
+// nombre annoncé soit EXACTEMENT le nombre supprimé.
+const construireFiltrePurge = async (entreprise, options = {}) => {
+  const { avant, types = [], garderArNonConfirme = true } = options;
+
+  const dateAvant = avant instanceof Date ? avant : new Date(avant);
+  if (!avant || isNaN(dateAvant.getTime())) {
+    const err = new Error("Date de purge invalide.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const demandes = (Array.isArray(types) ? types : [types])
+    .map(trim)
+    .filter((t) => TYPES_HISTORIQUE.includes(t));
+  const typesRetenus = demandes.length ? [...new Set(demandes)] : [...TYPES_HISTORIQUE];
+
+  const filtre = { entreprise: entreprise._id, createdAt: { $lt: dateAvant } };
+  const purgeCommandes = typesRetenus.includes("commande");
+
+  if (garderArNonConfirme && purgeCommandes) {
+    // On ne purge du type "commande" que celles dont l'AR est confirmé.
+    const confirmes = await EnvoiCdeAr.find({
+      entreprise: entreprise._id,
+      statut: "confirme",
+    })
+      .select("numcde")
+      .lean();
+    const numcdesConfirmes = confirmes.map((a) => a.numcde).filter(Boolean);
+    const autresTypes = typesRetenus.filter((t) => t !== "commande");
+    const clauses = [
+      { ...FILTRE_TYPE_COMMANDE, numcde: { $in: numcdesConfirmes } },
+    ];
+    if (autresTypes.length) clauses.push({ type: { $in: autresTypes } });
+    filtre.$or = clauses;
+    return { filtre, dateAvant, typesRetenus, protegeAr: true };
+  }
+
+  // `null` ne s'ajoute que si les commandes sont purgées (lignes sans `type`).
+  filtre.type = { $in: purgeCommandes ? [...typesRetenus, null] : typesRetenus };
+  return { filtre, dateAvant, typesRetenus, protegeAr: false };
+};
+
+// Aperçu : ce que la purge supprimerait, sans rien toucher.
+export const compterPurgeHistorique = async (entreprise, options = {}) => {
+  const { filtre, dateAvant, typesRetenus, protegeAr } =
+    await construireFiltrePurge(entreprise, options);
+
+  const [aSupprimer, parType, totalHistorique, plusAncien, protegees] =
+    await Promise.all([
+      EnvoiCdeHistorique.countDocuments(filtre),
+      EnvoiCdeHistorique.aggregate([
+        { $match: filtre },
+        // Les lignes sans `type` comptent comme des commandes (cf. FILTRE_TYPE_COMMANDE).
+        { $group: { _id: { $ifNull: ["$type", "commande"] }, n: { $sum: 1 } } },
+      ]),
+      EnvoiCdeHistorique.countDocuments({ entreprise: entreprise._id }),
+      EnvoiCdeHistorique.findOne({ entreprise: entreprise._id })
+        .sort({ createdAt: 1 })
+        .select("createdAt")
+        .lean(),
+      // Protégées = commandes antérieures à la date MOINS celles que la purge
+      // emporte réellement (celles dont l'AR est confirmé).
+      protegeAr
+        ? Promise.all([
+            EnvoiCdeHistorique.countDocuments({
+              entreprise: entreprise._id,
+              createdAt: { $lt: dateAvant },
+              ...FILTRE_TYPE_COMMANDE,
+            }),
+            EnvoiCdeHistorique.countDocuments({
+              $and: [filtre, FILTRE_TYPE_COMMANDE],
+            }),
+          ]).then(([toutes, dansPurge]) => Math.max(0, toutes - dansPurge))
+        : Promise.resolve(0),
+    ]);
+
+  return {
+    avant: dateAvant,
+    types: typesRetenus,
+    garderArNonConfirme: protegeAr,
+    aSupprimer,
+    parType: Object.fromEntries(parType.map((r) => [r._id, r.n])),
+    // Commandes antérieures épargnées parce que leur AR n'est pas confirmé.
+    protegees,
+    totalHistorique,
+    restant: Math.max(0, totalHistorique - aSupprimer),
+    plusAncien: plusAncien?.createdAt || null,
+  };
+};
+
+// Purge effective. Renvoie aussi le nombre de suivis d'AR devenus orphelins et
+// supprimés au passage (un AR sans ligne d'historique n'est plus affichable).
+export const purgerHistorique = async (entreprise, options = {}) => {
+  const { filtre, dateAvant, typesRetenus, protegeAr } =
+    await construireFiltrePurge(entreprise, options);
+
+  // N° de commande concernés AVANT suppression : ils servent à repérer les AR
+  // devenus orphelins juste après.
+  const numcdesTouches = await EnvoiCdeHistorique.distinct("numcde", {
+    $and: [filtre, FILTRE_TYPE_COMMANDE],
+  });
+
+  const res = await EnvoiCdeHistorique.deleteMany(filtre);
+  const supprimes = res.deletedCount || 0;
+
+  let arSupprimes = 0;
+  if (numcdesTouches.length) {
+    // Une commande peut avoir plusieurs lignes : on ne supprime l'AR que si
+    // plus AUCUNE ligne "commande" ne subsiste pour ce n°.
+    const restants = await EnvoiCdeHistorique.distinct("numcde", {
+      entreprise: entreprise._id,
+      ...FILTRE_TYPE_COMMANDE,
+      numcde: { $in: numcdesTouches },
+    });
+    const encore = new Set(restants);
+    const orphelins = numcdesTouches.filter((n) => n && !encore.has(n));
+    if (orphelins.length) {
+      const r = await EnvoiCdeAr.deleteMany({
+        entreprise: entreprise._id,
+        numcde: { $in: orphelins },
+      });
+      arSupprimes = r.deletedCount || 0;
+    }
+  }
+
+  return {
+    supprimes,
+    arSupprimes,
+    avant: dateAvant,
+    types: typesRetenus,
+    garderArNonConfirme: protegeAr,
+  };
+};
+
+// ────────────────────────────────────────────────────────────────────────────
 // IMPORT DE LA BASE DE RÉFÉRENCE (fichiers commités -> Mongo), PAR SOCIÉTÉ.
 // Permet de peupler la prod (VPS) sans CLI : upsert des emails/modèles/responsable
 // de la société courante depuis backend/data/*.js (migrés depuis Access).
@@ -2298,4 +2454,6 @@ export default {
   supprimerEmails,
   compterCiblesMasse,
   envoyerMasse,
+  compterPurgeHistorique,
+  purgerHistorique,
 };

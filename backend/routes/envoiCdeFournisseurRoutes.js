@@ -37,6 +37,8 @@ import {
   getResponsable,
   upsertResponsable,
   getHistorique,
+  apercuPurgeHistorique,
+  purgerHistoriqueCtrl,
 } from "../controllers/envoiCdeFournisseurController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import {
@@ -108,7 +110,10 @@ router.put("/:nomDossierDBF/messages", ...write, upsertMessage);
 router.get("/:nomDossierDBF/responsable", ...read, getResponsable);
 router.put("/:nomDossierDBF/responsable", ...write, upsertResponsable);
 
-// ─── Historique ────────────────────────────────────────────────────────────
+// ─── Historique (+ purge des vieux envois) ─────────────────────────────────
+// L'aperçu ne supprime rien (droit lecture) ; la purge exige le droit delete.
+router.get("/:nomDossierDBF/historique/purge", ...read, apercuPurgeHistorique);
+router.post("/:nomDossierDBF/historique/purge", ...del, purgerHistoriqueCtrl);
 router.get("/:nomDossierDBF/historique", ...read, getHistorique);
 
 export default router;

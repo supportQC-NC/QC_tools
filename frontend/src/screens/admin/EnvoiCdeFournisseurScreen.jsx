@@ -51,7 +51,10 @@ import {
   useGetResponsableCcQuery,
   useUpsertResponsableCcMutation,
   useGetEnvoiHistoriqueQuery,
+  useGetApercuPurgeHistoriqueQuery,
+  usePurgerHistoriqueMutation,
 } from "../../slices/envoiCdeApiSlice";
+import { hasModulePermission } from "../../config/menuConfig";
 import { ENVOI_CDE_URL } from "../../constants";
 import Modal from "../../components/ui/Modal/Modal";
 import RichTextEditor from "../../components/ui/RichTextEditor/RichTextEditor";
@@ -2313,7 +2316,12 @@ const HistoriqueTab = ({ dossier, params }) => {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState([]); // n° de commande
   const [showRelance, setShowRelance] = useState(false);
+  const [showPurge, setShowPurge] = useState(false);
   const [result, setResult] = useState(null);
+  const [purgeResult, setPurgeResult] = useState(null);
+
+  const { userInfo } = useSelector((s) => s.auth);
+  const peutPurger = hasModulePermission(userInfo, "envoi_cde_fournisseur", "delete");
 
   const { data, isLoading, isFetching, refetch } = useGetEnvoiHistoriqueQuery({
     nomDossierDBF: dossier,
@@ -2392,6 +2400,18 @@ const HistoriqueTab = ({ dossier, params }) => {
         <button className="ecf-btn" onClick={() => refetch()} disabled={isFetching}>
           <HiRefresh /> Rafraîchir
         </button>
+        {peutPurger && (
+          <button
+            className="ecf-btn danger"
+            title="Supprimer les vieux envois de l'historique"
+            onClick={() => {
+              setPurgeResult(null);
+              setShowPurge(true);
+            }}
+          >
+            <HiTrash /> Purger…
+          </button>
+        )}
         <div className="ecf-spacer" />
         <span className="ecf-soc">{data?.total ?? 0} envoi(s)</span>
         <button
@@ -2410,6 +2430,14 @@ const HistoriqueTab = ({ dossier, params }) => {
           </button>
         )}
       </div>
+
+      {purgeResult && (
+        <div className="ecf-msg ok">
+          <b>
+            <HiCheckCircle /> {purgeResult.message}
+          </b>
+        </div>
+      )}
 
       {result && (
         <div className={`ecf-msg ${result.nbErr ? "err" : "ok"}`}>
@@ -2569,7 +2597,236 @@ const HistoriqueTab = ({ dossier, params }) => {
           }}
         />
       )}
+
+      {showPurge && (
+        <PurgeHistoriqueModal
+          dossier={dossier}
+          onClose={() => setShowPurge(false)}
+          onDone={(r) => {
+            setPurgeResult(r);
+            setResult(null);
+            setShowPurge(false);
+            setSelected([]);
+            setPage(1);
+          }}
+        />
+      )}
     </div>
+  );
+};
+
+// ── Modale de purge : aperçu chiffré puis suppression définitive ─────────────
+//
+// La purge est toujours bornée par une date. On affiche AVANT de supprimer le
+// nombre exact de lignes concernées, parce que l'historique n'est pas qu'un
+// journal : les lignes « commande » alimentent l'onglet « Accusés de réception »
+// et la date de 1er envoi rappelée dans les relances. Par défaut on épargne donc
+// les commandes dont l'AR n'est pas confirmé.
+const PERIODES = [
+  { value: "3", label: "plus de 3 mois" },
+  { value: "6", label: "plus de 6 mois" },
+  { value: "12", label: "plus d'un an" },
+  { value: "24", label: "plus de 2 ans" },
+  { value: "date", label: "antérieurs à une date précise…" },
+];
+
+const LIBELLE_TYPE = {
+  commande: "Commandes",
+  relance: "Relances",
+  ar: "Confirmations d'AR",
+  facture: "Demandes de facture",
+  masse: "Messages groupés",
+};
+
+const PurgeHistoriqueModal = ({ dossier, onClose, onDone }) => {
+  const [periode, setPeriode] = useState("12");
+  const [dateLimite, setDateLimite] = useState("");
+  const [types, setTypes] = useState(Object.keys(LIBELLE_TYPE));
+  const [garderArNonConfirme, setGarderArNonConfirme] = useState(true);
+  const [confirme, setConfirme] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  const [purger, { isLoading: purgeEnCours }] = usePurgerHistoriqueMutation();
+
+  const criteres =
+    periode === "date"
+      ? dateLimite
+        ? { avant: dateLimite }
+        : null
+      : { mois: periode };
+
+  const { data: apercu, isFetching } = useGetApercuPurgeHistoriqueQuery(
+    { nomDossierDBF: dossier, ...criteres, types, garderArNonConfirme },
+    { skip: !criteres || types.length === 0 },
+  );
+
+  // Toute modification des critères annule la confirmation déjà donnée.
+  const majCritere = (fn) => {
+    setConfirme(false);
+    setErreur(null);
+    fn();
+  };
+
+  const toggleType = (t) =>
+    majCritere(() =>
+      setTypes((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t])),
+    );
+
+  const nb = apercu?.aSupprimer ?? 0;
+
+  const lancer = async () => {
+    if (!criteres) return;
+    if (!confirme) {
+      setConfirme(true);
+      return;
+    }
+    try {
+      const r = await purger({
+        nomDossierDBF: dossier,
+        ...criteres,
+        types,
+        garderArNonConfirme,
+      }).unwrap();
+      onDone(r);
+    } catch (e) {
+      setErreur(e?.data?.message || "La purge a échoué.");
+    }
+  };
+
+  return (
+    <Modal onClose={onClose} overlayClassName="ecf-overlay" contentClassName="ecf-modal">
+      <h3>
+        <HiTrash /> Purger l'historique des envois
+      </h3>
+
+      {erreur && <div className="ecf-msg err">{erreur}</div>}
+
+      <div className="ecf-field">
+        <label>Supprimer les envois…</label>
+        <select
+          value={periode}
+          onChange={(e) => majCritere(() => setPeriode(e.target.value))}
+        >
+          {PERIODES.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {periode === "date" && (
+        <div className="ecf-field">
+          <label>Antérieurs au</label>
+          <input
+            type="date"
+            value={dateLimite}
+            onChange={(e) => majCritere(() => setDateLimite(e.target.value))}
+          />
+          <div className="ecf-hint">
+            Tout ce qui précède ce jour est supprimé ; cette journée est conservée.
+          </div>
+        </div>
+      )}
+
+      <div className="ecf-field">
+        <label>Types d'envoi concernés</label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+          {Object.entries(LIBELLE_TYPE).map(([t, lbl]) => (
+            <label key={t} className="ecf-check" style={{ marginBottom: 0 }}>
+              <input
+                type="checkbox"
+                className="ecf-checkbox"
+                checked={types.includes(t)}
+                onChange={() => toggleType(t)}
+              />
+              {lbl}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {types.includes("commande") && (
+        <label className="ecf-check">
+          <input
+            type="checkbox"
+            className="ecf-checkbox"
+            checked={garderArNonConfirme}
+            onChange={(e) =>
+              majCritere(() => setGarderArNonConfirme(e.target.checked))
+            }
+          />
+          Conserver les commandes dont l'accusé de réception n'est pas confirmé
+        </label>
+      )}
+
+      <div className="ecf-msg warn">
+        <HiExclamation /> Une commande retirée de l'historique disparaît aussi de
+        l'onglet « Accusés de réception » et ne peut plus être relancée. Les
+        commandes elles-mêmes (fichiers de l'ERP) ne sont jamais touchées.
+      </div>
+
+      <div className="ecf-purge-apercu">
+        {!criteres ? (
+          <span className="ecf-soc">Choisissez une date pour voir le résultat.</span>
+        ) : types.length === 0 ? (
+          <span className="ecf-soc">Sélectionnez au moins un type d'envoi.</span>
+        ) : isFetching || !apercu ? (
+          <span className="ecf-soc">Calcul…</span>
+        ) : (
+          <>
+            <div>
+              <b>{nb}</b> envoi(s) seront supprimés — {apercu.restant} conservé(s)
+              sur {apercu.totalHistorique}.
+            </div>
+            {nb > 0 && (
+              <div className="ecf-hint">
+                {Object.entries(apercu.parType || {})
+                  .map(([t, n]) => `${LIBELLE_TYPE[t] || t} : ${n}`)
+                  .join(" · ")}
+              </div>
+            )}
+            {apercu.protegees > 0 && (
+              <div className="ecf-hint">
+                {apercu.protegees} commande(s) conservée(s) : leur AR n'est pas
+                confirmé.
+              </div>
+            )}
+            {apercu.plusAncien && (
+              <div className="ecf-hint">
+                Envoi le plus ancien :{" "}
+                {new Date(apercu.plusAncien).toLocaleDateString("fr-FR")}.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {confirme && nb > 0 && (
+        <div className="ecf-msg err">
+          <b>Confirmez :</b> {nb} ligne(s) d'historique vont être supprimées
+          définitivement. Cliquez à nouveau sur « Supprimer » pour valider.
+        </div>
+      )}
+
+      <div className="ecf-actions">
+        <button className="ecf-btn" onClick={onClose} disabled={purgeEnCours}>
+          Annuler
+        </button>
+        <button
+          className="ecf-btn danger"
+          onClick={lancer}
+          disabled={purgeEnCours || isFetching || nb === 0}
+        >
+          <HiTrash />{" "}
+          {purgeEnCours
+            ? "Suppression…"
+            : confirme
+              ? `Oui, supprimer ${nb} envoi(s)`
+              : `Supprimer (${nb})`}
+        </button>
+      </div>
+    </Modal>
   );
 };
 

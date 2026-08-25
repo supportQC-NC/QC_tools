@@ -28,6 +28,10 @@ import {
   resoudreAr,
   confirmerAr,
   annulerAr,
+  compterPurgeHistorique,
+  purgerHistorique,
+  TYPES_HISTORIQUE,
+  FILTRE_TYPE_COMMANDE,
   nettoyerHtmlMessage,
   DEFAULT_MESSAGE_F,
   DEFAULT_MESSAGE_A,
@@ -645,7 +649,10 @@ export const getHistorique = asyncHandler(async (req, res) => {
   const p = parseInt(page) || 1;
   const l = parseInt(limit) || 50;
   const filter = { entreprise: req.entreprise._id };
-  if (["commande", "relance", "ar", "masse"].includes(type)) filter.type = type;
+  // Les plus vieilles lignes n'ont pas de `type` : elles s'affichent comme des
+  // commandes (badge par défaut), le filtre « Commandes » doit les inclure.
+  if (TYPES_HISTORIQUE.includes(type))
+    Object.assign(filter, type === "commande" ? FILTRE_TYPE_COMMANDE : { type });
   if (search) {
     const rx = new RegExp(String(search).trim(), "i");
     filter.$or = [{ numcde: rx }, { fournNom: rx }, { sujet: rx }];
@@ -660,4 +667,83 @@ export const getHistorique = asyncHandler(async (req, res) => {
     EnvoiCdeHistorique.countDocuments(filter),
   ]);
   res.json({ total, page: p, limit: l, historique: rows });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// PURGE DE L'HISTORIQUE
+// ────────────────────────────────────────────────────────────────────────────
+
+// Normalise les options de purge reçues en query (aperçu) ou en body (purge).
+// `avant` (JJ/MM/AAAA côté écran, "AAAA-MM-JJ" en transit) l'emporte sur `mois`.
+// Une date "AAAA-MM-JJ" est comprise à MINUIT LOCAL (fuseau du serveur) : on
+// supprime bien tout ce qui précède ce jour, sans décalage d'une demi-journée.
+const parserOptionsPurge = (src = {}) => {
+  const { avant, mois, types, garderArNonConfirme } = src;
+
+  let date = null;
+  const brut = typeof avant === "string" ? avant.trim() : avant;
+  if (brut) {
+    const jour = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(brut));
+    date = jour
+      ? new Date(+jour[1], +jour[2] - 1, +jour[3])
+      : new Date(brut);
+  } else if (mois !== undefined && mois !== null && mois !== "") {
+    const n = parseInt(mois, 10);
+    if (!isNaN(n) && n > 0) {
+      date = new Date();
+      date.setMonth(date.getMonth() - n);
+    }
+  }
+  if (!date || isNaN(date.getTime())) {
+    const err = new Error(
+      "Précisez la période à purger (une date ou un nombre de mois).",
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const liste = Array.isArray(types)
+    ? types
+    : typeof types === "string" && types.trim()
+      ? types.split(",")
+      : [];
+
+  return {
+    avant: date,
+    types: liste.map((t) => String(t).trim()).filter(Boolean),
+    // Coché par défaut : on n'ampute pas le suivi d'AR sans le vouloir.
+    garderArNonConfirme: String(garderArNonConfirme) !== "false",
+  };
+};
+
+// GET /:nomDossierDBF/historique/purge  — aperçu, ne supprime rien
+export const apercuPurgeHistorique = asyncHandler(async (req, res) => {
+  try {
+    const options = parserOptionsPurge(req.query);
+    res.json(await compterPurgeHistorique(req.entreprise, options));
+  } catch (e) {
+    // Le `statusCode` posé par le service/parseur doit atteindre errorHandler,
+    // qui lit celui de la RÉPONSE, pas celui de l'erreur.
+    res.status(e.statusCode || 500);
+    throw e;
+  }
+});
+
+// POST /:nomDossierDBF/historique/purge   body: { avant | mois, types[], garderArNonConfirme }
+export const purgerHistoriqueCtrl = asyncHandler(async (req, res) => {
+  let result;
+  try {
+    result = await purgerHistorique(req.entreprise, parserOptionsPurge(req.body));
+  } catch (e) {
+    res.status(e.statusCode || 500);
+    throw e;
+  }
+  res.json({
+    message:
+      `${result.supprimes} ligne(s) d'historique supprimée(s)` +
+      (result.arSupprimes
+        ? `, ${result.arSupprimes} suivi(s) d'AR devenu(s) sans objet.`
+        : "."),
+    ...result,
+  });
 });

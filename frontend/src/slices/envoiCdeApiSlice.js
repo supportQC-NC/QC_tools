@@ -291,6 +291,31 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: ["EnvoiCdeHistorique"],
     }),
+
+    // Aperçu de purge : combien de lignes partiraient, par type. Ne supprime rien.
+    getApercuPurgeHistorique: builder.query({
+      query: ({ nomDossierDBF, avant, mois, types, garderArNonConfirme }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/historique/purge`,
+        params: {
+          ...(avant && { avant }),
+          ...(mois && { mois }),
+          ...(types && types.length ? { types: types.join(",") } : {}),
+          garderArNonConfirme: garderArNonConfirme ? "true" : "false",
+        },
+      }),
+      providesTags: ["EnvoiCdeHistorique"],
+      keepUnusedDataFor: 5,
+    }),
+
+    // La purge peut retirer des commandes du suivi d'AR : on invalide les deux.
+    purgerHistorique: builder.mutation({
+      query: ({ nomDossierDBF, ...body }) => ({
+        url: `${ENVOI_CDE_URL}/${nomDossierDBF}/historique/purge`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["EnvoiCdeHistorique", "EnvoiCdeAr"],
+    }),
   }),
 });
 
@@ -325,4 +350,6 @@ export const {
   useGetResponsableCcQuery,
   useUpsertResponsableCcMutation,
   useGetEnvoiHistoriqueQuery,
+  useGetApercuPurgeHistoriqueQuery,
+  usePurgerHistoriqueMutation,
 } = envoiCdeApiSlice;
