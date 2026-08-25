@@ -1069,6 +1069,13 @@
   border: 1px solid var(--admin-success);
 }
 
+/* 4e couleur : les sociétés qui déclarent plus de 3 états (QC en a 4) */
+.proforma-detail-page .etat-warning {
+  background: var(--admin-warning-light);
+  color: var(--admin-warning);
+  border: 1px solid var(--admin-warning);
+}
+
 /* Table empty */
 .proforma-detail-page .table-empty {
   display: flex;

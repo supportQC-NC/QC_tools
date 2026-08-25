@@ -109,6 +109,10 @@
   border-left: 3px solid var(--admin-text-muted);
 }
 
+.proformas-table tbody tr.row-etat-warning {
+  border-left: 3px solid var(--admin-warning);
+}
+
 /* Link style for NUMFACT */
 .proforma-numfact-link {
   display: inline-flex;
@@ -237,6 +241,13 @@
   background: var(--admin-success-light);
   color: var(--admin-success);
   border: 1px solid var(--admin-success);
+}
+
+/* 4e couleur : les sociétés qui déclarent plus de 3 états (QC en a 4) */
+.admin-proformas-page .etat-warning {
+  background: var(--admin-warning-light);
+  color: var(--admin-warning);
+  border: 1px solid var(--admin-warning);
 }
 
 /* Actions */

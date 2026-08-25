@@ -78,8 +78,9 @@ const formatEntreprise = (entreprise) => ({
 });
 
 /**
- * Labels des états de proforma (valeurs par défaut si l'entreprise n'a rien
- * configuré dans mappingEtatsProforma).
+ * Libellés d'états utilisés UNIQUEMENT quand l'entreprise n'a rien configuré.
+ * ⚠️ Ils ne valent pour aucune société en particulier : les états réels varient
+ * (chez QC les proformas sont en ETAT 1 à 4 et l'ETAT 0 n'existe pas).
  */
 const ETAT_LABELS = {
   0: "brouillon",
@@ -88,26 +89,46 @@ const ETAT_LABELS = {
 };
 
 /**
- * Construit la table des libellés d'états pour une entreprise :
- * on part des valeurs par défaut puis on applique le mapping personnalisé
- * (mappingEtatsProforma) configuré sur la fiche entreprise.
+ * Table des libellés d'états d'une entreprise.
+ *
+ * ⚠️ Le `mappingEtatsProforma` de la fiche société FAIT FOI : dès qu'il contient
+ * au moins un libellé, il remplace entièrement les valeurs par défaut (il ne s'y
+ * ajoute pas). Sans ça, une société qui renomme ses états gardait les libellés
+ * génériques sur les codes qu'elle n'avait pas redéfinis — l'écran affichait
+ * « Facturée » là où le paramétrage disait tout autre chose.
  */
 const buildEtatLabels = (entreprise) => {
-  const labels = { ...ETAT_LABELS };
   const mapping = entreprise?.mappingEtatsProforma;
-  if (mapping) {
-    // mappingEtatsProforma est un Map Mongoose (ou un objet après toJSON).
-    const entries =
-      typeof mapping.entries === "function"
-        ? [...mapping.entries()]
-        : Object.entries(mapping);
-    for (const [code, libelle] of entries) {
-      if (libelle !== undefined && libelle !== null && String(libelle).trim()) {
-        labels[code] = libelle;
-      }
+  // mappingEtatsProforma est un Map Mongoose (ou un objet après toJSON).
+  const entries = !mapping
+    ? []
+    : typeof mapping.entries === "function"
+      ? [...mapping.entries()]
+      : Object.entries(mapping);
+
+  const labels = {};
+  for (const [code, libelle] of entries) {
+    if (libelle !== undefined && libelle !== null && String(libelle).trim()) {
+      labels[String(code).trim()] = String(libelle).trim();
     }
   }
-  return labels;
+  return Object.keys(labels).length ? labels : { ...ETAT_LABELS };
+};
+
+/**
+ * Même table, ordonnée, pour alimenter le filtre « État » de l'écran : le menu
+ * doit proposer les états RÉELS de la société, pas 0/1/2 en dur.
+ */
+const buildEtatOptions = (entreprise) => {
+  const labels = buildEtatLabels(entreprise);
+  return Object.entries(labels)
+    .map(([code, label]) => ({ code, label }))
+    .sort((a, b) => {
+      const na = Number(a.code);
+      const nb = Number(b.code);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return String(a.code).localeCompare(String(b.code));
+    });
 };
 
 // ===========================================
@@ -186,6 +207,7 @@ const getProformas = asyncHandler(async (req, res) => {
         active: activeFilters,
       },
       etatLabels: buildEtatLabels(entreprise),
+      etatOptions: buildEtatOptions(entreprise),
       _queryTime: `${queryTime}ms`,
       proformas: result.proformas,
     });
@@ -240,7 +262,9 @@ const getProformaByNumfact = asyncHandler(async (req, res) => {
       entreprise: formatEntreprise(entreprise),
       _queryTime: `${queryTime}ms`,
       proforma,
-      etatLabel: buildEtatLabels(entreprise)[proforma.ETAT] || "inconnu",
+      etatLabel:
+        buildEtatLabels(entreprise)[String(proforma.ETAT).trim()] || "inconnu",
+      etatLabels: buildEtatLabels(entreprise),
       detail: {
         totalLignes: lignes.length,
         lignesArticle: lignesArticle.length,

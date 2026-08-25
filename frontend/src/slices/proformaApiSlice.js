@@ -34,7 +34,9 @@ export const proformaApiSlice = apiSlice.injectEndpoints({
           ...(dateFin && { dateFin }),
         },
       }),
-      providesTags: ["Proforma"],
+      // La réponse porte les libellés d'états de la société (`etatLabels`) :
+      // modifier la fiche société doit donc rafraîchir cette liste.
+      providesTags: ["Proforma", "Entreprise"],
       keepUnusedDataFor: 60,
     }),
 
@@ -43,7 +45,7 @@ export const proformaApiSlice = apiSlice.injectEndpoints({
       query: ({ nomDossierDBF, numfact }) => ({
         url: `${PROFORMAS_URL}/${nomDossierDBF}/${numfact}`,
       }),
-      providesTags: ["Proforma"],
+      providesTags: ["Proforma", "Entreprise"],
     }),
 
     // Recherche de proformas

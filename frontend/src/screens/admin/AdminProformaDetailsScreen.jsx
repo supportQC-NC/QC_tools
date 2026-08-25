@@ -7,6 +7,7 @@ import {
   HiCalendar,
   HiCurrencyDollar,
   HiCheckCircle,
+  HiClock,
   HiExclamation,
   HiRefresh,
   HiSearch,
@@ -28,18 +29,16 @@ import { useGetEntrepriseByDossierQuery } from "../../slices/entrepriseApiSlice"
 import * as XLSX from "xlsx";
 import "./AdminProformaDetailScreen.css";
 
-// Labels et styles des états
-const ETAT_CONFIG = {
-  0: { label: "Brouillon", color: "muted", icon: HiDocumentText },
-  1: { label: "Validée", color: "success", icon: HiCheckCircle },
-  2: { label: "Facturée", color: "info", icon: HiCurrencyDollar },
-};
-
-const ETAT_LABELS = {
-  0: "Brouillon",
-  1: "Validée",
-  2: "Facturée",
-};
+// Styles des états — seules la couleur et l'icône dépendent du code.
+// ⚠️ Les LIBELLÉS viennent du paramétrage de la société (`mappingEtatsProforma`),
+// servi par l'API (`etatLabels`) : aucun libellé n'est codé ici, chaque société
+// a ses propres états.
+const ETAT_STYLES = [
+  { color: "muted", icon: HiDocumentText },
+  { color: "success", icon: HiCheckCircle },
+  { color: "info", icon: HiCurrencyDollar },
+  { color: "warning", icon: HiClock },
+];
 
 const AdminProformaDetailScreen = () => {
   const { nomDossierDBF, numfact } = useParams();
@@ -189,15 +188,26 @@ const AdminProformaDetailScreen = () => {
     return "";
   };
 
+  // Libellé d'état : paramétrage de la société d'abord (servi par l'API dans
+  // `etatLabels`), repli sur la fiche entreprise si la réponse est plus ancienne
+  // que le cache, puis « État N » — jamais de libellé générique en dur.
+  const etatLabel = useCallback(
+    (etat) => {
+      const code = etat === null || etat === undefined ? "" : String(etat).trim();
+      if (!code) return "-";
+      return (
+        proformaData?.etatLabels?.[code] ||
+        entrepriseData?.mappingEtatsProforma?.[code] ||
+        `État ${code}`
+      );
+    },
+    [proformaData, entrepriseData],
+  );
+
   const getEtatInfo = (etat) => {
-    const base =
-      ETAT_CONFIG[etat] || {
-        label: `État ${etat}`,
-        color: "muted",
-        icon: HiDocumentText,
-      };
-    const custom = entrepriseData?.mappingEtatsProforma?.[etat];
-    return custom ? { ...base, label: custom } : base;
+    const code = etat === null || etat === undefined ? "" : String(etat).trim();
+    const style = ETAT_STYLES[Number(code) % ETAT_STYLES.length] || ETAT_STYLES[0];
+    return { label: etatLabel(etat), color: style.color, icon: style.icon };
   };
 
   // =============================================
@@ -314,12 +324,7 @@ const AdminProformaDetailScreen = () => {
         ["MONTANT", proforma.MONTANT ?? 0],
         ["DATCHANT", formatDateForExcel(proforma.DATCHANT)],
         ["ETAT", proforma.ETAT ?? ""],
-        [
-          "ETAT (Libellé)",
-          entrepriseData?.mappingEtatsProforma?.[proforma.ETAT] ||
-            ETAT_LABELS[proforma.ETAT] ||
-            `État ${proforma.ETAT}`,
-        ],
+        ["ETAT (Libellé)", etatLabel(proforma.ETAT)],
         ["MAILING1", safeTrim(proforma.MAILING1)],
         ["MAILING2", safeTrim(proforma.MAILING2)],
         ["MAILING3", safeTrim(proforma.MAILING3)],

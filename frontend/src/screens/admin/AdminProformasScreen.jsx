@@ -42,12 +42,17 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
-// Labels et styles des états
-const ETAT_CONFIG = {
-  0: { label: "Brouillon", color: "muted", icon: HiDocumentText },
-  1: { label: "Validée", color: "success", icon: HiCheckCircle },
-  2: { label: "Facturée", color: "info", icon: HiCurrencyDollar },
-};
+// Styles des états — la COULEUR et l'ICÔNE seules sont dérivées du code.
+// ⚠️ Les LIBELLÉS ne sont jamais codés ici : ils viennent du paramétrage de la
+// société (`mappingEtatsProforma`), servi par l'API dans `etatLabels`. Chaque
+// société a ses propres états (QC va de 1 à 4), un tableau en dur affichait des
+// libellés faux et rendait les états non configurés illisibles (« État 3 »).
+const ETAT_STYLES = [
+  { color: "muted", icon: HiDocumentText },
+  { color: "success", icon: HiCheckCircle },
+  { color: "info", icon: HiCurrencyDollar },
+  { color: "warning", icon: HiClock },
+];
 
 const AdminProformasScreen = () => {
   const navigate = useNavigate();
@@ -208,15 +213,33 @@ const AdminProformasScreen = () => {
     return String(value);
   };
 
+  // Libellés d'état de la société (paramétrage) — repli sur « État N » pour un
+  // code présent dans les données mais absent de la configuration.
+  const etatLabels = proformasData?.etatLabels || {};
+
   const getEtatInfo = (etat) => {
-    return (
-      ETAT_CONFIG[etat] || {
-        label: `État ${etat}`,
-        color: "muted",
-        icon: HiDocumentText,
-      }
-    );
+    const code = etat === null || etat === undefined ? "" : String(etat).trim();
+    const style = ETAT_STYLES[Number(code) % ETAT_STYLES.length] || ETAT_STYLES[0];
+    return {
+      label: etatLabels[code] || (code === "" ? "-" : `État ${code}`),
+      color: style.color,
+      icon: style.icon,
+    };
   };
+
+  // Choix du filtre « État » : les états RÉELS de la société. On y ajoute la
+  // valeur courante si elle vient de l'URL et n'est pas (ou plus) configurée,
+  // sinon le menu afficherait un libellé vide sur un filtre pourtant actif.
+  const etatOptions = useMemo(() => {
+    const options = proformasData?.etatOptions || [];
+    if (
+      filters.etat !== "TOUT" &&
+      !options.some((o) => String(o.code) === String(filters.etat))
+    ) {
+      return [...options, { code: filters.etat, label: `État ${filters.etat}` }];
+    }
+    return options;
+  }, [proformasData, filters.etat]);
 
   return (
     <div className="admin-proformas-page">
@@ -360,9 +383,11 @@ const AdminProformasScreen = () => {
                         }
                       >
                         <option value="TOUT">Tous les états</option>
-                        <option value="0">Brouillon</option>
-                        <option value="1">Validée</option>
-                        <option value="2">Facturée</option>
+                        {etatOptions.map((o) => (
+                          <option key={o.code} value={o.code}>
+                            {o.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
