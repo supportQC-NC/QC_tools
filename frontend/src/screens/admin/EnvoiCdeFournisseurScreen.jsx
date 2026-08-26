@@ -105,6 +105,13 @@ const EnvoiCdeFournisseurScreen = () => {
 
   const [editEmails, setEditEmails] = useState(null); // édition des adresses de test
 
+  // L'écran n'est pas remonté quand on change de société dans l'en-tête : une
+  // édition en cours doit être abandonnée, sinon on enregistrerait les adresses
+  // de test d'une société sur une autre.
+  useEffect(() => {
+    setEditEmails(null);
+  }, [dossier]);
+
   const toggleTestMode = async () => {
     if (!params) return;
     // Sécurité : confirmation explicite avant de PASSER en mode réel.
@@ -227,13 +234,24 @@ const EnvoiCdeFournisseurScreen = () => {
         ))}
       </div>
 
-      {tab === "commandes" && <CommandesTab dossier={dossier} params={params} />}
-      {tab === "ar" && <ArTab dossier={dossier} params={params} />}
-      {tab === "masse" && <MasseTab dossier={dossier} params={params} />}
-      {tab === "emails" && <EmailsTab dossier={dossier} />}
-      {tab === "messages" && <MessagesTab dossier={dossier} />}
-      {tab === "responsable" && <ResponsableTab dossier={dossier} />}
-      {tab === "historique" && <HistoriqueTab dossier={dossier} params={params} />}
+      {/* ⚠️ key={dossier} : OBLIGATOIRE. Ces onglets gardent l'état de leurs
+          champs en local (brouillon du responsable/CC, brouillon de modèle,
+          recherche, pagination…). Sans remontage au changement de société, le
+          formulaire continuait d'afficher les valeurs de la société précédente
+          — et « Enregistrer » écrivait les CC de QC sur la société affichée. */}
+      {tab === "commandes" && (
+        <CommandesTab key={dossier} dossier={dossier} params={params} />
+      )}
+      {tab === "ar" && <ArTab key={dossier} dossier={dossier} params={params} />}
+      {tab === "masse" && (
+        <MasseTab key={dossier} dossier={dossier} params={params} />
+      )}
+      {tab === "emails" && <EmailsTab key={dossier} dossier={dossier} />}
+      {tab === "messages" && <MessagesTab key={dossier} dossier={dossier} />}
+      {tab === "responsable" && <ResponsableTab key={dossier} dossier={dossier} />}
+      {tab === "historique" && (
+        <HistoriqueTab key={dossier} dossier={dossier} params={params} />
+      )}
     </div>
   );
 };

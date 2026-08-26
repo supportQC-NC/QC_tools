@@ -2328,8 +2328,11 @@ const upsertReferencePourEntreprise = async (
   }
   let nbMessages = 0;
   for (const row of messages) {
+    // `type` DOIT figurer dans le filtre : l'unicité est (entreprise, type,
+    // langue). Sans lui, l'upsert pouvait écraser un modèle de relance/AR avec
+    // le texte d'envoi de commande.
     await MessageFournisseur.updateOne(
-      { entreprise: entrepriseId, langue: row.langue },
+      { entreprise: entrepriseId, type: "commande", langue: row.langue },
       { $set: { message: row.message || "" } },
       { upsert: true },
     );
