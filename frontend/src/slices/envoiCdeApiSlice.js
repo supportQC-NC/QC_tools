@@ -64,6 +64,15 @@ export const envoiCdeApiSlice = apiSlice.injectEndpoints({
       query: ({ nomDossierDBF, numcde }) => ({
         url: `${ENVOI_CDE_URL}/${nomDossierDBF}/apercu/${numcde}`,
       }),
+      // L'aperçu dépend de la fiche email du fournisseur (sa LANGUE), du modèle
+      // de message et des paramètres d'envoi : sans ces tags, changer la langue
+      // d'un fournisseur laissait l'ancien aperçu (français) en cache.
+      providesTags: [
+        "FournisseurEmail",
+        "MessageFournisseur",
+        "ResponsableCc",
+        "EnvoiCdeParametre",
+      ],
       keepUnusedDataFor: 10,
     }),
 

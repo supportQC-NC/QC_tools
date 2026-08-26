@@ -229,22 +229,21 @@ export const nettoyerHtmlMessage = (html) =>
     .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
     .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
 
-// Charge le modèle (société, type, langue) avec repli : autre langue, puis
-// modèle par défaut. Ne renvoie JAMAIS un corps vide.
+// Charge le modèle (société, type, langue) avec repli sur le modèle par défaut
+// DE LA MÊME LANGUE. Ne renvoie JAMAIS un corps vide.
+//
+// ⚠️ Surtout PAS de repli sur l'autre langue : une société qui n'a personnalisé
+// que son modèle français envoyait alors du français à ses fournisseurs anglais
+// (constaté sur AVB, et sur les relances/AR/factures dont le modèle n'est le
+// plus souvent saisi qu'en FR). Le défaut anglais est toujours préférable à un
+// texte français adressé à un anglophone.
 const chargerModele = async (entrepriseId, type, langue) => {
   await assurerSchemaMessages();
-  let tpl = await MessageFournisseur.findOne({
+  const tpl = await MessageFournisseur.findOne({
     entreprise: entrepriseId,
     type,
     langue,
   }).lean();
-  if (!tpl) {
-    tpl = await MessageFournisseur.findOne({
-      entreprise: entrepriseId,
-      type,
-      langue: langue === "A" ? "F" : "A",
-    }).lean();
-  }
   const defauts =
     type === "relance"
       ? getDefaultRelance(langue)

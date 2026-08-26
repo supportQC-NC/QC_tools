@@ -93,8 +93,11 @@ const importData = async () => {
         ignores.add(row.nomDossierDBF || row.et);
         continue;
       }
+      // `type` DOIT figurer dans le filtre : l'unicité est (entreprise, type,
+      // langue). Sans lui, l'upsert tombait sur le premier modèle de cette
+      // langue — au risque d'écraser une relance avec le texte de commande.
       await MessageFournisseur.updateOne(
-        { entreprise: entrepriseId, langue: row.langue },
+        { entreprise: entrepriseId, type: "commande", langue: row.langue },
         { $set: { message: row.message || "" } },
         { upsert: true },
       );
