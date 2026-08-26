@@ -28,11 +28,15 @@ const canDelete = checkModuleAccess("bipage", "delete");
 router.get("/detail/:id", protect, canRead, getDemandeById);
 router.delete("/:id", protect, canDelete, deleteDemande);
 
-// MOBILE : liste active + réalisation (module reapro, comme le collecteur)
-const canReapproRead = checkModuleAccess("reapro", "read");
-const canReapproWrite = checkModuleAccess("reapro", "write");
-router.get("/mobile/list", protect, canReapproRead, getMobileDemandes);
-router.patch("/mobile/:id/realiser", protect, canReapproWrite, realiserDemande);
+// MOBILE : liste active + réalisation.
+//
+// ⚠️ AUCUNE garde de module ici, VOLONTAIREMENT — même règle que les listes de
+// réappro : toute demande est visible par les collecteurs de SA société, le
+// périmètre société étant appliqué dans `getMobileDemandes`. L'ancienne garde
+// `reapro` fermait l'écran aux collecteurs qui ne l'avaient pas, sous la forme
+// d'une liste vide (l'app avale les 403).
+router.get("/mobile/list", protect, getMobileDemandes);
+router.patch("/mobile/:id/realiser", protect, realiserDemande);
 
 // Résolution NART (manuel) + créations (scopées entreprise)
 router.get(

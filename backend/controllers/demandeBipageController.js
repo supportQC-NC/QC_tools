@@ -268,6 +268,18 @@ const realiserDemande = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Demande introuvable");
   }
+  // La route mobile n'exige plus de module : le périmètre SOCIÉTÉ reste donc le
+  // seul contrôle, et il doit être fait ici aussi (pas seulement à la liste).
+  const scope = await getAccessibleEntreprises(req.user);
+  if (!scope.all) {
+    const ents = await Entreprise.find({ _id: { $in: scope.ids } }).select(
+      "nomDossierDBF",
+    );
+    if (!ents.some((e) => e.nomDossierDBF === d.entreprise)) {
+      res.status(403);
+      throw new Error("Vous n'avez pas accès à cette société");
+    }
+  }
   if (d.statut !== "realisee") {
     const lignes = (Array.isArray(req.body?.lignes) ? req.body.lignes : [])
       .map((l) => ({

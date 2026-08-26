@@ -47,18 +47,23 @@ router.get("/detail/:id", protect, canRead, getDemandeById);
 router.patch("/:id/urgence", protect, canWrite, updateUrgence);
 router.delete("/:id", protect, canDelete, deleteDemande);
 
-// MOBILE : liste active + réalisation
-const canReapproRead = checkModuleAccess(["demande_reappro", "reapro"], "read");
-const canReapproWrite = checkModuleAccess(
-  ["demande_reappro", "reapro"],
-  "write",
-);
-router.get("/mobile/list", protect, canReapproRead, getMobileDemandes);
-router.post("/mobile/:id/ouvrir", protect, canReapproWrite, ouvrirDemande);
-router.post("/mobile/:id/liberer", protect, canReapproWrite, libererDemande);
-router.post("/mobile/:id/scan", protect, canReapproWrite, scanDemande);
-router.post("/mobile/:id/lignes", protect, canReapproWrite, enregistrerLigne);
-router.patch("/mobile/:id/realiser", protect, canReapproWrite, realiserDemande);
+// MOBILE : liste active + réalisation.
+//
+// ⚠️ AUCUNE garde de module ici, VOLONTAIREMENT (règle métier du 26/08/2026) :
+// « dès qu'une liste est créée, tous les collecteurs rattachés à la société
+// doivent la voir ». Le périmètre reste la SOCIÉTÉ — `getMobileDemandes` filtre
+// sur les sociétés accordées à l'utilisateur et `chargerListeMobile` renvoie 403
+// pour une liste d'une autre société.
+//
+// Avant, ces routes exigeaient `demande_reappro` ou `reapro` : un collecteur
+// n'ayant que `inventaire`/`reception` recevait un 403 que l'app affiche comme
+// une liste VIDE — d'où « aucune demande ne s'affiche » sans le moindre message.
+router.get("/mobile/list", protect, getMobileDemandes);
+router.post("/mobile/:id/ouvrir", protect, ouvrirDemande);
+router.post("/mobile/:id/liberer", protect, libererDemande);
+router.post("/mobile/:id/scan", protect, scanDemande);
+router.post("/mobile/:id/lignes", protect, enregistrerLigne);
+router.patch("/mobile/:id/realiser", protect, realiserDemande);
 
 // Résolution d'un code (NART / gencode / référence) + création par panier
 router.get(
