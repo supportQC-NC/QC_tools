@@ -448,11 +448,6 @@ export const getUserMenus = (userInfo) => {
       { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
       { label: "Mon profil", path: "/profile", icon: HiUser },
       { label: "Organiser mon menu", path: "/mon-menu", icon: HiViewGrid },
-      {
-        label: "Organiser mon tableau de bord",
-        path: "/mon-dashboard",
-        icon: HiViewGrid,
-      },
     ],
   });
 
@@ -627,8 +622,7 @@ export const getAccessibleEntreprises = (userInfo, allEntreprises = []) => {
 // Texte court affiché au survol de chaque onglet. Peut être surchargé par
 // l'administrateur (stocké en base, clé = path). Voir Sidebar + AdminInfobulles.
 export const DEFAULT_MENU_HINTS = {
-  "/": "Mon tableau de bord : widgets et indicateurs que j'ai choisis.",
-  "/mon-dashboard": "Composer mon tableau de bord (widgets et tuiles chiffrées).",
+  "/": "Ma société active et mes accès rapides.",
   "/mes-taches": "Vos tâches personnelles à traiter.",
   // Espace commercial
   "/commercial": "Mon activité commerciale : portefeuille, relances, alertes.",
@@ -747,11 +741,6 @@ const PERSONAL_ITEMS = [
   { label: "Espace équipe", path: "/espace-equipe", icon: HiChatAlt2 },
   { label: "Mon profil", path: "/profile", icon: HiUser },
   { label: "Organiser mon menu", path: "/mon-menu", icon: HiViewGrid },
-  {
-    label: "Organiser mon tableau de bord",
-    path: "/mon-dashboard",
-    icon: HiViewGrid,
-  },
 ];
 
 // Aplatit toutes les structures de menu -> liste { path, label, group } unique.

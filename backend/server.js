@@ -22,7 +22,7 @@ import filialeRoutes from "./routes/fillialeRoutes.js";
 import concurrentRoutes from "./routes/concurrentRoutes.js";
 import releveRoutes from "./routes/releveRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
-import dashboardLayoutRoutes from "./routes/dashboardLayoutRoutes.js";
+import raccourcisRoutes from "./routes/raccourcisRoutes.js";
 import { installerMasqueDbf } from "./middleware/masquerChampsDbf.js";
 import champsDbfRoutes from "./routes/champsDbfRoutes.js";
 // ========== ROUTES COMMANDES ==========
@@ -236,7 +236,7 @@ app.use("/api/fournisseurs", fournissRoutes);
 app.use("/api/envoi-cde-fournisseur", envoiCdeFournisseurRoutes);
 app.use("/api/clients", clientRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/dashboard-layout", dashboardLayoutRoutes);
+app.use("/api/raccourcis", raccourcisRoutes);
 app.use("/api/commerciaux", commerciauxRoutes);
 // Espace dédié aux utilisateurs au profil commercial (ne pas confondre avec
 // /api/commerciaux, qui est l'écran d'ANALYSE des commerciaux côté direction).

@@ -107,7 +107,6 @@ import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 import MonMenuScreen from "./screens/user/MonMenuScreen";
 import ReceptionManuelleScreen from "./screens/user/ReceptionManuelleScreen";
 import ListesReapproScreen from "./screens/user/ListesReapproScreen";
-import MonDashboardScreen from "./screens/user/MonDashboardScreen";
 import CommercialDashboardScreen from "./screens/commercial/CommercialDashboardScreen";
 import CommercialPortefeuilleScreen from "./screens/commercial/CommercialPortefeuilleScreen";
 import CommercialClientScreen from "./screens/commercial/CommercialClientScreen";
@@ -148,7 +147,6 @@ const router = createBrowserRouter(
         <Route path="/mes-taches" element={<MesTachesScreen />} />
         <Route path="/espace-equipe" element={<EspaceEquipeScreen />} />
         <Route path="/mon-menu" element={<MonMenuScreen />} />
-        <Route path="/mon-dashboard" element={<MonDashboardScreen />} />
         {/* Tableau de bord unique : l'ancienne route admin y renvoie. */}
         <Route path="/admin" element={<Navigate to="/" replace />} />
       </Route>

@@ -370,685 +370,203 @@
     position: static;
   }
 }
-/* ═══════════ Tableau de bord personnalisé (KPI + activité + tâches) ═══════════ */
-.ud-section-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  margin: 26px 0 12px;
-}
 
-/* KPI cards */
-.ud-kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
-  margin-bottom: 16px;
-}
-.ud-kpi {
+/* ═══════════════════════════════════════════════════════
+   SOCIÉTÉ ACTIVE
+   ═══════════════════════════════════════════════════════ */
+.ud-societe {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  text-decoration: none;
-  transition: border-color 0.15s, transform 0.1s;
-}
-.ud-kpi:hover {
-  border-color: var(--accent, #4da6ff);
-  transform: translateY(-2px);
-}
-.ud-kpi-icon {
-  flex-shrink: 0;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.35rem;
-}
-.ud-kpi-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.ud-kpi-value {
-  font-size: 1.7rem;
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--text-primary);
-}
-.ud-kpi-label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
-.ud-kpi-sub {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-top: 3px;
-}
-.ud-kpi-alert {
-  color: #f87171;
-  font-weight: 700;
-}
-
-/* Panneaux activité + tâches */
-.ud-panels {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-.ud-panel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-}
-.ud-panel h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 12px;
-}
-.ud-tasks-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.ud-task-stat {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-}
-.ud-task-stat b {
-  margin-left: auto;
-  color: var(--text-primary);
-  font-size: 0.95rem;
-}
-.ud-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.ud-dot-blue {
-  background: #3b82f6;
-}
-.ud-dot-amber {
-  background: #f59e0b;
-}
-.ud-dot-gray {
-  background: #6b7280;
-}
-.ud-task-late {
-  color: #f87171;
-}
-.ud-task-late svg {
-  color: #f87171;
-}
-.ud-task-done {
-  color: #34d399;
-}
-.ud-task-done svg {
-  color: #34d399;
-}
-.ud-task-link {
-  margin-top: 6px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--accent, #4da6ff);
-  text-decoration: none;
-}
-.ud-task-link:hover {
-  text-decoration: underline;
-}
-
-@media (max-width: 900px) {
-  .ud-panels {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* =====================================================================
-   Tableau de bord unique : grille de blocs (widgets + tuiles KPI).
-   La largeur de chaque bloc vient de sa taille (tiers / moitie / pleine).
-   ===================================================================== */
-
-.db-grille {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: stretch;
-}
-
-.db-bloc {
-  min-width: 0;
-  display: flex;
-}
-
-.db-bloc > * {
-  width: 100%;
-}
-
-.db-w-third {
-  flex: 1 1 300px;
-  max-width: calc(33.333% - 0.67rem);
-}
-
-.db-w-half {
-  flex: 1 1 420px;
-  max-width: calc(50% - 0.5rem);
-}
-
-.db-w-full {
-  flex: 1 1 100%;
-  max-width: 100%;
-}
-
-@media (max-width: 1100px) {
-  .db-w-third,
-  .db-w-half {
-    max-width: 100%;
-  }
-}
-
-/* ── Carte commune ── */
-.db-carte {
-  display: flex;
-  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
 }
 
-.db-carte-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.7rem 0.9rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.db-carte-head h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.db-carte-body {
-  padding: 0.9rem;
-  flex: 1;
-}
-
-.db-vide {
-  margin: 0;
-  padding: 1.2rem 0;
-  text-align: center;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-/* ── Rangée de compteurs personnels ── */
-.db-kpi-rangee {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 0.75rem;
-  width: 100%;
-}
-
-.db-kpi {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.85rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  text-decoration: none;
-  transition: border-color 0.2s;
-}
-
-.db-kpi:hover {
-  border-color: #8b5cf6;
-}
-
-.db-kpi-icone,
-.db-tuile-icone {
+.ud-societe-icone {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 40px;
   height: 40px;
-  flex-shrink: 0;
   border-radius: 10px;
-  font-size: 1.15rem;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: rgba(99, 102, 241, 0.14);
+  color: #6366f1;
 }
 
-.db-kpi-corps,
-.db-tuile-corps {
+.ud-societe-corps {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
-}
-
-.db-kpi-valeur,
-.db-tuile-valeur {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-}
-
-.db-kpi-label,
-.db-tuile-titre {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.db-kpi-sous,
-.db-tuile-sous {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.db-kpi-alerte {
-  color: #ef4444;
-  font-weight: 600;
-}
-
-/* ── Tuile KPI sur mesure ── */
-.db-tuile {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.9rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-top: 3px solid #6366f1;
-  border-radius: 10px;
-  height: 100%;
-}
-
-/* ── Listes et chiffres ── */
-.db-liste {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.db-liste li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.82rem;
-}
-
-.db-liste li:last-child {
-  border-bottom: none;
-}
-
-.db-liste-serree li {
-  padding: 0.25rem 0;
-}
-
-.db-liste-cle {
-  font-family: "Courier New", monospace;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.db-liste-sec {
   flex: 1;
-  min-width: 0;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.db-liste-val {
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.db-chiffres {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 0.75rem;
-}
-
-.db-chiffres > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.db-chiffre {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.db-chiffre-label {
-  font-size: 0.72rem;
+.ud-societe-label {
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.4px;
   color: var(--text-muted);
 }
 
-/* ── Statuts de tâches ── */
-.db-stat {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
-  font-size: 0.84rem;
-  color: var(--text-secondary);
-}
-
-.db-stat b {
-  margin-left: auto;
+.ud-societe-nom {
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-primary);
-}
-
-.db-pastille {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.db-bleu { background: #3b82f6; }
-.db-ambre { background: #f59e0b; }
-.db-gris { background: #6b7280; }
-.db-retard { color: #ef4444; }
-.db-fait { color: #10b981; }
-
-.db-lien {
-  display: inline-block;
-  margin-top: 0.6rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #8b5cf6;
-  text-decoration: none;
-}
-
-/* ── Raccourcis ── */
-.db-raccourcis {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 0.5rem;
-}
-
-.db-raccourci {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 0.7rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.db-raccourci:hover {
-  border-color: #8b5cf6;
-  color: #8b5cf6;
-}
-
-.db-raccourci span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ── États d'écran ── */
-.db-chargement {
-  padding: 2rem;
-  text-align: center;
+.ud-societe-nom.vide {
+  font-weight: 500;
   color: var(--text-muted);
 }
 
-.db-vide-total {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 3rem 1.5rem;
-  text-align: center;
-  background: var(--bg-secondary);
-  border: 1px dashed var(--border);
-  border-radius: 12px;
-}
-
-.db-vide-total svg {
-  font-size: 2.4rem;
-  color: #8b5cf6;
-  opacity: 0.65;
-}
-
-.db-vide-total h2 {
-  margin: 0;
-  font-size: 1.05rem;
+.ud-societe-select {
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
+  font-size: 13px;
 }
 
-.db-vide-total p {
-  margin: 0;
-  max-width: 46ch;
-  font-size: 0.85rem;
+.ud-societe-note {
+  font-size: 11px;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.db-bouton {
+/* ═══════════════════════════════════════════════════════
+   ACCÈS RAPIDES : entête de section + bouton
+   ═══════════════════════════════════════════════════════ */
+.ud-section-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ud-section-tete h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+
+.ud-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
-  padding: 0.6rem 1.1rem;
-  background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+  gap: 6px;
+  padding: 7px 12px;
   border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ud-btn:hover {
+  border-color: var(--accent);
+}
+
+.ud-btn.primaire {
+  background: #6366f1;
+  border-color: #6366f1;
   color: #fff;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
 }
 
-.ud-config-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.8rem;
+.ud-spacer {
+  flex: 1;
+}
+
+/* ═══════════════════════════════════════════════════════
+   MODALE « CHOISIR MES ACCÈS RAPIDES »
+   ═══════════════════════════════════════════════════════ */
+.ud-modal {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.ud-config-link:hover {
-  color: #8b5cf6;
-  border-color: #8b5cf6;
-}
-
-/* Sous-titre d'entête de carte (nb de lignes / groupes d'un graphique) */
-.db-carte-sous {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* Visuel tableau */
-.db-tableau-scroll {
-  overflow: auto;
-  max-height: 340px;
-}
-
-.db-tableau {
+  border-radius: 12px;
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
-}
-
-.db-tableau thead th {
-  position: sticky;
-  top: 0;
-  background: var(--bg-tertiary, var(--bg-secondary));
-  color: var(--text-secondary);
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.db-tableau td {
-  padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  max-width: 620px;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 20px;
   color: var(--text-primary);
-  white-space: nowrap;
 }
 
-.db-tableau tbody tr:last-child td {
-  border-bottom: none;
+.ud-modal h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 16px;
 }
 
-.db-tableau tbody tr:hover {
-  background: rgba(139, 92, 246, 0.06);
-}
-
-.db-tableau .num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.db-tableau-note {
-  margin: 0.5rem 0 0;
-  font-size: 0.7rem;
+.ud-modal-hint {
+  margin: 0 0 14px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
-.db-mini-export {
-  margin-left: 0.4rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: #8b5cf6;
-  cursor: pointer;
-  vertical-align: middle;
-}
-
-/* =====================================================================
-   Grille 12 colonnes (remplace les trois largeurs fixes) + onglets de page
-   ===================================================================== */
-.db-grille {
+.ud-choix-liste {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: 90px;
-  gap: 1rem;
-  align-items: stretch;
+  grid-template-columns: 1fr;
+  gap: 2px;
 }
 
-.db-grille > .db-bloc {
-  min-width: 0;
-  min-height: 0;
+.ud-choix {
   display: flex;
-}
-
-.db-grille > .db-bloc > * {
-  width: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* En dessous de 1100 px, la grille retombe sur une colonne : les spans
-   n'ont plus de sens sur un écran étroit. */
-@media (max-width: 1100px) {
-  .db-grille {
-    grid-template-columns: 1fr;
-    grid-auto-rows: auto;
-  }
-  .db-grille > .db-bloc {
-    grid-column: 1 / -1 !important;
-    grid-row: auto !important;
-  }
-}
-
-/* Onglets de pages */
-.db-onglets {
-  display: flex;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.25rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.4rem;
-}
-
-.db-onglet {
-  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px 8px 0 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 600;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
   cursor: pointer;
 }
 
-.db-onglet:hover {
-  background: var(--bg-secondary);
+.ud-choix:hover {
+  background: var(--bg-tertiary);
 }
 
-.db-onglet.actif {
-  background: var(--bg-secondary);
-  border-color: var(--border);
-  border-bottom-color: transparent;
-  color: #a78bfa;
+.ud-choix input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
-.db-onglet-nb {
-  padding: 0 0.4rem;
-  border-radius: 10px;
-  background: rgba(139, 92, 246, 0.18);
-  color: #a78bfa;
-  font-size: 0.68rem;
+.ud-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+@media (min-width: 640px) {
+  .ud-choix-liste {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .ud-societe {
+    flex-wrap: wrap;
+  }
+
+  .ud-societe-select {
+    max-width: 100%;
+    width: 100%;
+  }
 }

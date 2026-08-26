@@ -111,7 +111,7 @@ export const apiSlice = createApi({
     "MyMenuLayout",
     "SmtpConfig",
     // ========== TAGS TABLEAU DE BORD PERSONNEL ==========
-    "DashboardLayout",
+    "Raccourcis",
     // ========== TAGS DROITS CHAMP PAR CHAMP (DBF) ==========
     "ChampsDbf",
     // ========== TAGS VEILLE (rapports IA hebdomadaires) ==========
