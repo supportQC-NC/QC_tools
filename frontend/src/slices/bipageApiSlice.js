@@ -61,10 +61,12 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
     }),
 
     importProformasBipage: builder.mutation({
-      query: ({ entrepriseId, numfacts }) => ({
+      // `items` porte, pour chaque proforma, la zone et l'agent — saisis à la
+      // main quand l'observation ne les donne pas. `mode` : inventaire|deduction.
+      query: ({ entrepriseId, items, mode }) => ({
         url: `${BASE}/${entrepriseId}/import-proformas`,
         method: "POST",
-        body: { numfacts },
+        body: { items, mode },
       }),
       invalidatesTags: ["Bipage"],
     }),

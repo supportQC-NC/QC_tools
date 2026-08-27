@@ -417,19 +417,33 @@ const listProformasBipage = asyncHandler(async (req, res) => {
 
 /**
  * @desc    Intègre les proformas choisies dans l'inventaire actif.
- * @route   POST /api/bipages/:entrepriseId/import-proformas   body { numfacts: [] }
+ * @route   POST /api/bipages/:entrepriseId/import-proformas
+ * @body    { items: [{ numfact, zoneCode?, emplacement?, agentCode? }], mode? }
+ *          Les champs de `items` permettent d'intégrer une proforma dont
+ *          l'observation ne désigne aucune zone. `mode` : "inventaire" (défaut)
+ *          ou "deduction" (quantités enregistrées en négatif).
  * @access  Private (module bipage, write)
  */
 const importProformasBipage = asyncHandler(async (req, res) => {
-  const { numfacts = [] } = req.body;
-  if (!Array.isArray(numfacts) || numfacts.length === 0) {
+  // `items` = forme complète (zone/agent saisis à la main quand l'observation
+  // ne dit rien) ; `numfacts` = ancienne forme, toujours acceptée.
+  const { items, numfacts = [] } = req.body;
+  const selection = Array.isArray(items) && items.length ? items : numfacts;
+  if (!Array.isArray(selection) || selection.length === 0) {
     res.status(400);
     throw new Error("Aucune proforma sélectionnée.");
   }
+  const mode = req.body.mode === "deduction" ? "deduction" : "inventaire";
+
   const session = await sessionActiveOuErreur(req.entreprise, res);
-  const result = await importerProformas(req.entreprise, session, numfacts);
+  const result = await importerProformas(req.entreprise, session, selection, mode);
+  const echecs = result.resultats.filter((r) => r.statut === "erreur").length;
   res.json({
-    message: `${result.importees} proforma(s) intégrée(s), ${result.lignes} ligne(s).`,
+    message:
+      `${mode === "deduction" ? "DÉDUCTION" : "Comptage"} — ` +
+      `${result.importees} proforma(s) intégrée(s), ${result.lignes} ligne(s), ` +
+      `${result.unites} unité(s)` +
+      `${echecs ? `, ${echecs} en échec` : ""}.`,
     ...result,
   });
 });

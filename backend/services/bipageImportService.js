@@ -46,6 +46,23 @@ export const getEmplacements = async (entrepriseId) => {
 };
 
 /**
+ * Zones existantes (code + emplacement), pour que l'écran puisse proposer une
+ * liste de choix quand l'observation d'une proforma ne dit pas où elle a été
+ * bipée : l'utilisateur complète alors la zone à la main.
+ */
+export const getZones = async (entrepriseId) => {
+  const zones = await Zone.find({ entreprise: entrepriseId }, "code type").lean();
+  return zones
+    .map((z) => ({ code: trim(z.code), emplacement: trim(z.type) }))
+    .filter((z) => z.code && z.emplacement)
+    .sort(
+      (a, b) =>
+        a.emplacement.localeCompare(b.emplacement) ||
+        a.code.localeCompare(b.code, "fr", { numeric: true }),
+    );
+};
+
+/**
  * Découpe "<zone>_<EMPLACEMENT>".
  * @returns { zoneCode, emplacement } ou null si la convention n'est pas respectée.
  */
@@ -108,6 +125,7 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
 
   const cache = await proformaCacheService.getProformas(entreprise);
   const emplacements = await getEmplacements(entreprise._id);
+  const zones = await getZones(entreprise._id);
 
   const debut = memeJour(dateDebut);
   const fin = memeJour(dateFin);
@@ -158,11 +176,18 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
       agentNom: nomAgent(entreprise, p.REPRES),
       zoneCode: lecture ? lecture.zoneCode : "",
       emplacement: lecture ? lecture.emplacement : "",
+      // `eligible` : intégrable TEL QUEL, l'observation suffit à savoir où.
       eligible: !!lecture && lignes.length > 0,
+      // `completable` : la zone est inconnue mais la proforma a des lignes —
+      // l'écran laisse alors l'utilisateur désigner la zone à la main. Seule une
+      // proforma SANS ligne article reste définitivement inintégrable.
+      completable: !lecture && lignes.length > 0,
       raison: !lecture
-        ? observation
-          ? `Observation « ${observation} » non conforme (attendu : <zone>_<EMPLACEMENT>)`
-          : "Observation vide"
+        ? lignes.length === 0
+          ? "Proforma sans ligne"
+          : observation
+            ? `Observation « ${observation} » non conforme (attendu : <zone>_<EMPLACEMENT>) — zone à désigner à la main`
+            : "Observation vide — zone à désigner à la main"
         : lignes.length === 0
           ? "Proforma sans ligne"
           : "",
@@ -172,8 +197,10 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
   proformas.sort((a, b) => new Date(b.datfact || 0) - new Date(a.datfact || 0));
   return {
     emplacements,
+    zones,
     total: proformas.length,
     nbEligibles: proformas.filter((p) => p.eligible).length,
+    nbCompletables: proformas.filter((p) => p.completable).length,
     proformas,
   };
 };
@@ -182,18 +209,63 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
  * Intègre les proformas choisies dans la session d'inventaire active.
  * Un ré-import de la même proforma REMPLACE ses lignes (même logique que le
  * retraitement d'un .DAT), il n'empile pas de doublons.
+ *
+ * `selection` accepte deux formes, volontairement :
+ *  - un simple numéro de proforma : la zone est lue dans l'observation ;
+ *  - un objet { numfact, zoneCode, emplacement, agentCode } : l'écran a complété
+ *    à la main ce que l'observation ne dit pas. C'est ce qui rend intégrable une
+ *    proforma « non conforme » — seule une proforma SANS ligne article reste
+ *    définitivement hors jeu, il n'y a rien à compter.
+ *
+ * `mode`, identique à l'import Excel :
+ *  - "inventaire" (défaut) : comptage normal, quantités positives ;
+ *  - "deduction" : quantités enregistrées en NÉGATIF, pour retrancher du
+ *    comptage ce qui est sorti d'une partie du magasin restée ouverte.
+ * Les deux imports d'une même proforma coexistent (références distinctes).
  */
-export const importerProformas = async (entreprise, session, numfacts = []) => {
-  const liste = [...new Set(numfacts.map((n) => trim(n)).filter(Boolean))];
-  if (!liste.length) return { importees: 0, lignes: 0, resultats: [] };
+export const importerProformas = async (
+  entreprise,
+  session,
+  selection = [],
+  mode = "inventaire",
+) => {
+  const deduction = mode === "deduction";
+
+  // Normalisation : numéros bruts ou objets complétés, sans doublon de numfact.
+  const items = [];
+  const vus = new Set();
+  for (const brut of Array.isArray(selection) ? selection : [selection]) {
+    const item =
+      brut && typeof brut === "object"
+        ? {
+            numfact: trim(brut.numfact),
+            zoneCode: trim(brut.zoneCode),
+            emplacement: trim(brut.emplacement),
+            agentCode: trim(brut.agentCode),
+          }
+        : { numfact: trim(brut), zoneCode: "", emplacement: "", agentCode: "" };
+    if (!item.numfact || vus.has(item.numfact)) continue;
+    vus.add(item.numfact);
+    items.push(item);
+  }
+  if (!items.length)
+    return {
+      mode: deduction ? "deduction" : "inventaire",
+      importees: 0,
+      lignes: 0,
+      unites: 0,
+      resultats: [],
+    };
 
   const cache = await proformaCacheService.getProformas(entreprise);
   const emplacements = await getEmplacements(entreprise._id);
 
   const resultats = [];
   let totalLignes = 0;
+  let totalUnites = 0;
 
-  for (const numfact of liste) {
+  for (const item of items) {
+    const { numfact } = item;
     const idx = cache.indexByNumfact.get(numfact);
     const p = idx !== undefined ? cache.proformaRecords[idx] : null;
     if (!p) {
@@ -201,12 +273,22 @@ export const importerProformas = async (entreprise, session, numfacts = []) => {
       continue;
     }
 
-    const lecture = parserZoneEmplacement(trim(p[CHAMP_OBSERVATION]), emplacements);
+    // La zone saisie à la main PRIME sur l'observation : c'est elle qui permet
+    // d'intégrer une proforma dont l'observation ne respecte pas la convention.
+    let lecture = null;
+    if (item.zoneCode && item.emplacement) {
+      const connu = emplacements.find(
+        (e) => e.toLowerCase() === item.emplacement.toLowerCase(),
+      );
+      lecture = { zoneCode: item.zoneCode, emplacement: connu || item.emplacement };
+    } else {
+      lecture = parserZoneEmplacement(trim(p[CHAMP_OBSERVATION]), emplacements);
+    }
     if (!lecture) {
       resultats.push({
         numfact,
         statut: "erreur",
-        message: `Observation « ${trim(p[CHAMP_OBSERVATION])} » non conforme`,
+        message: `Observation « ${trim(p[CHAMP_OBSERVATION])} » non conforme et aucune zone saisie`,
       });
       continue;
     }
@@ -238,9 +320,14 @@ export const importerProformas = async (entreprise, session, numfacts = []) => {
     }
 
     const { rows } = await construireLignes(entreprise, aCompter);
-    const reference = `proforma ${numfact}`;
-    const agentCode = trim(p.REPRES);
-    const agentNom = nomAgent(entreprise, p.REPRES);
+    // Référence distincte par mode : une même proforma peut être intégrée en
+    // comptage PUIS en déduction sans que l'un écrase l'autre (comme l'Excel).
+    const reference = `${deduction ? "deduction proforma" : "proforma"} ${numfact}`;
+    // L'agent saisi à la main l'emporte sur le vendeur de la proforma (REPRES
+    // n'est pas toujours celui qui a effectivement bipé le rayon).
+    const agentCode = item.agentCode || trim(p.REPRES);
+    const agentNom = nomAgent(entreprise, agentCode);
+    const unites = rows.reduce((s, r) => s + r.qte, 0) * (deduction ? -1 : 1);
 
     await LigneBipage.deleteMany({ session: session._id, datFileName: reference });
     await LigneBipage.insertMany(
@@ -252,7 +339,7 @@ export const importerProformas = async (entreprise, session, numfacts = []) => {
         zoneType: lecture.emplacement,
         ordre: r.n,
         eanArticle: r.code,
-        qteScan: r.qte,
+        qteScan: deduction ? -r.qte : r.qte,
         nart: r.nart === "-" ? "" : r.nart,
         designation: r.designation,
         observation: "",
@@ -260,12 +347,14 @@ export const importerProformas = async (entreprise, session, numfacts = []) => {
         found: !r.nonTrouve,
         source: "proforma",
         sourceRef: numfact,
+        modeImport: deduction ? "deduction" : "inventaire",
         agentCode,
         agentNom,
       })),
     );
 
     totalLignes += rows.length;
+    totalUnites += unites;
     resultats.push({
       numfact,
       statut: "importee",
@@ -273,12 +362,17 @@ export const importerProformas = async (entreprise, session, numfacts = []) => {
       emplacement: lecture.emplacement,
       agentNom,
       lignes: rows.length,
+      unites,
+      // Trace ce qui a été complété à la main, pour le compte rendu de l'écran.
+      manuelle: !!(item.zoneCode && item.emplacement),
     });
   }
 
   return {
+    mode: deduction ? "deduction" : "inventaire",
     importees: resultats.filter((r) => r.statut === "importee").length,
     lignes: totalLignes,
+    unites: totalUnites,
     resultats,
   };
 };
@@ -505,6 +599,7 @@ export const importerExcelBipage = async (
 
 export default {
   getEmplacements,
+  getZones,
   parserZoneEmplacement,
   parserNomFichierExcel,
   getProformasEligibles,

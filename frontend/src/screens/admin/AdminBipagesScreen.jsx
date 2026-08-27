@@ -471,16 +471,23 @@ const AdminBipagesScreen = () => {
 // ════════════════════════════════════════════════════════════════════════════
 //  MODALE « Intégrer des proformas »
 //
-//  On choisit une plage de dates et un ou plusieurs numéros de client ; toute
-//  proforma de cette sélection dont l'OBSERVATION respecte la convention
-//  « <zone>_<EMPLACEMENT> » peut être intégrée. L'agent vient du code vendeur
-//  (REPRES) de la proforma.
+//  On choisit une plage de dates et un ou plusieurs numéros de client. Deux cas :
+//   - l'OBSERVATION respecte la convention « <zone>_<EMPLACEMENT> » : la zone est
+//     déduite toute seule ;
+//   - elle ne dit rien : la proforma reste intégrable, mais on DÉSIGNE LA ZONE
+//     À LA MAIN dans la ligne (et l'agent, si le vendeur de la proforma n'est
+//     pas celui qui a bipé). Seule une proforma sans ligne article est refusée :
+//     il n'y a rien à compter.
+//  Le mode (comptage / déduction) est le même que pour l'import Excel.
 // ════════════════════════════════════════════════════════════════════════════
 const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
   const [clients, setClients] = useState("");
-  const [selected, setSelected] = useState([]);
+  // Sélection : { [numfact]: { zoneCode, emplacement, agentCode } }. On garde la
+  // zone PAR LIGNE, puisqu'elle peut être saisie à la main.
+  const [choix, setChoix] = useState({});
+  const [mode, setMode] = useState("inventaire");
   const [erreur, setErreur] = useState("");
   const [voirToutes, setVoirToutes] = useState(false);
 
@@ -488,11 +495,17 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
   const [importer, { isLoading: importing }] = useImportProformasBipageMutation();
 
   const proformas = data?.proformas || [];
+  const zones = data?.zones || [];
   const affichees = voirToutes ? proformas : proformas.filter((p) => p.eligible);
+  const selected = Object.keys(choix);
+  const deduction = mode === "deduction";
+
+  // Une proforma sans ligne article n'est jamais intégrable — rien à compter.
+  const selectionnable = (p) => p.eligible || p.completable;
 
   const lancerRecherche = async () => {
     setErreur("");
-    setSelected([]);
+    setChoix({});
     if (!dateDebut && !dateFin && !clients.trim()) {
       setErreur(
         "Renseignez au moins une plage de dates ou un numéro de client : sans filtre, toute la table des proformas serait balayée.",
@@ -506,18 +519,49 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
     }
   };
 
-  const toggle = (numfact) =>
-    setSelected((s) =>
-      s.includes(numfact) ? s.filter((n) => n !== numfact) : [...s, numfact],
-    );
+  const toggle = (p) =>
+    setChoix((c) => {
+      if (c[p.numfact]) {
+        const { [p.numfact]: _, ...reste } = c;
+        return reste;
+      }
+      return {
+        ...c,
+        [p.numfact]: {
+          zoneCode: p.zoneCode || "",
+          emplacement: p.emplacement || "",
+          agentCode: p.agentCode || "",
+        },
+      };
+    });
+
+  const majChoix = (numfact, patch) =>
+    setChoix((c) => (c[numfact] ? { ...c, [numfact]: { ...c[numfact], ...patch } } : c));
 
   const eligibles = proformas.filter((p) => p.eligible);
   const toutCoche =
-    eligibles.length > 0 && eligibles.every((p) => selected.includes(p.numfact));
+    eligibles.length > 0 && eligibles.every((p) => choix[p.numfact]);
+
+  // Les proformas cochées dont la zone n'est toujours pas renseignée bloquent
+  // l'import : on le dit avant, plutôt que de renvoyer N erreurs après.
+  const sansZone = selected.filter(
+    (n) => !choix[n].zoneCode || !choix[n].emplacement,
+  );
 
   const valider = async () => {
+    setErreur("");
+    if (sansZone.length) {
+      setErreur(
+        `Zone à désigner pour ${sansZone.length} proforma(s) cochée(s) : ${sansZone.join(", ")}.`,
+      );
+      return;
+    }
     try {
-      const r = await importer({ entrepriseId, numfacts: selected }).unwrap();
+      const r = await importer({
+        entrepriseId,
+        mode,
+        items: selected.map((numfact) => ({ numfact, ...choix[numfact] })),
+      }).unwrap();
       onDone(r?.message || "Proformas intégrées.");
     } catch (e) {
       setErreur(e?.data?.message || "Import impossible.");
@@ -537,10 +581,11 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
         </div>
 
         <p className="bipages-convention">
-          L'observation de la proforma doit être <code>&lt;zone&gt;_&lt;EMPLACEMENT&gt;</code>{" "}
-          — par exemple <code>A_1_MAGASIN</code> ou <code>B_5d_DOCK</code>. Le code
-          de zone est tout ce qui précède le dernier « _ ». L'agent est le vendeur
-          de la proforma.
+          Quand l'observation de la proforma est <code>&lt;zone&gt;_&lt;EMPLACEMENT&gt;</code>{" "}
+          — par exemple <code>A_1_MAGASIN</code> ou <code>B_5d_DOCK</code> — la zone
+          et l'agent sont déduits tout seuls. Sinon, <b>cochez quand même la
+          proforma et désignez la zone dans la ligne</b> : seules celles sans
+          aucune ligne article sont refusées.
           {data?.emplacements?.length ? (
             <> Emplacements reconnus : <b>{data.emplacements.join(", ")}</b>.</>
           ) : null}
@@ -575,15 +620,41 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
           <button className="btn-primary" onClick={lancerRecherche} disabled={isFetching}>
             <HiSearch /> {isFetching ? "Recherche…" : "Rechercher"}
           </button>
+          {/* Même choix que pour l'import Excel : un comptage compte en positif,
+              une déduction retranche (quantités enregistrées en négatif). */}
+          <select
+            className="filter-select mode-select"
+            value={mode}
+            onChange={(e) => setMode(e.target.value)}
+            title="Comptage : les quantités s'ajoutent. Déduction : elles sont retranchées (ventes d'une partie du magasin restée ouverte)."
+          >
+            <option value="inventaire">Mode : comptage</option>
+            <option value="deduction">Mode : déduction (−)</option>
+          </select>
         </div>
 
         {erreur && <div className="bipages-msg err">{erreur}</div>}
+
+        {deduction && (
+          <div className="bipages-msg warn">
+            Mode <b>déduction</b> : les quantités de ces proformas seront
+            enregistrées en <b>négatif</b> et retranchées du comptage. Une même
+            proforma peut être intégrée dans les deux modes sans que l'un efface
+            l'autre.
+          </div>
+        )}
 
         {data && (
           <div className="bipages-resultats">
             <span>
               {data.total} proforma(s) trouvée(s), <b>{data.nbEligibles}</b>{" "}
-              intégrable(s).
+              avec zone reconnue
+              {data.nbCompletables ? (
+                <>
+                  , <b>{data.nbCompletables}</b> à compléter à la main
+                </>
+              ) : null}
+              .
             </span>
             <label className="bipages-check">
               <input
@@ -591,7 +662,7 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
                 checked={voirToutes}
                 onChange={(e) => setVoirToutes(e.target.checked)}
               />
-              Afficher aussi les non intégrables
+              Afficher aussi celles sans zone reconnue
             </label>
           </div>
         )}
@@ -604,8 +675,24 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
                   <input
                     type="checkbox"
                     checked={toutCoche}
+                    title="Cocher toutes les proformas dont la zone est reconnue"
                     onChange={() =>
-                      setSelected(toutCoche ? [] : eligibles.map((p) => p.numfact))
+                      setChoix((c) => {
+                        if (toutCoche) {
+                          const reste = { ...c };
+                          eligibles.forEach((p) => delete reste[p.numfact]);
+                          return reste;
+                        }
+                        const ajout = { ...c };
+                        eligibles.forEach((p) => {
+                          ajout[p.numfact] = {
+                            zoneCode: p.zoneCode || "",
+                            emplacement: p.emplacement || "",
+                            agentCode: p.agentCode || "",
+                          };
+                        });
+                        return ajout;
+                      })
                     }
                   />
                 </th>
@@ -613,8 +700,7 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
                 <th>Date</th>
                 <th>Client</th>
                 <th>Observation</th>
-                <th>Zone</th>
-                <th>Emplacement</th>
+                <th>Zone / emplacement</th>
                 <th>Agent</th>
                 <th>Lignes</th>
               </tr>
@@ -622,50 +708,117 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
             <tbody>
               {!data ? (
                 <tr>
-                  <td colSpan={9} className="no-data">
+                  <td colSpan={8} className="no-data">
                     Choisissez une plage de dates et/ou des clients, puis lancez la
                     recherche.
                   </td>
                 </tr>
               ) : affichees.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="no-data">
-                    Aucune proforma intégrable sur cette sélection.
+                  <td colSpan={8} className="no-data">
+                    Aucune proforma sur cette sélection.
                   </td>
                 </tr>
               ) : (
-                affichees.map((p) => (
-                  <tr key={p.numfact} className={p.eligible ? "" : "row-unknown"}>
-                    <td>
-                      {p.eligible && (
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(p.numfact)}
-                          onChange={() => toggle(p.numfact)}
-                        />
-                      )}
-                    </td>
-                    <td className="mono">{p.numfact}</td>
-                    <td>
-                      {p.datfact
-                        ? new Date(p.datfact).toLocaleDateString("fr-FR")
-                        : "—"}
-                    </td>
-                    <td className="desig-cell">
-                      {p.tiers} {p.nomClient}
-                    </td>
-                    <td className="desig-cell">
-                      {p.observation || "—"}
-                      {!p.eligible && p.raison && (
-                        <div className="bipages-raison">{p.raison}</div>
-                      )}
-                    </td>
-                    <td className="zone-cell">{p.zoneCode || "—"}</td>
-                    <td className="zone-cell">{p.emplacement || "—"}</td>
-                    <td>{p.agentNom || (p.agentCode ? `Code ${p.agentCode}` : "—")}</td>
-                    <td className="num-cell">{p.nbLignes}</td>
-                  </tr>
-                ))
+                affichees.map((p) => {
+                  const coche = choix[p.numfact];
+                  const zoneVal =
+                    coche && coche.zoneCode && coche.emplacement
+                      ? `${coche.zoneCode}||${coche.emplacement}`
+                      : "";
+                  // Une observation peut désigner une zone que la société n'a
+                  // pas (créée depuis, mal orthographiée…) : on l'ajoute à la
+                  // liste pour ne pas vider silencieusement la cellule — le
+                  // serveur refusera l'import et le dira.
+                  const zoneInconnue =
+                    zoneVal && !zones.some((z) => `${z.code}||${z.emplacement}` === zoneVal);
+                  return (
+                    <tr
+                      key={p.numfact}
+                      className={p.eligible ? "" : "row-unknown"}
+                    >
+                      <td>
+                        {selectionnable(p) && (
+                          <input
+                            type="checkbox"
+                            checked={!!coche}
+                            onChange={() => toggle(p)}
+                          />
+                        )}
+                      </td>
+                      <td className="mono">{p.numfact}</td>
+                      <td>
+                        {p.datfact
+                          ? new Date(p.datfact).toLocaleDateString("fr-FR")
+                          : "—"}
+                      </td>
+                      <td className="desig-cell">
+                        {p.tiers} {p.nomClient}
+                      </td>
+                      <td className="desig-cell">
+                        {p.observation || "—"}
+                        {!p.eligible && p.raison && (
+                          <div className="bipages-raison">{p.raison}</div>
+                        )}
+                      </td>
+                      {/* Zone : figée tant que la ligne n'est pas cochée, puis
+                          modifiable — c'est ce qui permet d'intégrer une
+                          proforma dont l'observation ne désigne rien. */}
+                      <td className="zone-cell">
+                        {coche ? (
+                          <select
+                            className="bipages-cell-select"
+                            value={zoneVal}
+                            onChange={(e) => {
+                              const [zoneCode, emplacement] =
+                                e.target.value.split("||");
+                              majChoix(p.numfact, {
+                                zoneCode: zoneCode || "",
+                                emplacement: emplacement || "",
+                              });
+                            }}
+                          >
+                            <option value="">— Choisir une zone —</option>
+                            {zoneInconnue && (
+                              <option value={zoneVal}>
+                                {coche.zoneCode} ({coche.emplacement}) — inconnue
+                              </option>
+                            )}
+                            {zones.map((z) => (
+                              <option
+                                key={`${z.code}||${z.emplacement}`}
+                                value={`${z.code}||${z.emplacement}`}
+                              >
+                                {z.code} ({z.emplacement})
+                              </option>
+                            ))}
+                          </select>
+                        ) : p.zoneCode ? (
+                          `${p.zoneCode} (${p.emplacement})`
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        {coche ? (
+                          <input
+                            className="bipages-cell-input"
+                            type="text"
+                            value={coche.agentCode}
+                            placeholder="code vendeur"
+                            title="Code vendeur (REPRES). Laissez celui de la proforma s'il est bon."
+                            onChange={(e) =>
+                              majChoix(p.numfact, { agentCode: e.target.value })
+                            }
+                          />
+                        ) : (
+                          p.agentNom || (p.agentCode ? `Code ${p.agentCode}` : "—")
+                        )}
+                      </td>
+                      <td className="num-cell">{p.nbLignes}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -676,14 +829,14 @@ const ProformasModal = ({ entrepriseId, onClose, onDone }) => {
             Annuler
           </button>
           <button
-            className="btn-primary"
+            className={`btn-primary ${deduction ? "btn-deduction" : ""}`}
             onClick={valider}
             disabled={selected.length === 0 || importing}
           >
             <HiUpload />{" "}
             {importing
               ? "Intégration…"
-              : `Intégrer ${selected.length} proforma(s)`}
+              : `${deduction ? "Déduire" : "Intégrer"} ${selected.length} proforma(s)`}
           </button>
         </div>
       </div>

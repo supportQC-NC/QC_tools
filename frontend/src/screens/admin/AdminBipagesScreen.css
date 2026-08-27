@@ -507,6 +507,42 @@
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.bipages-msg.warn {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* ── Saisie DANS une ligne de la modale proformas ──────────────────────────
+   Zone et agent d'une proforma dont l'observation ne dit rien : on les
+   désigne à la main, la ligne devient alors intégrable. Champs compacts —
+   .filter-select impose un min-width de 200px, inutilisable en cellule. */
+.bipages-cell-select,
+.bipages-cell-input {
+  width: 100%;
+  min-width: 120px;
+  padding: 5px 7px;
+  background: var(--bg-primary);
+  border: 1px solid #8b5cf6;
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.bipages-cell-select {
+  cursor: pointer;
+}
+
+.bipages-cell-input {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.bipages-cell-select:focus,
+.bipages-cell-input:focus {
+  outline: none;
+  border-color: #a78bfa;
+}
+
 /* ── Mode d'import Excel : comptage / déduction ─────────────────────────── */
 .mode-select {
   min-width: 0;
