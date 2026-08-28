@@ -137,6 +137,22 @@ const drawChamp = (doc, label, x, y, w, h) => {
     .text(label.toUpperCase(), x + 4, y + 3, { width: w - 8, lineBreak: false });
 };
 
+// Écrit un texte en gras à la plus grande taille qui tient sur UNE ligne dans
+// `w` (les noms de fournisseurs vont de « ETS X » à 40 caractères) ; si même la
+// plus petite ne tient pas, on tronque.
+const drawTitreAdaptatif = (doc, texte, x, y, w, tailles, align = "left") => {
+  const t = safeTrim(texte) || "—";
+  doc.font("Helvetica-Bold");
+  const taille =
+    tailles.find((s) => {
+      doc.fontSize(s);
+      return doc.widthOfString(t) <= w;
+    }) || tailles[tailles.length - 1];
+  doc.fontSize(taille);
+  doc.text(tronquer(doc, t, w), x, y, { width: w, align, lineBreak: false });
+  return taille;
+};
+
 // Couple libellé / valeur du bloc d'identité de la commande.
 const drawInfo = (doc, label, valeur, x, y, w) => {
   doc
@@ -232,7 +248,9 @@ const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, optio
 
   // ── Bloc d'identité de la commande ────────────────────────────────────────
   y += 10;
-  const blocH = 50;
+  // Deux étages : (1) n° de commande + FOURNISSEUR en gros, (2) les autres
+  // infos sur une seule ligne.
+  const blocH = 74;
   doc.save().lineWidth(0.7);
   doc.rect(M, y, CW, blocH).fillAndStroke(GRIS_FOND, GRIS_LIGNE);
   doc.restore();
@@ -251,32 +269,53 @@ const drawPageEntete = (doc, { entreprise, commande, lignes, commentaires, optio
       lineBreak: false,
     });
 
+  // Le FOURNISSEUR est l'information la plus lue sur le quai : il sort de la
+  // grille d'infos et prend sa propre colonne, en gras et en grand (taille
+  // adaptée à la longueur du nom).
+  const fournX = M + 175;
+  const fournW = CW - 175 - 12;
+  doc
+    .font("Helvetica")
+    .fontSize(6.5)
+    .fillColor(GRIS_LABEL)
+    .text("FOURNISSEUR", fournX, y + 8, { width: fournW, lineBreak: false });
+  doc.fillColor(NOIR);
+  drawTitreAdaptatif(
+    doc,
+    commande?.fournisseurNom,
+    fournX,
+    y + 17,
+    fournW,
+    [24, 21, 18, 15, 12],
+  );
+
   // ⚠️ Aucune quantité commandée ici non plus (même en total) : comptage à l'aveugle.
+  // Le 3e membre est un poids de largeur (nom de bateau et libellé d'état sont
+  // longs, les compteurs tiennent en 3 chiffres).
   const infos = [
-    ["Fournisseur", commande?.fournisseurNom],
-    ["Bateau / vol", commande?.bateau],
-    ["Arrivée prévue", fmtDate(commande?.arrivee)],
-    ["Date commande", fmtDate(commande?.datcde)],
+    ["Bateau / vol", commande?.bateau, 2],
+    ["Arrivée prévue", fmtDate(commande?.arrivee), 1],
+    ["Date commande", fmtDate(commande?.datcde), 1],
     [
       "État",
       commande?.etatLabel || (commande?.etat != null ? `État ${commande.etat}` : ""),
+      1.4,
     ],
-    ["Lignes à contrôler", String(lignes.length)],
-    ["Nouveautés", String(lignes.filter((l) => l.estNouveau).length)],
+    ["Lignes à contrôler", String(lignes.length), 1],
+    ["Nouveautés", String(lignes.filter((l) => l.estNouveau).length), 1],
     [
       "Réservations",
       options?.resaDisponible === false
         ? "n/d"
         : String(lignes.filter((l) => l.estReserve).length),
+      1,
     ],
   ];
-  const zoneX = M + 175;
-  const zoneW = CW - 175 - 12;
-  const colW = zoneW / 4;
-  infos.forEach(([label, valeur], i) => {
-    const cx = zoneX + (i % 4) * colW;
-    const cy = y + 8 + Math.floor(i / 4) * 24;
-    drawInfo(doc, label, valeur, cx, cy, colW - 10);
+  const unite = (CW - 24) / infos.reduce((s, [, , p]) => s + p, 0);
+  let cx = M + 12;
+  infos.forEach(([label, valeur, poids]) => {
+    drawInfo(doc, label, valeur, cx, y + 46, poids * unite - 10);
+    cx += poids * unite;
   });
 
   y += blocH + 10;
@@ -347,23 +386,29 @@ const drawEntetePageDetail = (doc, { entreprise, commande }) => {
       y,
       { width: CW * 0.7, lineBreak: false },
     );
-  doc
-    .font("Helvetica")
-    .fontSize(7.5)
-    .fillColor(GRIS_LABEL)
-    .text(
-      [
-        safeTrim(commande?.fournisseurNom),
-        safeTrim(commande?.bateau),
-        safeTrim(entreprise?.trigramme).toUpperCase(),
-      ]
-        .filter(Boolean)
-        .join(" · "),
-      M,
-      y + 1,
-      { width: CW, align: "right" },
-    );
-  y += 16;
+  // Même logique qu'en page 1 : le fournisseur est mis en avant (gras, plus
+  // gros) ; le reste du contexte reste en petit, sur la ligne du dessous.
+  const contexte = [safeTrim(commande?.bateau), safeTrim(entreprise?.trigramme).toUpperCase()]
+    .filter(Boolean)
+    .join(" · ");
+  doc.fillColor(NOIR);
+  drawTitreAdaptatif(
+    doc,
+    commande?.fournisseurNom,
+    M + CW * 0.62,
+    y - 2,
+    CW * 0.38,
+    [13, 11.5, 10],
+    "right",
+  );
+  if (contexte) {
+    doc
+      .font("Helvetica")
+      .fontSize(7)
+      .fillColor(GRIS_LABEL)
+      .text(contexte, M, y + 13, { width: CW, align: "right", lineBreak: false });
+  }
+  y += 24;
   doc.save().lineWidth(0.7).strokeColor(GRIS_LIGNE);
   doc.moveTo(M, y).lineTo(M + CW, y).stroke();
   doc.restore();
