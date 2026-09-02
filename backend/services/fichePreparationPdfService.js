@@ -37,13 +37,13 @@ const ROUGE = "#b91c1c";
 const ZONES = {
   dock: {
     titre: "1 · DOCK",
-    detail: "stock dock (S2) — à faire EN PREMIER",
+    detail: "stock S2 · gisement GISM2 — à faire EN PREMIER",
     couleur: "#0f766e",
     fond: "#e6f4f1",
   },
   magasin: {
     titre: "2 · MAGASIN",
-    detail: "reliquat en rayon (S1) — après le dock",
+    detail: "stock S1 · gisement GISM1 — après le dock",
     couleur: "#b45309",
     fond: "#fdf3e3",
   },
@@ -118,11 +118,14 @@ const logoBuffer = (entreprise) => {
 
 // ---------------------------------------------------------------------------
 // COLONNES DU TABLEAU (paysage)
-// « Désignation » est prioritaire (300 pt) ; le RAYON prend le reste, car c'est
-// lui qui guide le déplacement de l'agent au magasin. « À PRENDRE » est la
-// colonne IMPRIMÉE la plus lue, « CTRL » la seule laissée vide.
+// « Désignation » est prioritaire (280 pt). GISEMENT porte le CODE
+// d'emplacement de la zone parcourue (GISM2 au dock, GISM1 au magasin) : c'est
+// lui qui guide le déplacement de l'agent, il est donc en gras. RAYON n'est
+// renseigné que si la société a un dictionnaire Excel des gisements (libellé +
+// sous-rayon) et prend la largeur restante. « À PRENDRE » est la colonne
+// IMPRIMÉE la plus lue, « CTRL » la seule laissée vide.
 // ---------------------------------------------------------------------------
-const DESIGNATION_W = 300;
+const DESIGNATION_W = 280;
 
 const buildColonnes = () => {
   const cols = [
@@ -138,7 +141,8 @@ const buildColonnes = () => {
     },
     { key: "gencod", label: "GENCODE", w: 58, align: "left" },
     { key: "refer", label: "RÉF.", w: 46, align: "left" },
-    { key: "rayon", label: "RAYON / EMPLACEMENT", w: 0, align: "left" },
+    { key: "gisement", label: "GISEMENT", w: 58, align: "left" },
+    { key: "rayon", label: "RAYON", w: 0, align: "left" },
     { key: "stock", label: "STOCK", w: 42, align: "center" },
     { key: "aPrendre", label: "À PRENDRE", w: 62, align: "center" },
     { key: "ctrl", label: "CTRL", w: 52, align: "center", saisie: true },
@@ -610,11 +614,12 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
   cell("designation", ligne.designation);
   cell("gencod", ligne.gencod, { size: 7, color: GRIS_LABEL });
   cell("refer", ligne.refer, { size: 7, color: GRIS_LABEL });
-  // Au magasin le rayon guide le déplacement ; au dock il n'est qu'un repère.
-  const emplacement = [ligne.rayon || ligne.gism1, ligne.sousRayon]
-    .filter(Boolean)
-    .join(" · ");
-  cell("rayon", emplacement, { size: 7, color: GRIS_TXT });
+  // Code d'emplacement de la zone en cours (GISM2 dock / GISM1 magasin) : en
+  // gras, c'est lui que l'agent cherche des yeux pour se déplacer.
+  cell("gisement", ligne.gisement, { bold: true, size: 7.6, color: NOIR });
+  // Libellé du dictionnaire Excel des gisements, quand la société en a un.
+  const rayon = [ligne.rayon, ligne.sousRayon].filter(Boolean).join(" · ");
+  cell("rayon", rayon, { size: 7, color: GRIS_TXT });
   // Stock de la zone : sert à comprendre un « ! » d'un coup d'œil.
   cell("stock", fmtNb(ligne.stockZone), {
     size: 7,
@@ -640,8 +645,9 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
  * @param {object} p.proforma      entête { numfact, clientNom, clientCode, vendeurCode, vendeurNom, datfact, etat, etatLabel }
  * @param {Array}  p.lignesDock    lignes à prendre au dock (S2), déjà ordonnées
  * @param {Array}  p.lignesMagasin lignes à prendre au magasin (S1), déjà ordonnées
- *                                 [{ nl, nart, designation, refer, gencod, gism1, rayon,
- *                                    sousRayon, aPrendre, stockZone, manquant, autreZone }]
+ *                                 [{ nl, nart, designation, refer, gencod, gisement,
+ *                                    rayon, sousRayon, aPrendre, stockZone,
+ *                                    manquant, autreZone }]
  * @param {Array}  p.commentaires  commentaires de la proforma (TEXTE + lignes « ! »)
  * @param {object} p.totaux        { totalDock, totalMagasin } — volumes des
  *                                 bandeaux de section (la page 1 n'affiche

@@ -461,6 +461,14 @@ l'ordonnancement (gisement, priorité de parcours) ne sont **pas redéveloppés*
 pas la demande, la ligne part quand même au magasin avec un repère `!` et le
 stock de la zone affiché — l'agent voit la rupture probable avant de chercher.
 
+**Gisement** : la fiche article porte un code d'emplacement **par zone** —
+`GISM2` = dock, `GISM1` = magasin. La colonne GISEMENT affiche celui de la zone
+parcourue (et le dictionnaire Excel des gisements, quand la société en a un, est
+interrogé avec ce code-là). Ne pas afficher GISM1 sur une ligne dock : chez QC
+les deux diffèrent presque toujours (dock `J_2` vs rayon `C_4`).
+`analyserProforma` n'expose que GISM1 — GISM2 est lu dans le cache articles,
+par index, sans relecture DBF.
+
 ⚠️ **Ne jamais arrondir les quantités à l'unité** : `prodet.QTE`, `article.S1`
 et `S2` sont des `N(x.3)` et beaucoup d'articles se vendent au mètre (tuyau,
 câble). Un `Math.round` transforme « prendre 38,5 m » en « 38 » ou « 39 ».

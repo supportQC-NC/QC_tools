@@ -47,8 +47,8 @@ const STATUT_LABEL = {
 
 // Libellés des deux zones de prélèvement (même code couleur que la fiche PDF).
 const ZONES = {
-  dock: { titre: "1 · Dock", sous: "stock dock (S2) — à faire en premier" },
-  magasin: { titre: "2 · Magasin", sous: "reliquat en rayon (S1) — après le dock" },
+  dock: { titre: "1 · Dock", sous: "stock S2 · gisement GISM2 — à faire en premier" },
+  magasin: { titre: "2 · Magasin", sous: "stock S1 · gisement GISM1 — après le dock" },
 };
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("fr-FR") : "—");
@@ -621,7 +621,8 @@ const SectionZone = ({ zone, lignes }) => {
               <th>Code article</th>
               <th>Désignation</th>
               <th>Gencode</th>
-              <th>Rayon / emplacement</th>
+              <th>Gisement</th>
+              <th>Rayon</th>
               <th className="pm-num">Stock zone</th>
               <th className="pm-num">À prendre</th>
             </tr>
@@ -653,9 +654,11 @@ const SectionZone = ({ zone, lignes }) => {
                   )}
                 </td>
                 <td className="pm-mono pm-muted">{l.gencod || "—"}</td>
+                {/* Code d'emplacement de la zone parcourue : GISM2 au dock,
+                    GISM1 au magasin — c'est lui qui guide le déplacement. */}
+                <td className="pm-mono pm-strong">{l.gisement || "—"}</td>
                 <td className="pm-muted">
-                  {[l.rayon || l.gism1, l.sousRayon].filter(Boolean).join(" · ") ||
-                    "—"}
+                  {[l.rayon, l.sousRayon].filter(Boolean).join(" · ") || "—"}
                 </td>
                 <td className="pm-num pm-muted">{fmtQte(l.stockZone)}</td>
                 <td className="pm-num">
