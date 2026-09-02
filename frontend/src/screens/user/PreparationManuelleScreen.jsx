@@ -623,7 +623,7 @@ const SectionZone = ({ zone, lignes }) => {
               <th>Gencode</th>
               <th>Gisement</th>
               <th>Rayon</th>
-              <th className="pm-num">Stock zone</th>
+              <th className="pm-num">Dispo zone</th>
               <th className="pm-num">À prendre</th>
             </tr>
           </thead>

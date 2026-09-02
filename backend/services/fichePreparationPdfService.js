@@ -143,7 +143,7 @@ const buildColonnes = () => {
     { key: "refer", label: "RÉF.", w: 46, align: "left" },
     { key: "gisement", label: "GISEMENT", w: 58, align: "left" },
     { key: "rayon", label: "RAYON", w: 0, align: "left" },
-    { key: "stock", label: "STOCK", w: 42, align: "center" },
+    { key: "stock", label: "DISPO", w: 42, align: "center" },
     { key: "aPrendre", label: "À PRENDRE", w: 62, align: "center" },
     { key: "ctrl", label: "CTRL", w: 52, align: "center", saisie: true },
   ];
@@ -620,10 +620,15 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
   // Libellé du dictionnaire Excel des gisements, quand la société en a un.
   const rayon = [ligne.rayon, ligne.sousRayon].filter(Boolean).join(" · ");
   cell("rayon", rayon, { size: 7, color: GRIS_TXT });
-  // Stock de la zone : sert à comprendre un « ! » d'un coup d'œil.
-  cell("stock", fmtNb(ligne.stockZone), {
+  // ⚠️ NE JAMAIS imprimer le stock quand il couvre le besoin : un « 90 » posé
+  // à côté d'un « 3 » se lit comme une quantité à prendre (erreur constatée en
+  // relecture client). La colonne ne sert qu'à l'ALERTE : on n'y met un chiffre
+  // que lorsque la zone n'a pas de quoi servir la ligne — c'est alors le nombre
+  // d'unités réellement trouvables sur place.
+  cell("stock", ligne.manquant > 0 ? fmtNb(ligne.stockZone) : "", {
+    bold: true,
     size: 7,
-    color: ligne.manquant > 0 ? ROUGE : GRIS_LABEL,
+    color: ROUGE,
   });
 
   // Quantité à prendre : l'instruction — la plus grosse valeur de la ligne.
@@ -744,7 +749,7 @@ export const genererFichePreparationPDF = async ({
   // ── Pieds de page (numérotation connue une fois toutes les pages écrites) ──
   const range = doc.bufferedPageRange();
   const legende =
-    "Parcours : DOCK (S2) puis MAGASIN (S1) · CTRL = quantité réellement prise si elle diffère · ! = stock insuffisant · > = article aussi à prendre dans l'autre zone";
+    "Parcours : DOCK (S2) puis MAGASIN (S1) · À PRENDRE = quantité commandée par le client pour cette zone · CTRL = quantité réellement prise si elle diffère · DISPO n'est rempli que si la zone n'a pas le compte (! ) · > = article aussi à prendre dans l'autre zone";
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(range.start + i);
     const fy = PAGE_H - M - 10;
