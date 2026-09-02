@@ -62,9 +62,17 @@ const fmtDateHeure = (d) =>
         minute: "2-digit",
       })
     : "—";
+// Compteurs (nombre de lignes, d'articles, d'impressions) : toujours entiers.
 const fmtInt = (v) =>
   Number.isFinite(Number(v))
     ? Math.round(Number(v)).toLocaleString("fr-FR")
+    : "—";
+// ⚠️ Quantités et stocks viennent de champs DBF N(x.3) : un article vendu au
+// mètre vaut 0,5 ou 3,6. Les arrondir à l'unité fausserait ce que l'agent doit
+// prendre — 3 décimales max, zéros de fin supprimés.
+const fmtQte = (v) =>
+  Number.isFinite(Number(v))
+    ? Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 3 })
     : "—";
 
 const PreparationManuelleScreen = () => {
@@ -338,7 +346,7 @@ const PreparationManuelleScreen = () => {
                     {p.etatLabel || (p.etat != null ? `État ${p.etat}` : "—")}
                   </td>
                   <td className="pm-num">{fmtInt(p.nbLignes)}</td>
-                  <td className="pm-num">{fmtInt(p.totalUnites)}</td>
+                  <td className="pm-num">{fmtQte(p.totalUnites)}</td>
                   <td>
                     <span className={`pm-chip pm-chip-${p.suivi.statut}`}>
                       {STATUT_LABEL[p.suivi.statut]}
@@ -502,15 +510,15 @@ const ApercuPreparation = ({
             <span className="pm-stat-label">Articles</span>
           </div>
           <div className="pm-stat">
-            <span className="pm-stat-value">{fmtInt(totaux?.totalDemande)}</span>
+            <span className="pm-stat-value">{fmtQte(totaux?.totalDemande)}</span>
             <span className="pm-stat-label">Unités demandées</span>
           </div>
           <div className="pm-stat">
-            <span className="pm-stat-value">{fmtInt(totaux?.totalDock)}</span>
+            <span className="pm-stat-value">{fmtQte(totaux?.totalDock)}</span>
             <span className="pm-stat-label">Au dock</span>
           </div>
           <div className="pm-stat">
-            <span className="pm-stat-value">{fmtInt(totaux?.totalMagasin)}</span>
+            <span className="pm-stat-value">{fmtQte(totaux?.totalMagasin)}</span>
             <span className="pm-stat-label">Au magasin</span>
           </div>
           <div className="pm-stat">
@@ -595,7 +603,7 @@ const SectionZone = ({ zone, lignes }) => {
         <span className="pm-zone-sub">{ZONES[zone].sous}</span>
         <span className="pm-zone-count">
           {fmtInt(lignes.length)} ligne{lignes.length > 1 ? "s" : ""} ·{" "}
-          {fmtInt(total)} unité{total > 1 ? "s" : ""}
+          {fmtQte(total)} unité{total > 1 ? "s" : ""}
         </span>
       </header>
 
@@ -628,7 +636,7 @@ const SectionZone = ({ zone, lignes }) => {
                   {l.manquant > 0 && (
                     <span
                       className="pm-tag pm-tag-manquant"
-                      title={`Stock de la zone insuffisant : ${fmtInt(
+                      title={`Stock de la zone insuffisant : ${fmtQte(
                         l.manquant,
                       )} unité(s) probablement introuvable(s)`}
                     >
@@ -649,12 +657,12 @@ const SectionZone = ({ zone, lignes }) => {
                   {[l.rayon || l.gism1, l.sousRayon].filter(Boolean).join(" · ") ||
                     "—"}
                 </td>
-                <td className="pm-num pm-muted">{fmtInt(l.stockZone)}</td>
+                <td className="pm-num pm-muted">{fmtQte(l.stockZone)}</td>
                 <td className="pm-num">
                   <span
                     className={`pm-qte ${l.manquant > 0 ? "pm-qte-manquant" : ""}`}
                   >
-                    {fmtInt(l.aPrendre)}
+                    {fmtQte(l.aPrendre)}
                   </span>
                 </td>
               </tr>

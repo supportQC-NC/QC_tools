@@ -24,6 +24,11 @@ const num = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : 0;
 };
+// ⚠️ Les quantités (prodet.QTE) et les stocks (article.S1/S2) sont des N(x.3) :
+// un article vendu au mètre vaut 0,5 ou 3,6. On ne les arrondit JAMAIS à
+// l'unité — on se contente de couper le bruit de la virgule flottante à la
+// 3e décimale, la précision réelle du DBF.
+const q = (v) => Math.round(num(v) * 1000) / 1000;
 
 const toDate = (v) => proformaCacheService.parseDate(v);
 
@@ -135,7 +140,7 @@ export const listerProformas = async (entreprise, options = {}) => {
       etat: isNaN(etat) ? null : etat,
       etatLabel: etatLabel(entreprise, etat),
       nbLignes,
-      totalUnites: Math.round(totalUnites),
+      totalUnites: q(totalUnites),
     };
   });
 
@@ -223,7 +228,7 @@ export const getPreparationComplete = async (entreprise, numpro) => {
       stockMagasin: l.stockMagasin || 0,
       // Part demandée que le stock de la zone ne couvre pas : l'agent doit le
       // voir AVANT de chercher (rupture probable), pas le découvrir au rayon.
-      manquant: Math.max(0, aPrendre - stockZone),
+      manquant: Math.max(0, q(aPrendre - stockZone)),
       // Le même article est aussi à prendre dans l'autre zone.
       autreZone:
         zone === "dock"
@@ -269,11 +274,11 @@ export const getPreparationComplete = async (entreprise, numpro) => {
     totaux: {
       nbArticles: analyse.lignes.length,
       nbLignesFiche: lignesDock.length + lignesMagasin.length,
-      totalDemande: Math.round(
+      totalDemande: q(
         analyse.lignes.reduce((s, l) => s + (l.qteCommandee || 0), 0),
       ),
-      totalDock: Math.round(somme(lignesDock)),
-      totalMagasin: Math.round(somme(lignesMagasin)),
+      totalDock: q(somme(lignesDock)),
+      totalMagasin: q(somme(lignesMagasin)),
       nbManquants:
         lignesDock.filter((l) => l.manquant > 0).length +
         lignesMagasin.filter((l) => l.manquant > 0).length,

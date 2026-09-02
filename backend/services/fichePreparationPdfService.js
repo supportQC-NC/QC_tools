@@ -57,12 +57,19 @@ const FOOTER_H = 24;
 const PAGE_OPTS = { size: "A4", layout: "landscape", margin: 0 };
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
+// ⚠️ Quantités et stocks sont des N(x.3) dans le DBF : un article vendu au
+// mètre peut valoir 0,5 ou 3,6. Arrondir à l'unité fausserait l'instruction
+// donnée à l'agent — on garde donc jusqu'à 3 décimales, zéros de fin supprimés
+// (« 12 » et non « 12,000 »).
 const fmtNb = (v) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return "";
-  // toLocaleString("fr-FR") sépare les milliers par une espace fine insécable
-  // (U+202F), absente du jeu WinAnsi de pdfkit -> espace normale.
-  return Math.round(n).toLocaleString("fr-FR").replace(/[  ]/g, " ");
+  // toLocaleString("fr-FR") sépare les milliers par une espace insécable
+  // (U+00A0) ou fine insécable (U+202F), absentes du jeu WinAnsi de pdfkit
+  // -> espace normale.
+  return n
+    .toLocaleString("fr-FR", { maximumFractionDigits: 3 })
+    .replace(/[  ]/g, " ");
 };
 const fmtDate = (d) => {
   if (!d) return "—";
@@ -243,10 +250,7 @@ const drawGrandeCase = (doc, { titre, aide, x, y, w, h }) => {
 // ---------------------------------------------------------------------------
 // PAGE 1 — EN-TÊTE DE LA PROFORMA + 4 GRANDES CASES
 // ---------------------------------------------------------------------------
-const drawPageEntete = (
-  doc,
-  { entreprise, proforma, totaux, commentaires, options },
-) => {
+const drawPageEntete = (doc, { entreprise, proforma, commentaires, options }) => {
   const couleur = safeTrim(entreprise?.couleurPrimaire) || "#0f766e";
   let y = M;
 
@@ -345,12 +349,18 @@ const drawPageEntete = (
     [24, 21, 18, 15, 12],
   );
 
+  // Décision client : AUCUN compteur sur la page d'en-tête (nb d'articles,
+  // total à prendre, part dock / magasin, ruptures). Les volumes se lisent sur
+  // le bandeau de chaque section, au moment où l'agent y arrive.
   // Le 3e membre est un poids de largeur (le nom du vendeur et le libellé
-  // d'état sont longs, les compteurs tiennent en 3 chiffres).
+  // d'état sont longs, la date tient en 10 caractères).
   const infos = [
     [
       "Vendeur",
-      [safeTrim(proforma?.vendeurNom), proforma?.vendeurCode ? `(${proforma.vendeurCode})` : ""]
+      [
+        safeTrim(proforma?.vendeurNom),
+        proforma?.vendeurCode ? `(${proforma.vendeurCode})` : "",
+      ]
         .filter(Boolean)
         .join(" "),
       2,
@@ -362,11 +372,6 @@ const drawPageEntete = (
         (proforma?.etat != null ? `État ${proforma.etat}` : ""),
       1.4,
     ],
-    ["Articles", String(totaux?.nbArticles ?? 0), 0.8],
-    ["Total à prendre", fmtNb(totaux?.totalDemande), 1],
-    ["Dont dock", fmtNb(totaux?.totalDock), 1],
-    ["Dont magasin", fmtNb(totaux?.totalMagasin), 1],
-    ["Stock insuffisant", String(totaux?.nbManquants ?? 0), 1.1],
   ];
   const unite = (CW - 24) / infos.reduce((s, [, , p]) => s + p, 0);
   let cx = M + 12;
@@ -638,7 +643,9 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
  *                                 [{ nl, nart, designation, refer, gencod, gism1, rayon,
  *                                    sousRayon, aPrendre, stockZone, manquant, autreZone }]
  * @param {Array}  p.commentaires  commentaires de la proforma (TEXTE + lignes « ! »)
- * @param {object} p.totaux        { nbArticles, totalDemande, totalDock, totalMagasin, nbManquants }
+ * @param {object} p.totaux        { totalDock, totalMagasin } — volumes des
+ *                                 bandeaux de section (la page 1 n'affiche
+ *                                 aucun compteur, décision client)
  * @param {object} p.options       { editePar:string }
  * @param {WritableStream} p.stream
  * @returns {Promise<{nbPages:number, nbLignes:number}>}
@@ -671,13 +678,7 @@ export const genererFichePreparationPDF = async ({
   doc.pipe(stream);
 
   // ── Page 1 : en-tête de proforma + 4 grandes cases ────────────────────────
-  drawPageEntete(doc, {
-    entreprise,
-    proforma,
-    totaux,
-    commentaires,
-    options,
-  });
+  drawPageEntete(doc, { entreprise, proforma, commentaires, options });
 
   // ── Pages suivantes : le parcours, DOCK d'abord puis MAGASIN ──────────────
   const limiteBas = PAGE_H - M - FOOTER_H;

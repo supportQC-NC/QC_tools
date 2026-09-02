@@ -461,6 +461,17 @@ l'ordonnancement (gisement, priorité de parcours) ne sont **pas redéveloppés*
 pas la demande, la ligne part quand même au magasin avec un repère `!` et le
 stock de la zone affiché — l'agent voit la rupture probable avant de chercher.
 
+⚠️ **Ne jamais arrondir les quantités à l'unité** : `prodet.QTE`, `article.S1`
+et `S2` sont des `N(x.3)` et beaucoup d'articles se vendent au mètre (tuyau,
+câble). Un `Math.round` transforme « prendre 38,5 m » en « 38 » ou « 39 ».
+Le formatage se fait à 3 décimales, zéros de fin supprimés (`fmtNb` du service
+PDF, `fmtQte` de l'écran) ; `fmtInt` reste réservé aux compteurs (nb de lignes,
+d'articles, d'impressions).
+
+La page d'en-tête ne porte **aucun compteur** (décision client) : ni nombre
+d'articles, ni total à prendre, ni part dock/magasin, ni ruptures. Ces volumes
+figurent sur le bandeau de chaque section, là où l'agent en a besoin.
+
 ## Carte des domaines fonctionnels
 
 Repères pour situer un écran / un routeur. Les préfixes API sont sous `/api/`.
