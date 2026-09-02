@@ -25,6 +25,11 @@ export const PERMISSION_MODULES = [
   { key: "reception", label: "Réception marchandises", group: "gestion" },
   { key: "reception_manuelle", label: "Contrôle réception manuel", group: "gestion" },
   { key: "prep_commande", label: "Préparation Commandes", group: "gestion" },
+  {
+    key: "prep_commande_manuelle",
+    label: "Préparation commande manuelle",
+    group: "gestion",
+  },
   { key: "envoi_cde_fournisseur", label: "Envoi Cde Fournisseur", group: "gestion" },
   { key: "ctrl_info_produit", label: "Contrôle Infos Produit", group: "gestion" },
   { key: "releve", label: "Relevé de prix", group: "gestion" },

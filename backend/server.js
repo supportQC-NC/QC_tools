@@ -35,6 +35,8 @@ import receptionRoutes from "./routes/receptionRoutes.js";
 import receptionManuelleRoutes from "./routes/receptionManuelleRoutes.js";
 // ========== ROUTES PRÉPARATION DE COMMANDE ==========
 import preparationRoutes from "./routes/preparationRoutes.js";
+// ========== ROUTES PRÉPARATION DE COMMANDE MANUELLE (fiches papier) ==========
+import preparationManuelleRoutes from "./routes/preparationManuelleRoutes.js";
 import etiquetteRoutes from "./routes/etiquetteRoutes.js";
 import changementPrixRoutes from "./routes/changementPrixRoutes.js";
 import pachatHistoriqueRoutes from "./routes/pachatHistoriqueRoutes.js";
@@ -202,6 +204,8 @@ app.use("/api/receptions", receptionRoutes);
 app.use("/api/reception-manuelle", receptionManuelleRoutes);
 // ========== ROUTES PRÉPARATION DE COMMANDE ==========
 app.use("/api/preparations", preparationRoutes);
+// ========== ROUTES PRÉPARATION DE COMMANDE MANUELLE (fiches papier) ==========
+app.use("/api/preparation-manuelle", preparationManuelleRoutes);
 // ========== ROUTES ZONES (INVENTAIRE) ==========
 app.use("/api/zones", zoneRoutes);
 // ========== ROUTES INVENTAIRE ZONES (PROGRESSION) ==========

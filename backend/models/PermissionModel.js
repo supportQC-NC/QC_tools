@@ -70,6 +70,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Préparation de commande MANUELLE (fiches papier à remplir à la main)
+      prep_commande_manuelle: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Envoi Commande Fournisseur (envoi par email des commandes préparées)
       envoi_cde_fournisseur: {
         read: { type: Boolean, default: false },

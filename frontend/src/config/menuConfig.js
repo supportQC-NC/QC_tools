@@ -229,6 +229,20 @@ export const moduleMenuStructure = [
   },
   {
     type: "subgroup",
+    label: "Préparation",
+    icon: HiClipboardList,
+    collapsible: true,
+    items: [
+      {
+        moduleKey: "prep_commande_manuelle",
+        label: "Préparation manuelle",
+        path: "/preparation-manuelle",
+        icon: HiClipboardList,
+      },
+    ],
+  },
+  {
+    type: "subgroup",
     label: "Réception",
     icon: HiTruck,
     collapsible: true,
@@ -664,6 +678,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
   "/reception-manuelle":
     "Imprimer les fiches de contrôle papier des commandes à réceptionner.",
+  "/preparation-manuelle":
+    "Imprimer les fiches de préparation papier des proformas à préparer (dock puis magasin).",
   "/admin/frequentation":
     "Plages horaires de fréquentation du magasin, d'après les factures éditées.",
   "/admin/suivi-entrees":

@@ -1,0 +1,533 @@
+/* PreparationManuelleScreen.css — module « Préparation de commande manuelle ».
+   Thème admin sombre (--admin-*). Classes préfixées .pm- (pas de style global).
+   Structure calquée sur ReceptionManuelleScreen.css (même famille d écrans). */
+
+.pm-page {
+  min-height: 100vh;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  padding-bottom: 2rem;
+}
+
+/* ── Header ── */
+.pm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1.25rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.pm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.pm-header-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--admin-radius);
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+}
+.pm-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.pm-header-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+}
+.pm-entreprise-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.pm-entreprise-badge svg {
+  color: #14b8a6;
+  font-size: 1.05rem;
+}
+
+/* ── Toolbar ── */
+.pm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  background: var(--admin-bg-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+.pm-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.35rem 0.6rem;
+}
+.pm-search > svg {
+  color: var(--admin-text-muted);
+  flex-shrink: 0;
+}
+.pm-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  min-width: 220px;
+}
+.pm-filters {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.pm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.pm-field > span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+}
+.pm-field select {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+.pm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  padding: 0.4rem 0.65rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+}
+/* Rappel non interactif : la fiche est toujours imprimée à l'aveugle. */
+.pm-check-info {
+  cursor: help;
+  color: var(--admin-text-muted);
+  font-style: italic;
+}
+
+/* ── Boutons ── */
+.pm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+  white-space: nowrap;
+}
+.pm-btn:hover:not(:disabled) {
+  background: var(--admin-bg-hover);
+}
+.pm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pm-btn-sm {
+  padding: 0.35rem 0.55rem;
+  font-size: 0.78rem;
+}
+.pm-btn-primary {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  border-color: transparent;
+  color: #fff;
+}
+.pm-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.pm-btn-done {
+  background: var(--admin-success-light);
+  border-color: var(--admin-success);
+  color: var(--admin-success);
+}
+.pm-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--admin-text-muted);
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.pm-icon-btn:hover {
+  color: var(--admin-text);
+}
+.pm-spin {
+  animation: rm-rotate 1s linear infinite;
+}
+@keyframes rm-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Alertes ── */
+.pm-alert {
+  margin: 1rem 1.5rem 0;
+  padding: 0.7rem 1rem;
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.85rem;
+}
+.pm-alert-err {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--admin-danger);
+  color: #fca5a5;
+}
+.pm-alert-warn {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid var(--admin-warning);
+  color: #fcd34d;
+}
+
+/* ── Tableau ── */
+.pm-table-wrap {
+  margin: 1rem 1.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+.pm-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 0.65rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+.pm-table tbody td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  vertical-align: middle;
+}
+.pm-table tbody tr:hover {
+  background: var(--admin-bg-hover);
+}
+.pm-num {
+  text-align: right;
+}
+.pm-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.pm-strong {
+  font-weight: 700;
+}
+.pm-muted {
+  color: var(--admin-text-muted);
+}
+.pm-td-info {
+  text-align: center;
+  padding: 1.6rem;
+  color: var(--admin-text-muted);
+}
+.pm-actions-col {
+  text-align: right;
+}
+.pm-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+/* ── Chips de statut ── */
+.pm-chip {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pm-chip-a_preparer {
+  background: var(--admin-info-light);
+  color: #93c5fd;
+}
+.pm-chip-imprime {
+  background: var(--admin-warning-light);
+  color: #fcd34d;
+}
+.pm-chip-prepare {
+  background: var(--admin-success-light);
+  color: #6ee7b7;
+}
+.pm-print-info {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+  cursor: help;
+}
+.pm-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: var(--admin-radius-xs);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+/* Stock de la zone insuffisant pour la quantite demandee (rupture probable). */
+.pm-tag-manquant {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+/* Article egalement a prendre dans l'autre zone (il reapparait plus loin). */
+.pm-tag-autre {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+/* ── Pagination ── */
+.pm-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  font-size: 0.82rem;
+  color: var(--admin-text-muted);
+}
+
+/* ── État vide ── */
+.pm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 60vh;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+.pm-empty-icon {
+  font-size: 2.5rem;
+  color: var(--admin-warning);
+}
+.pm-empty h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--admin-text);
+}
+
+/* ── Spinner ── */
+.pm-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--admin-border);
+  border-top-color: #14b8a6;
+  border-radius: 50%;
+  animation: rm-rotate 0.8s linear infinite;
+  vertical-align: -2px;
+  margin-right: 0.4rem;
+}
+
+/* ── Modale d'aperçu ── */
+.pm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1000;
+}
+.pm-modal {
+  width: min(1000px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow-lg);
+  overflow: hidden;
+}
+.pm-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+.pm-modal-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.pm-modal-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted);
+}
+.pm-modal-stats {
+  display: flex;
+  gap: 1.75rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+}
+.pm-stat {
+  display: flex;
+  flex-direction: column;
+}
+.pm-stat-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.pm-stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+}
+.pm-comments {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary);
+}
+.pm-comments strong {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+  margin-bottom: 0.3rem;
+}
+.pm-comments ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.pm-modal-table-wrap {
+  flex: 1;
+  overflow: auto;
+}
+.pm-table-compact tbody td {
+  padding: 0.4rem 0.7rem;
+}
+.pm-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+}
+.pm-footer-note {
+  font-size: 0.78rem;
+  color: var(--admin-text-muted);
+}
+.pm-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Sections DOCK / MAGASIN de l'apercu ──
+   Meme code couleur que la fiche PDF : teal = dock, ambre = magasin. */
+.pm-zone {
+  margin: 0 1.25rem 0.75rem;
+}
+.pm-zone-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+}
+.pm-zone-dock .pm-zone-head {
+  background: rgba(15, 118, 110, 0.14);
+  border-color: rgba(20, 184, 166, 0.4);
+}
+.pm-zone-magasin .pm-zone-head {
+  background: rgba(180, 83, 9, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.pm-zone-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pm-zone-dock .pm-zone-title {
+  color: #5eead4;
+}
+.pm-zone-magasin .pm-zone-title {
+  color: #fcd34d;
+}
+.pm-zone-sub {
+  font-size: 0.75rem;
+  color: var(--admin-text-muted);
+}
+.pm-zone-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.pm-zone-empty {
+  padding: 0.6rem 0.75rem;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--admin-text-muted);
+}
+/* Quantite a prendre : l'instruction donnee a l'agent, la valeur la plus lue. */
+.pm-qte {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.pm-qte-manquant {
+  color: #fca5a5;
+}

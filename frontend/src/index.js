@@ -106,6 +106,7 @@ import MesTachesScreen from "./screens/user/MesTachesScreen";
 import EspaceEquipeScreen from "./screens/user/EspaceEquipeScreen";
 import MonMenuScreen from "./screens/user/MonMenuScreen";
 import ReceptionManuelleScreen from "./screens/user/ReceptionManuelleScreen";
+import PreparationManuelleScreen from "./screens/user/PreparationManuelleScreen";
 import ListesReapproScreen from "./screens/user/ListesReapproScreen";
 import CommercialDashboardScreen from "./screens/commercial/CommercialDashboardScreen";
 import CommercialPortefeuilleScreen from "./screens/commercial/CommercialPortefeuilleScreen";
@@ -223,6 +224,14 @@ const router = createBrowserRouter(
       {/* Gestion · Contrôle réception manuel (fiches papier) */}
       <Route element={<ModuleRoute module="reception_manuelle" />}>
         <Route path="/reception-manuelle" element={<ReceptionManuelleScreen />} />
+      </Route>
+
+      {/* Gestion · Préparation de commande manuelle (fiches papier) */}
+      <Route element={<ModuleRoute module="prep_commande_manuelle" />}>
+        <Route
+          path="/preparation-manuelle"
+          element={<PreparationManuelleScreen />}
+        />
       </Route>
 
       {/* Gestion · Listes de réappro -> module "demande_reappro" */}
