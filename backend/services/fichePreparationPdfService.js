@@ -118,14 +118,19 @@ const logoBuffer = (entreprise) => {
 
 // ---------------------------------------------------------------------------
 // COLONNES DU TABLEAU (paysage)
-// « Désignation » est prioritaire (280 pt). GISEMENT porte le CODE
-// d'emplacement de la zone parcourue (GISM2 au dock, GISM1 au magasin) : c'est
-// lui qui guide le déplacement de l'agent, il est donc en gras. RAYON n'est
-// renseigné que si la société a un dictionnaire Excel des gisements (libellé +
-// sous-rayon) et prend la largeur restante. « À PRENDRE » est la colonne
-// IMPRIMÉE la plus lue, « CTRL » la seule laissée vide.
+// GISEMENT porte le CODE d'emplacement de la zone parcourue (GISM2 au dock,
+// GISM1 au magasin) : c'est lui qui guide le déplacement de l'agent, il est
+// donc en gras. RAYON n'est renseigné que si la société a un dictionnaire Excel
+// des gisements (libellé + sous-rayon).
+//
+// Le trio de droite se lit de gauche à droite et DOIT rester dans cet ordre :
+//   QTÉ CDE   = ce que le client a commandé sur la proforma (le total) ;
+//   À PRENDRE = la part à prélever DANS CETTE ZONE (≤ qté cde) ;
+//   CTRL      = la seule case vide, pour la quantité réellement prise.
+// Sans « QTÉ CDE », l'agent qui voit « à prendre 25 » sur une commande de 50 ne
+// peut pas savoir s'il manque quelque chose ou si le reste vient d'ailleurs.
 // ---------------------------------------------------------------------------
-const DESIGNATION_W = 280;
+const DESIGNATION_W = 240;
 
 const buildColonnes = () => {
   const cols = [
@@ -144,6 +149,7 @@ const buildColonnes = () => {
     { key: "gisement", label: "GISEMENT", w: 58, align: "left" },
     { key: "rayon", label: "RAYON", w: 0, align: "left" },
     { key: "stock", label: "DISPO", w: 42, align: "center" },
+    { key: "qteCde", label: "QTÉ CDE", w: 52, align: "center" },
     { key: "aPrendre", label: "À PRENDRE", w: 62, align: "center" },
     { key: "ctrl", label: "CTRL", w: 52, align: "center", saisie: true },
   ];
@@ -631,7 +637,15 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
     color: ROUGE,
   });
 
-  // Quantité à prendre : l'instruction — la plus grosse valeur de la ligne.
+  // Quantité commandée sur la proforma : le total dû au client, toutes zones
+  // confondues. Grisée et plus petite que « à prendre » pour qu'on ne puisse
+  // pas les confondre ; c'est un repère, pas l'instruction.
+  cell("qteCde", fmtNb(ligne.qteCommandee), {
+    size: 8.5,
+    color: GRIS_LABEL,
+    ty: y + 5.5,
+  });
+  // Quantité à prendre ICI : l'instruction — la plus grosse valeur de la ligne.
   cell("aPrendre", fmtNb(ligne.aPrendre), {
     bold: true,
     size: 11,
@@ -651,8 +665,8 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
  * @param {Array}  p.lignesDock    lignes à prendre au dock (S2), déjà ordonnées
  * @param {Array}  p.lignesMagasin lignes à prendre au magasin (S1), déjà ordonnées
  *                                 [{ nl, nart, designation, refer, gencod, gisement,
- *                                    rayon, sousRayon, aPrendre, stockZone,
- *                                    manquant, autreZone }]
+ *                                    rayon, sousRayon, qteCommandee, aPrendre,
+ *                                    stockZone, manquant, autreZone }]
  * @param {Array}  p.commentaires  commentaires de la proforma (TEXTE + lignes « ! »)
  * @param {object} p.totaux        { totalDock, totalMagasin } — volumes des
  *                                 bandeaux de section (la page 1 n'affiche
@@ -749,7 +763,7 @@ export const genererFichePreparationPDF = async ({
   // ── Pieds de page (numérotation connue une fois toutes les pages écrites) ──
   const range = doc.bufferedPageRange();
   const legende =
-    "Parcours : DOCK (S2) puis MAGASIN (S1) · À PRENDRE = quantité commandée par le client pour cette zone · CTRL = quantité réellement prise si elle diffère · DISPO n'est rempli que si la zone n'a pas le compte (! ) · > = article aussi à prendre dans l'autre zone";
+    "Parcours : DOCK (S2) puis MAGASIN (S1) · QTÉ CDE = quantité de la proforma (toutes zones) · À PRENDRE = part à prélever ICI · CTRL = quantité réellement prise si elle diffère · DISPO n'est rempli que si la zone n'a pas le compte (!) · > = le solde est à prendre dans l'autre zone";
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(range.start + i);
     const fy = PAGE_H - M - 10;

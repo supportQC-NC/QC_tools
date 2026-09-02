@@ -461,6 +461,16 @@ l'ordonnancement (gisement, priorité de parcours) ne sont **pas redéveloppés*
 pas la demande, la ligne part quand même au magasin avec un repère `!` et le
 stock de la zone affiché — l'agent voit la rupture probable avant de chercher.
 
+**Les trois colonnes de droite de la fiche**, dans cet ordre et jamais
+autrement : `QTÉ CDE` (ce que le client a commandé, toutes zones confondues),
+`À PRENDRE` (la part de cette zone) puis `CTRL` (vide). Retirer `QTÉ CDE` rend
+la fiche illisible dès qu'un article est à cheval : « à prendre 25 » sur une
+commande de 50 ne dit pas s'il en manque 25 ou s'ils sont dans l'autre zone.
+La colonne `DISPO` ne porte un chiffre **que** lorsque la zone n'a pas le
+compte (avec le repère `!`) : un stock affiché à côté d'une quantité à prendre
+se lit comme une seconde quantité à prendre — erreur constatée en relecture
+client sur une ligne « dispo 90 / à prendre 3 ».
+
 **Gisement** : la fiche article porte un code d'emplacement **par zone** —
 `GISM2` = dock, `GISM1` = magasin. La colonne GISEMENT affiche celui de la zone
 parcourue (et le dictionnaire Excel des gisements, quand la société en a un, est

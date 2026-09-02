@@ -624,7 +624,8 @@ const SectionZone = ({ zone, lignes }) => {
               <th>Gisement</th>
               <th>Rayon</th>
               <th className="pm-num">Dispo zone</th>
-              <th className="pm-num">À prendre</th>
+              <th className="pm-num">Qté proforma</th>
+              <th className="pm-num">À prendre ici</th>
             </tr>
           </thead>
           <tbody>
@@ -661,6 +662,10 @@ const SectionZone = ({ zone, lignes }) => {
                   {[l.rayon, l.sousRayon].filter(Boolean).join(" · ") || "—"}
                 </td>
                 <td className="pm-num pm-muted">{fmtQte(l.stockZone)}</td>
+                {/* Total commandé par le client, toutes zones confondues :
+                    sans lui, « à prendre 25 » sur une commande de 50 est
+                    illisible (manque-t-il 25, ou sont-ils dans l'autre zone ?). */}
+                <td className="pm-num pm-muted">{fmtQte(l.qteCommandee)}</td>
                 <td className="pm-num">
                   <span
                     className={`pm-qte ${l.manquant > 0 ? "pm-qte-manquant" : ""}`}
