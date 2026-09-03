@@ -234,6 +234,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Dernière facturation par client
+      derniere_facturation_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Analyse CA
       analyse_ca_admin: {
         read: { type: Boolean, default: false },

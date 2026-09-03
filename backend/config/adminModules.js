@@ -61,6 +61,7 @@ export const PERMISSION_MODULES = [
   { key: "reappro_local_admin", label: "Reappro Local", group: "analyse" },
   { key: "debit_comptant_admin", label: "Débit / Comptant", group: "analyse" },
   { key: "gencod_doublons_admin", label: "Doublons GENCODE", group: "analyse" },
+  { key: "derniere_facturation_admin", label: "Dernière facturation", group: "analyse" },
   { key: "analyse_ca_admin", label: "Analyse CA", group: "analyse" },
   { key: "performance_dock_admin", label: "Performance Dock", group: "analyse" },
   { key: "analyse_reappro_admin", label: "Analyse Réappro", group: "analyse" },

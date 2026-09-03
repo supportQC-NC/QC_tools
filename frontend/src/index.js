@@ -86,6 +86,7 @@ import AdminFilialesScreen from "./screens/admin/AdminFilialesScreen";
 import AdminReapproLocalScreen from "./screens/admin/AdminReapproLocalScreen";
 import AdminDebitComptantScreen from "./screens/admin/AdminDebitComptantScreen";
 import AdminGencodDoublonsScreen from "./screens/admin/AdminGencodDoublonsScreen";
+import AdminDerniereFacturationScreen from "./screens/admin/AdminDerniereFacturationScreen";
 import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScreen";
 import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
 import AdminCollecteursMapScreen from "./screens/admin/AdminCollecteursMapScreen";
@@ -491,6 +492,14 @@ const router = createBrowserRouter(
         <Route
           path="/admin/gencod-doublons"
           element={<AdminGencodDoublonsScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Dernière facturation -> module "derniere_facturation_admin" */}
+      <Route element={<ModuleRoute module="derniere_facturation_admin" />}>
+        <Route
+          path="/admin/derniere-facturation"
+          element={<AdminDerniereFacturationScreen />}
         />
       </Route>
 

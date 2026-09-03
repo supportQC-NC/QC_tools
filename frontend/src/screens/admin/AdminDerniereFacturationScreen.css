@@ -1,0 +1,243 @@
+/* AdminDerniereFacturationScreen.css */
+.admin-derniere-facturation {
+  padding: 20px;
+  color: var(--admin-text, #f0f0f5);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 40px);
+}
+
+.df-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.df-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  margin: 0;
+}
+.df-header h1 svg {
+  color: var(--admin-primary, #6366f1);
+}
+.df-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.df-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  color: var(--admin-text, #f0f0f5);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.df-btn:hover:not(:disabled) {
+  background: var(--admin-bg-hover, #22222e);
+}
+.df-btn.primary {
+  background: var(--admin-success, #10b981);
+  border-color: var(--admin-success, #10b981);
+  color: #fff;
+}
+.df-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.df-btn .spin {
+  animation: df-spin 1s linear infinite;
+}
+@keyframes df-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.df-empty,
+.df-error,
+.df-loading {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.df-error {
+  border-color: var(--admin-danger, #ef4444);
+}
+.df-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.df-refreshing {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid var(--admin-primary, #6366f1);
+  color: var(--admin-primary-light, #818cf8);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+/* KPIs */
+.df-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.df-kpi {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.df-kpi.danger {
+  border-color: var(--admin-danger, #ef4444);
+}
+.df-kpi.danger .v {
+  color: #f87171;
+}
+.df-kpi.warn {
+  border-color: var(--admin-warning, #f59e0b);
+}
+.df-kpi.warn .v {
+  color: #fbbf24;
+}
+.df-kpi.ok {
+  border-color: var(--admin-success, #10b981);
+}
+.df-kpi.ok .v {
+  color: #34d399;
+}
+.df-kpi .v {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+.df-kpi .l {
+  font-size: 0.72rem;
+  color: var(--admin-text-muted, #606070);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Filtres */
+.df-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.df-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 240px;
+}
+.df-search svg {
+  color: var(--admin-text-muted, #606070);
+}
+.df-search input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--admin-text, #f0f0f5);
+  width: 100%;
+  font-size: 0.9rem;
+}
+.df-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.df-chip {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  color: var(--admin-text-secondary, #a0a0b0);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.df-chip:hover {
+  background: var(--admin-bg-hover, #22222e);
+}
+.df-chip.actif {
+  background: var(--admin-primary, #6366f1);
+  border-color: var(--admin-primary, #6366f1);
+  color: #fff;
+  font-weight: 600;
+}
+.df-count {
+  font-size: 0.82rem;
+  color: var(--admin-text-muted, #606070);
+}
+
+/* AG Grid */
+.df-grid {
+  flex: 1;
+  width: 100%;
+  min-height: 400px;
+  --ag-background-color: var(--admin-bg-secondary, #12121a);
+  --ag-odd-row-background-color: var(--admin-bg, #0a0a0f);
+  --ag-header-background-color: var(--admin-bg-tertiary, #1a1a25);
+  --ag-border-color: var(--admin-border, #2a2a3a);
+  --ag-row-border-color: var(--admin-border, #2a2a3a);
+  --ag-font-size: 12px;
+  --ag-row-hover-color: var(--admin-bg-hover, #22222e);
+}
+.df-grid .cell-mono {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.df-grid .col-date {
+  font-weight: 700;
+}
+/* Pastilles d'ancienneté : la couleur porte l'information, le texte reste lisible. */
+.df-grid .badge-cell {
+  font-weight: 700;
+}
+.df-grid .st-dormant {
+  color: #f87171;
+}
+.df-grid .st-veille {
+  color: #fbbf24;
+}
+.df-grid .st-recent {
+  color: #34d399;
+}
+.df-grid .st-jamais {
+  color: var(--admin-text-muted, #606070);
+}
+
+@media (max-width: 640px) {
+  .admin-derniere-facturation {
+    padding: 12px;
+    height: auto;
+  }
+  .df-grid {
+    height: 70vh;
+  }
+}

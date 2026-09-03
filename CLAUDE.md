@@ -518,7 +518,8 @@ rayons).
 `debit_comptant_admin`, `gencod_doublons_admin`, `analyse_ca_admin` (13 onglets,
 générateurs dans `services/analyseCa/`), `performance_dock_admin`,
 `analyse_reappro_admin`, `collecteurs_admin`, `rapport_tgc` (déclaration fiscale
-mensuelle), `balances_clients`, `frequentation_admin` (plages horaires de passage
+mensuelle), `balances_clients`, `derniere_facturation_admin` (dernière facture
+par client), `frequentation_admin` (plages horaires de passage
 en caisse).
 
 **Administration** — `dashboard_admin`, `users_admin`, `entreprises_admin`,

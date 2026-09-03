@@ -405,6 +405,9 @@ const buildFactureIndex = async (entreprise) => {
 
   const resas = [];
   const dernierAchat = new Map(); // tiers -> ymd le plus récent
+  // Dernière FACTURE (TYPFACT="F" seul : un avoir n'est pas une facturation)
+  // par client — sert au module d'analyse « Dernière facturation ».
+  const dernieresFactures = new Map(); // tiers -> { ymd, numfact, montant, nb, premiere }
   // NUMFACT -> indice de ligne : sert à joindre detail.dbf sans relire les
   // entêtes (voir commercialAnalyseService, analyse par article/rayon/fourn.).
   const parNumfact = new Map();
@@ -453,6 +456,27 @@ const buildFactureIndex = async (entreprise) => {
       const numf = safeTrim(f.NUMFACT);
       if (numf) parNumfact.set(numf, { ymd: cle, tiers: t, repres: safeTrim(f.REPRES), avoir: typ === "A" });
 
+      if (typ === "F" && t) {
+        const cur = dernieresFactures.get(t);
+        if (!cur) {
+          dernieresFactures.set(t, {
+            ymd: cle,
+            numfact: numf,
+            montant: num(f.MONTANT),
+            nb: 1,
+            premiere: cle,
+          });
+        } else {
+          cur.nb += 1;
+          if (cle < cur.premiere) cur.premiere = cle;
+          if (cle >= cur.ymd) {
+            cur.ymd = cle;
+            cur.numfact = numf;
+            cur.montant = num(f.MONTANT);
+          }
+        }
+      }
+
       // Colonnes : bornées à N / N-1, comme l'analyse commerciaux existante.
       if (annee !== anneeN && annee !== anneeN1) continue;
       if (n >= capacite) continue; // sécurité si recordCount sous-estime
@@ -484,6 +508,7 @@ const buildFactureIndex = async (entreprise) => {
     noms,
     resas,
     dernierAchat,
+    dernieresFactures,
     parNumfact,
     anneeN,
     anneeN1,
@@ -508,6 +533,15 @@ export const getIndexFactures = async (entreprise) => {
   })();
   factIndexLocks.set(dossier, promesse);
   return promesse;
+};
+
+/**
+ * Invalide l'index facture d'une société (bouton « Rafraîchir » des écrans qui
+ * s'appuient dessus). Le prochain appel repaie le scan complet — à n'utiliser
+ * que sur action explicite de l'utilisateur.
+ */
+export const invaliderIndexFactures = (dossier) => {
+  factIndexCache.delete(dossier);
 };
 
 /** Libellé d'un état de réservation (mappingEtatsReservation de la société). */

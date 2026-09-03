@@ -28,6 +28,7 @@ import {
   HiTrendingUp,
   HiUser,
   HiClock,
+  HiCalendar,
   HiCog
 } from "react-icons/hi";
 import { moduleForPath, estCommercial } from "./adminModules";
@@ -101,6 +102,7 @@ export const adminMenuStructure = [
       { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
       { label: "Rapports TGC", path: "/admin/rapport-tgc", icon: HiCurrencyDollar },
       { label: "Balances clients", path: "/admin/balances-clients", icon: HiCurrencyDollar },
+      { label: "Dernière facturation", path: "/admin/derniere-facturation", icon: HiCalendar },
       { label: "Fréquentation magasin", path: "/admin/frequentation", icon: HiClock },
       { label: "Top Articles", path: "/admin/top-articles", icon: HiChartBar },
       { label: "Reappro Local", path: "/admin/reappro-local", icon: HiTruck },
@@ -716,6 +718,8 @@ export const DEFAULT_MENU_HINTS = {
     "Listes de réappro à préparer : urgence, avancement et création manuelle.",
   "/admin/debit-comptant": "Répartition débit / comptant.",
   "/admin/gencod-doublons": "Détection des doublons de gencode.",
+  "/admin/derniere-facturation":
+    "Clients de la société et date de leur dernière facture, du plus ancien au plus récent.",
   "/admin/performance-dock": "Performance du dock (réceptions).",
   "/admin/collecteurs": "Collecteurs (terminaux de scan).",
   "/admin/collecteurs-carte": "Carte de localisation des collecteurs.",
