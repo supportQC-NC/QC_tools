@@ -294,7 +294,11 @@ export const getCommandeComplete = async (entreprise, numcde) => {
     lignes.push({
       nl: parseFloat(l.NL) || 0,
       nart,
-      designation: safeTrim(l.DESIGN) || safeTrim(art?.DESIGN),
+      // Désignation = celle de la BASE ARTICLE. cmdetail.DESIGN porte le libellé
+      // du fournisseur (DESIFRN), que l'agent qui contrôle la réception ne
+      // reconnaît pas. Repli sur la ligne de commande seulement si l'article est
+      // absent de la base (ligne alors marquée `inconnu`).
+      designation: safeTrim(art?.DESIGN) || safeTrim(l.DESIGN),
       refer: safeTrim(l.REFER) || safeTrim(art?.REFER),
       gencod: safeTrim(art?.GENCOD),
       qteCommandee: parseFloat(l.QTE) || 0,
