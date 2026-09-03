@@ -476,8 +476,12 @@ client sur une ligne « dispo 90 / à prendre 3 ».
 parcourue (et le dictionnaire Excel des gisements, quand la société en a un, est
 interrogé avec ce code-là). Ne pas afficher GISM1 sur une ligne dock : chez QC
 les deux diffèrent presque toujours (dock `J_2` vs rayon `C_4`).
-`analyserProforma` n'expose que GISM1 — GISM2 est lu dans le cache articles,
-par index, sans relecture DBF.
+`analyserProforma` expose les DEUX jeux (code, libellé, sous-rayon, priorité) et
+**ordonne chaque phase sur le gisement de sa zone** : le dock par la priorité de
+GISM2, le magasin par celle de GISM1. Le repli reste l'ordre de la proforma (NL)
+au dock, famille/fournisseur/désignation au magasin, quand le code n'est pas dans
+le dictionnaire — cas de toutes les lignes tant que la société n'a pas de fichier
+gisements.
 
 ⚠️ **Ne jamais arrondir les quantités à l'unité** : `prodet.QTE`, `article.S1`
 et `S2` sont des `N(x.3)` et beaucoup d'articles se vendent au mètre (tuyau,

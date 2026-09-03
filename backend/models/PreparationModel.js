@@ -9,9 +9,11 @@ import mongoose from "mongoose";
  *  - chaque quantité est répartie entre DOCK (stock S2) et MAGASIN (stock S1) :
  *      qteDock = (S2 > 0) ? min(qteCommandée, S2) : 0
  *      qteMagasin = qteCommandée - qteDock
- *  - le DOCK est préparé en premier (ordre de la proforma / NL) ;
- *  - le MAGASIN ensuite, trié par gisement (GISM1 -> priorité du fichier Excel),
- *    les articles sans gisement étant renvoyés en fin (famille/fournisseur/désignation) ;
+ *  - le DOCK est préparé en premier, trié par gisement DOCK (GISM2 -> priorité
+ *    du fichier Excel), les articles sans gisement finissant par ordre de la
+ *    proforma (NL) ;
+ *  - le MAGASIN ensuite, trié par gisement MAGASIN (GISM1 -> priorité du fichier
+ *    Excel), les articles sans gisement étant renvoyés en fin (famille/fournisseur/désignation) ;
  *  - contrôle par lecture du gencode (résolution GENDOUBL identique au scan) ;
  *  - reliquats dock -> magasin recalculés ;
  *  - à la fin : rapport PDF (STOCK/prepa_cde) + email, et fichier de transfert de
@@ -34,7 +36,8 @@ const lignePrepaSchema = new mongoose.Schema(
     fournisseurNom: { type: String, default: "" },
     gencod: { type: String, default: "" }, // gencode principal (fiche article)
     gencodes: { type: [String], default: [] }, // tous les gencodes possibles (renvois inclus) — CDC §5/§8
-    gism1: { type: String, default: "" }, // gisement (fiche article, champ GISM1)
+    gism1: { type: String, default: "" }, // gisement MAGASIN (fiche article, GISM1)
+    gism2: { type: String, default: "" }, // gisement DOCK (fiche article, GISM2)
     pvttc: { type: Number, default: 0 }, // prix TTC (prodet.PVTTC) — aide à l'identification
 
     // Quantité demandée sur la proforma (prodet.QTE).
@@ -56,12 +59,19 @@ const lignePrepaSchema = new mongoose.Schema(
     gencodeBipeDock: { type: String, default: "" },
     gencodeBipeMagasin: { type: String, default: "" },
 
-    // Gisement (Excel <TRIG>_gissement.xlsx, lookup par GISM1 = GisementSTOCKXL) :
-    //   rayon = LIBELLÉ affiché à l'opérateur ; priorite = ordre de parcours MAGASIN.
-    rayon: { type: String, default: "" }, // libellé du gisement (affichage)
+    // Gisement (Excel <TRIG>_gissement.xlsx, lookup par code = GisementSTOCKXL) :
+    //   rayon = LIBELLÉ affiché à l'opérateur ; priorite = ordre de parcours.
+    // Un jeu PAR ZONE : GISM1 pour le magasin, GISM2 pour le dock — les deux
+    // codes diffèrent presque toujours, et chaque phase se parcourt dans l'ordre
+    // de sa propre zone.
+    rayon: { type: String, default: "" }, // libellé du gisement MAGASIN (affichage)
     sousRayon: { type: String, default: "" }, // étagère (Excel gisements, colonne SOUS-RAYON)
-    priorite: { type: Number, default: null },
+    priorite: { type: Number, default: null }, // ordre de parcours MAGASIN
     aGisement: { type: Boolean, default: false }, // GISM1 présent ET trouvé dans l'Excel
+    rayonDock: { type: String, default: "" }, // libellé du gisement DOCK
+    sousRayonDock: { type: String, default: "" },
+    prioriteDock: { type: Number, default: null }, // ordre de parcours DOCK
+    aGisementDock: { type: Boolean, default: false }, // GISM2 présent ET trouvé dans l'Excel
 
     // Ordres de parcours (null si la ligne n'a pas de part dans cette phase).
     ordreDock: { type: Number, default: null },

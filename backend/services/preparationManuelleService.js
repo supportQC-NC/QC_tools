@@ -14,8 +14,6 @@
 import fs from "fs";
 import path from "path";
 import proformaCacheService from "./proformaCacheService.js";
-import articleCacheService from "./articleService.js";
-import gisementsService, { lookupGisement } from "./gisementsService.js";
 import { analyserProforma } from "./preparationService.js";
 
 // État des proformas « à préparer » (identique au module scanné).
@@ -206,19 +204,6 @@ export const getPreparationComplete = async (entreprise, numpro) => {
   const texteEntete = safeTrim(record.TEXTE);
   if (texteEntete) commentaires.unshift(texteEntete);
 
-  // Emplacement de prélèvement : la fiche article porte UN code par zone —
-  // GISM2 = dock, GISM1 = magasin. `analyserProforma` n'expose que GISM1 (le
-  // seul qui serve à son tri) : on lit GISM2 dans le cache articles, déjà chaud
-  // à ce stade, par index O(1) — aucune relecture DBF, aucun await par ligne.
-  const artCache = await articleCacheService.getArticles(entreprise);
-  const gism2DeNart = (nart) => {
-    const idx = artCache.indexByNart.get(safeTrim(nart).toUpperCase());
-    return idx !== undefined ? safeTrim(artCache.records[idx].GISM2) : "";
-  };
-  // Dictionnaire Excel des gisements (libellé + sous-rayon). Absent chez QC :
-  // `lookupGisement` renvoie alors null et seul le CODE est affiché.
-  const { map: gisMap } = await gisementsService.getGisements(entreprise);
-
   // Projection « fiche » : une entrée par zone de prélèvement, avec la quantité
   // à prendre DANS CETTE zone et le stock de la zone (repère pour l'agent).
   const projeter = (l, zone) => {
@@ -227,9 +212,9 @@ export const getPreparationComplete = async (entreprise, numpro) => {
     const stockZone = zone === "dock" ? l.stockDock || 0 : l.stockMagasin || 0;
     // ⚠️ Le gisement affiché est celui de la ZONE parcourue, pas celui de la
     // fiche article en général : un dock rangé en A_3g et un rayon en G_6g.
-    const gism2 = gism2DeNart(l.nart);
-    const gisement = zone === "dock" ? gism2 : l.gism1;
-    const gis = lookupGisement(gisMap, gisement);
+    // `analyserProforma` porte les deux jeux (GISM2 pour le dock, GISM1 pour le
+    // magasin), libellé et sous-rayon compris : rien à relire ici.
+    const gisement = zone === "dock" ? l.gism2 : l.gism1;
     return {
       zone,
       ordre: zone === "dock" ? l.ordreDock : l.ordreMagasin,
@@ -239,10 +224,10 @@ export const getPreparationComplete = async (entreprise, numpro) => {
       refer: l.refer,
       gencod: l.gencod,
       gism1: l.gism1,
-      gism2,
+      gism2: l.gism2,
       gisement, // code d'emplacement de la zone (GISM2 dock / GISM1 magasin)
-      rayon: gis ? gis.libelle : "",
-      sousRayon: gis && gis.sousRayon ? gis.sousRayon : "",
+      rayon: zone === "dock" ? l.rayonDock : l.rayon,
+      sousRayon: zone === "dock" ? l.sousRayonDock : l.sousRayon,
       qteCommandee: l.qteCommandee,
       aPrendre,
       stockZone,

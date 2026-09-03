@@ -3,9 +3,10 @@
 // Couche « données » du module Préparation de commande (P1) :
 //  - lecture de la proforma (proforma.dbf / prodet.dbf) via proformaCacheService ;
 //  - répartition automatique DOCK (S2) / MAGASIN (S1) pour chaque ligne ;
-//  - ordonnancement du parcours :
-//      * DOCK    : ordre de la proforma (NL) ;
-//      * MAGASIN : gisement (GISM1 -> priorité du fichier Excel), puis articles
+//  - ordonnancement du parcours, chacun sur le gisement de SA zone :
+//      * DOCK    : GISM2 -> priorité du fichier Excel, puis articles sans
+//                  gisement par ordre de la proforma (NL) ;
+//      * MAGASIN : GISM1 -> priorité du fichier Excel, puis articles
 //                  sans gisement (famille = 2 1ers car. du NART, puis fournisseur,
 //                  puis désignation).
 //
@@ -94,10 +95,24 @@ export const ordonnerMagasin = (lignes) => {
 };
 
 /**
+ * Gisement de la zone DOCK d'une ligne : GISM2 et la priorité qui en découle.
+ * Repli sur les champs GISM1 pour les sessions enregistrées avant l'ajout du
+ * gisement dock (elles n'ont pas `aGisementDock`) : leur ordre reste celui
+ * qu'avait vu l'opérateur.
+ */
+const gisementDock = (l) =>
+  l.aGisementDock === undefined
+    ? { present: !!l.aGisement, priorite: l.priorite, code: l.gism1 }
+    : { present: !!l.aGisementDock, priorite: l.prioriteDock, code: l.gism2 };
+
+/**
  * Ordonne la préparation DOCK sur la base de la quantité dock à préparer.
  * Règle retenue (CDC §4, choix client) :
- *   - d'abord les articles AVEC gisement, par priorité croissante (puis GISM1, NL) ;
+ *   - d'abord les articles AVEC gisement, par priorité croissante (puis GISM2, NL) ;
  *   - puis les articles SANS gisement, par ordre de la proforma (NL) en fin.
+ * ⚠️ Le tri se fait sur le gisement du DOCK (GISM2), pas sur celui du magasin :
+ * les deux diffèrent presque toujours (dock J_2 vs rayon C_4 chez QC), et c'est
+ * le dock que l'agent parcourt dans cette phase.
  * Remet ordreDock à null pour les lignes sans part dock.
  */
 export const ordonnerDock = (lignes) => {
@@ -106,17 +121,22 @@ export const ordonnerDock = (lignes) => {
   });
   const dock = lignes.filter((l) => (l.qteDockAPreparer || 0) > 0);
   const avecGisement = dock
-    .filter((l) => l.aGisement)
-    .sort(
-      (a, b) =>
-        (a.priorite ?? Number.POSITIVE_INFINITY) -
-          (b.priorite ?? Number.POSITIVE_INFINITY) ||
-        String(a.gism1).localeCompare(String(b.gism1), "fr", {
+    .filter((l) => gisementDock(l).present)
+    .sort((a, b) => {
+      const ga = gisementDock(a);
+      const gb = gisementDock(b);
+      return (
+        (ga.priorite ?? Number.POSITIVE_INFINITY) -
+          (gb.priorite ?? Number.POSITIVE_INFINITY) ||
+        String(ga.code).localeCompare(String(gb.code), "fr", {
           sensitivity: "base",
         }) ||
-        a.nl - b.nl,
-    );
-  const sansGisement = dock.filter((l) => !l.aGisement).sort((a, b) => a.nl - b.nl);
+        a.nl - b.nl
+      );
+    });
+  const sansGisement = dock
+    .filter((l) => !gisementDock(l).present)
+    .sort((a, b) => a.nl - b.nl);
   [...avecGisement, ...sansGisement].forEach((l, i) => {
     l.ordreDock = i + 1;
   });
@@ -288,7 +308,8 @@ export const analyserProforma = async (entreprise, numpro) => {
 
     const s1 = article ? num(article.S1) : 0; // MAGASIN
     const s2 = article ? num(article.S2) : 0; // DOCK
-    const gism1 = article ? safeTrim(article.GISM1) : "";
+    const gism1 = article ? safeTrim(article.GISM1) : ""; // MAGASIN
+    const gism2 = article ? safeTrim(article.GISM2) : ""; // DOCK
     const gencod = article ? safeTrim(article.GENCOD) : "";
     const fourn =
       article && article.FOURN != null && article.FOURN !== ""
@@ -300,9 +321,13 @@ export const analyserProforma = async (entreprise, numpro) => {
     const qteDock = s2 > 0 ? Math.min(qteCommandee, s2) : 0;
     const qteMagasin = qteCommandee - qteDock;
 
-    // Gisement (Excel <TRIG>_gissement.xlsx : GISM1 -> libellé + sous-rayon + priorité).
+    // Gisement (Excel <TRIG>_gissement.xlsx : code -> libellé + sous-rayon +
+    // priorité). Un lookup PAR ZONE : la fiche article porte GISM1 pour le rayon
+    // et GISM2 pour le dock, et chaque phase se parcourt dans l'ordre de SA zone.
     const gis = lookupGisement(gisMap, gism1);
     const aGisement = !!(gism1 && gis);
+    const gisDock = lookupGisement(gisMap, gism2);
+    const aGisementDock = !!(gism2 && gisDock);
 
     // Tous les gencodes possibles (renvois inclus) + gencode principal en tête.
     const setGencodes = gencodesParNart.get(nart.toUpperCase());
@@ -322,6 +347,7 @@ export const analyserProforma = async (entreprise, numpro) => {
       gencod,
       gencodes, // tous les gencodes possibles (renvois inclus) — CDC §5/§8
       gism1,
+      gism2,
       pvttc: num(d.PVTTC),
       qteCommandee,
       stockDock: s2,
@@ -336,6 +362,11 @@ export const analyserProforma = async (entreprise, numpro) => {
       sousRayon: gis && gis.sousRayon ? gis.sousRayon : "", // étagère (Excel gisements)
       priorite: gis ? gis.priorite : null,
       aGisement,
+      // Mêmes informations pour la zone DOCK (lookup sur GISM2).
+      rayonDock: gisDock ? gisDock.libelle : "",
+      sousRayonDock: gisDock && gisDock.sousRayon ? gisDock.sousRayon : "",
+      prioriteDock: gisDock ? gisDock.priorite : null,
+      aGisementDock,
       ordreDock: null,
       ordreMagasin: null,
       statutDock: "a_faire",
@@ -344,7 +375,7 @@ export const analyserProforma = async (entreprise, numpro) => {
     });
   }
 
-  // --- Ordonnancement DOCK : gisement (priorité) puis sans-gisement par NL ---
+  // --- Ordonnancement DOCK : gisement GISM2 (priorité) puis sans-gisement par NL ---
   ordonnerDock(lignes);
 
   // --- Ordonnancement MAGASIN ---
