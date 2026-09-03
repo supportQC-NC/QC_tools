@@ -25,6 +25,21 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/**
+ * Identité du commercial d'un document (proforma.REPRES) via le dictionnaire de
+ * la fiche société. `vendeurs[].code` est une chaîne (« 05 ») et REPRES un
+ * numérique : la comparaison DOIT être numérique. Nom vide quand l'onglet
+ * Vendeurs de la société n'est pas renseigné — on garde alors le code seul.
+ */
+export const resolveVendeur = (entreprise, repres) => {
+  const brut = safeTrim(repres);
+  const code = Number(repres);
+  if (!Number.isFinite(code)) return { code: brut, nom: "" };
+  const v = (entreprise?.vendeurs || []).find((x) => Number(x.code) === code);
+  const nom = v ? [v.prenom, v.nom].filter(Boolean).join(" ").trim() : "";
+  return { code: brut || String(code), nom };
+};
+
 // Résout le nom du fournisseur (best-effort, repli silencieux).
 const resolveFournisseurNom = async (entreprise, fourn) => {
   if (fourn === undefined || fourn === null || fourn === "") return "";
@@ -204,14 +219,21 @@ export const getProformasAPreparer = async (entreprise, options = {}) => {
   // getPaginated renvoie généralement { data|proformas, pagination }. On mappe
   // défensivement quel que soit le nom du tableau.
   const liste = res.proformas || res.data || res.records || res.items || [];
-  const proformas = liste.map((p) => ({
-    numfact: safeTrim(p.NUMFACT),
-    clientNom: safeTrim(p.NOM),
-    clientCode: p.TIERS != null && p.TIERS !== "" ? Number(p.TIERS) : null,
-    datfact: toDate(p.DATFACT),
-    etat: p.ETAT != null ? Number(p.ETAT) : null,
-    texte: safeTrim(p.TEXTE),
-  }));
+  const proformas = liste.map((p) => {
+    // Commercial à l'origine de la demande : l'agent doit savoir à qui
+    // s'adresser quand une ligne pose question, sans ouvrir le document.
+    const vendeur = resolveVendeur(entreprise, p.REPRES);
+    return {
+      numfact: safeTrim(p.NUMFACT),
+      clientNom: safeTrim(p.NOM),
+      clientCode: p.TIERS != null && p.TIERS !== "" ? Number(p.TIERS) : null,
+      datfact: toDate(p.DATFACT),
+      etat: p.ETAT != null ? Number(p.ETAT) : null,
+      texte: safeTrim(p.TEXTE),
+      vendeurCode: vendeur.code,
+      vendeurNom: vendeur.nom,
+    };
+  });
 
   return { pagination: res.pagination || null, proformas };
 };
@@ -231,14 +253,19 @@ export const getReservationsAPreparer = async (entreprise, options = {}) => {
   });
 
   const liste = res.proformas || res.data || res.records || res.items || [];
-  const proformas = liste.map((p) => ({
-    numfact: safeTrim(p.NUMFACT),
-    clientNom: safeTrim(p.NOM),
-    clientCode: p.TIERS != null && p.TIERS !== "" ? Number(p.TIERS) : null,
-    datfact: toDate(p.DATFACT),
-    etat: p.ETAT != null ? Number(p.ETAT) : null,
-    texte: safeTrim(p.TEXTE),
-  }));
+  const proformas = liste.map((p) => {
+    const vendeur = resolveVendeur(entreprise, p.REPRES);
+    return {
+      numfact: safeTrim(p.NUMFACT),
+      clientNom: safeTrim(p.NOM),
+      clientCode: p.TIERS != null && p.TIERS !== "" ? Number(p.TIERS) : null,
+      datfact: toDate(p.DATFACT),
+      etat: p.ETAT != null ? Number(p.ETAT) : null,
+      texte: safeTrim(p.TEXTE),
+      vendeurCode: vendeur.code,
+      vendeurNom: vendeur.nom,
+    };
+  });
 
   return { pagination: res.pagination || null, proformas };
 };
@@ -268,12 +295,17 @@ export const analyserProforma = async (entreprise, numpro) => {
     if (m) mailings.push(m);
   }
 
+  const vendeur = resolveVendeur(entreprise, entete.REPRES);
   const proformaInfo = {
     numfact: safeTrim(entete.NUMFACT) || numfact,
     clientNom: safeTrim(entete.NOM),
     clientCode: entete.TIERS != null && entete.TIERS !== "" ? Number(entete.TIERS) : null,
     datfact: toDate(entete.DATFACT),
     etat: entete.ETAT != null ? Number(entete.ETAT) : null,
+    // Commercial demandeur (proforma.REPRES) : affiché à l'opérateur pendant
+    // toute la préparation, c'est lui qu'on rappelle en cas de doute.
+    vendeurCode: vendeur.code,
+    vendeurNom: vendeur.nom,
     mailings,
   };
 
@@ -385,6 +417,7 @@ export const analyserProforma = async (entreprise, numpro) => {
 };
 
 export default {
+  resolveVendeur,
   ordonnerDock,
   ordonnerMagasin,
   getProformasAPreparer,

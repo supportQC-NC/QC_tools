@@ -40,6 +40,22 @@ const ymd = (d) => {
 const startOfYear = () => ymd(new Date(new Date().getFullYear(), 0, 1));
 const today = () => ymd(new Date());
 
+// Types de vendeur de la fiche société (entreprise.vendeurs[].type).
+// Par défaut l'écran ne montre que les VENDEURS : les commerciaux ont leur
+// propre espace et les codes « autre » (caisse, comptes techniques) faussent
+// la comparaison. « Tous les types » et le filtre par type restent accessibles.
+const TYPES_VENDEUR = [
+  { value: "vendeur", label: "Vendeurs" },
+  { value: "commercial", label: "Commerciaux" },
+  { value: "autre", label: "Autres" },
+  { value: "tous", label: "Tous les types" },
+];
+const LIBELLE_TYPE = {
+  vendeur: "Vendeur",
+  commercial: "Commercial",
+  autre: "Autre",
+};
+
 const fNum = (n) => (Number(n) || 0).toLocaleString("fr-FR");
 const fPct = (n) => `${(Number(n) || 0).toFixed(1)} %`;
 const num = { type: "rightAligned" };
@@ -59,6 +75,7 @@ const AdminFactureAnalyseScreen = () => {
   const [dateDebut, setDateDebut] = useState(startOfYear);
   const [dateFin, setDateFin] = useState(today);
   const [selectedVendeur, setSelectedVendeur] = useState("");
+  const [typeVendeur, setTypeVendeur] = useState("vendeur");
 
   const { data, isLoading, isFetching, error } = useGetFactureAnalyseQuery(
     { nomDossierDBF: selectedEntreprise, dateDebut, dateFin },
@@ -71,9 +88,31 @@ const AdminFactureAnalyseScreen = () => {
   }, [selectedEntreprise]);
 
   const totaux = data?.totaux;
-  const vendeurs = useMemo(() => data?.vendeurs || [], [data]);
+  // Le back renvoie TOUS les codes REPRES déclarés : le filtre par type se fait
+  // ici, sans refetch (le coût de l'analyse est le scan du cache facture).
+  const vendeursTous = useMemo(() => data?.vendeurs || [], [data]);
+  const vendeurs = useMemo(
+    () =>
+      typeVendeur === "tous"
+        ? vendeursTous
+        : vendeursTous.filter((v) => (v.type || "vendeur") === typeVendeur),
+    [vendeursTous, typeVendeur],
+  );
   const parMois = data?.parMois || [];
   const loading = isLoading || (isFetching && !data);
+
+  const libelleType =
+    TYPES_VENDEUR.find((t) => t.value === typeVendeur)?.label || "Vendeurs";
+
+  // Le vendeur sélectionné peut sortir du filtre courant : on le lâche.
+  useEffect(() => {
+    if (
+      selectedVendeur &&
+      !vendeurs.some((v) => v.code === selectedVendeur)
+    ) {
+      setSelectedVendeur("");
+    }
+  }, [vendeurs, selectedVendeur]);
 
   // Vendeur sélectionné dans le menu déroulant
   const vendeur = useMemo(
@@ -97,6 +136,10 @@ const AdminFactureAnalyseScreen = () => {
     () => [
       { field: "code", headerName: "Code", minWidth: 80, cellClass: "cell-mono" },
       { field: "nom", headerName: "Vendeur", minWidth: 200, flex: 1 },
+      {
+        field: "type", headerName: "Type", minWidth: 120,
+        valueFormatter: (p) => LIBELLE_TYPE[p.value] || p.value || "",
+      },
       {
         field: "nbFactures", headerName: "Nb factures", ...num, minWidth: 120,
         filter: "agNumberColumnFilter", sort: "desc",
@@ -152,6 +195,7 @@ const AdminFactureAnalyseScreen = () => {
       ["Analyse factures type F"],
       ["Entreprise", selectedEntreprise],
       ["Du", data.dateDebut, "au", data.dateFin],
+      ["Type de vendeur", libelleType],
       [],
       ["Nombre de factures", totaux.nbFactures],
       ["Montant total facturé (XPF)", roundInt(totaux.montantTotal)],
@@ -168,14 +212,15 @@ const AdminFactureAnalyseScreen = () => {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsK), "Synthèse");
 
     const wsV = [[
-      "Code", "Vendeur", "Nb factures", "Montant facturé (XPF)", "Part (%)",
+      "Code", "Vendeur", "Type", "Nb factures", "Montant facturé (XPF)", "Part (%)",
       "Montant moy./facture (XPF)", "Articles/facture (moy. QTE)",
       "Articles vendus (Σ QTE)", "Lignes/facture (moy.)", "Factures à 0",
       "% factures à 0",
     ]];
     vendeurs.forEach((v) =>
       wsV.push([
-        v.code, v.nom, v.nbFactures, roundInt(v.montant),
+        v.code, v.nom, LIBELLE_TYPE[v.type] || v.type || "",
+        v.nbFactures, roundInt(v.montant),
         Number(v.partMontant.toFixed(1)),
         roundInt(v.montantMoyenParFacture),
         Number(v.moyenneArticlesParFacture.toFixed(2)),
@@ -189,7 +234,7 @@ const AdminFactureAnalyseScreen = () => {
 
     XLSX.writeFile(
       wb,
-      `factures_typeF_${selectedEntreprise}_${data.dateDebut}_${data.dateFin}.xlsx`,
+      `factures_typeF_${selectedEntreprise}_${typeVendeur}_${data.dateDebut}_${data.dateFin}.xlsx`,
     );
   };
 
@@ -218,6 +263,19 @@ const AdminFactureAnalyseScreen = () => {
               max={today()}
               onChange={(e) => setDateFin(e.target.value)}
             />
+          </label>
+          <label className="fa-field">
+            Type
+            <select
+              value={typeVendeur}
+              onChange={(e) => setTypeVendeur(e.target.value)}
+            >
+              {TYPES_VENDEUR.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
           </label>
           <button className="fa-btn primary" onClick={handleExport} disabled={!data}>
             <HiDownload /> Excel
@@ -304,7 +362,10 @@ const AdminFactureAnalyseScreen = () => {
               <div className="fa-kpi-icon"><HiUsers /></div>
               <div>
                 <span className="fa-kpi-value">{fNum(vendeurs.length)}</span>
-                <span className="fa-kpi-label">Vendeurs</span>
+                <span className="fa-kpi-label">{libelleType}</span>
+                <span className="fa-kpi-mini">
+                  sur {fNum(vendeursTous.length)} codes déclarés
+                </span>
               </div>
             </div>
           </div>
@@ -352,7 +413,7 @@ const AdminFactureAnalyseScreen = () => {
             </div>
 
             <div className="fa-card">
-              <h3>Répartition du montant par vendeur</h3>
+              <h3>Répartition du montant — {libelleType.toLowerCase()}</h3>
               {donutData.length === 0 ? (
                 <div className="fa-empty small">Aucun montant vendeur.</div>
               ) : (
@@ -383,7 +444,9 @@ const AdminFactureAnalyseScreen = () => {
             </div>
 
             <div className="fa-card full">
-              <h3>Par vendeur — nb factures & articles / facture (moy.)</h3>
+              <h3>
+                {libelleType} — nb factures & articles / facture (moy.)
+              </h3>
               <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart
                   data={vendeurs.filter((v) => v.nbFactures > 0)}
@@ -445,6 +508,11 @@ const AdminFactureAnalyseScreen = () => {
                 onChange={(e) => setSelectedVendeur(e.target.value)}
               >
                 <option value="">— Choisir un vendeur —</option>
+                {vendeurs.length === 0 && (
+                  <option value="" disabled>
+                    Aucun code de ce type
+                  </option>
+                )}
                 {vendeurs.map((v) => (
                   <option key={v.code} value={v.code}>
                     {v.nom} ({v.code}) — {fNum(v.nbFactures)} factures
@@ -556,7 +624,10 @@ const AdminFactureAnalyseScreen = () => {
           {/* ===== Tableau (conservé) ===== */}
           <div className="fa-table-title">
             Récapitulatif par vendeur
-            <small> (vendeurs uniquement — clique une ligne pour le détail)</small>
+            <small>
+              {" "}
+              ({libelleType.toLowerCase()} — clique une ligne pour le détail)
+            </small>
           </div>
           <div className="ag-theme-quartz fa-grid">
             <AgGridReact

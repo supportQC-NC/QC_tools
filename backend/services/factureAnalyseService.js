@@ -14,11 +14,14 @@
 //   - moyenne de lignes / facture + total lignes
 //   - ventilation MENSUELLE (nb factures + montant) pour les graphiques
 //
-// KPI PAR VENDEUR (uniquement entreprise.vendeurs avec type === "vendeur") :
+// KPI PAR VENDEUR (tous les codes REPRES déclarés dans entreprise.vendeurs,
+// quel que soit leur type : vendeur / commercial / autre) :
 //   - nb factures, montant, part du montant total
 //   - factures à 0 (nb + %), articles / facture (moy. QTE), lignes / facture,
 //     montant moyen / facture, total articles vendus
 //   - ventilation mensuelle (graphique du vendeur sélectionné)
+// Le `type` est renvoyé sur chaque ligne : l'écran filtre dessus (« vendeur »
+// par défaut) sans refaire l'analyse, le scan du cache facture étant le coût.
 //
 // IMPORTANT : le cache facture (factureCacheService) ne conserve que l'année en
 // cours et l'année précédente. Une plage hors de ces deux années ne remontera
@@ -114,25 +117,27 @@ class FactureAnalyseService {
 
     const moisList = this.buildMoisList(debut, fin);
 
-    // Vendeurs "type = vendeur" de l'entreprise
+    // Tous les codes REPRES déclarés sur la fiche société (le filtre par type
+    // se fait à l'affichage). Un même code n'est pris qu'une fois : en cas de
+    // doublon dans le dictionnaire, la première entrée fait foi.
     const vendeurs = Array.isArray(entreprise.vendeurs) ? entreprise.vendeurs : [];
     const parVendeur = new Map();
-    vendeurs
-      .filter((v) => (v.type || "vendeur") === "vendeur")
-      .forEach((v) => {
-        const code = this.repCode(v.code);
-        const nom = [v.nom, v.prenom].filter(Boolean).join(" ").trim();
-        parVendeur.set(code, {
-          code: String(code).padStart(2, "0"),
-          nom: nom || `Vendeur ${String(v.code || code)}`,
-          nbFactures: 0,
-          montant: 0,
-          nbFacturesZero: 0,
-          totalArticles: 0, // Σ QTE
-          totalLignesArticle: 0, // nb lignes
-          moisMap: new Map(),
-        });
+    vendeurs.forEach((v) => {
+      const code = this.repCode(v.code);
+      if (parVendeur.has(code)) return;
+      const nom = [v.nom, v.prenom].filter(Boolean).join(" ").trim();
+      parVendeur.set(code, {
+        code: String(code).padStart(2, "0"),
+        nom: nom || `Vendeur ${String(v.code || code)}`,
+        type: v.type || "vendeur",
+        nbFactures: 0,
+        montant: 0,
+        nbFacturesZero: 0,
+        totalArticles: 0, // Σ QTE
+        totalLignesArticle: 0, // nb lignes
+        moisMap: new Map(),
       });
+    });
 
     // Agrégats globaux
     let montantTotal = 0;
@@ -176,7 +181,7 @@ class FactureAnalyseService {
       gm.nbFactures += 1;
       gm.montant += montant;
 
-      // Par vendeur (uniquement type = vendeur)
+      // Par code vendeur (tous types)
       const rep = this.repCode(f.REPRES);
       if (parVendeur.has(rep)) {
         const v = parVendeur.get(rep);
@@ -197,6 +202,7 @@ class FactureAnalyseService {
       .map((v) => ({
         code: v.code,
         nom: v.nom,
+        type: v.type,
         nbFactures: v.nbFactures,
         montant: v.montant,
         nbFacturesZero: v.nbFacturesZero,

@@ -28,6 +28,7 @@
   flex-wrap: wrap;
 }
 .fa-select,
+.fa-field select,
 .fa-field input {
   background: #16161f;
   border: 1px solid #2a2a3a;

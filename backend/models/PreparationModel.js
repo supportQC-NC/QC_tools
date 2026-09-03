@@ -130,6 +130,9 @@ const preparationSchema = new mongoose.Schema(
       clientCode: { type: Number, default: null }, // proforma.TIERS
       datfact: { type: Date, default: null },
       etat: { type: Number, default: null },
+      // Commercial demandeur (proforma.REPRES) résolu via entreprise.vendeurs.
+      vendeurCode: { type: String, default: "" },
+      vendeurNom: { type: String, default: "" },
       mailings: { type: [String], default: [] }, // MAILING1-5 (non vides)
     },
 

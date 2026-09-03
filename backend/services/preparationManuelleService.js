@@ -14,7 +14,7 @@
 import fs from "fs";
 import path from "path";
 import proformaCacheService from "./proformaCacheService.js";
-import { analyserProforma } from "./preparationService.js";
+import { analyserProforma, resolveVendeur } from "./preparationService.js";
 
 // État des proformas « à préparer » (identique au module scanné).
 export const ETAT_A_PREPARER = 2;
@@ -47,18 +47,6 @@ const etatLabel = (entreprise, etat) => {
     /* mapping absent */
   }
   return "";
-};
-
-// Identité du vendeur (proforma.REPRES) via le dictionnaire de la fiche société.
-// `vendeurs[].code` est une chaîne (« 05 »), REPRES un numérique : comparaison
-// numérique obligatoire.
-const resolveVendeur = (entreprise, repres) => {
-  const brut = safeTrim(repres);
-  const code = Number(repres);
-  if (!Number.isFinite(code)) return { code: brut, nom: "" };
-  const v = (entreprise.vendeurs || []).find((x) => Number(x.code) === code);
-  const nom = v ? [v.prenom, v.nom].filter(Boolean).join(" ").trim() : "";
-  return { code: brut || String(code), nom };
 };
 
 // Vérifie la présence des DBF de proformas de la société.
