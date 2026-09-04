@@ -5,7 +5,9 @@ import Entreprise from "../models/EntrepriseModel.js";
 import User from "../models/UserModel.js";
 import articleCacheService from "../services/articleService.js";
 import preparationService from "../services/preparationService.js";
-import preparationReportService from "../services/preparationReportService.js";
+import preparationReportService, {
+  listerUnitesColisage,
+} from "../services/preparationReportService.js";
 
 // ===========================================
 // HELPERS
@@ -412,6 +414,11 @@ const computeControleFinal = (prep) => {
         rayon: l.rayon,
         sousRayon: l.sousRayon,
         gism1: l.gism1,
+        // Emplacement DOCK aussi : au contrôle final l'opérateur choisit lui-même
+        // la zone où il retourne chercher, il lui faut les deux codes.
+        rayonDock: l.rayonDock,
+        sousRayonDock: l.sousRayonDock,
+        gism2: l.gism2,
         qteCommandee: l.qteCommandee,
         qtePrepareeDock: l.qtePrepareeDock,
         qtePrepareeMagasin: l.qtePrepareeMagasin,
@@ -541,11 +548,62 @@ const updateColisage = asyncHandler(async (req, res) => {
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n > 0 ? n : 0;
   };
-  prep.colisage = {
+  const colisage = {
     nbColis: toInt(req.body.nbColis),
     nbPalettes: toInt(req.body.nbPalettes),
     nbLongueurs: toInt(req.body.nbLongueurs),
   };
+  prep.colisage = colisage;
+
+  // Répartition facultative : [{ ligneId, unites: [{ unite, quantite }] }].
+  // Absente => on ne touche à rien (les versions déjà déployées de l'app
+  // mobile n'envoient que les compteurs).
+  if (Array.isArray(req.body.repartition)) {
+    const unitesValides = new Set(
+      listerUnitesColisage(colisage).map((u) => u.key),
+    );
+    // Une seule passe : on remet à zéro puis on applique, sinon une
+    // répartition partiellement rejouée laisserait d'anciennes affectations.
+    prep.lignes.forEach((l) => {
+      l.repartitionColis = [];
+    });
+    for (const entree of req.body.repartition) {
+      const ligne = prep.lignes.id(entree?.ligneId);
+      if (!ligne) continue;
+      const affectations = [];
+      let cumul = 0;
+      for (const u of entree.unites || []) {
+        const unite = String(u?.unite || "").trim();
+        const quantite = Number(u?.quantite);
+        if (!unitesValides.has(unite)) {
+          res.status(400);
+          throw new Error(
+            `Unité de colisage inconnue « ${unite} » (colisage : ${colisage.nbColis} colis, ${colisage.nbPalettes} palette(s), ${colisage.nbLongueurs} longueur(s)).`,
+          );
+        }
+        if (!Number.isFinite(quantite) || quantite <= 0) continue;
+        cumul += quantite;
+        const existante = affectations.find((a) => a.unite === unite);
+        if (existante) existante.quantite += quantite;
+        else affectations.push({ unite, quantite });
+      }
+      // Garde-fou : on ne colise pas plus que ce qui a été préparé.
+      const prepare =
+        ligne.qteRetenue != null
+          ? Number(ligne.qteRetenue)
+          : Number(ligne.qtePrepareeDock || 0) +
+            Number(ligne.qtePrepareeMagasin || 0);
+      if (cumul - prepare > 0.001) {
+        res.status(400);
+        throw new Error(
+          `Article ${ligne.nart} : ${cumul} coli(s)é(s) pour ${prepare} préparé(s).`,
+        );
+      }
+      ligne.repartitionColis = affectations;
+    }
+    prep.markModified("lignes");
+  }
+
   await prep.save();
   res.json(prep);
 });

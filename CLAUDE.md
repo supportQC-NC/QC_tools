@@ -478,7 +478,10 @@ interrogé avec ce code-là). Ne pas afficher GISM1 sur une ligne dock : chez QC
 les deux diffèrent presque toujours (dock `J_2` vs rayon `C_4`).
 `analyserProforma` expose les DEUX jeux (code, libellé, sous-rayon, priorité) et
 **ordonne chaque phase sur le gisement de sa zone** : le dock par la priorité de
-GISM2, le magasin par celle de GISM1. Le repli reste l'ordre de la proforma (NL)
+GISM2, le magasin par celle de GISM1. **L'app collecteur suit exactement le même
+ordre** — elle trie sur les `ordreDock` / `ordreMagasin` calculés par le serveur
+et affiche le gisement de la zone en cours ; ne jamais retrier côté mobile, les
+deux supports divergeraient. Le repli reste l'ordre de la proforma (NL)
 au dock, famille/fournisseur/désignation au magasin, quand le code n'est pas dans
 le dictionnaire — cas de toutes les lignes tant que la société n'a pas de fichier
 gisements.
@@ -493,6 +496,32 @@ d'articles, d'impressions).
 La page d'en-tête ne porte **aucun compteur** (décision client) : ni nombre
 d'articles, ni total à prendre, ni part dock/magasin, ni ruptures. Ces volumes
 figurent sur le bandeau de chaque section, là où l'agent en a besoin.
+
+## Colisage de la préparation scannée
+
+En fin de préparation l'opérateur déclare un nombre de **colis / palettes /
+longueurs**, et une **feuille A4 par unité** est générée à côté du rapport
+(`preparationReportService.genererSorties`).
+
+⚠️ Cette feuille doit porter **le contenu de SON unité**, pas la commande
+entière : sinon les N feuilles sont identiques et n'apprennent rien à celui qui
+ouvre le colis (constat client du 04/09/2026). La répartition est saisie sur le
+collecteur juste avant la génération (écran « Répartir les articles ») et stockée
+par ligne dans `PreparationModel.lignes[].repartitionColis` =
+`[{ unite, quantite }]`, `unite` étant la clé produite par
+`listerUnitesColisage` (`colis1`, `palette2`, `longueur1`…). Un article peut
+être **scindé** entre plusieurs unités (50 m de câble sur 2 palettes), d'où une
+quantité et non un simple rattachement.
+
+- La répartition transite avec les compteurs sur `PUT /api/preparations/:id/colisage`
+  (champ `repartition` facultatif). Le contrôleur **refuse** une unité inconnue
+  ou un cumul supérieur à la quantité préparée.
+- **Repli assumé** : `repartitionColis` vide partout → ancien comportement
+  (contenu complet sur chaque feuille). Les APK déjà déployées n'envoient que
+  les compteurs, elles ne doivent pas produire des feuilles vides.
+- Ce que l'opérateur n'a affecté à aucune unité est reporté sur la **première**
+  feuille, marqué `?` en rouge avec une note en pied : rien ne disparaît entre la
+  préparation et le colisage.
 
 ## Carte des domaines fonctionnels
 

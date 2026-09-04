@@ -95,6 +95,26 @@ const lignePrepaSchema = new mongoose.Schema(
     // Quantité RETENUE si correction au contrôle final (sur-préparation).
     // null = pas de correction ; sinon remplace le total préparé dans le rapport.
     qteRetenue: { type: Number, default: null },
+
+    // Répartition du colisage (§13) : combien de CETTE ligne part dans chaque
+    // unité (« colis1 », « palette2 », « longueur1 »…). Un article peut être
+    // scindé sur plusieurs unités (50 m de câble sur 2 palettes), d'où une
+    // quantité par unité et non un simple rattachement.
+    // Tableau vide = ligne non répartie : les feuilles de colisage retombent
+    // alors sur l'ancien comportement (liste complète sur chaque feuille), ce
+    // qui garde les versions déjà déployées de l'app mobile fonctionnelles.
+    repartitionColis: {
+      type: [
+        new mongoose.Schema(
+          {
+            unite: { type: String, default: "" }, // clé d'unité (colis1, palette2…)
+            quantite: { type: Number, default: 0 },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
   },
   { _id: true },
 );

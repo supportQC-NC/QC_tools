@@ -2,15 +2,31 @@
 .admin-collecteurs {
   padding: 20px;
   color: var(--text-primary);
+  /* Le conteneur ne doit jamais imposer sa largeur à .main-content : sinon la
+     page déborde latéralement et les actions de l'en-tête (« Nouveau », alignées
+     à droite) se retrouvent hors écran. Le tableau, lui, scrolle dans son
+     propre cadre (.col-table-wrap). */
+  min-width: 0;
+  max-width: 100%;
 }
 
+/* En-tête COLLÉ en haut : la liste des collecteurs est longue, et sans ça le
+   bouton « Nouveau » disparaissait dès qu'on descendait dans le tableau. Les
+   marges négatives annulent le padding du conteneur pour que la barre occupe
+   toute la largeur et masque le contenu qui passe dessous. */
 .admin-collecteurs .col-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+  margin: -20px -20px 16px;
+  padding: 16px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 16px;
 }
 .admin-collecteurs .col-header h1 {
   display: flex;
@@ -18,14 +34,18 @@
   gap: 10px;
   font-size: 20px;
   margin: 0;
+  min-width: 0; /* le titre se serre avant de pousser les boutons dehors */
 }
 .admin-collecteurs .col-header h1 svg {
   color: var(--accent);
+  flex-shrink: 0; /* l'icône ne se comprime pas quand le titre se serre */
 }
 .admin-collecteurs .col-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap; /* les boutons passent à la ligne plutôt que de sortir */
+  margin-left: auto;
 }
 .admin-collecteurs .btn-primary,
 .admin-collecteurs .btn-secondary,
@@ -296,6 +316,11 @@
 
 @media (max-width: 600px) {
   .admin-collecteurs {
+    padding: 12px;
+  }
+  /* Marges négatives alignées sur le nouveau padding. */
+  .admin-collecteurs .col-header {
+    margin: -12px -12px 12px;
     padding: 12px;
   }
 }
