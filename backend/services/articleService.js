@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import {
   variantesCodeBarres,
+  canoniserCodeBarres,
   memeCodeBarres,
   trimCode,
 } from "../utils/codeBarres.js";
@@ -31,6 +32,12 @@ class ArticleCacheService {
     const indexByNart = new Map();
     // Index par GENCOD (code barre) - accès O(1)
     const indexByGencod = new Map();
+    // Index par GENCOD CANONIQUE (code sans ses zéros de tête) - repli du scan.
+    // L'ERP stocke le même code sous des longueurs différentes, y compris non
+    // standard (« 0047294873 » sur 10 caractères) : le padding aux longueurs
+    // usuelles ne suffit pas, il faut pouvoir retomber sur la racine du code.
+    // Premier arrivé, premier servi : l'article d'origine prime sur le doublon.
+    const indexByGencodCanon = new Map();
     // Index par GROUPE pour filtrage rapide
     const indexByGroupe = new Map();
     // Index par GISM1 (gisement / emplacement principal) pour filtrage rapide
@@ -53,6 +60,10 @@ class ArticleCacheService {
         const gencod = record.GENCOD.trim();
         if (gencod) {
           indexByGencod.set(gencod, idx);
+          const canon = canoniserCodeBarres(gencod);
+          if (canon && !indexByGencodCanon.has(canon)) {
+            indexByGencodCanon.set(canon, idx);
+          }
         }
       }
 
@@ -103,6 +114,7 @@ class ArticleCacheService {
       dbfInfo,
       indexByNart,
       indexByGencod,
+      indexByGencodCanon,
       indexByGroupe,
       indexByGism1,
       indexByFourn,
@@ -395,6 +407,14 @@ class ArticleCacheService {
   lookupGencod(cache, code) {
     for (const forme of variantesCodeBarres(code)) {
       const idx = cache.indexByGencod.get(forme);
+      if (idx !== undefined) return idx;
+    }
+    // Dernier repli : la racine du code, qui rattrape les longueurs stockées
+    // hors format standard. `indexByGencodCanon` peut manquer sur une entrée
+    // de cache construite avant cette version.
+    const canon = canoniserCodeBarres(code);
+    if (canon && cache.indexByGencodCanon) {
+      const idx = cache.indexByGencodCanon.get(canon);
       if (idx !== undefined) return idx;
     }
     return undefined;
