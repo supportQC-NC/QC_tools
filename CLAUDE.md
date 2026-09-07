@@ -91,6 +91,16 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   la forme exacte **puis** les écritures équivalentes. Sans ça les articles à
   gencod `0…` sortent « inconnu » (constaté en contrôle de commande). Les zéros
   ne sont retirés d'aucune valeur affichée, exportée ou stockée.
+- **Même maladie sur le NART** (`C(6)`) : l'ERP mélange « 12345 » et « 012345 ».
+  Passer par `articleCacheService.lookupNart()` / `variantesNart()` plutôt que
+  par `cache.indexByNart.get()` en direct — sinon toute une commande peut sortir
+  marquée « ? article inconnu » sur la fiche de contrôle réception. La forme
+  exacte reste toujours prioritaire, le repli ne joue que si elle est absente.
+- **Un GENCOD de 12 chiffres est un UPC-A : il porte DÉJÀ sa clé.** Son EAN-13
+  est `0` + le code, surtout pas une clé de plus (`076501207828` imprimé
+  `0765012078287` = code-barres inexistant, illisible au rescan). Corrigé dans
+  les trois copies de `ean13Bits` (`etiquetteService`, `ficheArticleService`,
+  `utils/ean13.js`) via `cleModulo10`.
 - Les tables de l'ERP **ne sont jamais purgées** : tout compteur « en cours » doit
   être borné par une fenêtre glissante explicite, sinon on remonte à 2019.
 

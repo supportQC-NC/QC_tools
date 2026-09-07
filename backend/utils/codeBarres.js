@@ -95,9 +95,46 @@ export const memeCodeBarres = (a, b) => {
   return na !== null && na === nb;
 };
 
+
+// ── NART ─────────────────────────────────────────────────────────────────────
+//
+// Même maladie sur le code article : `article.NART` est un `C(6)` et l'ERP y
+// mélange « 012345 » et « 12345 » selon l'écran qui a servi à la saisie. Un
+// NART reste comparé en MAJUSCULES (il peut être alphanumérique : « 99A713 ») ;
+// on n'essaie les écritures zéro-padées que s'il est purement numérique.
+
+// Longueur du champ NART dans le DBF.
+const LONGUEUR_NART = 6;
+
+/**
+ * Écritures équivalentes d'un code article, forme saisie en premier.
+ * « 12345 » → ["12345", "012345"] ; « 012345 » → ["012345", "12345"]
+ * « 99A713 » → ["99A713"] (alphanumérique : aucune variante)
+ */
+export const variantesNart = (nart) => {
+  const brut = trimCode(nart).toUpperCase();
+  if (!brut) return [];
+  if (!/^\d+$/.test(brut)) return [brut];
+
+  const formes = [brut];
+  const ajouter = (v) => {
+    if (v && v !== brut && !formes.includes(v)) formes.push(v);
+  };
+
+  const sansZeros = brut.replace(/^0+/, "") || "0";
+  if (brut.length < LONGUEUR_NART) ajouter(brut.padStart(LONGUEUR_NART, "0"));
+  if (sansZeros.length <= LONGUEUR_NART) {
+    ajouter(sansZeros.padStart(LONGUEUR_NART, "0"));
+  }
+  ajouter(sansZeros);
+
+  return formes;
+};
+
 export default {
   trimCode,
   canoniserCodeBarres,
   variantesCodeBarres,
   memeCodeBarres,
+  variantesNart,
 };

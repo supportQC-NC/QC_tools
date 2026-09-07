@@ -181,7 +181,7 @@ const construireGencodesParNart = (cacheEntry) => {
       const gendoubl =
         rec && rec.GENDOUBL ? String(rec.GENDOUBL).trim().toUpperCase() : "";
       if (!gendoubl) break;
-      const next = indexByNart.get(gendoubl);
+      const next = articleCacheService.lookupNart(cacheEntry, gendoubl);
       if (next === undefined) break;
       idx = next;
       it++;

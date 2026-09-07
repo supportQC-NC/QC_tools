@@ -6,6 +6,7 @@ import {
   variantesCodeBarres,
   canoniserCodeBarres,
   memeCodeBarres,
+  variantesNart,
   trimCode,
 } from "../utils/codeBarres.js";
 
@@ -388,12 +389,25 @@ class ArticleCacheService {
   }
 
   /**
+   * Cherche un indice dans l'index NART en essayant les écritures équivalentes
+   * du code article (« 12345 » / « 012345 ») : le champ est un C(6) et l'ERP
+   * mélange les deux selon l'écran de saisie. La forme reçue est toujours
+   * essayée en premier.
+   */
+  lookupNart(cache, nart) {
+    for (const forme of variantesNart(nart)) {
+      const idx = cache.indexByNart.get(forme);
+      if (idx !== undefined) return idx;
+    }
+    return undefined;
+  }
+
+  /**
    * Recherche par NART - O(1)
    */
   async findByNart(entreprise, nart) {
     const cache = await this.getArticles(entreprise);
-    const nartNormalized = nart.trim().toUpperCase();
-    const idx = cache.indexByNart.get(nartNormalized);
+    const idx = this.lookupNart(cache, nart);
     return idx !== undefined ? cache.records[idx] : null;
   }
 
@@ -442,8 +456,8 @@ class ArticleCacheService {
       return cache.records[idx];
     }
 
-    // Sinon par NART
-    idx = cache.indexByNart.get(codeNormalized.toUpperCase());
+    // Sinon par NART, zéros de tête tolérés eux aussi
+    idx = this.lookupNart(cache, codeNormalized);
     if (idx !== undefined) {
       return cache.records[idx];
     }

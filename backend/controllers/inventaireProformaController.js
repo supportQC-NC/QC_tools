@@ -898,7 +898,7 @@ const genererInventaireDoc = asyncHandler(async (req, res) => {
 
   for (const [key, info] of qteByNart) {
     if (!universe.has(key)) {
-      const idx = acache.indexByNart.get(key);
+      const idx = articleCacheService.lookupNart(acache, key);
       if (idx !== undefined) addFromRecord(acache.records[idx]);
       else
         universe.set(key, {

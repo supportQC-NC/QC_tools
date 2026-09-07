@@ -288,7 +288,10 @@ export const getCommandeComplete = async (entreprise, numcde) => {
 
     const nart = safeTrim(l.NART);
     const cle = nart.toUpperCase();
-    const idx = artCache.indexByNart.get(cle);
+    // Zéros de tête tolérés : cmdetail et article.dbf n'écrivent pas toujours
+    // le NART de la même façon (« 12345 » / « 012345 »). Sans ça toute une
+    // commande peut sortir marquée « ? article inconnu » sur la fiche.
+    const idx = articleCacheService.lookupNart(artCache, cle);
     const art = idx !== undefined ? artCache.records[idx] : null;
 
     lignes.push({

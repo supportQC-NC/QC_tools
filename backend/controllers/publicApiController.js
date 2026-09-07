@@ -164,7 +164,7 @@ const chargerVariantes = async (record, entreprise, indexPlus, champs) => {
 
   const cache = await articleCacheService.getArticles(entreprise);
   return produit.narts.map((n) => {
-    const i = cache.indexByNart.get(n);
+    const i = articleCacheService.lookupNart(cache, n);
     const autre = i !== undefined ? cache.records[i] : null;
     return {
       nart: n,

@@ -28,6 +28,17 @@ const EAN_PARITY = [
 ];
 
 // Chiffre de contrôle EAN-13 à partir des 12 premiers chiffres.
+// Clé de contrôle modulo 10 d'un corps de longueur quelconque (EAN/UPC) :
+// poids 3 et 1 alternés en partant de la DROITE du corps. Sert à reconnaître
+// un UPC-A (12 chiffres, clé sur les 11 premiers) d'un EAN-13 amputé de sa clé.
+const cleModulo10 = (corps) => {
+  let s = 0;
+  for (let i = corps.length - 1, p = 3; i >= 0; i -= 1, p = p === 3 ? 1 : 3) {
+    s += parseInt(corps[i], 10) * p;
+  }
+  return String((10 - (s % 10)) % 10);
+};
+
 export const ean13CheckDigit = (d12) => {
   let s = 0;
   for (let i = 0; i < 12; i++) s += parseInt(d12[i], 10) * (i % 2 === 0 ? 1 : 3);
@@ -38,7 +49,14 @@ export const ean13CheckDigit = (d12) => {
 // Renvoie { bits, full } ou null si invalide.
 export const ean13Bits = (code) => {
   let d = String(code == null ? "" : code).replace(/\D/g, "");
-  if (d.length === 12) d += ean13CheckDigit(d);
+  // ⚠️ Un code à 12 chiffres est un UPC-A : il PORTE DÉJÀ sa clé de contrôle,
+  // son EAN-13 est « 0 » + le code. Lui ajouter une clé calculée imprimait un
+  // code-barres inexistant (« 076501207828 » → « 0765012078287 »), illisible au
+  // rescan. On ne complète par une clé que les codes à 12 chiffres dont la
+  // dernière position n'est pas déjà une clé valide.
+  if (d.length === 12) {
+    d = cleModulo10(d.slice(0, 11)) === d[11] ? `0${d}` : d + ean13CheckDigit(d);
+  }
   if (d.length !== 13) return null;
   const first = parseInt(d[0], 10);
   const left = d.slice(1, 7);

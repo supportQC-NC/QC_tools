@@ -28,6 +28,17 @@ const EAN_G = ["0100111","0110011","0011011","0100001","0011101","0111001","0000
 const EAN_R = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
 const EAN_PARITY = ["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"];
 
+// Clé de contrôle modulo 10 d'un corps de longueur quelconque (EAN/UPC) :
+// poids 3 et 1 alternés en partant de la DROITE du corps. Sert à reconnaître
+// un UPC-A (12 chiffres, clé sur les 11 premiers) d'un EAN-13 amputé de sa clé.
+const cleModulo10 = (corps) => {
+  let s = 0;
+  for (let i = corps.length - 1, p = 3; i >= 0; i -= 1, p = p === 3 ? 1 : 3) {
+    s += parseInt(corps[i], 10) * p;
+  }
+  return String((10 - (s % 10)) % 10);
+};
+
 const ean13CheckDigit = (d12) => {
   let s = 0;
   for (let i = 0; i < 12; i += 1) s += parseInt(d12[i], 10) * (i % 2 === 0 ? 1 : 3);
@@ -35,7 +46,14 @@ const ean13CheckDigit = (d12) => {
 };
 const ean13Bits = (code) => {
   let d = String(code == null ? "" : code).replace(/\D/g, "");
-  if (d.length === 12) d += ean13CheckDigit(d);
+  // ⚠️ Un code à 12 chiffres est un UPC-A : il PORTE DÉJÀ sa clé de contrôle,
+  // son EAN-13 est « 0 » + le code. Lui ajouter une clé calculée imprimait un
+  // code-barres inexistant (« 076501207828 » → « 0765012078287 »), illisible au
+  // rescan. On ne complète par une clé que les codes à 12 chiffres dont la
+  // dernière position n'est pas déjà une clé valide.
+  if (d.length === 12) {
+    d = cleModulo10(d.slice(0, 11)) === d[11] ? `0${d}` : d + ean13CheckDigit(d);
+  }
   if (d.length !== 13) return null;
   const par = EAN_PARITY[parseInt(d[0], 10)];
   let bits = "101";

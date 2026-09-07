@@ -42,7 +42,7 @@ const cibleRenvoi = (rec, cache) => {
   const ref = trim(rec?.GENDOUBL);
   if (!ref) return null;
 
-  let idx = cache.indexByNart.get(ref.toUpperCase());
+  let idx = articleService.lookupNart(cache, ref);
   if (idx === undefined) idx = cache.indexByGencod.get(ref);
   const cible = idx !== undefined ? cache.records[idx] : null;
 
