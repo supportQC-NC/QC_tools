@@ -8,6 +8,7 @@ import {
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import articleCacheService from "../services/articleService.js";
+import { memeCodeBarres } from "../utils/codeBarres.js";
 import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
 import { importerProformasReappro } from "../services/reapproProformaImportService.js";
 
@@ -606,7 +607,9 @@ const scanDemande = asyncHandler(async (req, res) => {
   let index = (d.articles || []).findIndex(
     (a) =>
       cleanCode(a.nart) === code ||
-      cleanCode(a.gencod) === code ||
+      // Zéros de tête tolérés : l'ERP mélange UPC-A 12 et EAN-13 (cf.
+      // utils/codeBarres.js), la douchette n'envoie qu'une seule forme.
+      memeCodeBarres(a.gencod, code) ||
       cleanCode(a.refer) === code,
   );
 

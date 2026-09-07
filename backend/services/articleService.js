@@ -2,6 +2,11 @@
 import { DBFFile } from "dbffile";
 import path from "path";
 import fs from "fs";
+import {
+  variantesCodeBarres,
+  memeCodeBarres,
+  trimCode,
+} from "../utils/codeBarres.js";
 
 /**
  * Service de cache pour les articles DBF
@@ -381,12 +386,26 @@ class ArticleCacheService {
   }
 
   /**
+   * Cherche un indice dans l'index GENCOD en essayant les écritures
+   * équivalentes du code (voir utils/codeBarres.js) : l'ERP mélange UPC-A à
+   * 12 chiffres, EAN-13 et EAN-8 padés de zéros, alors que la douchette n'en
+   * envoie qu'une seule forme. La forme exacte reste toujours essayée en
+   * premier ; les variantes ne servent que de repli.
+   */
+  lookupGencod(cache, code) {
+    for (const forme of variantesCodeBarres(code)) {
+      const idx = cache.indexByGencod.get(forme);
+      if (idx !== undefined) return idx;
+    }
+    return undefined;
+  }
+
+  /**
    * Recherche par GENCOD - O(1)
    */
   async findByGencod(entreprise, gencod) {
     const cache = await this.getArticles(entreprise);
-    const gencodNormalized = gencod.trim();
-    const idx = cache.indexByGencod.get(gencodNormalized);
+    const idx = this.lookupGencod(cache, gencod);
     return idx !== undefined ? cache.records[idx] : null;
   }
 
@@ -395,10 +414,10 @@ class ArticleCacheService {
    */
   async findByCode(entreprise, code) {
     const cache = await this.getArticles(entreprise);
-    const codeNormalized = code.trim();
+    const codeNormalized = trimCode(code);
 
-    // Essayer d'abord par GENCOD (code barre)
-    let idx = cache.indexByGencod.get(codeNormalized);
+    // Essayer d'abord par GENCOD (code barre), zéros de tête tolérés
+    let idx = this.lookupGencod(cache, codeNormalized);
     if (idx !== undefined) {
       return cache.records[idx];
     }
@@ -550,6 +569,10 @@ class ArticleCacheService {
           design2.includes(searchLower) ||
           nartVal.includes(searchLower) ||
           gencod.includes(searchLower) ||
+          // Un code-barres saisi avec ses zéros de tête (« 0088381121620 »)
+          // doit retrouver l'article stocké sans (« 88381121620 ») et
+          // réciproquement — cf. utils/codeBarres.js.
+          memeCodeBarres(gencod, searchLower) ||
           refer.includes(searchLower)
         );
       });

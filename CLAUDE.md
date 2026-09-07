@@ -82,6 +82,15 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
 - Les fichiers DBF sont en **jeu de caractères DOS** et l'application les restitue
   tels quels (`N°` → `Nø`, `À` → `Aÿ`). C'est un comportement **global** : ne pas
   le corriger dans un seul service, ça désaligne les champs entre eux.
+- **Les GENCOD commencent parfois par des zéros — ne jamais les retirer.** Le
+  champ est un `C(13)` : chez QC 2 456 codes commencent par `0`, et 1 341
+  existent sous DEUX écritures du même code (UPC-A `088381121620` / EAN-13
+  `0088381121620`, EAN-8 `25927818` / padé `0000025927818`). La douchette n'en
+  envoie qu'une : toute recherche par code-barres doit passer par
+  `utils/codeBarres.js` (`variantesCodeBarres` / `memeCodeBarres`), qui essaie
+  la forme exacte **puis** les écritures équivalentes. Sans ça les articles à
+  gencod `0…` sortent « inconnu » (constaté en contrôle de commande). Les zéros
+  ne sont retirés d'aucune valeur affichée, exportée ou stockée.
 - Les tables de l'ERP **ne sont jamais purgées** : tout compteur « en cours » doit
   être borné par une fenêtre glissante explicite, sinon on remonte à 2019.
 
