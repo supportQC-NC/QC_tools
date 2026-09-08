@@ -282,6 +282,50 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // ══════════ MODULES LONGTEMPS ABSENTS DE CE SCHÉMA ══════════
+      // Ces six droits étaient cochables dans l'écran d'administration et
+      // contrôlés par les routes, mais MANQUAIENT ici : Mongoose ignore
+      // silencieusement une clé hors schéma, la case revenait donc décochée
+      // après enregistrement et l'utilisateur n'obtenait jamais l'accès
+      // (signalé par le client le 08/09/2026). Ajouter un module, c'est
+      // toucher LES TROIS registres : ce schéma, backend/config/adminModules.js
+      // et frontend/src/config/adminModules.js.
+      // Suivi Réceptions (/admin/suivi-receptions)
+      reception_suivi_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Exécutables (/admin/executables)
+      executables_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Analyse Facturation (/admin/facture-analyse)
+      facture_analyse_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Journal de Caisse (/admin/journal-caisse)
+      journal_caisse_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Top Articles (/admin/top-articles)
+      top_articles_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Analyse Réappro (/admin/analyse-reappro)
+      analyse_reappro_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // ══════════ ADMINISTRATION (dashboard, users, entreprises) ══════════
       // Tableau de bord
       dashboard_admin: {

@@ -53,6 +53,7 @@ export const PERMISSION_MODULES = [
   { key: "suivi_entrees", label: "Suivi des entrées", group: "donnees" },
   { key: "resa_entrees", label: "Entrées sur réservation", group: "donnees" },
   { key: "export_gisements_admin", label: "Export Gisements", group: "donnees" },
+  { key: "executables_admin", label: "Exécutables", group: "donnees" },
   // ── Commerciaux (boîte à outils commerciale — accès global unique) ─────────
   { key: "commerciaux_outils", label: "Outils Commerciaux", group: "commerciaux" },
   // ── Analyse (écrans admin) ────────────────────────────────────────────────
@@ -64,6 +65,9 @@ export const PERMISSION_MODULES = [
   { key: "derniere_facturation_admin", label: "Dernière facturation", group: "analyse" },
   { key: "analyse_ca_admin", label: "Analyse CA", group: "analyse" },
   { key: "performance_dock_admin", label: "Performance Dock", group: "analyse" },
+  { key: "facture_analyse_admin", label: "Analyse Facturation", group: "analyse" },
+  { key: "journal_caisse_admin", label: "Journal de Caisse", group: "analyse" },
+  { key: "top_articles_admin", label: "Top Articles", group: "analyse" },
   { key: "analyse_reappro_admin", label: "Analyse Réappro", group: "analyse" },
   { key: "collecteurs_admin", label: "Collecteurs", group: "analyse" },
   { key: "rapport_tgc", label: "Rapports TGC", group: "analyse" },
