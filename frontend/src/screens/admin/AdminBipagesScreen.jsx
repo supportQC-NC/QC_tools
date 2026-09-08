@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   HiClipboardList,
   HiDownload,
+  HiDocumentReport,
+  HiTable,
   HiRefresh,
   HiSearch,
   HiTrash,
@@ -27,6 +29,12 @@ const AdminBipagesScreen = () => {
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState("");
   const [exporting, setExporting] = useState(false);
+  // Feuille d'écarts : mêmes réglages que l'écran Inventaire proforma, le
+  // document produit étant le même (générateur commun côté serveur).
+  const [groupBy, setGroupBy] = useState("famille"); // famille | fournisseur
+  const [seuil, setSeuil] = useState(""); // seuil |écart| en XPF
+  const [perimetre, setPerimetre] = useState("comptes"); // comptes | stock
+  const [ecartsLoading, setEcartsLoading] = useState("");
 
   const dirty = useRef(new Set());
 
@@ -106,6 +114,56 @@ const AdminBipagesScreen = () => {
 
   const onCellKeyDown = (e) => {
     if (e.key === "Enter") e.target.blur();
+  };
+
+  // Feuille d'écarts (PDF ou Excel). Même document que « Inventaire proforma » :
+  // c'est le même générateur côté serveur, seule la source du comptage change.
+  const exporterEcarts = async (format) => {
+    if (!selectedEntreprise) return;
+    setEcartsLoading(format);
+    try {
+      const params = new URLSearchParams();
+      params.set("groupBy", groupBy);
+      params.set("format", format);
+      params.set("perimetre", perimetre);
+      if (seuil) params.set("seuil", seuil);
+      // Les filtres de l'écran cadrent le document : on exporte ce qu'on voit.
+      if (zone) params.set("zone", zone);
+      if (type) params.set("type", type);
+      if (search) params.set("search", search);
+
+      const url = `${BASE_URL}/api/bipages/${selectedEntreprise}/ecarts?${params.toString()}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        let m = `Génération échouée (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) m = j.message;
+        } catch {
+          /* réponse non JSON */
+        }
+        throw new Error(m);
+      }
+      const blob = await res.blob();
+      let filename = format === "xlsx" ? "ecarts.xlsx" : "ecarts.pdf";
+      const cd = res.headers.get("Content-Disposition");
+      if (cd) {
+        const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^"\n;]+)"?/i);
+        if (m && m[1]) filename = decodeURIComponent(m[1]);
+      }
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(href);
+    } catch (e) {
+      setMsg(e.message || "Génération impossible");
+    } finally {
+      setEcartsLoading("");
+    }
   };
 
   // Export CSV authentifié : fetch avec cookie (credentials) → blob → download.
@@ -209,6 +267,80 @@ const AdminBipagesScreen = () => {
         </div>
       ) : (
         <>
+          {/* Feuilles d'écarts — en tête d'écran : c'est la sortie qu'on vient
+              chercher ici en fin de comptage. Réglages identiques à l'écran
+              Inventaire proforma, documents identiques. */}
+          <div className="ecarts-bar">
+            <span className="ecarts-titre">
+              <HiDocumentReport /> Feuille d'écarts
+            </span>
+
+            <label>
+              Regrouper par
+              <select
+                className="filter-select"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value)}
+              >
+                <option value="famille">Famille (2 1ers car. NART)</option>
+                <option value="fournisseur">Fournisseur</option>
+              </select>
+            </label>
+
+            <label>
+              Seuil écart (XPF)
+              <input
+                type="number"
+                min="0"
+                step="1"
+                className="ecarts-seuil"
+                value={seuil}
+                onChange={(e) => setSeuil(e.target.value)}
+                placeholder="0"
+                title="Les articles dont l'écart en valeur absolue est inférieur ou égal au seuil sont exclus du document."
+              />
+            </label>
+
+            <label>
+              Périmètre
+              <select
+                className="filter-select"
+                value={perimetre}
+                onChange={(e) => setPerimetre(e.target.value)}
+                title="Articles comptés : seulement ce qui a été bipé. Stock complet : ajoute les articles en stock jamais comptés, qui ressortent en écart négatif."
+              >
+                <option value="comptes">Articles comptés</option>
+                <option value="stock">Stock complet</option>
+              </select>
+            </label>
+
+            <div className="ecarts-actions">
+              <button
+                className="btn-primary"
+                onClick={() => exporterEcarts("pdf")}
+                disabled={!!ecartsLoading}
+                title="Feuille d'écarts (PDF paysage)"
+              >
+                <HiDocumentReport />{" "}
+                {ecartsLoading === "pdf" ? "Génération…" : "PDF"}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => exporterEcarts("xlsx")}
+                disabled={!!ecartsLoading}
+                title="Feuille d'écarts (classeur Excel)"
+              >
+                <HiTable />{" "}
+                {ecartsLoading === "xlsx" ? "Génération…" : "Excel"}
+              </button>
+            </div>
+
+            <span className="ecarts-hint">
+              Les filtres ci-dessous (emplacement, zone, recherche) cadrent aussi
+              le document.
+            </span>
+          </div>
+
           <div className="bipages-toolbar">
             <select
               className="filter-select"

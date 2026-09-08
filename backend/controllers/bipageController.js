@@ -11,6 +11,15 @@ import {
   getInventaireDirs,
   emplacementDir,
 } from "../services/ficheControleService.js";
+import os from "os";
+import fournissCacheService from "../services/fournissCacheService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
+import {
+  fmtNum,
+  grouperEcarts,
+  dessinerDocInventaire,
+  construireClasseurEcarts,
+} from "../services/ecartsInventaireService.js";
 import {
   getProformasEligibles,
   importerProformas,
@@ -145,6 +154,221 @@ const getBipages = asyncHandler(async (req, res) => {
     types, // liste des types distincts présents
     lignes,
   });
+});
+
+/**
+ * @desc    FEUILLE D'ÉCARTS du comptage en cours : pour chaque article, la
+ *          quantité comptée face au stock théorique, l'écart et sa valeur en
+ *          XPF, regroupés par famille (2 premiers caractères du NART) ou par
+ *          fournisseur, au-dessus d'un seuil de valeur.
+ *
+ *          C'EST LE MÊME DOCUMENT que celui de l'inventaire proforma — même
+ *          mise en page PDF, même classeur Excel (`ecartsInventaireService`).
+ *          Seule la source du comptage change : les lignes bipées de la session
+ *          au lieu des lignes de proformas.
+ *
+ *          `perimetre` :
+ *            · "comptes" (défaut) — uniquement les articles effectivement
+ *              comptés. C'est le seul périmètre lisible EN COURS d'inventaire :
+ *              sinon les 90 000 articles du catalogue jamais bipés sortiraient
+ *              tous en écart négatif.
+ *            · "stock" — y ajoute tous les articles à stock > 0 non comptés, ce
+ *              qui donne la photo complète en FIN d'inventaire (même univers
+ *              que l'inventaire proforma).
+ *
+ *          Les filtres zone / emplacement / recherche de l'écran s'appliquent.
+ * @route   GET /api/bipages/:entrepriseId/ecarts?groupBy=&seuil=&format=&perimetre=&zone=&type=
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const exportEcartsBipage = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  const groupBy = req.query.groupBy === "fournisseur" ? "fournisseur" : "famille";
+  const seuil = Math.max(0, Number(req.query.seuil) || 0);
+  const toutLeStock = req.query.perimetre === "stock";
+
+  // Comptage : mêmes filtres que la liste de l'écran (zone, emplacement,
+  // recherche), pour que le document reflète ce que l'utilisateur regarde.
+  const lignes = await LigneBipage.find(buildFilter(session, req.query))
+    .select("nart eanArticle qteScan designation zoneCode zoneType")
+    .lean();
+
+  // Cumul par article. Clé = NART résolu, repli sur le code scanné : deux zones
+  // qui comptent le même article doivent s'additionner, pas se doubler.
+  const compte = new Map();
+  for (const l of lignes) {
+    const cle = String(l.nart || l.eanArticle || "").trim().toUpperCase();
+    if (!cle) continue;
+    const cur = compte.get(cle) || {
+      qte: 0,
+      design: "",
+      code: String(l.nart || l.eanArticle || "").trim(),
+      zones: new Set(),
+    };
+    cur.qte += Number(l.qteScan) || 0;
+    if (!cur.design && l.designation) cur.design = l.designation;
+    cur.zones.add(`${l.zoneCode}|${l.zoneType || ""}`);
+    compte.set(cle, cur);
+  }
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(entreprise);
+
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const univers = new Map();
+  const ajouterArticle = (rec) => {
+    const nart = String(rec.NART || "").trim();
+    if (!nart) return;
+    const fourn =
+      rec.FOURNISS !== undefined && rec.FOURNISS !== null
+        ? String(rec.FOURNISS).trim()
+        : String(rec.FOURN || "").trim();
+    univers.set(nart.toUpperCase(), {
+      nart,
+      design: String(rec.DESIGN || "").trim(),
+      refer: String(rec.REFER || "").trim(),
+      gencod: String(rec.GENCOD || "").trim(),
+      fourn,
+      stock: articleCacheService.calculateStockTotal(rec),
+      prev: num(rec.PREV),
+      qte: 0,
+      nonTrouve: false,
+    });
+  };
+
+  if (toutLeStock) {
+    for (const idx of acache.articlesEnStock) ajouterArticle(acache.records[idx]);
+  }
+
+  for (const [cle, info] of compte) {
+    if (!univers.has(cle)) {
+      // ⚠️ lookupNart, pas indexByNart : l'ERP mélange « 12345 » et « 012345 ».
+      const idx = articleCacheService.lookupNart(acache, cle);
+      if (idx !== undefined) ajouterArticle(acache.records[idx]);
+      else
+        univers.set(cle, {
+          nart: info.code,
+          design: info.design,
+          refer: "",
+          gencod: "",
+          fourn: "",
+          stock: 0,
+          prev: 0,
+          qte: 0,
+          nonTrouve: true,
+        });
+    }
+    const cible = univers.get(cle);
+    cible.qte += info.qte;
+    // « D » ici = article compté dans PLUSIEURS zones : le doublon à vérifier
+    // n'est pas la ligne répétée (le collecteur cumule) mais le rayon en double.
+    cible.doublon = info.zones.size > 1;
+  }
+
+  const rows = [];
+  for (const row of univers.values()) {
+    const diff = row.qte - row.stock;
+    const diffval = Math.round(diff * row.prev);
+    if (Math.abs(diffval) <= seuil) continue;
+    const flags = [];
+    if (row.doublon) flags.push("D");
+    if (row.qte > row.stock) flags.push("XX");
+    rows.push({ ...row, diff, diffval, att: flags.join(" ") });
+  }
+
+  if (rows.length === 0) {
+    res.status(404);
+    throw new Error("Aucun article au-dessus du seuil de valeur indiqué.");
+  }
+
+  // Nom du fournisseur (fourniss.dbf) — nécessaire au groupement fournisseur
+  // comme à la colonne du document.
+  const nomFournByCode = new Map();
+  for (const r of rows) {
+    const code = String(r.fourn || "").trim();
+    if (!code) {
+      r.fournNom = "";
+      continue;
+    }
+    if (!nomFournByCode.has(code)) {
+      let nom = "";
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const f = await fournissCacheService.findByFourn(entreprise, code);
+        if (f) nom = String(f.NOM || "").trim();
+      } catch {
+        nom = "";
+      }
+      nomFournByCode.set(code, nom);
+    }
+    r.fournNom = nomFournByCode.get(code);
+  }
+
+  const { groupes, grandTotal, groupLabel } = grouperEcarts(rows, groupBy);
+
+  const perimetreLabel = toutLeStock
+    ? "stock complet"
+    : "articles comptés";
+  const filtreLabel = [
+    req.query.type ? `emplacement ${req.query.type}` : "",
+    req.query.zone ? `zone ${req.query.zone}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const titre = `Écarts d'inventaire — ${session.nom} — par ${
+    groupBy === "fournisseur" ? "fournisseur" : "famille"
+  }${filtreLabel ? ` — ${filtreLabel}` : ""} — ${perimetreLabel}${
+    seuil ? ` (|écart| > ${fmtNum(seuil)} XPF)` : ""
+  }`;
+
+  const base = `ecarts_${session.nom.replace(/[^\w-]+/g, "_")}_${groupBy}`;
+
+  if (req.query.format === "xlsx") {
+    const wb = await construireClasseurEcarts({
+      titre,
+      groupes,
+      grandTotal,
+      groupLabel,
+    });
+    // Droits « champ par champ » appliqués avant l'envoi.
+    await envoyerClasseur(req, res, wb, `${base}.xlsx`);
+    return;
+  }
+
+  const tmp = path.join(os.tmpdir(), `${base}_${Date.now()}.pdf`);
+  await dessinerDocInventaire({
+    titre,
+    groupes,
+    grandTotal,
+    groupLabel,
+    outPath: tmp,
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${base}.pdf"`);
+  const stream = fs.createReadStream(tmp);
+  const nettoyer = () => {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+  };
+  stream.on("close", nettoyer);
+  stream.on("error", nettoyer);
+  res.on("close", nettoyer);
+  stream.pipe(res);
 });
 
 /**
@@ -586,6 +810,7 @@ const importExcelBipage = asyncHandler(async (req, res) => {
 
 export {
   getBipages,
+  exportEcartsBipage,
   updateBipage,
   exportCsv,
   recommencerZone,

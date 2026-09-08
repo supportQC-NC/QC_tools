@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import {
   getBipages,
+  exportEcartsBipage,
   updateBipage,
   exportCsv,
   recommencerZone,
@@ -38,6 +39,9 @@ const uploadExcel = multer({
 
 // Routes littérales / spécifiques d'abord, puis paramétrées.
 router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exportCsv);
+
+// Feuille d'écarts (PDF / Excel) — MÊME document que l'inventaire proforma.
+router.get("/:entrepriseId/ecarts", protect, canReadImport, checkEntrepriseAccess, exportEcartsBipage);
 
 router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAccess, recommencerZone);
 

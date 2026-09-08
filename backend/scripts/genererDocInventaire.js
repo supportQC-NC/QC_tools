@@ -648,7 +648,7 @@ const contenu = (r) => {
     [
       ["Fiches inventaires", "Avant", "Creer les zones et imprimer les fiches rayons."],
       ["Progression inventaire", "Avant / pendant", "Lancer l'inventaire, scanner les coupons, suivre l'avancement, importer un comptage fait sans collecteur."],
-      ["Detail des bipages", "Pendant / apres", "Consulter et corriger les lignes deja comptees, recommencer une zone."],
+      ["Detail des bipages", "Pendant / apres", "Consulter et corriger les lignes comptees, sortir les feuilles d'ecarts (PDF/Excel), recommencer une zone."],
       ["Fiches de controle", "Pendant", "Retrouver, ouvrir et telecharger les fiches PDF pour les imprimer."],
       ["Recap par zone", "Pendant / apres", "Voir l'avancement en couleurs et les ecarts chiffres."],
       ["Suivi bipage", "Pendant / apres", "Savoir qui a bipe quelle zone, quand et en combien de temps."],
@@ -1056,6 +1056,36 @@ const contenu = (r) => {
     "Le comptage precedent de la zone est definitivement perdu. Si vous voulez en garder une trace, " +
       "exportez d'abord la zone en CSV depuis le meme ecran.",
     "interdit",
+  );
+
+  r.h2("Sortir les feuilles d'ecarts");
+  r.p(
+    "En haut de l'ecran Detail des bipages, un bandeau Feuille d'ecarts produit le document de " +
+      "controle en PDF ou en Excel. C'est EXACTEMENT le meme document que celui de l'ecran " +
+      "Inventaire proforma : meme mise en page, memes colonnes, memes sous-totaux.",
+  );
+  r.tableau(
+    [
+      { t: "Reglage", w: 26 },
+      { t: "Ce qu'il fait", w: 74 },
+    ],
+    [
+      ["Regrouper par", "Famille (les 2 premiers caracteres du NART) ou Fournisseur. Un sous-total en francs par groupe, et un total general."],
+      ["Seuil ecart (XPF)", "Les articles dont l'ecart en valeur absolue est inferieur ou egal au seuil sont exclus. A 5 000, on ne garde que ce qui pese vraiment."],
+      ["Perimetre", "Articles comptes : uniquement ce qui a ete bipe. Stock complet : ajoute les articles en stock jamais comptes, qui ressortent en ecart negatif."],
+    ],
+  );
+  r.encadre(
+    "Quel perimetre choisir",
+    "PENDANT l'inventaire, gardez Articles comptes : avec Stock complet, tout le catalogue non " +
+      "encore compte sortirait en ecart negatif et le document serait illisible. Stock complet " +
+      "n'a de sens qu'une fois tous les rayons comptes, pour la photo finale.",
+    "info",
+  );
+  r.p(
+    "Les filtres de l'ecran (emplacement, zone, recherche) cadrent aussi le document : filtrez sur " +
+      "le DOCK et vous obtenez la feuille d'ecarts du dock seul. Le titre du document rappelle " +
+      "toujours le perimetre, le filtre et le seuil retenus.",
   );
 
   r.h2("Savoir qui a fait quoi : ecran Suivi bipage");
