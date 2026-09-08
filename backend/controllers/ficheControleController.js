@@ -3,7 +3,11 @@ import fs from "fs";
 import asyncHandler from "../middleware/asyncHandler.js";
 import FicheControle from "../models/FicheControleModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
-import { config, resoudreCheminPdf } from "../services/ficheControleService.js";
+import {
+  config,
+  resoudreCheminPdf,
+  assurerPdfFiche,
+} from "../services/ficheControleService.js";
 import {
   scanManuel,
   isWatching,
@@ -112,8 +116,14 @@ const reimprimer = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Télécharger / afficher le PDF d'une fiche
- * @route   GET /api/fiches-controle/:entrepriseId/:id/pdf
+ * @desc    Afficher (aperçu) ou télécharger le PDF d'une fiche.
+ *          Le PDF vit sur le partage réseau, mais il peut avoir été déplacé ou
+ *          supprimé par le programme externe qui surveille le dossier — et le
+ *          backend web (VPS) n'a pas toujours accès à ce partage. On le
+ *          REGÉNÈRE alors à l'identique depuis le .DAT ou depuis les lignes
+ *          stockées en base : l'aperçu et le téléchargement marchent donc
+ *          toujours, indépendamment de l'agent d'impression.
+ * @route   GET /api/fiches-controle/:entrepriseId/:id/pdf[?download=1]
  * @access  Private/Admin
  */
 const telechargerPdf = asyncHandler(async (req, res) => {
@@ -127,20 +137,45 @@ const telechargerPdf = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Fiche non trouvée");
   }
-  // Chemin recalculé pour CET environnement (le PDF a pu être créé par l'agent
-  // Windows ; le VPS Linux le relit via son montage /mnt/rcommun).
-  const pdfPath = resoudreCheminPdf(fiche);
-  if (!pdfPath) {
+
+  const { chemin, temporaire } = await assurerPdfFiche(fiche, entreprise);
+  if (!chemin) {
     res.status(404);
-    throw new Error("Fichier PDF introuvable");
+    throw new Error(
+      "PDF indisponible : ni le fichier sur le partage, ni les lignes bipées ne sont accessibles pour cette fiche.",
+    );
   }
+
+  // Nom de fichier lisible côté poste : "fiche_<zone>_<emplacement>.pdf".
+  const base =
+    [fiche.zoneCode, fiche.zoneType].filter(Boolean).join("_") || "fiche";
+  const nomFichier = (fiche.pdfFileName || `fiche ${base}.pdf`).replace(
+    /[\\/:*?"<>|]/g,
+    "_",
+  );
+  const disposition = req.query.download ? "attachment" : "inline";
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${fiche.pdfFileName || "fiche.pdf"}"`,
+    `${disposition}; filename="${nomFichier}"`,
   );
-  fs.createReadStream(pdfPath).pipe(res);
+
+  const stream = fs.createReadStream(chemin);
+  // Le PDF regénéré est un temporaire : on le supprime une fois envoyé (ou si
+  // le client coupe la connexion), sinon on remplit %TEMP% à chaque aperçu.
+  const nettoyer = () => {
+    if (!temporaire) return;
+    try {
+      fs.unlinkSync(chemin);
+    } catch {
+      /* ignore */
+    }
+  };
+  stream.on("close", nettoyer);
+  stream.on("error", nettoyer);
+  res.on("close", nettoyer);
+  stream.pipe(res);
 });
 
 /**

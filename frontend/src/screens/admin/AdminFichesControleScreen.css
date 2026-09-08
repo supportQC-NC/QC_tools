@@ -459,3 +459,26 @@
 .scan-line.zone_inconnue {
   color: var(--warning);
 }
+/* Erreur d'aperçu / de téléchargement du PDF d'une fiche */
+.admin-fiches .fiches-erreur {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-left: 4px solid var(--danger);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.admin-fiches .fiches-erreur svg {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+}
+
+.admin-fiches .fiches-erreur span {
+  flex: 1;
+}

@@ -1,7 +1,9 @@
 // backend/services/ficheControleService.js
 import fs from "fs";
+import os from "os";
 import path from "path";
 import articleCacheService from "./articleService.js";
+import LigneBipage from "../models/LigneBipageModel.js";
 
 // ===========================================
 // CONFIG (.env, avec valeurs par défaut)
@@ -449,4 +451,110 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     stream.on("finish", resolve);
     stream.on("error", reject);
   });
+};
+// ===========================================
+// RÉCUPÉRATION / RECONSTRUCTION DU PDF
+// ===========================================
+
+/**
+ * Reconstruit le chemin du .DAT source d'une fiche pour l'environnement
+ * courant. `fiche.datFileName` est une clé LOGIQUE « <EMPLACEMENT>/stock.dat
+ * <code> » : le dossier d'emplacement y est déjà, on l'accroche simplement au
+ * dossier de l'inventaire recalculé ici (cf. resoudreCheminPdf).
+ */
+export const resoudreCheminDat = (fiche) => {
+  if (!fiche) return "";
+  const nom = fiche.inventaireSlug || fiche.inventaireNom || "";
+  const logique = String(fiche.datFileName || "");
+  if (!nom || !logique) return "";
+  const dirs = getInventaireDirs(nom);
+  const parts = logique.split("/").filter(Boolean);
+  const fileName = parts.pop();
+  const sousDossier = parts.length
+    ? parts.join(path.sep)
+    : emplacementDir(fiche.zoneType);
+  const candidats = [
+    path.join(dirs.base, sousDossier, fileName),
+    path.join(dirs.base, sousDossier, config.archiveDatDirName, fileName),
+    path.join(dirs.base, fileName), // anciennes fiches à plat
+    path.join(dirs.archiveDat, fileName),
+  ];
+  for (const p of candidats) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {
+      /* ignore */
+    }
+  }
+  return "";
+};
+
+/**
+ * Retrouve les lignes brutes (code + quantité) d'une fiche, d'abord depuis le
+ * .DAT s'il est encore là, sinon depuis les lignes persistées en base
+ * (LigneBipage, écrites au traitement du .DAT). Le second chemin est celui qui
+ * sauve la mise quand un programme externe a déplacé/supprimé les fichiers du
+ * partage, ou quand le backend web n'a pas accès au partage du tout.
+ */
+const retrouverLignesDat = async (fiche) => {
+  const datPath = resoudreCheminDat(fiche);
+  if (datPath) {
+    try {
+      const lignes = parseDat(fs.readFileSync(datPath, "utf8"));
+      if (lignes.length) return { lignes, origine: "dat" };
+    } catch {
+      /* on bascule sur la base */
+    }
+  }
+
+  const enBase = await LigneBipage.find({
+    session: fiche.session,
+    datFileName: fiche.datFileName,
+  })
+    .sort({ ordre: 1 })
+    .lean();
+
+  if (enBase.length) {
+    return {
+      lignes: enBase.map((l) => ({
+        code: String(l.eanArticle || l.nart || "").trim(),
+        quantite: Number(l.qteScan) || 0,
+      })),
+      origine: "base",
+    };
+  }
+  return { lignes: [], origine: "" };
+};
+
+/**
+ * Renvoie un chemin de PDF LISIBLE pour cette fiche, quoi qu'il arrive :
+ *  1. le PDF d'origine s'il est toujours sur le partage ;
+ *  2. sinon un PDF REGÉNÉRÉ à l'identique dans un fichier temporaire, à partir
+ *     du .DAT ou des lignes stockées en base.
+ * L'appelant doit supprimer le fichier quand `temporaire` est vrai.
+ * @returns {Promise<{chemin: string, temporaire: boolean, origine: string}>}
+ */
+export const assurerPdfFiche = async (fiche, entreprise) => {
+  const existant = resoudreCheminPdf(fiche);
+  if (existant) return { chemin: existant, temporaire: false, origine: "disque" };
+
+  const { lignes, origine } = await retrouverLignesDat(fiche);
+  if (!lignes.length) return { chemin: "", temporaire: false, origine: "" };
+
+  const { rows } = await construireLignes(entreprise, lignes);
+  const outPath = path.join(
+    os.tmpdir(),
+    `fiche_${fiche._id}_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`,
+  );
+  await ecrirePDF({
+    header: {
+      zoneCode: fiche.zoneCode || "",
+      zoneLibelle: fiche.zoneLibelle || "",
+      zoneType: fiche.zoneType || "",
+      date: fiche.date || fiche.createdAt || new Date(),
+    },
+    rows,
+    outPath,
+  });
+  return { chemin: outPath, temporaire: true, origine };
 };

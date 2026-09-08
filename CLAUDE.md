@@ -650,8 +650,16 @@ l'écran, mais ne pas laisser l'ambiguïté.
 **Impression en production** : le backend est un VPS Ubuntu qui ne peut pas
 imprimer. C'est `npm run print-agent` (`backend/printAgent.js`), lancé sur le poste
 `192.168.0.250` qui a le Rcommun **et** l'imprimante, qui porte le watcher. Il se
-connecte au **même** MongoDB Atlas. La réimpression demandée depuis le web passe
-par `FicheControle.reprintRequested`.
+connecte au **même** MongoDB Atlas.
+
+Depuis le web on **ne réimprime plus à distance** : l'écran Fiches de contrôle
+propose l'**aperçu** et le **téléchargement** du PDF
+(`GET /api/fiches-controle/:entrepriseId/:id/pdf[?download=1]`), et l'utilisateur
+imprime depuis son poste. Le PDF est **regénéré à la volée** (`assurerPdfFiche`)
+quand il n'est plus sur le partage — d'abord depuis le .DAT, sinon depuis les
+`LigneBipage` déjà stockées : l'aperçu fonctionne donc même depuis le VPS, qui
+n'a pas toujours accès au Rcommun. Le drapeau `FicheControle.reprintRequested`
+reste traité par l'agent local, mais plus aucun écran ne le pose.
 
 ## Clients mobiles
 

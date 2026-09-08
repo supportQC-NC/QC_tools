@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import {
   HiDocumentReport,
   HiRefresh,
-  HiPrinter,
+  HiDownload,
   HiEye,
   HiTrash,
   HiCheckCircle,
@@ -16,12 +16,12 @@ import { useSelector } from "react-redux";
 import {
   useGetFichesQuery,
   useScanFichesMutation,
-  useReprintFicheMutation,
   useDeleteFicheMutation,
   useGetWatchStatusQuery,
   useStartWatchMutation,
   useStopWatchMutation,
   getFichePdfUrl,
+  telechargerFichePdf,
 } from "../../slices/ficheControleApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./AdminFichesControleScreen.css";
@@ -32,6 +32,10 @@ const AdminFichesControleScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [scanReport, setScanReport] = useState(null);
+  // Erreur d'aperçu / de téléchargement (message renvoyé par le backend).
+  const [pdfErreur, setPdfErreur] = useState("");
+  // Id de la fiche en cours de téléchargement (bouton désactivé pendant).
+  const [enTelechargement, setEnTelechargement] = useState("");
 
   const {
     data,
@@ -43,7 +47,6 @@ const AdminFichesControleScreen = () => {
   });
 
   const [scanFiches, { isLoading: scanning }] = useScanFichesMutation();
-  const [reprintFiche, { isLoading: reprinting }] = useReprintFicheMutation();
   const [deleteFiche] = useDeleteFicheMutation();
 
   const { data: watchStatus } = useGetWatchStatusQuery(undefined, {
@@ -87,11 +90,21 @@ const AdminFichesControleScreen = () => {
     }
   };
 
-  const handleReprint = async (id) => {
+  // L'impression ne peut pas se faire depuis le serveur (le VPS n'a pas
+  // d'imprimante) : on télécharge le PDF sur le poste, l'utilisateur l'imprime
+  // ensuite depuis son lecteur PDF.
+  const handleDownload = async (fiche) => {
+    setPdfErreur("");
+    setEnTelechargement(fiche._id);
+    const nom =
+      fiche.pdfFileName ||
+      `fiche ${[fiche.zoneCode, fiche.zoneType].filter(Boolean).join(" ")}.pdf`;
     try {
-      await reprintFiche({ entrepriseId: selectedEntreprise, id }).unwrap();
-    } catch {
-      /* erreur déjà reflétée par le statut de la fiche */
+      await telechargerFichePdf(selectedEntreprise, fiche._id, nom);
+    } catch (err) {
+      setPdfErreur(err.message || "Téléchargement impossible");
+    } finally {
+      setEnTelechargement("");
     }
   };
 
@@ -105,7 +118,8 @@ const AdminFichesControleScreen = () => {
   };
 
   const openPdf = (id) => {
-    window.open(getFichePdfUrl(selectedEntreprise, id), "_blank");
+    setPdfErreur("");
+    window.open(getFichePdfUrl(selectedEntreprise, id), "_blank", "noopener");
   };
 
   return (
@@ -182,6 +196,19 @@ const AdminFichesControleScreen = () => {
               </button>
             </div>
           </div>
+
+          {pdfErreur && (
+            <div className="fiches-erreur">
+              <HiExclamationCircle />
+              <span>{pdfErreur}</span>
+              <button
+                className="scan-report-close"
+                onClick={() => setPdfErreur("")}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {scanReport && (
             <div className="scan-report">
@@ -281,14 +308,7 @@ const AdminFichesControleScreen = () => {
                         </div>
                       </td>
                       <td>
-                        {f.reprintRequested ? (
-                          <span
-                            className="print-wait"
-                            title="Réimpression envoyée à l'imprimante du magasin — sortie imminente"
-                          >
-                            <HiClock /> Réimpression…
-                          </span>
-                        ) : f.printed ? (
+                        {f.printed ? (
                           <span className="print-ok">
                             <HiCheckCircle /> Imprimée
                           </span>
@@ -307,17 +327,17 @@ const AdminFichesControleScreen = () => {
                           <button
                             className="btn-icon"
                             onClick={() => openPdf(f._id)}
-                            title="Ouvrir le PDF"
+                            title="Aperçu du PDF"
                           >
                             <HiEye />
                           </button>
                           <button
                             className="btn-icon"
-                            onClick={() => handleReprint(f._id)}
-                            disabled={reprinting}
-                            title="Réimprimer"
+                            onClick={() => handleDownload(f)}
+                            disabled={enTelechargement === f._id}
+                            title="Télécharger le PDF (à imprimer depuis le poste)"
                           >
-                            <HiPrinter />
+                            <HiDownload />
                           </button>
                           <button
                             className="btn-icon danger"
