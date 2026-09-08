@@ -89,8 +89,13 @@ const resolveArticles = async (req, res, entreprise, mode) => {
       ? await articleCacheService.findArticlesGroupesParGism1(entreprise, codes)
       : await articleCacheService.findArticlesGroupesParGroupe(entreprise, codes);
 
+    // ⚠️ Le CODE SEUL, jamais précédé de « GISEMENT » / « GROUPE » (décision
+    // client du 09/09/2026) : toute la feuille vient du même regroupement, le
+    // mot n'apprend rien et mange la place — en haut de page comme en bout de
+    // rangée, où la marge est comptée.
     sections = paquets.map((paquet) => ({
-      titre: `${estGism ? "GISEMENT" : "GROUPE"} ${libelleCode(paquet.code)}`,
+      titre: libelleCode(paquet.code),
+      code: libelleCode(paquet.code),
       narts: paquet.articles.map((a) => safeTrim(a.NART)).filter(Boolean),
     }));
     nartList = sections.flatMap((sec) => sec.narts);
@@ -135,6 +140,7 @@ const resolveArticles = async (req, res, entreprise, mode) => {
     sectionsArticles = sections
       .map((sec) => ({
         titre: sec.titre,
+        code: sec.code || "",
         articles: sec.narts.map((n) => parNart.get(n)).filter(Boolean),
       }))
       .filter((sec) => sec.articles.length > 0);

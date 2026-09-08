@@ -379,42 +379,59 @@ const drawTitreSection = (rl, titre, xDroite) => {
   rl.drawString(xDroite - w, rl.H - TITRE_SECTION_Y, titre);
 };
 
-// Marque de ligne : le même code que le titre, répété dans la marge DROITE en
-// face de chaque rangée d'étiquettes.
+// Marque de ligne : le CODE du gisement / groupe, répété dans la marge DROITE
+// en face de chaque rangée d'étiquettes.
 //
 // POURQUOI : la feuille se découpe en BANDES horizontales, une par rangée. Le
-// titre en haut à droite disparaît alors sur toutes les bandes sauf la
-// première, et un paquet de bandes coupées n'est plus identifiable. Le code
-// répété en bout de rangée reste sur chaque bande.
+// titre en haut à droite disparaît alors de toutes les bandes sauf la première,
+// et un paquet de bandes coupées n'est plus identifiable.
 //
-// Il est écrit HORIZONTALEMENT, dans le sens de lecture des étiquettes : une
-// bande posée à plat se lit sans la tourner. La taille s'adapte à la marge
-// disponible (~1,9 cm sur A4 paysage) et le texte est tronqué en dernier
-// recours, plutôt que de déborder dans la zone rognée par l'imprimante.
-const MARQUE_LIGNE_MAX = 10;
+// ⚠️ Le CODE SEUL, sans le mot « GISEMENT » / « GROUPE » : toute la feuille
+// vient du même regroupement, le mot ne fait que manger la marge.
+//
+// ⚠️ Écrit VERTICALEMENT (rotation de 90°, lecture de bas en haut) le long du
+// bord de la bande. C'est ce sens qui donne de la place : la marge droite ne
+// fait que 1,9 cm de large, alors que la rangée fait 4 cm de haut — un code
+// long tient donc sans être rétréci ni tronqué, et la marque reste alignée sur
+// la tranche de la bande une fois découpée.
+const MARQUE_LIGNE_MAX = 12;
 const MARQUE_LIGNE_MIN = 6;
-const MARQUE_LIGNE_ECART = 5; // écart entre le bord des étiquettes et la marque
+const MARQUE_LIGNE_ECART = 6; // écart entre le bord des étiquettes et la marque
 
-const drawMarqueLigne = (rl, titre, x, largeur, yCentre) => {
-  if (!titre || largeur <= 8) return;
-  let texte = String(titre);
+const drawMarqueLigne = (rl, code, xGauche, largeur, yCentre, hauteurRangee) => {
+  if (!code || largeur <= 6) return;
+  const doc = rl.doc;
+  let texte = String(code);
 
-  // 1) réduire la taille tant que ça dépasse ; 2) tronquer si ça dépasse encore.
-  let taille = MARQUE_LIGNE_MAX;
-  const mesure = (t, s) =>
-    rl.doc.font("Helvetica-Bold").fontSize(s).widthOfString(t);
-  while (taille > MARQUE_LIGNE_MIN && mesure(texte, taille) > largeur) {
+  // Le texte est vertical : c'est la HAUTEUR de rangée qui borne sa longueur,
+  // et la largeur de marge qui borne sa taille de police.
+  const longueurDispo = hauteurRangee - 8;
+  const mesure = (t, taille) =>
+    doc.font("Helvetica-Bold").fontSize(taille).widthOfString(t);
+
+  let taille = Math.min(MARQUE_LIGNE_MAX, Math.floor(largeur));
+  while (taille > MARQUE_LIGNE_MIN && mesure(texte, taille) > longueurDispo) {
     taille -= 0.5;
   }
-  while (texte.length > 1 && mesure(texte + "…", taille) > largeur) {
+  while (texte.length > 1 && mesure(texte + "…", taille) > longueurDispo) {
     texte = texte.slice(0, -1);
   }
-  if (texte !== String(titre)) texte += "…";
+  if (texte !== String(code)) texte += "…";
 
-  rl.setFillColorRGB(0, 0, 0);
-  rl.setFont("Helvetica-Bold", taille);
-  // Centrage optique sur la hauteur de la rangée.
-  rl.drawString(x, yCentre - taille * 0.35, texte);
+  // Coordonnées pdfkit (origine en HAUT à gauche) : centre de la marque.
+  const cx = xGauche + largeur / 2;
+  const cy = rl.H - yCentre;
+  const w = mesure(texte, taille);
+
+  doc.save();
+  // -90° = sens anti-horaire → le texte se lit de BAS en HAUT.
+  doc.rotate(-90, { origin: [cx, cy] });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(taille)
+    .fillColor("#000000")
+    .text(texte, cx - w / 2, cy - taille * 0.72, { lineBreak: false });
+  doc.restore();
 };
 
 /**
@@ -445,11 +462,11 @@ const drawStandard = (rl, sections, opts = {}) => {
   const startYTop = (H - gridH) / 2; // marge haute (mesurée depuis le haut)
   const perPage = cols * rows;
 
-  // Marge droite disponible pour la marque de ligne (grille centrée → elle vaut
-  // startX), moins l'écart aux étiquettes et une sécurité anti-rognage.
+  // Bande de marge droite où s'inscrit la marque de rangée (grille centrée →
+  // la marge vaut startX). 0,5 cm réservé au bord : c'est la zone non
+  // imprimable habituelle (~5 mm), celle qui avait déjà obligé à descendre le
+  // titre de section.
   const xMarque = startX + gridW + MARQUE_LIGNE_ECART;
-  // 0,5 cm réservé au bord droit : c'est la zone non imprimable habituelle
-  // (~5 mm), la même qui avait déjà obligé à descendre le titre de section.
   const largeurMarque = W - xMarque - 0.5 * CM;
 
   let premierePage = true;
@@ -474,10 +491,13 @@ const drawStandard = (rl, sections, opts = {}) => {
         const yHaut = H - (startYTop + row * (labelH + gap));
         drawMarqueLigne(
           rl,
-          section.titre,
+          // Le code seul ; repli sur le titre pour un appelant qui n'en
+          // fournirait pas (aucun aujourd'hui, mais l'API reste tolérante).
+          section.code || section.titre,
           xMarque,
           largeurMarque,
           yHaut - labelH / 2,
+          labelH,
         );
       }
 
