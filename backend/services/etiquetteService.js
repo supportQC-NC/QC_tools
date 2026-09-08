@@ -347,7 +347,38 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   }
 };
 
-const drawStandard = (rl, records, opts = {}) => {
+/**
+ * Titre de section, en HAUT À DROITE de la feuille A4, en gras.
+ *
+ * ⚠️ Il est dessiné dans la MARGE de la feuille, jamais sur une étiquette :
+ * la grille est centrée verticalement et laisse ~62 pt libres en haut (5x4 cm
+ * sur A4 paysage), largement de quoi loger une ligne de 13 pt. La taille et le
+ * nombre d'étiquettes par page ne changent donc pas d'un iota.
+ */
+const drawTitreSection = (rl, titre) => {
+  if (!titre) return;
+  const marginDroite = 0.6 * CM;
+  rl.setFillColorRGB(0, 0, 0);
+  rl.setFont("Helvetica-Bold", 13);
+  // Aligné à droite : on mesure pour poser le coin gauche du texte.
+  rl.doc.font("Helvetica-Bold").fontSize(13);
+  const w = rl.doc.widthOfString(String(titre));
+  rl.drawString(rl.W - marginDroite - w, rl.H - 0.55 * CM, titre);
+};
+
+/**
+ * Grille d'étiquettes standard (5x4 cm).
+ *
+ * `sections` = [{ titre, articles }]. Une section NE PARTAGE JAMAIS une feuille
+ * avec une autre (décision client du 08/09/2026) : imprimer un gisement, c'est
+ * imprimer un paquet d'étiquettes qu'on emporte dans le rayon, et deux rayons
+ * sur la même feuille obligent à découper puis trier. Le titre rappelle en haut
+ * à droite de quel gisement ou groupe il s'agit.
+ *
+ * Une section sans titre (impression par NART, par proforma, par commande…) se
+ * comporte exactement comme avant : remplissage continu, aucun en-tête.
+ */
+const drawStandard = (rl, sections, opts = {}) => {
   const W = rl.W;
   const H = rl.H;
   const labelW = 5 * CM;
@@ -363,14 +394,30 @@ const drawStandard = (rl, records, opts = {}) => {
   const startYTop = (H - gridH) / 2; // marge haute (mesurée depuis le haut)
   const perPage = cols * rows;
 
-  records.forEach((record, i) => {
-    const idxOnPage = i % perPage;
-    if (idxOnPage === 0 && i > 0) rl.showPage();
-    const col = idxOnPage % cols;
-    const row = Math.floor(idxOnPage / cols);
-    const x = startX + col * (labelW + gap);
-    const y = H - (startYTop + row * (labelH + gap)) - labelH;
-    drawStandardCell(rl, record, x, y, labelW, labelH, opts);
+  let premierePage = true;
+  sections.forEach((section) => {
+    const articles = section.articles || [];
+    if (articles.length === 0) return;
+
+    // Nouvelle section = nouvelle feuille (sauf pour la toute première).
+    if (!premierePage) rl.showPage();
+    premierePage = false;
+    drawTitreSection(rl, section.titre);
+
+    articles.forEach((record, i) => {
+      const idxOnPage = i % perPage;
+      if (idxOnPage === 0 && i > 0) {
+        rl.showPage();
+        // Le titre est répété sur chaque feuille de la section : un paquet de
+        // 3 feuilles doit rester identifiable après avoir été séparé.
+        drawTitreSection(rl, section.titre);
+      }
+      const col = idxOnPage % cols;
+      const row = Math.floor(idxOnPage / cols);
+      const x = startX + col * (labelW + gap);
+      const y = H - (startYTop + row * (labelH + gap)) - labelH;
+      drawStandardCell(rl, record, x, y, labelW, labelH, opts);
+    });
   });
 };
 
@@ -621,7 +668,7 @@ const drawFullPage = (rl, records, logoBuf, drawOne) => {
 // Rendu DEMI A4 : 2 articles différents par feuille A4 portrait.
 // Chaque article = demi-page (A5 paysage) = visuel pleine page réduit à l'échelle.
 // ----------------------------------------------------------------------------
-const drawDemi = (rl, doc, records, logoBuf, drawOne) => {
+const drawDemi = (rl, doc, sections, logoBuf, drawOne) => {
   // Coordonnées logiques = A4 paysage ; le contenu est réduit puis placé dans
   // une moitié de la feuille A4 portrait.
   rl.W = LAND_W;
@@ -629,17 +676,30 @@ const drawDemi = (rl, doc, records, logoBuf, drawOne) => {
   const s = PORTRAIT_W / LAND_W; // 1/√2 ≈ 0.7071 (largeur paysage -> largeur portrait)
   const halfH = PORTRAIT_H / 2;
 
-  records.forEach((record, i) => {
-    const slot = i % 2; // 0 = haut, 1 = bas
-    if (slot === 0 && i > 0) {
-      doc.addPage({ size: "A4", layout: "portrait", margin: 0 });
-    }
-    const ty = slot === 0 ? 0 : halfH;
-    doc.save();
-    doc.translate(0, ty);
-    doc.scale(s);
-    drawOne(rl, record, logoBuf);
-    doc.restore();
+  // Comme la grille standard : une section ne partage jamais une feuille avec
+  // une autre. Deux étiquettes tiennent ici sur une A4, donc le découpage est
+  // nécessaire — au prix, parfois, d'une demi-feuille vide en fin de section.
+  // Pas de titre en revanche : l'étiquette occupe toute la demi-page, il n'y a
+  // aucune marge où l'écrire sans mordre dessus.
+  let premiere = true;
+  sections.forEach((section) => {
+    const articles = section.articles || [];
+    if (articles.length === 0) return;
+    if (!premiere) doc.addPage({ size: "A4", layout: "portrait", margin: 0 });
+    premiere = false;
+
+    articles.forEach((record, i) => {
+      const slot = i % 2; // 0 = haut, 1 = bas
+      if (slot === 0 && i > 0) {
+        doc.addPage({ size: "A4", layout: "portrait", margin: 0 });
+      }
+      const ty = slot === 0 ? 0 : halfH;
+      doc.save();
+      doc.translate(0, ty);
+      doc.scale(s);
+      drawOne(rl, record, logoBuf);
+      doc.restore();
+    });
   });
 };
 
@@ -871,7 +931,26 @@ export const genererEtiquettesCustomPDF = async ({
  * @param {Object} p.entreprise- doc entreprise (pour le chemin du logo)
  * @param {string} p.outPath   - chemin de sortie du PDF
  */
-export const genererEtiquettesPDF = async ({ type, format, articles, entreprise, outPath }) => {
+/**
+ * @param {object} p
+ * @param {Array}  p.articles  liste à plat (compat : tous les modes hors
+ *                             gisement/groupe)
+ * @param {Array}  [p.sections] [{ titre, articles }] — une section par gisement
+ *                             ou par groupe. Chacune démarre une NOUVELLE
+ *                             feuille et porte son titre en haut à droite.
+ *                             N'a d'effet que sur les étiquettes « standard »,
+ *                             les seules à en tuiler plusieurs par feuille ;
+ *                             les autres types impriment déjà un article par
+ *                             page (ou deux en demi-format).
+ */
+export const genererEtiquettesPDF = async ({
+  type,
+  format,
+  articles,
+  sections,
+  entreprise,
+  outPath,
+}) => {
   const isStandard = type === "standard" || type === "standard_sans_prix";
   if (!isStandard && !ONE_DRAWERS[type]) {
     throw new Error(`Type d'étiquette inconnu: ${type}`);
@@ -889,11 +968,18 @@ export const genererEtiquettesPDF = async ({ type, format, articles, entreprise,
   // Logo entreprise (optionnel) — résolu + tracé dans les logs si ignoré
   const logoBuf = resolveLogoBuffer(entreprise);
 
+  // Sans sections (impression par NART, proforma, commande…) : une seule
+  // section sans titre, donc remplissage continu, exactement comme avant.
+  const paquets =
+    Array.isArray(sections) && sections.length
+      ? sections
+      : [{ titre: "", articles }];
+
   const rl = new RL(doc);
   if (isStandard) {
-    drawStandard(rl, articles, { showPrice: type === "standard" });
+    drawStandard(rl, paquets, { showPrice: type === "standard" });
   } else if (isDemi) {
-    drawDemi(rl, doc, articles, logoBuf, ONE_DRAWERS[type]);
+    drawDemi(rl, doc, paquets, logoBuf, ONE_DRAWERS[type]);
   } else {
     drawFullPage(rl, articles, logoBuf, ONE_DRAWERS[type]);
   }

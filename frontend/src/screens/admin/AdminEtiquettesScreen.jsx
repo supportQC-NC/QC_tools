@@ -105,8 +105,11 @@ const SearchableMultiSelect = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const q = search.trim().toLowerCase();
+  // La recherche porte sur le libelle affiche : taper « vide » doit trouver
+  // l'entree des articles sans groupe / sans gisement.
   const filtered = (items || []).filter((g) =>
-    g.code.toLowerCase().includes(search.trim().toLowerCase()),
+    libelleCode(g.code).toLowerCase().includes(q),
   );
 
   return (
@@ -116,8 +119,11 @@ const SearchableMultiSelect = ({
           <span className="etiq-gism1-placeholder">{placeholder}</span>
         )}
         {selected.map((code) => (
-          <span key={code} className="etiq-gism1-chip">
-            {code}
+          <span
+            key={code}
+            className={`etiq-gism1-chip ${code === CODE_VIDE ? "etiq-chip-vide" : ""}`}
+          >
+            {libelleCode(code)}
             <button
               type="button"
               className="etiq-gism1-chip-x"
@@ -125,7 +131,7 @@ const SearchableMultiSelect = ({
                 e.stopPropagation();
                 onToggle(code);
               }}
-              aria-label={`Retirer ${code}`}
+              aria-label={`Retirer ${libelleCode(code)}`}
             >
               <HiX />
             </button>
@@ -158,11 +164,18 @@ const SearchableMultiSelect = ({
                 <button
                   type="button"
                   key={g.code}
-                  className={`etiq-gism1-option ${checked ? "checked" : ""}`}
+                  className={`etiq-gism1-option ${checked ? "checked" : ""} ${
+                    g.code === CODE_VIDE ? "etiq-option-vide" : ""
+                  }`}
                   onClick={() => onToggle(g.code)}
+                  title={
+                    g.code === CODE_VIDE
+                      ? "Articles auxquels aucun code n'est attribue dans l'ERP"
+                      : undefined
+                  }
                 >
                   <span className="etiq-gism1-check">{checked ? "✓" : ""}</span>
-                  <span className="etiq-gism1-code">{g.code}</span>
+                  <span className="etiq-gism1-code">{libelleCode(g.code)}</span>
                   <span className="etiq-gism1-count">
                     {g.count} article{g.count > 1 ? "s" : ""}
                   </span>
@@ -175,6 +188,12 @@ const SearchableMultiSelect = ({
     </div>
   );
 };
+
+// Code réservé renvoyé par l'API pour « les articles SANS groupe / SANS
+// gisement » (backend : articleService.CODE_VIDE). Il est affiche « VIDE »
+// partout : l'utilisateur ne doit jamais voir la valeur technique.
+const CODE_VIDE = "__VIDE__";
+const libelleCode = (code) => (code === CODE_VIDE ? "VIDE" : code);
 
 const AdminEtiquettesScreen = () => {
   const { data: entreprises, isLoading: loadingEntreprises } =
@@ -325,12 +344,14 @@ const AdminEtiquettesScreen = () => {
   const nomDossierDBF = entrepriseData?.nomDossierDBF;
 
   // Listes GISM1 / GROUPE de l'entreprise (chargées à la demande, cache 5 min)
+  // `vide: true` ajoute en tete de liste l'entree « VIDE » = les articles sans
+  // gisement / sans groupe, qu'aucune selection ne permettait d'atteindre.
   const { data: gism1Data, isLoading: loadingGism1 } = useGetGism1Query(
-    nomDossierDBF,
+    { nomDossierDBF, vide: true },
     { skip: !nomDossierDBF || mode !== "gism1" },
   );
   const { data: groupeData, isLoading: loadingGroupe } = useGetGroupesQuery(
-    nomDossierDBF,
+    { nomDossierDBF, vide: true },
     { skip: !nomDossierDBF || mode !== "groupe" },
   );
 

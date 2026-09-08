@@ -2,6 +2,13 @@
 import { apiSlice } from "./apiSlice";
 import { ARTICLES_URL } from "../constants";
 
+// Les listes de groupes / gisements acceptent deux formes d'argument : la
+// société seule (tous les écrans historiques) ou { nomDossierDBF, vide }.
+const normaliserArgListe = (arg) =>
+  typeof arg === "string" || arg == null
+    ? { nomDossierDBF: arg, vide: false }
+    : { nomDossierDBF: arg.nomDossierDBF, vide: !!arg.vide };
+
 // URL pour les photos
 const PHOTOS_URL = "/api/photos";
 
@@ -100,19 +107,28 @@ export const articleApiSlice = apiSlice.injectEndpoints({
     }),
 
     // Liste des groupes/familles
+    // Accepte la société seule (usage historique) ou { nomDossierDBF, vide } :
+    // `vide` ajoute l'entrée des articles SANS groupe, utilisée par l'écran
+    // Étiquettes. Les autres écrans veulent des codes réels et ne la passent pas.
     getGroupes: builder.query({
-      query: (nomDossierDBF) => ({
-        url: `${ARTICLES_URL}/${nomDossierDBF}/groupes`,
-      }),
+      query: (arg) => {
+        const { nomDossierDBF, vide } = normaliserArgListe(arg);
+        return {
+          url: `${ARTICLES_URL}/${nomDossierDBF}/groupes${vide ? "?vide=1" : ""}`,
+        };
+      },
       providesTags: ["Article"],
       keepUnusedDataFor: 300, // Cache 5 min car change rarement
     }),
 
-    // Liste des GISM1 (gisements)
+    // Liste des GISM1 (gisements) — mêmes arguments que getGroupes.
     getGism1: builder.query({
-      query: (nomDossierDBF) => ({
-        url: `${ARTICLES_URL}/${nomDossierDBF}/gism1`,
-      }),
+      query: (arg) => {
+        const { nomDossierDBF, vide } = normaliserArgListe(arg);
+        return {
+          url: `${ARTICLES_URL}/${nomDossierDBF}/gism1${vide ? "?vide=1" : ""}`,
+        };
+      },
       providesTags: ["Article"],
       keepUnusedDataFor: 300, // Cache 5 min car change rarement
     }),

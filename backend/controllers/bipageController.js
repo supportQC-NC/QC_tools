@@ -16,6 +16,7 @@ import {
   importerProformas,
   genererModeleExcelBipage,
   importerExcelBipage,
+  resoudreZoneImport,
 } from "../services/bipageImportService.js";
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -416,18 +417,17 @@ const listProformasBipage = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Intègre les proformas choisies dans l'inventaire actif.
+ * @desc    Intègre les proformas choisies SUR UNE ZONE CHOISIE dans l'écran.
  * @route   POST /api/bipages/:entrepriseId/import-proformas
- * @body    { items: [{ numfact, zoneCode?, emplacement?, agentCode? }], mode? }
- *          Les champs de `items` permettent d'intégrer une proforma dont
- *          l'observation ne désigne aucune zone. `mode` : "inventaire" (défaut)
- *          ou "deduction" (quantités enregistrées en négatif).
- * @access  Private (module bipage, write)
+ * @body    { zoneCode, emplacement, items|numfacts, mode? }
+ *          `zoneCode` (+ `emplacement` si la société en utilise plusieurs) dit
+ *          où atterrit le comptage : il n'est plus lu dans l'observation.
+ *          `mode` : "inventaire" (défaut) ou "deduction" (quantités négatives).
+ * @access  Private (module inventaire ou bipage, write)
  */
 const importProformasBipage = asyncHandler(async (req, res) => {
-  // `items` = forme complète (zone/agent saisis à la main quand l'observation
-  // ne dit rien) ; `numfacts` = ancienne forme, toujours acceptée.
-  const { items, numfacts = [] } = req.body;
+  // `items` = forme complète (agent surchargé) ; `numfacts` = forme simple.
+  const { items, numfacts = [], zoneCode, emplacement } = req.body;
   const selection = Array.isArray(items) && items.length ? items : numfacts;
   if (!Array.isArray(selection) || selection.length === 0) {
     res.status(400);
@@ -436,14 +436,36 @@ const importProformasBipage = asyncHandler(async (req, res) => {
   const mode = req.body.mode === "deduction" ? "deduction" : "inventaire";
 
   const session = await sessionActiveOuErreur(req.entreprise, res);
-  const result = await importerProformas(req.entreprise, session, selection, mode);
+
+  let zone;
+  try {
+    zone = await resoudreZoneImport(req.entreprise._id, zoneCode, emplacement);
+  } catch (e) {
+    res.status(400);
+    throw e;
+  }
+
+  const result = await importerProformas(
+    req.entreprise,
+    session,
+    zone,
+    selection,
+    mode,
+    req.user._id,
+  );
   const echecs = result.resultats.filter((r) => r.statut === "erreur").length;
   res.json({
     message:
-      `${mode === "deduction" ? "DÉDUCTION" : "Comptage"} — ` +
+      `${mode === "deduction" ? "DÉDUCTION" : "Comptage"} — zone ${result.zoneCode}` +
+      `${result.emplacement ? ` (${result.emplacement})` : ""} : ` +
       `${result.importees} proforma(s) intégrée(s), ${result.lignes} ligne(s), ` +
       `${result.unites} unité(s)` +
-      `${echecs ? `, ${echecs} en échec` : ""}.`,
+      `${echecs ? `, ${echecs} en échec` : ""}` +
+      `${
+        result.phasesMarquees.length
+          ? `. Phases ${result.phasesMarquees.join(" et ")} cochées automatiquement.`
+          : "."
+      }`,
     ...result,
   });
 });
@@ -459,44 +481,65 @@ const modeleExcelBipage = asyncHandler(async (req, res) => {
     "Content-Type",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   );
-  // Nom d'exemple VALIDE sous Windows : « < » et « > » y sont interdits, un
-  // gabarit littéral donnerait un fichier impossible à enregistrer.
-  // L'utilisateur renomme ensuite avec sa zone (mode d'emploi dans l'onglet Aide).
+  // Le nom du fichier n'a plus aucun rôle : la zone est choisie dans l'écran.
   res.setHeader(
     "Content-Disposition",
-    'attachment; filename="bipage_12_A_1_MAGASIN.xlsx"',
+    'attachment; filename="modele_comptage.xlsx"',
   );
   res.send(Buffer.from(buffer));
 });
 
 /**
- * @desc    Import d'un fichier Excel de bipage (multipart, champ "file").
- *          C'est le NOM du fichier qui porte l'agent, la zone et l'emplacement.
- * @route   POST /api/bipages/:entrepriseId/import-excel
- * @access  Private (module bipage, write)
+ * @desc    Import d'un comptage Excel (multipart, champ "file") SUR UNE ZONE
+ *          CHOISIE dans l'écran. Le nom du fichier ne sert qu'à tracer la
+ *          provenance et à ne pas réimporter deux fois le même.
+ * @route   POST /api/bipages/:entrepriseId/import-excel?mode=&zoneCode=&emplacement=
+ * @access  Private (module inventaire ou bipage, write)
  */
 const importExcelBipage = asyncHandler(async (req, res) => {
   if (!req.file || !req.file.buffer) {
     res.status(400);
     throw new Error("Aucun fichier reçu.");
   }
-  // Mode passé en query (et non en champ de formulaire) : il reste lisible quel
-  // que soit l'ordre des parties du multipart.
+  // Paramètres passés en query (et non en champs de formulaire) : ils restent
+  // lisibles quel que soit l'ordre des parties du multipart.
   const mode = req.query.mode === "deduction" ? "deduction" : "inventaire";
+  const { zoneCode, emplacement } = req.query;
 
   const session = await sessionActiveOuErreur(req.entreprise, res);
+
+  let zone;
+  try {
+    zone = await resoudreZoneImport(req.entreprise._id, zoneCode, emplacement);
+  } catch (e) {
+    res.status(400);
+    throw e;
+  }
+
   const result = await importerExcelBipage(
     req.entreprise,
     session,
+    zone,
     req.file.originalname,
     req.file.buffer,
     mode,
+    // Le nom du fichier ne porte plus de code agent : on trace qui a importé.
+    {
+      userId: req.user._id,
+      nom: `${req.user.prenom || ""} ${req.user.nom || ""}`.trim() || req.user.email,
+    },
   );
   res.json({
     message:
-      `${mode === "deduction" ? "DÉDUCTION" : "Comptage"} — zone ${result.zoneCode} ` +
-      `(${result.emplacement}) : ${result.lignes} ligne(s), ${result.unites} unité(s)` +
-      `${result.nonTrouves ? `, dont ${result.nonTrouves} article(s) non trouvé(s)` : ""}.`,
+      `${mode === "deduction" ? "DÉDUCTION" : "Comptage"} — zone ${result.zoneCode}` +
+      `${result.emplacement ? ` (${result.emplacement})` : ""} : ` +
+      `${result.lignes} ligne(s), ${result.unites} unité(s)` +
+      `${result.nonTrouves ? `, dont ${result.nonTrouves} article(s) non trouvé(s)` : ""}` +
+      `${
+        result.phasesMarquees.length
+          ? `. Phases ${result.phasesMarquees.join(" et ")} cochées automatiquement.`
+          : "."
+      }`,
     ...result,
   });
 });

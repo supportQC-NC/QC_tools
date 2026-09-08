@@ -5,7 +5,7 @@ import fs from "fs";
 import asyncHandler from "../middleware/asyncHandler.js";
 import proformaCacheService from "../services/proformaCacheService.js";
 import commandeCacheService from "../services/commandeService.js";
-import articleCacheService from "../services/articleService.js";
+import articleCacheService, { CODE_VIDE } from "../services/articleService.js";
 import {
   genererEtiquettesPDF,
   genererEtiquettesCustomPDF,
@@ -13,6 +13,13 @@ import {
 } from "../services/etiquetteService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
+
+// Separateurs acceptes quand une liste de codes arrive en une seule chaine.
+const SEPARATEUR_CODES = /[\n,;]+/;
+
+// Le code reserve des articles SANS groupe / SANS gisement s'affiche « VIDE »
+// partout ou l'utilisateur le lit (titre de section, message d'erreur).
+const libelleCode = (code) => (code === CODE_VIDE ? "VIDE" : code);
 const toNum = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : 0;
@@ -23,6 +30,8 @@ const toNum = (v) => {
 // Lève des erreurs HTTP via res.status (comportement identique à l'ancien code).
 const resolveArticles = async (req, res, entreprise, mode) => {
   let nartList = [];
+  // Renseigne uniquement par les modes gisement / groupe : [{ titre, narts }].
+  let sections = null;
   if (mode === "proforma") {
     const numfact = safeTrim(req.body.numfact);
     if (!numfact) {
@@ -60,37 +69,38 @@ const resolveArticles = async (req, res, entreprise, mode) => {
       res.status(400);
       throw new Error("Aucun NART fourni");
     }
-  } else if (mode === "gism1") {
-    const { gism1 } = req.body;
+  } else if (mode === "gism1" || mode === "groupe") {
+    // Gisement / groupe : on recupere les articles DEJA REGROUPES par code, pour
+    // que le PDF puisse commencer une feuille a chaque changement (voir
+    // etiquetteService.drawStandard). L'ordre des sections suit celui des codes
+    // coches dans l'ecran.
+    const estGism = mode === "gism1";
+    const brut = estGism ? req.body.gism1 : req.body.groupe;
     let codes = [];
-    if (Array.isArray(gism1)) codes = gism1.map((c) => safeTrim(c)).filter(Boolean);
-    else if (typeof gism1 === "string")
-      codes = gism1.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+    if (Array.isArray(brut)) codes = brut.map((c) => safeTrim(c)).filter(Boolean);
+    else if (typeof brut === "string")
+      codes = brut.split(SEPARATEUR_CODES).map((c) => c.trim()).filter(Boolean);
     if (codes.length === 0) {
       res.status(400);
-      throw new Error("Aucun GISM1 fourni");
+      throw new Error(estGism ? "Aucun GISM1 fourni" : "Aucun groupe fourni");
     }
-    const arts = await articleCacheService.findArticlesByGism1(entreprise, codes);
-    nartList = arts.map((a) => safeTrim(a.NART)).filter(Boolean);
+
+    const paquets = estGism
+      ? await articleCacheService.findArticlesGroupesParGism1(entreprise, codes)
+      : await articleCacheService.findArticlesGroupesParGroupe(entreprise, codes);
+
+    sections = paquets.map((paquet) => ({
+      titre: `${estGism ? "GISEMENT" : "GROUPE"} ${libelleCode(paquet.code)}`,
+      narts: paquet.articles.map((a) => safeTrim(a.NART)).filter(Boolean),
+    }));
+    nartList = sections.flatMap((sec) => sec.narts);
+
     if (nartList.length === 0) {
       res.status(404);
-      throw new Error(`Aucun article pour le(s) gisement(s) : ${codes.join(", ")}`);
-    }
-  } else if (mode === "groupe") {
-    const { groupe } = req.body;
-    let codes = [];
-    if (Array.isArray(groupe)) codes = groupe.map((c) => safeTrim(c)).filter(Boolean);
-    else if (typeof groupe === "string")
-      codes = groupe.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
-    if (codes.length === 0) {
-      res.status(400);
-      throw new Error("Aucun groupe fourni");
-    }
-    const arts = await articleCacheService.findArticlesByGroupe(entreprise, codes);
-    nartList = arts.map((a) => safeTrim(a.NART)).filter(Boolean);
-    if (nartList.length === 0) {
-      res.status(404);
-      throw new Error(`Aucun article pour le(s) groupe(s) : ${codes.join(", ")}`);
+      throw new Error(
+        `Aucun article pour le(s) ${estGism ? "gisement(s)" : "groupe(s)"} : ` +
+          codes.map(libelleCode).join(", "),
+      );
     }
   } else {
     res.status(400);
@@ -115,7 +125,22 @@ const resolveArticles = async (req, res, entreprise, mode) => {
     res.status(404);
     throw new Error("Aucun article trouvé pour les NART fournis");
   }
-  return { nartList, articles, introuvables };
+
+  // Les sections sont exprimees en NART : on les rattache aux articles charges,
+  // en ignorant les introuvables (un article peut avoir disparu du catalogue
+  // entre la lecture de l'index et le chargement).
+  let sectionsArticles = null;
+  if (sections) {
+    const parNart = new Map(articles.map((a) => [safeTrim(a.NART), a]));
+    sectionsArticles = sections
+      .map((sec) => ({
+        titre: sec.titre,
+        articles: sec.narts.map((n) => parNart.get(n)).filter(Boolean),
+      }))
+      .filter((sec) => sec.articles.length > 0);
+  }
+
+  return { nartList, articles, introuvables, sections: sectionsArticles };
 };
 
 // Stream un PDF déjà écrit sur disque puis le supprime.
@@ -202,7 +227,7 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
   }
 
   // ── Types classiques (données article obligatoires). ──
-  const { articles, introuvables, nartList } = await resolveArticles(
+  const { articles, introuvables, nartList, sections } = await resolveArticles(
     req,
     res,
     entreprise,
@@ -210,7 +235,14 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
   );
 
   const tmp = path.join(os.tmpdir(), `etiquettes_${type}_${Date.now()}.pdf`);
-  await genererEtiquettesPDF({ type, format, articles, entreprise, outPath: tmp });
+  await genererEtiquettesPDF({
+    type,
+    format,
+    articles,
+    sections,
+    entreprise,
+    outPath: tmp,
+  });
 
   return streamAndCleanup(res, tmp, `etiquettes_${type}.pdf`, {
     "X-Articles-Total": String(nartList.length),

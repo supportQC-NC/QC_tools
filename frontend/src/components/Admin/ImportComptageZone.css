@@ -1,0 +1,251 @@
+/* src/components/Admin/ImportComptageZone.css
+   Bloc « Comptage sans collecteur » de l'écran Progression inventaire.
+   Reprend la charte des cartes de l'écran (AdminProgressionScreen.css) :
+   variables globales, fond secondaire, bord fin, rayon 10px. */
+
+.icz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.icz-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.icz-card h2 svg {
+  color: #f59e0b;
+}
+
+.icz-hint {
+  margin: -4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.icz-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.icz-actions {
+  align-items: center;
+}
+
+.icz-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 150px;
+}
+
+.icz-field > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+
+.icz-grow {
+  flex: 1;
+  min-width: 240px;
+}
+
+.icz-select {
+  padding: 9px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.icz-select:focus {
+  border-color: #8b5cf6;
+}
+
+/* Bouton en mode déduction : on ne retranche pas un stock par mégarde. */
+.icz-btn-deduction {
+  background: #b45309 !important;
+  border-color: #b45309 !important;
+}
+
+.icz-btn-deduction:hover:not(:disabled) {
+  background: #92400e !important;
+}
+
+.icz-modele {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.icz-modele:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+/* Rappel permanent de la cible : la première cause d'erreur est d'importer
+   sur la mauvaise zone. */
+.icz-cible {
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.12);
+  border-left: 3px solid #8b5cf6;
+  color: var(--text-primary);
+}
+
+.icz-cible-deduction {
+  background: rgba(180, 83, 9, 0.14);
+  border-left-color: #f59e0b;
+}
+
+.icz-cible-vide {
+  background: var(--bg-tertiary);
+  border-left-color: var(--border);
+  color: var(--text-secondary);
+}
+
+/* ── Modale proformas ──────────────────────────────────────────────────── */
+
+.icz-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.icz-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(1100px, 100%);
+  max-height: 90vh;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.icz-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.icz-modal-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.icz-filtres {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.icz-filtres label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.icz-filtres input {
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.icz-filtres input:focus {
+  border-color: #8b5cf6;
+}
+
+.icz-msg {
+  font-size: 13px;
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+
+.icz-msg.err {
+  background: rgba(185, 28, 28, 0.15);
+  border-left: 3px solid #ef4444;
+  color: var(--text-primary);
+}
+
+.icz-resultats {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.icz-modal-table {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.icz-modal-table table {
+  width: 100%;
+}
+
+/* Proforma sans ligne article : affichée pour expliquer, jamais cochable. */
+.icz-row-ko {
+  opacity: 0.55;
+}
+
+.icz-raison {
+  font-size: 11.5px;
+  color: #f59e0b;
+  margin-top: 2px;
+}
+
+.icz-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .icz-field,
+  .icz-grow {
+    min-width: 100%;
+  }
+}

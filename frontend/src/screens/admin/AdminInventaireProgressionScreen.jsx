@@ -25,6 +25,7 @@ import {
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
+import ImportComptageZone from "../../components/Admin/ImportComptageZone";
 import "./AdminProgressionScreen.css";
 
 const POLL = 4000;
@@ -377,6 +378,18 @@ const AdminInventaireProgressionScreen = () => {
               </div>
             )}
           </div>
+
+          {/* Comptage sans collecteur (Excel / proforma), zone par zone.
+              Ici et pas dans « Détail des bipages » : c'est le pilotage de
+              l'inventaire, et un import vaut passage de l'agent — il coche
+              papillonnage et bipage quand la zone n'avait jamais été comptée. */}
+          <ImportComptageZone
+            entrepriseId={selectedEntreprise}
+            zones={zones}
+            onMessage={(message, tone) =>
+              setBipFeedback({ tone: tone === "error" ? "error" : "success", message })
+            }
+          />
 
           {/* Progression */}
           {progress && (

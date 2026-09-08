@@ -15,6 +15,18 @@ import {
  * Optimisé pour 90 000+ références avec recherche < 2 secondes
  * Supporte les filtres avancés côté serveur
  */
+/**
+ * Code réservé désignant « les articles SANS valeur » sur un champ de
+ * regroupement (GROUPE, GISM1). L'ERP laisse ces champs vides sur une partie du
+ * catalogue, et ces articles n'apparaissaient dans aucune sélection : on ne
+ * pouvait donc jamais leur imprimer d'étiquettes. Ils sont désormais joignables
+ * par ce code, présenté « VIDE » dans les écrans.
+ *
+ * ⚠️ La valeur ne doit ressembler à AUCUN code réel : les codes de groupe et de
+ * gisement sont alphanumériques, jamais encadrés de soulignés doubles.
+ */
+export const CODE_VIDE = "__VIDE__";
+
 class ArticleCacheService {
   constructor() {
     // Cache principal : Map<nomDossierDBF, CacheEntry>
@@ -773,7 +785,7 @@ class ArticleCacheService {
   /**
    * Obtenir les groupes avec comptage
    */
-  async getGroupes(entreprise) {
+  async getGroupes(entreprise, options = {}) {
     const cache = await this.getArticles(entreprise);
     const groupes = [];
 
@@ -781,13 +793,45 @@ class ArticleCacheService {
       groupes.push({ code, count: indices.length });
     }
 
-    return groupes.sort((a, b) => a.code.localeCompare(b.code));
+    groupes.sort((a, b) => a.code.localeCompare(b.code));
+
+    // Entrée « VIDE » en TÊTE de liste, et seulement sur demande : les autres
+    // écrans (export gisements, API partenaire, config rapports) attendent des
+    // codes réels et généreraient une étiquette « __VIDE__ ».
+    if (options.inclureVide) {
+      const count = this.compterSansValeur(cache, "GROUPE");
+      if (count > 0) groupes.unshift({ code: CODE_VIDE, count, vide: true });
+    }
+
+    return groupes;
+  }
+
+  /**
+   * Nombre d'articles dont le champ de regroupement est vide.
+   * Balayage direct : ces articles ne sont dans AUCUN index (les index ne
+   * retiennent que les valeurs non vides). ~5 ms sur les 100 000 articles de QC.
+   */
+  compterSansValeur(cache, champ) {
+    let n = 0;
+    for (const record of cache.records) {
+      if (!this.safeTrim(record[champ])) n += 1;
+    }
+    return n;
+  }
+
+  /** Articles dont le champ de regroupement est vide, dans l'ordre du fichier. */
+  listerSansValeur(cache, champ) {
+    const articles = [];
+    cache.records.forEach((record, idx) => {
+      if (!this.safeTrim(record[champ])) articles.push(idx);
+    });
+    return articles;
   }
 
   /**
    * Obtenir les GISM1 (gisement principal) avec comptage
    */
-  async getGism1(entreprise) {
+  async getGism1(entreprise, options = {}) {
     const cache = await this.getArticles(entreprise);
     const gisements = [];
 
@@ -795,7 +839,14 @@ class ArticleCacheService {
       gisements.push({ code, count: indices.length });
     }
 
-    return gisements.sort((a, b) => a.code.localeCompare(b.code));
+    gisements.sort((a, b) => a.code.localeCompare(b.code));
+
+    if (options.inclureVide) {
+      const count = this.compterSansValeur(cache, "GISM1");
+      if (count > 0) gisements.unshift({ code: CODE_VIDE, count, vide: true });
+    }
+
+    return gisements;
   }
 
   /**
@@ -833,7 +884,11 @@ class ArticleCacheService {
     const articles = [];
     const seen = new Set();
     for (const code of codes) {
-      const indices = cache.indexByGism1.get(code);
+      // CODE_VIDE : les articles sans gisement, absents de tout index.
+      const indices =
+        code === CODE_VIDE
+          ? this.listerSansValeur(cache, "GISM1")
+          : cache.indexByGism1.get(code);
       if (!indices) continue;
       for (const idx of indices) {
         if (seen.has(idx)) continue;
@@ -842,6 +897,51 @@ class ArticleCacheService {
       }
     }
     return articles;
+  }
+
+  /**
+   * Articles d'un ou plusieurs GISM1, GROUPÉS par code et dans l'ORDRE demandé.
+   * Sert à l'impression d'étiquettes, qui commence une nouvelle feuille à chaque
+   * changement de gisement : le regroupement doit être fait ici, une fois, et
+   * pas reconstitué après coup à partir d'une liste à plat.
+   * @returns [{ code, articles }] — les codes sans article sont omis.
+   */
+  async findArticlesGroupesParGism1(entreprise, gism1List) {
+    const cache = await this.getArticles(entreprise);
+    return this.regrouperParCodes(cache, gism1List, "GISM1", cache.indexByGism1);
+  }
+
+  /** Idem pour les GROUPE (familles). */
+  async findArticlesGroupesParGroupe(entreprise, groupeList) {
+    const cache = await this.getArticles(entreprise);
+    return this.regrouperParCodes(cache, groupeList, "GROUPE", cache.indexByGroupe);
+  }
+
+  /**
+   * Fabrique les sections { code, articles } d'une sélection de codes.
+   * Un article rattaché à plusieurs codes de la sélection n'apparaît que dans
+   * la PREMIÈRE section : on n'imprime pas deux fois la même étiquette.
+   */
+  regrouperParCodes(cache, liste, champ, index) {
+    const codes = (Array.isArray(liste) ? liste : [liste])
+      .map((c) => (c == null ? "" : String(c)).trim())
+      .filter(Boolean);
+
+    const sections = [];
+    const seen = new Set();
+    for (const code of codes) {
+      const indices =
+        code === CODE_VIDE ? this.listerSansValeur(cache, champ) : index.get(code);
+      if (!indices || indices.length === 0) continue;
+      const articles = [];
+      for (const idx of indices) {
+        if (seen.has(idx)) continue;
+        seen.add(idx);
+        articles.push(cache.records[idx]);
+      }
+      if (articles.length) sections.push({ code, articles });
+    }
+    return sections;
   }
 
   /**
@@ -858,7 +958,11 @@ class ArticleCacheService {
     const articles = [];
     const seen = new Set();
     for (const code of codes) {
-      const indices = cache.indexByGroupe.get(code);
+      // CODE_VIDE : les articles sans groupe, absents de tout index.
+      const indices =
+        code === CODE_VIDE
+          ? this.listerSansValeur(cache, "GROUPE")
+          : cache.indexByGroupe.get(code);
       if (!indices) continue;
       for (const idx of indices) {
         if (seen.has(idx)) continue;

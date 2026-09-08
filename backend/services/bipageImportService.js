@@ -1,14 +1,18 @@
 // backend/services/bipageImportService.js
 //
-// Deux sources d'alimentation de l'écran « Détail des bipages », en plus des
-// fichiers .DAT déposés par le collecteur :
+// Deux sources d'alimentation du comptage, en plus des fichiers .DAT déposés
+// par le collecteur :
 //
 //   1. PROFORMA (lecture DBF) — on choisit une plage de dates et un ou plusieurs
-//      numéros de client ; toute proforma qui tombe dedans et dont l'OBSERVATION
-//      respecte la convention devient un bipage. L'agent est le vendeur du champ
-//      REPRES.
-//   2. FICHIER EXCEL — un fichier par zone, dont le NOM porte l'agent, la zone
-//      et l'emplacement ; le contenu ne porte que les codes et les quantités.
+//      numéros de client, puis on prend la proforma voulue dans la liste.
+//   2. FICHIER EXCEL — deux colonnes, CODE et QUANTITE.
+//
+// ⚠️ LA ZONE EST TOUJOURS CHOISIE DANS L'ÉCRAN, jamais devinée (décision client
+// du 08/09/2026). Avant, elle était lue dans le NOM du fichier Excel
+// (« bipage_12_A_1_MAGASIN.xlsx ») et dans l'observation de la proforma : un
+// fichier mal nommé était refusé, et la moitié des proformas étaient déclarées
+// « non conformes » alors qu'on avait la liste des zones sous les yeux. Le nom
+// du fichier et l'observation ne servent donc plus qu'à SUGGÉRER une zone.
 //
 // Dans les deux cas les lignes produites sont des `LigneBipage` rattachées à la
 // SESSION D'INVENTAIRE ACTIVE, exactement comme celles issues d'un .DAT : elles
@@ -20,6 +24,8 @@ import proformaCacheService from "./proformaCacheService.js";
 import { construireLignes } from "./ficheControleService.js";
 import Zone from "../models/ZoneModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
+import InventaireCollecte from "../models/InventaireCollecteModel.js";
+import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 
 const trim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
@@ -116,6 +122,99 @@ const memeJour = (d) => {
 };
 
 /**
+ * Résout la zone visée par un import. La zone est CHOISIE dans l'écran : on
+ * exige donc son code, et son emplacement dès que la société en utilise
+ * plusieurs (le même code peut exister en MAGASIN et en DOCK).
+ */
+export const resoudreZoneImport = async (entrepriseId, zoneCode, emplacement) => {
+  const code = trim(zoneCode);
+  if (!code) {
+    throw new Error("Aucune zone choisie : sélectionnez la zone avant d'importer.");
+  }
+  const empl = trim(emplacement);
+  const requete = { entreprise: entrepriseId, code };
+  if (empl) requete.type = empl;
+
+  const candidates = await Zone.find(requete);
+  if (candidates.length === 0) {
+    throw new Error(
+      `Zone ${code}${empl ? ` (${empl})` : ""} inconnue pour cette société.`,
+    );
+  }
+  if (candidates.length > 1) {
+    // Code présent à plusieurs emplacements et aucun n'a été précisé : on ne
+    // devine pas, le comptage atterrirait une fois sur deux au mauvais endroit.
+    throw new Error(
+      `La zone ${code} existe à plusieurs emplacements (${candidates
+        .map((z) => z.type || "sans emplacement")
+        .join(", ")}) : précisez lequel.`,
+    );
+  }
+  return candidates[0];
+};
+
+/**
+ * Une zone n'a « jamais été comptée » si rien ne la concerne dans la session :
+ * ni ligne bipée (collecteur, Excel ou proforma), ni collecte ouverte ou
+ * déposée sur le collecteur.
+ *
+ * ⚠️ Le test sur les collectes n'est pas redondant : en production le fichier
+ * .DAT est traité par le poste d'impression, donc une zone peut avoir été
+ * déposée par un agent sans qu'aucune LigneBipage n'existe encore.
+ */
+export const zoneJamaisComptee = async (session, zone) => {
+  const dejaBipee = await LigneBipage.exists({
+    session: session._id,
+    zoneCode: zone.code,
+    zoneType: zone.type || "",
+  });
+  if (dejaBipee) return false;
+
+  const dejaCollectee = await InventaireCollecte.exists({
+    session: session._id,
+    zoneCode: zone.code,
+    zoneType: zone.type || "",
+  });
+  return !dejaCollectee;
+};
+
+/**
+ * Marque « papillonnage » et « bipage » comme faits sur une zone de la session.
+ *
+ * POURQUOI : un comptage importé (Excel ou proforma) remplace le passage de
+ * l'agent au collecteur. Sans ce marquage, la zone resterait rouge dans le
+ * récapitulatif et le suivi réclamerait éternellement des coupons qui
+ * n'existent pas — l'équipe n'ayant pas travaillé avec la fiche papier.
+ * La phase « contrôle » n'est PAS cochée : elle reste à faire, un import ne
+ * vérifie rien.
+ *
+ * Le marquage n'a lieu qu'au PREMIER comptage de la zone : un import qui vient
+ * s'ajouter à un comptage existant ne réécrit ni l'heure ni l'auteur.
+ */
+export const marquerPhasesImport = async (session, zone, userId) => {
+  const cible = (session.zones || []).find(
+    (z) => z.code === zone.code && (z.type || "") === (zone.type || ""),
+  );
+  if (!cible) return [];
+
+  const marquees = [];
+  ["papillonnage", "bipage"].forEach((phase) => {
+    if (!cible[phase] || !cible[phase].fait) {
+      cible[phase].fait = true;
+      cible[phase].at = new Date();
+      cible[phase].by = userId || null;
+      marquees.push(phase);
+    }
+  });
+
+  if (marquees.length) {
+    session.markModified("zones");
+    await session.save();
+  }
+  return marquees;
+};
+
+/**
  * Proformas candidates : plage de dates (DATFACT) + numéros de client (TIERS).
  * Chaque proforma est renvoyée AVEC le verdict de lecture de son observation,
  * pour que l'écran puisse expliquer pourquoi une proforma n'est pas éligible.
@@ -176,21 +275,11 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
       agentNom: nomAgent(entreprise, p.REPRES),
       zoneCode: lecture ? lecture.zoneCode : "",
       emplacement: lecture ? lecture.emplacement : "",
-      // `eligible` : intégrable TEL QUEL, l'observation suffit à savoir où.
-      eligible: !!lecture && lignes.length > 0,
-      // `completable` : la zone est inconnue mais la proforma a des lignes —
-      // l'écran laisse alors l'utilisateur désigner la zone à la main. Seule une
-      // proforma SANS ligne article reste définitivement inintégrable.
-      completable: !lecture && lignes.length > 0,
-      raison: !lecture
-        ? lignes.length === 0
-          ? "Proforma sans ligne"
-          : observation
-            ? `Observation « ${observation} » non conforme (attendu : <zone>_<EMPLACEMENT>) — zone à désigner à la main`
-            : "Observation vide — zone à désigner à la main"
-        : lignes.length === 0
-          ? "Proforma sans ligne"
-          : "",
+      // La zone étant choisie dans l'écran, TOUTE proforma qui porte au moins
+      // une ligne article est intégrable. L'observation ne sert plus qu'à
+      // proposer une zone par défaut (`zoneCode`/`emplacement` ci-dessus).
+      eligible: lignes.length > 0,
+      raison: lignes.length === 0 ? "Proforma sans ligne article" : "",
     });
   }
 
@@ -200,50 +289,53 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
     zones,
     total: proformas.length,
     nbEligibles: proformas.filter((p) => p.eligible).length,
-    nbCompletables: proformas.filter((p) => p.completable).length,
     proformas,
   };
 };
 
 /**
- * Intègre les proformas choisies dans la session d'inventaire active.
- * Un ré-import de la même proforma REMPLACE ses lignes (même logique que le
- * retraitement d'un .DAT), il n'empile pas de doublons.
+ * Intègre les proformas choisies dans la session d'inventaire active, SUR UNE
+ * ZONE CHOISIE DANS L'ÉCRAN.
  *
- * `selection` accepte deux formes, volontairement :
- *  - un simple numéro de proforma : la zone est lue dans l'observation ;
- *  - un objet { numfact, zoneCode, emplacement, agentCode } : l'écran a complété
- *    à la main ce que l'observation ne dit pas. C'est ce qui rend intégrable une
- *    proforma « non conforme » — seule une proforma SANS ligne article reste
- *    définitivement hors jeu, il n'y a rien à compter.
+ * `zone` est le document Zone cible (résolu par resoudreZoneImport). Toutes les
+ * proformas de la sélection y sont intégrées : l'écran travaille zone par zone.
  *
- * `mode`, identique à l'import Excel :
- *  - "inventaire" (défaut) : comptage normal, quantités positives ;
+ * `mode` :
+ *  - "inventaire" (défaut) : comptage normal, quantités positives, qui S'AJOUTE
+ *    au comptage déjà présent sur la zone (collecteur, Excel, autre proforma) ;
  *  - "deduction" : quantités enregistrées en NÉGATIF, pour retrancher du
  *    comptage ce qui est sorti d'une partie du magasin restée ouverte.
- * Les deux imports d'une même proforma coexistent (références distinctes).
+ *
+ * Idempotence : ré-intégrer LA MÊME proforma sur LA MÊME zone dans LE MÊME mode
+ * remplace ses lignes au lieu de les empiler (un double clic ne double pas le
+ * comptage). Les deux modes coexistent, et deux proformas différentes
+ * s'additionnent.
  */
 export const importerProformas = async (
   entreprise,
   session,
+  zone,
   selection = [],
   mode = "inventaire",
+  userId = null,
 ) => {
   const deduction = mode === "deduction";
+  const zoneCode = trim(zone?.code);
+  const emplacement = trim(zone?.type);
+  // Photographié AVANT le premier import : un import qui réussit crée des
+  // lignes, et la zone ne serait plus « jamais comptée » au second passage.
+  const premierComptage = await zoneJamaisComptee(session, zone);
 
   // Normalisation : numéros bruts ou objets complétés, sans doublon de numfact.
   const items = [];
   const vus = new Set();
   for (const brut of Array.isArray(selection) ? selection : [selection]) {
+    // La zone ne vient plus de l'item : elle est choisie une fois pour toute la
+    // sélection. Seul l'agent reste surchargeable par ligne.
     const item =
       brut && typeof brut === "object"
-        ? {
-            numfact: trim(brut.numfact),
-            zoneCode: trim(brut.zoneCode),
-            emplacement: trim(brut.emplacement),
-            agentCode: trim(brut.agentCode),
-          }
-        : { numfact: trim(brut), zoneCode: "", emplacement: "", agentCode: "" };
+        ? { numfact: trim(brut.numfact), agentCode: trim(brut.agentCode) }
+        : { numfact: trim(brut), agentCode: "" };
     if (!item.numfact || vus.has(item.numfact)) continue;
     vus.add(item.numfact);
     items.push(item);
@@ -251,14 +343,16 @@ export const importerProformas = async (
   if (!items.length)
     return {
       mode: deduction ? "deduction" : "inventaire",
+      zoneCode,
+      emplacement,
       importees: 0,
       lignes: 0,
       unites: 0,
+      phasesMarquees: [],
       resultats: [],
     };
 
   const cache = await proformaCacheService.getProformas(entreprise);
-  const emplacements = await getEmplacements(entreprise._id);
 
   const resultats = [];
   let totalLignes = 0;
@@ -270,41 +364,6 @@ export const importerProformas = async (
     const p = idx !== undefined ? cache.proformaRecords[idx] : null;
     if (!p) {
       resultats.push({ numfact, statut: "erreur", message: "Proforma introuvable" });
-      continue;
-    }
-
-    // La zone saisie à la main PRIME sur l'observation : c'est elle qui permet
-    // d'intégrer une proforma dont l'observation ne respecte pas la convention.
-    let lecture = null;
-    if (item.zoneCode && item.emplacement) {
-      const connu = emplacements.find(
-        (e) => e.toLowerCase() === item.emplacement.toLowerCase(),
-      );
-      lecture = { zoneCode: item.zoneCode, emplacement: connu || item.emplacement };
-    } else {
-      lecture = parserZoneEmplacement(trim(p[CHAMP_OBSERVATION]), emplacements);
-    }
-    if (!lecture) {
-      resultats.push({
-        numfact,
-        statut: "erreur",
-        message: `Observation « ${trim(p[CHAMP_OBSERVATION])} » non conforme et aucune zone saisie`,
-      });
-      continue;
-    }
-
-    // La zone doit exister, au bon emplacement (même exigence que pour un .DAT).
-    const zone = await Zone.findOne({
-      entreprise: entreprise._id,
-      code: lecture.zoneCode,
-      type: lecture.emplacement,
-    });
-    if (!zone) {
-      resultats.push({
-        numfact,
-        statut: "erreur",
-        message: `Zone ${lecture.zoneCode} (${lecture.emplacement}) inconnue`,
-      });
       continue;
     }
 
@@ -322,7 +381,9 @@ export const importerProformas = async (
     const { rows } = await construireLignes(entreprise, aCompter);
     // Référence distincte par mode : une même proforma peut être intégrée en
     // comptage PUIS en déduction sans que l'un écrase l'autre (comme l'Excel).
-    const reference = `${deduction ? "deduction proforma" : "proforma"} ${numfact}`;
+    const reference = `${deduction ? "deduction proforma" : "proforma"} ${numfact} ${zoneCode}${
+      emplacement ? `_${emplacement}` : ""
+    }`;
     // L'agent saisi à la main l'emporte sur le vendeur de la proforma (REPRES
     // n'est pas toujours celui qui a effectivement bipé le rayon).
     const agentCode = item.agentCode || trim(p.REPRES);
@@ -335,8 +396,8 @@ export const importerProformas = async (
         entreprise: entreprise._id,
         session: session._id,
         datFileName: reference,
-        zoneCode: lecture.zoneCode,
-        zoneType: lecture.emplacement,
+        zoneCode,
+        zoneType: emplacement,
         ordre: r.n,
         eanArticle: r.code,
         qteScan: deduction ? -r.qte : r.qte,
@@ -358,21 +419,29 @@ export const importerProformas = async (
     resultats.push({
       numfact,
       statut: "importee",
-      zoneCode: lecture.zoneCode,
-      emplacement: lecture.emplacement,
+      zoneCode,
+      emplacement,
       agentNom,
       lignes: rows.length,
       unites,
-      // Trace ce qui a été complété à la main, pour le compte rendu de l'écran.
-      manuelle: !!(item.zoneCode && item.emplacement),
     });
   }
 
+  const importees = resultats.filter((r) => r.statut === "importee").length;
+  // Premier comptage de la zone : papillonnage et bipage passent à « fait ».
+  const phasesMarquees =
+    importees && premierComptage
+      ? await marquerPhasesImport(session, zone, userId)
+      : [];
+
   return {
     mode: deduction ? "deduction" : "inventaire",
-    importees: resultats.filter((r) => r.statut === "importee").length,
+    zoneCode,
+    emplacement,
+    importees,
     lignes: totalLignes,
     unites: totalUnites,
+    phasesMarquees,
     resultats,
   };
 };
@@ -380,35 +449,10 @@ export const importerProformas = async (
 // ────────────────────────────────────────────────────────────────────────────
 // SOURCE 2 — FICHIER EXCEL
 //
-// CONVENTION DE NOMMAGE DU FICHIER (un fichier = une zone) :
-//
-//   bipage_<agent>_<zone>_<EMPLACEMENT>.xlsx      ex. bipage_12_A_1_MAGASIN.xlsx
-//
-// Lecture : on retire le préfixe « bipage_ », le PREMIER bloc est le code agent,
-// le DERNIER est l'emplacement, et TOUT CE QUI RESTE AU MILIEU est le code de
-// zone (il contient lui-même des « _ »).
-// Le contenu ne porte que deux colonnes : CODE et QUANTITE.
+// Le fichier ne porte QUE le comptage : deux colonnes, CODE et QUANTITE. Son
+// nom n'a aucune importance — la zone, l'emplacement et le mode sont choisis
+// dans l'écran au moment de l'import.
 // ────────────────────────────────────────────────────────────────────────────
-const PREFIXE_FICHIER = "bipage";
-
-export const parserNomFichierExcel = (nomFichier, emplacements = []) => {
-  const base = trim(nomFichier).replace(/\.(xlsx|xlsm|xls)$/i, "");
-  const parts = base.split("_").filter((p) => p !== "");
-  if (parts.length < 4) return null;
-  if (parts[0].toLowerCase() !== PREFIXE_FICHIER) return null;
-
-  const agentCode = parts[1];
-  const emplacementBrut = parts[parts.length - 1];
-  const zoneCode = parts.slice(2, parts.length - 1).join("_");
-  if (!agentCode || !zoneCode || !emplacementBrut) return null;
-
-  const connu = emplacements.find(
-    (e) => e.toLowerCase() === emplacementBrut.toLowerCase(),
-  );
-  if (!connu) return null;
-
-  return { agentCode, zoneCode, emplacement: connu };
-};
 
 /** Modèle Excel téléchargeable depuis l'écran. */
 export const genererModeleExcelBipage = async () => {
@@ -429,92 +473,80 @@ export const genererModeleExcelBipage = async () => {
   const aide = wb.addWorksheet("Aide");
   aide.columns = [{ width: 110 }];
   [
-    "IMPORT DE BIPAGES DEPUIS EXCEL",
+    "IMPORT D'UN COMPTAGE DEPUIS EXCEL",
     "",
-    "1) NOMMEZ LE FICHIER AVANT DE L'IMPORTER — c'est le nom qui dit qui a bipé, quelle zone et où :",
+    "Le nom du fichier n'a aucune importance : la zone, l'emplacement et le mode",
+    "sont choisis dans l'ecran au moment de l'import.",
     "",
-    "        bipage_<agent>_<zone>_<EMPLACEMENT>.xlsx",
-    "",
-    "   Exemples :   bipage_12_A_1_MAGASIN.xlsx      agent 12, zone A_1, au magasin",
-    "                bipage_08_B_5d_DOCK.xlsx        agent 08, zone B_5d, au dock",
-    "",
-    "   - <agent>       : code vendeur (REPRES), tel qu'il figure dans la fiche société",
-    "   - <zone>        : code du rayon, il peut contenir des « _ » (A_1, B_5d)",
-    "   - <EMPLACEMENT> : MAGASIN ou DOCK — c'est le DERNIER bloc du nom",
-    "",
-    "   Un fichier = une seule zone. Pour deux zones, faites deux fichiers.",
-    "",
-    "2) REMPLISSEZ L'ONGLET « Bipage » :",
+    "1) REMPLISSEZ L'ONGLET « Bipage » :",
     "",
     "   - CODE     : code-barres (gencode) ou code article (NART)",
-    "   - QUANTITE : quantité comptée, en nombre entier",
+    "   - QUANTITE : quantite comptee, en nombre entier",
     "",
-    "   Une ligne par article. Les lignes sans code sont ignorées.",
+    "   Une ligne par article. Les lignes sans code sont ignorees.",
     "",
-    "3) IMPORTEZ le fichier depuis l'écran « Détail des bipages », en choisissant le MODE :",
+    "2) IMPORTEZ le fichier depuis l'ecran « Progression inventaire » :",
     "",
-    "   - Inventaire : comptage normal. Les quantités s'ajoutent.",
-    "   - Déduction  : les quantités sont retranchées (enregistrées en négatif).",
-    "                  À utiliser pour une partie du magasin restée OUVERTE :",
-    "                  ce qui a été vendu entre le début et la fin de l'inventaire",
-    "                  ne doit pas être compté comme présent en rayon.",
+    "   - choisissez d'abord la ZONE dans la liste ;",
+    "   - puis le MODE :",
     "",
-    "   Dans les deux cas, saisissez les quantités NORMALEMENT (en positif) :",
-    "   c'est le mode choisi à l'import qui décide du signe.",
+    "     Comptage  : les quantites s'AJOUTENT au comptage deja present sur la zone.",
+    "     Deduction : les quantites sont RETRANCHEES (enregistrees en negatif).",
+    "                 A utiliser pour une partie du magasin restee OUVERTE :",
+    "                 ce qui a ete vendu entre le debut et la fin de l'inventaire",
+    "                 ne doit pas etre compte comme present en rayon.",
     "",
-    "   Un même fichier peut être importé dans les deux modes sans que l'un",
-    "   efface l'autre.",
+    "   Dans les deux cas, saisissez les quantites NORMALEMENT (en positif) :",
+    "   c'est le mode choisi a l'import qui decide du signe.",
     "",
-    "Les articles inconnus du catalogue sont importés quand même et signalés",
-    "« Article non trouvé » à l'écran, comme pour un bipage au collecteur.",
+    "Si la zone n'avait jamais ete comptee, l'import coche automatiquement ses",
+    "phases « papillonnage » et « bipage » pour le suivi. La phase « controle »",
+    "reste a faire.",
     "",
-    "Réimporter un fichier du même nom REMPLACE les lignes déjà importées :",
-    "cela corrige une erreur sans créer de doublon.",
+    "Les articles inconnus du catalogue sont importes quand meme et signales",
+    "« Article non trouve » a l'ecran, comme pour un bipage au collecteur.",
+    "",
+    "Reimporter le MEME fichier sur la MEME zone dans le MEME mode remplace les",
+    "lignes deja importees : cela corrige une erreur sans creer de doublon.",
+    "Deux fichiers de noms differents s'additionnent.",
   ].forEach((l) => aide.addRow([l]));
   aide.getRow(1).font = { bold: true, size: 13 };
-  aide.getRow(5).font = { bold: true };
+  aide.getRow(6).font = { bold: true };
+  aide.getRow(13).font = { bold: true };
 
   return wb.xlsx.writeBuffer();
 };
 
 /**
- * Lit le fichier et crée les lignes de bipage de la zone concernée.
+ * Lit le fichier Excel et crée les lignes de bipage SUR LA ZONE CHOISIE DANS
+ * L'ÉCRAN. Le nom du fichier ne sert qu'à tracer la provenance.
  *
  * `mode` :
- *  - "inventaire" (défaut) : comptage normal, quantités positives ;
+ *  - "inventaire" (défaut) : comptage normal, quantités positives, qui S'AJOUTE
+ *    au comptage déjà présent sur la zone ;
  *  - "deduction" : les quantités sont enregistrées en NÉGATIF. Sert aux parties
  *    du magasin restées ouvertes : ce qui a été vendu entre le début et la fin
- *    de l'inventaire est retranché du comptage. Les deux imports d'un même
- *    fichier coexistent (références distinctes), ils ne s'écrasent pas.
+ *    de l'inventaire est retranché du comptage.
+ *
+ * Idempotence : réimporter LE MÊME fichier sur LA MÊME zone dans LE MÊME mode
+ * remplace ses lignes au lieu de les empiler (un double clic ne double pas le
+ * comptage). Deux fichiers de noms différents s'additionnent, et les deux modes
+ * coexistent.
  */
 export const importerExcelBipage = async (
   entreprise,
   session,
+  zone,
   nomFichier,
   buffer,
   mode = "inventaire",
+  agent = {},
 ) => {
   const deduction = mode === "deduction";
-  const emplacements = await getEmplacements(entreprise._id);
-  const lecture = parserNomFichierExcel(nomFichier, emplacements);
-  if (!lecture) {
-    throw new Error(
-      `Nom de fichier non conforme : « ${nomFichier} ». Attendu : ` +
-        `bipage_<agent>_<zone>_<EMPLACEMENT>.xlsx (emplacements connus : ` +
-        `${emplacements.join(", ") || "aucun"}).`,
-    );
-  }
-
-  const zone = await Zone.findOne({
-    entreprise: entreprise._id,
-    code: lecture.zoneCode,
-    type: lecture.emplacement,
-  });
-  if (!zone) {
-    throw new Error(
-      `Zone ${lecture.zoneCode} (${lecture.emplacement}) inconnue pour cette société.`,
-    );
-  }
+  const zoneCode = trim(zone?.code);
+  const emplacement = trim(zone?.type);
+  // Photographié AVANT l'import : voir importerProformas.
+  const premierComptage = await zoneJamaisComptee(session, zone);
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
@@ -556,9 +588,11 @@ export const importerExcelBipage = async (
   }
 
   const { rows } = await construireLignes(entreprise, aCompter);
-  // Référence distincte par mode : un même fichier peut être importé en
-  // comptage PUIS en déduction sans que l'un écrase l'autre.
-  const reference = `${deduction ? "deduction" : "excel"} ${trim(nomFichier)}`;
+  // La référence identifie l'import : mode + fichier + zone. Deux modes, deux
+  // fichiers ou deux zones ne s'écrasent donc jamais ; le même trio, si.
+  const reference = `${deduction ? "deduction" : "excel"} ${trim(nomFichier)} ${zoneCode}${
+    emplacement ? `_${emplacement}` : ""
+  }`;
 
   await LigneBipage.deleteMany({ session: session._id, datFileName: reference });
   await LigneBipage.insertMany(
@@ -566,8 +600,8 @@ export const importerExcelBipage = async (
       entreprise: entreprise._id,
       session: session._id,
       datFileName: reference,
-      zoneCode: lecture.zoneCode,
-      zoneType: lecture.emplacement,
+      zoneCode,
+      zoneType: emplacement,
       ordre: r.n,
       eanArticle: r.code,
       qteScan: deduction ? -r.qte : r.qte,
@@ -579,20 +613,27 @@ export const importerExcelBipage = async (
       source: "excel",
       sourceRef: trim(nomFichier),
       modeImport: deduction ? "deduction" : "inventaire",
-      agentCode: lecture.agentCode,
-      agentNom: nomAgent(entreprise, lecture.agentCode),
+      // Le nom du fichier ne porte plus le code agent : on trace qui a importé.
+      agentCode: trim(agent.code),
+      agentNom: trim(agent.nom) || nomAgent(entreprise, agent.code),
     })),
   );
 
+  // Premier comptage de la zone : papillonnage et bipage passent à « fait ».
+  const phasesMarquees = premierComptage
+    ? await marquerPhasesImport(session, zone, agent.userId)
+    : [];
+
   return {
     mode: deduction ? "deduction" : "inventaire",
-    zoneCode: lecture.zoneCode,
-    emplacement: lecture.emplacement,
-    agentCode: lecture.agentCode,
-    agentNom: nomAgent(entreprise, lecture.agentCode),
+    zoneCode,
+    emplacement,
+    agentCode: trim(agent.code),
+    agentNom: trim(agent.nom) || nomAgent(entreprise, agent.code),
     lignes: rows.length,
     unites: rows.reduce((s, r) => s + r.qte, 0) * (deduction ? -1 : 1),
     nonTrouves: rows.filter((r) => r.nonTrouve).length,
+    phasesMarquees,
     ignorees,
   };
 };
@@ -601,7 +642,6 @@ export default {
   getEmplacements,
   getZones,
   parserZoneEmplacement,
-  parserNomFichierExcel,
   getProformasEligibles,
   importerProformas,
   genererModeleExcelBipage,

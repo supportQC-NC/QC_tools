@@ -567,3 +567,17 @@
   color: var(--text-muted);
   border-top: 1px solid var(--border);
 }
+/* Entrée « VIDE » (articles sans groupe / sans gisement) : elle est en tête de
+   liste et ne désigne pas un code réel — on la distingue pour qu'on ne la
+   coche pas par mégarde en croyant sélectionner un rayon. */
+.etiq-gism1-option.etiq-option-vide .etiq-gism1-code {
+  font-weight: 700;
+  font-style: italic;
+  color: #f59e0b;
+}
+
+.etiq-gism1-chip.etiq-chip-vide {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.14);
+  font-style: italic;
+}

@@ -22,8 +22,14 @@ const router = express.Router();
 const canRead = checkModuleAccess("bipage", "read");
 const canWrite = checkModuleAccess("bipage", "write");
 
-// Upload Excel en mémoire (5 Mo max, 1 fichier). Le NOM du fichier porte
-// l'agent / la zone / l'emplacement : il ne doit pas être perdu.
+// Les imports (Excel / proforma) sont pilotés depuis l'écran « Progression
+// inventaire », qui relève du module `inventaire` : ces routes acceptent donc
+// l'un OU l'autre droit. Le reste de l'écran « Détail des bipages » garde le
+// droit `bipage` seul.
+const canReadImport = checkModuleAccess(["inventaire", "bipage"], "read");
+const canWriteImport = checkModuleAccess(["inventaire", "bipage"], "write");
+
+// Upload Excel en mémoire (5 Mo max, 1 fichier).
 const uploadExcel = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -35,12 +41,12 @@ router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exp
 router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAccess, recommencerZone);
 
 // ─── Import depuis les proformas de l'ERP ─────────────────────────────────
-router.get("/:entrepriseId/proformas", protect, canRead, checkEntrepriseAccess, listProformasBipage);
-router.post("/:entrepriseId/import-proformas", protect, canWrite, checkEntrepriseAccess, importProformasBipage);
+router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAccess, listProformasBipage);
+router.post("/:entrepriseId/import-proformas", protect, canWriteImport, checkEntrepriseAccess, importProformasBipage);
 
 // ─── Import depuis un fichier Excel ───────────────────────────────────────
-router.get("/:entrepriseId/modele-excel", protect, canRead, checkEntrepriseAccess, modeleExcelBipage);
-router.post("/:entrepriseId/import-excel", protect, canWrite, checkEntrepriseAccess, uploadExcel, importExcelBipage);
+router.get("/:entrepriseId/modele-excel", protect, canReadImport, checkEntrepriseAccess, modeleExcelBipage);
+router.post("/:entrepriseId/import-excel", protect, canWriteImport, checkEntrepriseAccess, uploadExcel, importExcelBipage);
 
 router.get("/:entrepriseId", protect, canRead, checkEntrepriseAccess, getBipages);
 

@@ -467,7 +467,11 @@ const getGroupes = asyncHandler(async (req, res) => {
   }
 
   try {
-    const groupes = await articleCacheService.getGroupes(entreprise);
+    // ?vide=1 : ajoute l'entrée « articles sans groupe » en tête (écran
+    // Étiquettes). Les autres consommateurs veulent des codes réels.
+    const groupes = await articleCacheService.getGroupes(entreprise, {
+      inclureVide: req.query.vide === "1" || req.query.vide === "true",
+    });
     const queryTime = Date.now() - startTime;
 
     res.json({
@@ -511,7 +515,9 @@ const getGism1 = asyncHandler(async (req, res) => {
   }
 
   try {
-    const gisements = await articleCacheService.getGism1(entreprise);
+    const gisements = await articleCacheService.getGism1(entreprise, {
+      inclureVide: req.query.vide === "1" || req.query.vide === "true",
+    });
     const queryTime = Date.now() - startTime;
 
     res.json({

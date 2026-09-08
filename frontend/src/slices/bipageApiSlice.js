@@ -61,32 +61,38 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
     }),
 
     importProformasBipage: builder.mutation({
-      // `items` porte, pour chaque proforma, la zone et l'agent — saisis à la
-      // main quand l'observation ne les donne pas. `mode` : inventaire|deduction.
-      query: ({ entrepriseId, items, mode }) => ({
+      // La ZONE est choisie dans l'écran et vaut pour toute la sélection ;
+      // `items` ne porte plus que les numéros (et l'agent si on le surcharge).
+      // `mode` : inventaire | deduction.
+      query: ({ entrepriseId, zoneCode, emplacement, items, mode }) => ({
         url: `${BASE}/${entrepriseId}/import-proformas`,
         method: "POST",
-        body: { items, mode },
+        body: { zoneCode, emplacement, items, mode },
       }),
-      invalidatesTags: ["Bipage"],
+      // La session porte les phases : un import peut les cocher automatiquement.
+      invalidatesTags: ["Bipage", "InventaireZone"],
     }),
 
     // ─── Import depuis un fichier Excel ───────────────────────────────────
-    // ⚠️ Le NOM du fichier porte l'agent / la zone / l'emplacement : on le
-    // transmet tel quel dans le FormData.
-    // `mode` voyage en query (pas en champ de formulaire) : il reste lisible
-    // côté serveur quel que soit l'ordre des parties du multipart.
+    // Le nom du fichier n'a plus aucun rôle fonctionnel : zone, emplacement et
+    // mode voyagent en query (et non en champs de formulaire), ils restent
+    // lisibles côté serveur quel que soit l'ordre des parties du multipart.
     importExcelBipage: builder.mutation({
-      query: ({ entrepriseId, file, mode }) => {
+      query: ({ entrepriseId, file, mode, zoneCode, emplacement }) => {
         const formData = new FormData();
         formData.append("file", file, file.name);
+        const params = new URLSearchParams({
+          mode: mode === "deduction" ? "deduction" : "inventaire",
+          zoneCode: zoneCode || "",
+        });
+        if (emplacement) params.set("emplacement", emplacement);
         return {
-          url: `${BASE}/${entrepriseId}/import-excel?mode=${mode === "deduction" ? "deduction" : "inventaire"}`,
+          url: `${BASE}/${entrepriseId}/import-excel?${params.toString()}`,
           method: "POST",
           body: formData,
         };
       },
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: ["Bipage", "InventaireZone"],
     }),
   }),
 });
