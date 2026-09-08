@@ -68,11 +68,16 @@ const zoneStatut = (z) => {
 const AdminInventaireProgressionScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [bipCode, setBipCode] = useState("");
-  // Agent crédité des coupons scannés. Le coupon détachable ne porte aucune
-  // identité : c'est ici qu'on dit QUI a fait le travail. La sélection reste
-  // en place d'un scan à l'autre — un agent rapporte en général plusieurs
-  // coupons d'affilée.
+  // Désignation de l'agent : elle a lieu APRÈS le scan. Le coupon ne porte
+  // aucune identité, donc le scan ne fait que RÉSOUDRE le code (rien n'est
+  // marqué) ; cette fenêtre demande qui a fait le travail, et c'est sa
+  // validation qui écrit. Annuler ne laisse aucune trace.
+  // { source: 'bip'|'manuel', code?, zone, phase }
+  const [designation, setDesignation] = useState(null);
   const [agentUserId, setAgentUserId] = useState("");
+  // Dernier agent désigné : re-proposé au coupon suivant, un agent en rapporte
+  // en général plusieurs d'affilée.
+  const [dernierAgentId, setDernierAgentId] = useState("");
   const [bipFeedback, setBipFeedback] = useState(null); // { tone, message }
   const [search, setSearch] = useState("");
   const [showInitConfirm, setShowInitConfirm] = useState(false);
@@ -143,7 +148,9 @@ const AdminInventaireProgressionScreen = () => {
     setBipCode("");
     setSearch("");
     setShowHistorique(false);
+    setDesignation(null);
     setAgentUserId("");
+    setDernierAgentId("");
   }, [selectedEntreprise]);
 
   const handleConfirmInit = async () => {
@@ -180,6 +187,14 @@ const AdminInventaireProgressionScreen = () => {
     }
   };
 
+  // Message de retour homogène : "<zone> · <phase> — <message serveur>".
+  const messageBip = (res) =>
+    res.zone?.code && res.phase && PHASE_META[res.phase]
+      ? `${res.zone.code} · ${PHASE_META[res.phase].label} — ${res.message}`
+      : res.message;
+
+  // ÉTAPE 1 — le scan ne marque RIEN : il résout le code pour savoir quelle
+  // zone et quelle phase annoncer dans la fenêtre de désignation.
   const handleBip = async () => {
     const code = bipCode.trim();
     if (!code || biping) return;
@@ -187,29 +202,92 @@ const AdminInventaireProgressionScreen = () => {
       const res = await biperZone({
         entrepriseId: selectedEntreprise,
         code,
-        agentUserId,
+        previsualiser: true,
       }).unwrap();
+
+      if (res.action === "a_confirmer" && !res.dejaFait) {
+        // Le code est bon et la phase reste à faire → on demande QUI.
+        setBipFeedback(null);
+        setAgentUserId(dernierAgentId);
+        setDesignation({
+          source: "bip",
+          code,
+          zone: res.zone,
+          phase: res.phase,
+        });
+        setBipCode("");
+        return;
+      }
+
+      // Zone seulement identifiée, phase déjà faite ou verrouillée : rien à
+      // désigner, on affiche le message tel quel.
       const tone =
-        res.action === "deja_fait" || res.action === "verrouille"
-          ? "warning"
-          : res.action === "identifiee"
-            ? "info"
-            : "success";
-      const phaseLabel = res.phase ? PHASE_META[res.phase]?.label : null;
-      const detail =
-        res.zone?.code && phaseLabel
-          ? `${res.zone.code} · ${phaseLabel} — ${res.message}`
-          : res.message;
-      setBipFeedback({ tone, message: detail });
+        res.action === "identifiee"
+          ? "info"
+          : "warning";
+      setBipFeedback({ tone, message: messageBip(res) });
+      setBipCode("");
+      if (bipInputRef.current) bipInputRef.current.focus();
     } catch (err) {
       setBipFeedback({
         tone: "error",
         message: err?.data?.message || "Code inconnu",
       });
-    } finally {
       setBipCode("");
       if (bipInputRef.current) bipInputRef.current.focus();
     }
+  };
+
+  // ÉTAPE 2 — validation de la désignation : c'est ICI que la phase est marquée,
+  // que l'on soit venu du scan d'un coupon ou d'une coche manuelle.
+  const handleConfirmerDesignation = async () => {
+    if (!designation || biping) return;
+    try {
+      const res =
+        designation.source === "manuel"
+          ? await setPhaseManuelle({
+              entrepriseId: selectedEntreprise,
+              code: designation.zone.code,
+              phase: designation.phase,
+              fait: true,
+              agentUserId,
+            }).unwrap()
+          : await biperZone({
+              entrepriseId: selectedEntreprise,
+              code: designation.code,
+              agentUserId,
+            }).unwrap();
+      setDernierAgentId(agentUserId);
+      setBipFeedback({
+        tone: res.action === "deja_fait" ? "warning" : "success",
+        message:
+          designation.source === "manuel"
+            ? `${designation.zone.code} · ${
+                PHASE_META[designation.phase]?.label
+              } — validé${res.agent?.nom ? ` (${res.agent.nom})` : ""}`
+            : messageBip(res),
+      });
+    } catch (err) {
+      setBipFeedback({
+        tone: "error",
+        message: err?.data?.message || "Validation impossible",
+      });
+    } finally {
+      setDesignation(null);
+      if (bipInputRef.current) bipInputRef.current.focus();
+    }
+  };
+
+  const handleAnnulerDesignation = () => {
+    const manuel = designation?.source === "manuel";
+    setDesignation(null);
+    setBipFeedback({
+      tone: "warning",
+      message: manuel
+        ? "Validation annulée : la phase reste à faire."
+        : "Scan annulé : aucune phase n'a été validée.",
+    });
+    if (bipInputRef.current) bipInputRef.current.focus();
   };
 
   const handleBipKeyDown = (e) => {
@@ -219,14 +297,27 @@ const AdminInventaireProgressionScreen = () => {
     }
   };
 
-  const handleTogglePhase = async (code, phase, currentFait) => {
+  // Coche manuelle. VALIDER passe par la même fenêtre de désignation que le
+  // scan : sans elle, la phase serait créditée à la personne au poste, ce qui
+  // fausserait l'écran « Agents de l'inventaire ». DÉVALIDER est immédiat
+  // (rien à attribuer).
+  const handleTogglePhase = async (zone, phase, currentFait) => {
+    if (!currentFait) {
+      setBipFeedback(null);
+      setAgentUserId(dernierAgentId);
+      setDesignation({
+        source: "manuel",
+        zone: { code: zone.code, libelle: zone.libelle, type: zone.type },
+        phase,
+      });
+      return;
+    }
     try {
       await setPhaseManuelle({
         entrepriseId: selectedEntreprise,
-        code,
+        code: zone.code,
         phase,
-        fait: !currentFait,
-        agentUserId,
+        fait: false,
       }).unwrap();
     } catch {
       // silencieux : le polling resynchronise
@@ -369,25 +460,11 @@ const AdminInventaireProgressionScreen = () => {
               <HiClipboardCheck /> Scanner un coupon détachable
             </h2>
             <p className="bip-hint">
-              Scannez le code-barres du coupon (papillonnage / bipage / contrôle)
-              rapporté par l'agent : la phase est aussitôt marquée réalisée.
+              Scannez le code-barres du coupon (papillonnage / bipage /
+              contrôle) rapporté par l'agent : le code est reconnu, puis
+              l'application demande <b>qui</b> a fait le travail avant de
+              valider la phase.
             </p>
-            <div className="bip-agent">
-              <label htmlFor="bip-agent-picker">Réalisé par</label>
-              <UserPicker
-                id="bip-agent-picker"
-                users={agentsPossibles || []}
-                value={agentUserId}
-                onChange={setAgentUserId}
-                placeholder="Moi (par défaut)"
-                emptyLabel="Moi (par défaut)"
-              />
-              <span className="bip-agent-hint">
-                Le coupon n'identifie pas l'agent : choisissez-le ici, il sera
-                crédité de la zone dans « Agents de l'inventaire ». La sélection
-                reste active pour les coupons suivants.
-              </span>
-            </div>
             <div className="bip-row">
               <input
                 ref={bipInputRef}
@@ -518,7 +595,7 @@ const AdminInventaireProgressionScreen = () => {
                                   : undefined
                               }
                               onClick={() =>
-                                handleTogglePhase(z.code, ph, fait)
+                                handleTogglePhase(z, ph, fait)
                               }
                               title={
                                 fait
@@ -588,6 +665,80 @@ const AdminInventaireProgressionScreen = () => {
               <button
                 className="btn-secondary"
                 onClick={() => setShowInitConfirm(false)}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Désignation de l'agent — s'ouvre APRÈS le scan, avant toute écriture.
+          Le coupon détachable ne porte aucune identité : sans cette étape, la
+          phase serait créditée à la personne au poste, jamais à l'agent. */}
+      {designation && (
+        <div className="modal-backdrop" onClick={handleAnnulerDesignation}>
+          <div
+            className="modal-box modal-agent"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>
+                <HiClipboardCheck /> Qui a réalisé ce travail ?
+              </h2>
+              <button
+                className="btn-close-modal"
+                onClick={handleAnnulerDesignation}
+              >
+                <HiX />
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="designation-zone">
+                <span
+                  className="designation-phase"
+                  style={{
+                    borderColor: PHASE_META[designation.phase]?.color,
+                    color: PHASE_META[designation.phase]?.color,
+                  }}
+                >
+                  {PHASE_META[designation.phase]?.label || designation.phase}
+                </span>
+                <span className="designation-code">
+                  {designation.zone?.code}
+                </span>
+                {designation.zone?.libelle && (
+                  <span className="designation-lib">
+                    {designation.zone.libelle}
+                  </span>
+                )}
+              </div>
+              <UserPicker
+                users={agentsPossibles || []}
+                value={agentUserId}
+                onChange={setAgentUserId}
+                placeholder="Moi (par défaut)"
+                emptyLabel="Moi (par défaut)"
+              />
+              <p className="designation-hint">
+                Cherchez la personne par son nom ou son e-mail. Tous les comptes
+                de l'application sont proposés, pas seulement ceux de la
+                société : un renfort venu d'une autre société doit pouvoir être
+                crédité. Sans choix, la phase est mise à votre nom.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-primary"
+                onClick={handleConfirmerDesignation}
+                disabled={biping}
+                autoFocus
+              >
+                {biping ? "Validation…" : "Valider la phase"}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={handleAnnulerDesignation}
               >
                 Annuler
               </button>

@@ -344,3 +344,26 @@
 .agents-inv-legende b {
   color: var(--text-secondary);
 }
+
+/* Blocs du détail déplié : zones bipées d'un côté, coupons de l'autre. */
+.agents-inv-table .detail-bloc + .detail-bloc {
+  margin-top: 14px;
+}
+
+.agents-inv-table .detail-bloc h3 {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.agents-inv-table .phase-pastille {
+  display: inline-block;
+  padding: 1px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}

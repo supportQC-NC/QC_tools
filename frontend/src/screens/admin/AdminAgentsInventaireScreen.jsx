@@ -40,6 +40,19 @@ const fmtDuree = (ms) => {
   return rm ? `${h} h ${String(rm).padStart(2, "0")}` : `${h} h`;
 };
 
+// Libellés et couleurs des phases attestées par un coupon détachable
+// (mêmes couleurs que les pastilles de l'écran Progression d'inventaire).
+const PHASE_LABEL = {
+  papillonnage: "Papillonnage",
+  bipage: "Bipage",
+  controle: "Contrôle",
+};
+const PHASE_COLOR = {
+  papillonnage: "#f59e0b",
+  bipage: "#4da6ff",
+  controle: "#4ade80",
+};
+
 const fmtDateHeure = (v) =>
   v
     ? new Date(v).toLocaleString("fr-FR", {
@@ -116,6 +129,26 @@ const AdminAgentsInventaireScreen = () => {
         wb,
         XLSX.utils.json_to_sheet(detail),
         "Zones par agent",
+      );
+    }
+    // Troisième feuille : les coupons (papillonnage / contrôle compris), qui
+    // n'ont ni temps ni articles — les mélanger aux zones bipées ferait croire
+    // à des lignes incomplètes.
+    const coupons = agents.flatMap((a) =>
+      (a.zonesPhases || []).map((z) => ({
+        Agent: a.nom,
+        Zone: z.code,
+        Libellé: z.libelle || "",
+        Emplacement: z.type || "",
+        Phase: PHASE_LABEL[z.phase] || z.phase,
+        Quand: fmtDateHeure(z.at),
+      })),
+    );
+    if (coupons.length) {
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(coupons),
+        "Coupons par agent",
       );
     }
     const stamp = new Date().toISOString().slice(0, 10);
@@ -263,7 +296,9 @@ const AdminAgentsInventaireScreen = () => {
                   agents.map((a) => {
                     const cle = String(a.user || a.nom);
                     const ouvert = !!ouverts[cle];
-                    const depliable = !!a.zones?.length;
+                    const depliable = !!(
+                      a.zones?.length || a.zonesPhases?.length
+                    );
                     return (
                       <React.Fragment key={cle}>
                         <tr
@@ -328,43 +363,99 @@ const AdminAgentsInventaireScreen = () => {
                         {ouvert && (
                           <tr className="agent-detail">
                             <td colSpan={9}>
-                              <table className="detail-table">
-                                <thead>
-                                  <tr>
-                                    <th>Zone</th>
-                                    <th>Emplacement</th>
-                                    <th>État</th>
-                                    <th className="num">Articles</th>
-                                    <th className="num">Temps effectif</th>
-                                    <th>Quand</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {a.zones.map((z, i) => (
-                                    <tr key={`${z.code}-${i}`}>
-                                      <td>
-                                        <b>{z.code}</b>
-                                        {z.libelle ? ` · ${z.libelle}` : ""}
-                                      </td>
-                                      <td>{z.type || "—"}</td>
-                                      <td>
-                                        {z.status === "exporte" ? (
-                                          "Terminé"
-                                        ) : (
-                                          <span className="badge-encours">
-                                            en cours
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="num">{z.totalArticles}</td>
-                                      <td className="num">
-                                        {fmtDuree(z.tempsActifMs)}
-                                      </td>
-                                      <td>{fmtDateHeure(z.at)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              {/* Deux détails séparés, jamais fusionnés : le
+                                  collecteur mesure un temps de travail, le
+                                  coupon n'atteste que d'un passage. */}
+                              {a.zones?.length > 0 && (
+                                <div className="detail-bloc">
+                                  <h3>
+                                    Zones bipées au collecteur ({a.zones.length}
+                                    )
+                                  </h3>
+                                  <table className="detail-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Zone</th>
+                                        <th>Emplacement</th>
+                                        <th>État</th>
+                                        <th className="num">Articles</th>
+                                        <th className="num">Temps effectif</th>
+                                        <th>Quand</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {a.zones.map((z, i) => (
+                                        <tr key={`${z.code}-${i}`}>
+                                          <td>
+                                            <b>{z.code}</b>
+                                            {z.libelle ? ` · ${z.libelle}` : ""}
+                                          </td>
+                                          <td>{z.type || "—"}</td>
+                                          <td>
+                                            {z.status === "exporte" ? (
+                                              "Terminé"
+                                            ) : (
+                                              <span className="badge-encours">
+                                                en cours
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="num">
+                                            {z.totalArticles}
+                                          </td>
+                                          <td className="num">
+                                            {fmtDuree(z.tempsActifMs)}
+                                          </td>
+                                          <td>{fmtDateHeure(z.at)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
+                              {a.zonesPhases?.length > 0 && (
+                                <div className="detail-bloc">
+                                  <h3>
+                                    Coupons validés à son nom (
+                                    {a.zonesPhases.length})
+                                  </h3>
+                                  <table className="detail-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Zone</th>
+                                        <th>Emplacement</th>
+                                        <th>Phase</th>
+                                        <th>Quand</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {a.zonesPhases.map((z, i) => (
+                                        <tr key={`${z.code}-${z.phase}-${i}`}>
+                                          <td>
+                                            <b>{z.code}</b>
+                                            {z.libelle ? ` · ${z.libelle}` : ""}
+                                          </td>
+                                          <td>{z.type || "—"}</td>
+                                          <td>
+                                            <span
+                                              className="phase-pastille"
+                                              style={{
+                                                borderColor:
+                                                  PHASE_COLOR[z.phase],
+                                                color: PHASE_COLOR[z.phase],
+                                              }}
+                                            >
+                                              {PHASE_LABEL[z.phase] || z.phase}
+                                            </span>
+                                          </td>
+                                          <td>{fmtDateHeure(z.at)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -383,8 +474,9 @@ const AdminAgentsInventaireScreen = () => {
             d'inventaire », où l'agent est désigné au moment du scan. Le{" "}
             <b>temps effectif</b> ignore les silences de plus de{" "}
             {Math.round((data?.seuilPauseMs || 0) / 60000)} minutes, considérés
-            comme des pauses. Cliquez sur une ligne pour voir le détail de ses
-            zones.
+            comme des pauses. Cliquez sur une ligne pour voir, agent par agent,
+            les zones qu'il a bipées et les zones qu'il a papillonnées,
+            comptées ou contrôlées.
           </p>
         </>
       )}

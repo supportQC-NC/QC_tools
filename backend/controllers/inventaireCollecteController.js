@@ -2259,7 +2259,10 @@ const getAgentsInventaire = asyncHandler(async (req, res) => {
         totalPhases: 0,
         premiereActiviteAt: null,
         derniereActiviteAt: null,
+        // Deux détails distincts, jamais mélangés : le collecteur mesure un
+        // temps de travail, le coupon atteste seulement d'un passage.
         zones: [],
+        zonesPhases: [],
       });
     }
     const a = parAgent.get(cle);
@@ -2326,6 +2329,14 @@ const getAgentsInventaire = asyncHandler(async (req, res) => {
         const a = agent(p.by, nomUtilisateur(u), u?.email);
         a.phases[ph] += 1;
         a.totalPhases += 1;
+        a.zonesPhases.push({
+          code: z.code,
+          libelle: z.libelle || "",
+          type: z.type || "",
+          phase: ph,
+          at: p.at || null,
+          sessionNom: s.nom || "",
+        });
         marquerActivite(a, p.at);
       }
     }
@@ -2338,6 +2349,9 @@ const getAgentsInventaire = asyncHandler(async (req, res) => {
       score: a.nbZones + a.totalPhases,
       moyenneParZoneMs: a.nbZones ? Math.round(a.tempsActifMs / a.nbZones) : 0,
       zones: a.zones.sort((x, y) => new Date(y.at) - new Date(x.at)),
+      zonesPhases: a.zonesPhases.sort(
+        (x, y) => new Date(y.at || 0) - new Date(x.at || 0),
+      ),
     }))
     .sort((x, y) => y.score - x.score || x.nom.localeCompare(y.nom));
 

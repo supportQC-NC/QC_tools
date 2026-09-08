@@ -212,8 +212,13 @@ const initInventaireZone = asyncHandler(async (req, res) => {
  * @body    { code, agentUserId? }
  *
  * `agentUserId` : l'agent qui a réellement fait le travail, choisi dans la
- * liste au moment du scan (le coupon ne porte aucune identité). Absent →
- * la personne connectée est créditée.
+ * liste APRÈS le scan (le coupon ne porte aucune identité). Absent → la
+ * personne connectée est créditée.
+ *
+ * `previsualiser: true` : résout le code SANS RIEN ÉCRIRE. C'est ce que le
+ * front appelle au scan, pour savoir quelle zone et quelle phase annoncer dans
+ * la fenêtre « qui a fait ce travail ? » ; la validation refait un appel, sans
+ * le drapeau et avec `agentUserId`. Rien n'est marqué si l'opérateur annule.
  *
  * VERROU RE-BIPAGE : si la zone scannée via son EAN "bipage" a déjà été
  * bipée ET imprimée (FicheControle.printed === true), le re-bipage est refusé.
@@ -222,15 +227,18 @@ const initInventaireZone = asyncHandler(async (req, res) => {
  */
 const biperZone = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
-  const { code, agentUserId } = req.body;
+  const { code, agentUserId, previsualiser = false } = req.body;
 
   if (!code || !String(code).trim()) {
     res.status(400);
     throw new Error("Code-barres requis");
   }
 
-  const agent = await resoudreAgent(agentUserId, req.user);
-  if (!agent) {
+  // En prévisualisation, aucun agent n'est encore choisi : on ne le résout pas.
+  const agent = previsualiser
+    ? null
+    : await resoudreAgent(agentUserId, req.user);
+  if (!previsualiser && !agent) {
     res.status(400);
     throw new Error("Agent introuvable : re-sélectionnez la personne.");
   }
@@ -283,8 +291,25 @@ const biperZone = asyncHandler(async (req, res) => {
     }
   }
 
-  // Marquer la phase (idempotent)
   const dejaFait = zone[phase].fait;
+
+  // Résolution seule : le front a de quoi remplir la fenêtre de désignation.
+  // Une phase déjà faite est renvoyée telle quelle (`dejaFait`) : le front
+  // affiche l'avertissement habituel et n'ouvre pas la fenêtre — inutile de
+  // désigner quelqu'un pour un travail déjà enregistré.
+  if (previsualiser) {
+    return res.json({
+      type: "phase",
+      action: "a_confirmer",
+      zone: { code: zone.code, libelle: zone.libelle, type: zone.type },
+      phase,
+      dejaFait,
+      message: dejaFait ? "déjà validé" : "à désigner",
+      progress: computeProgress(session),
+    });
+  }
+
+  // Marquer la phase (idempotent)
   if (!dejaFait) {
     zone[phase].fait = true;
     zone[phase].at = new Date();
