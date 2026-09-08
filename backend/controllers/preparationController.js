@@ -5,6 +5,7 @@ import Entreprise from "../models/EntrepriseModel.js";
 import User from "../models/UserModel.js";
 import articleCacheService from "../services/articleService.js";
 import preparationService from "../services/preparationService.js";
+import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 import preparationReportService, {
   listerUnitesColisage,
 } from "../services/preparationReportService.js";
@@ -266,7 +267,10 @@ const scanControleLigne = asyncHandler(async (req, res) => {
     nartResolu = final && final.NART ? final.NART.trim() : "";
   }
 
-  const ok = !!nartResolu && nartResolu === safeTrim(ligne.nart);
+  // Comparaison tolérante aux écritures du NART : la ligne vient de la
+  // proforma, le NART résolu d'article.dbf ; « 012345 » et « 12345 »
+  // désignent le même article et ne doivent pas déclencher un refus.
+  const ok = !!nartResolu && memeNart(nartResolu, ligne.nart);
 
   res.json({
     ok,

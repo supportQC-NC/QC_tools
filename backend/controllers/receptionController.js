@@ -1461,6 +1461,7 @@ import {
 } from "../utils/receptionPaths.js";
 import path from "path";
 import fs from "fs";
+import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
 // ===========================================
 // CONSTANTES
@@ -2313,8 +2314,10 @@ const scanArticle = asyncHandler(async (req, res) => {
   // Présence dans la commande (par NART)
   let dansCommande = false;
   if (!articleInfo.isUnknown && articleInfo.nart) {
-    dansCommande = reception.lignesCommande.some(
-      (l) => l.nart === articleInfo.nart,
+    dansCommande = reception.lignesCommande.some((l) =>
+      // cmdetail et article.dbf n'écrivent pas toujours le NART pareil :
+      // sans tolérance, un article commandé passe « hors commande ».
+      memeNart(l.nart, articleInfo.nart),
     );
   }
 

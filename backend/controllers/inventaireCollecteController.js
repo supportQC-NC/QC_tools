@@ -989,6 +989,7 @@ import {
 import path from "path";
 import fs from "fs";
 import os from "os";
+import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -1452,7 +1453,10 @@ const addLigneCollecte = asyncHandler(async (req, res) => {
 
   // Cumul si l'article est déjà présent dans la zone
   const ligneExistante = collecte.lignes.find(
-    (l) => l.nart === nart || (gencod && l.gencod === gencod),
+    (l) =>
+      // Écritures d'ERP tolérées (« 12345 »/« 012345 », UPC-A/EAN-13) :
+      // sans ça un même article scanné deux fois crée deux lignes.
+      memeNart(l.nart, nart) || (gencod && memeCodeBarres(l.gencod, gencod)),
   );
 
   if (ligneExistante) {

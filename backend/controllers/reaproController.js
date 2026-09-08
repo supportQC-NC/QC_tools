@@ -605,6 +605,7 @@ import Entreprise from "../models/EntrepriseModel.js";
 import articleCacheService from "../services/articleService.js";
 import path from "path";
 import fs from "fs";
+import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
 /**
  * @desc    Créer un nouveau réappro
@@ -979,7 +980,10 @@ const addLigneReappro = asyncHandler(async (req, res) => {
 
   // Vérifier si l'article existe déjà dans le réappro
   const ligneExistante = reappro.lignes.find(
-    (l) => l.nart === nart || (gencod && l.gencod === gencod),
+    (l) =>
+      // Écritures d'ERP tolérées (« 12345 »/« 012345 », UPC-A/EAN-13) :
+      // sans ça un même article scanné deux fois crée deux lignes.
+      memeNart(l.nart, nart) || (gencod && memeCodeBarres(l.gencod, gencod)),
   );
 
   if (ligneExistante) {

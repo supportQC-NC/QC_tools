@@ -31,6 +31,7 @@ import {
 } from "../../slices/inventaireApiSlice";
 import Modal from "../../components/ui/Modal/Modal";
 import "./UserControleCommande.css";
+import { memeNart } from "../../utils/codeBarres.js";
 
 const UserControleCommande = () => {
   // ==========================================
@@ -152,7 +153,7 @@ const UserControleCommande = () => {
   // Articles hors commande (scannés mais pas dans la commande)
   const lignesHorsCommande = useMemo(() => {
     return lignesControlees.filter(
-      (lc) => !lignesAttendues.some((la) => (la.NART || "").trim() === lc.nart),
+      (lc) => !lignesAttendues.some((la) => memeNart(la.NART, lc.nart)),
     );
   }, [lignesControlees, lignesAttendues]);
 
@@ -231,7 +232,9 @@ const UserControleCommande = () => {
 
     // Chercher dans les lignes attendues par NART
     const ligneAttendue = lignesAttendues.find(
-      (la) => safeTrim(la.NART).toUpperCase() === code,
+      // Zéros de tête tolérés : cmdetail et article.dbf n'écrivent pas
+      // toujours le NART pareil (« 12345 » / « 012345 »).
+      (la) => memeNart(la.NART, code),
     );
 
     if (ligneAttendue) {
@@ -243,8 +246,8 @@ const UserControleCommande = () => {
         isInCommande: true,
       });
       // Pré-remplir la quantité attendue
-      const existante = lignesControlees.find(
-        (lc) => lc.nart === safeTrim(ligneAttendue.NART),
+      const existante = lignesControlees.find((lc) =>
+        memeNart(lc.nart, ligneAttendue.NART),
       );
       setQuantite(existante ? existante.quantite.toString() : String(parseFloat(ligneAttendue.QTE) || 1));
     } else {

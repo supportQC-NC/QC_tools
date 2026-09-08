@@ -131,10 +131,25 @@ export const variantesNart = (nart) => {
   return formes;
 };
 
+/**
+ * Deux codes article désignent-ils le même article ? Pour rapprocher une ligne
+ * d'ERP (cmdetail, prodet) d'un article résolu dans article.dbf sans se faire
+ * piéger par « 12345 » / « 012345 ».
+ */
+export const memeNart = (a, b) => {
+  const ca = trimCode(a).toUpperCase();
+  const cb = trimCode(b).toUpperCase();
+  if (!ca || !cb) return false;
+  if (ca === cb) return true;
+  if (!/^\d+$/.test(ca) || !/^\d+$/.test(cb)) return false;
+  return (ca.replace(/^0+/, "") || "0") === (cb.replace(/^0+/, "") || "0");
+};
+
 export default {
   trimCode,
   canoniserCodeBarres,
   variantesCodeBarres,
   memeCodeBarres,
   variantesNart,
+  memeNart,
 };

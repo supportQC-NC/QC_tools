@@ -7,6 +7,7 @@ import articleCacheService from "../services/articleService.js";
 import { genererExcelReleve } from "../services/releveExcelService.js";
 import path from "path";
 import fs from "fs";
+import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
 /**
  * @desc    Créer un nouveau relevé de prix
@@ -194,8 +195,8 @@ const scanArticleReleve = asyncHandler(async (req, res) => {
   // Vérifier si l'article existe déjà dans le relevé
   const ligneExistante = releve.lignes.find(
     (l) =>
-      l.gencod === gencod.trim() ||
-      l.nart === (articleFinal.NART ? articleFinal.NART.trim() : ""),
+      memeCodeBarres(l.gencod, gencod) ||
+      memeNart(l.nart, articleFinal.NART ? articleFinal.NART.trim() : ""),
   );
 
   const queryTime = Date.now() - startTime;
@@ -248,7 +249,7 @@ const addLigneReleve = asyncHandler(async (req, res) => {
 
   // Vérifier si l'article existe déjà dans le relevé
   const ligneIndex = releve.lignes.findIndex(
-    (l) => l.gencod === gencod || l.nart === nart,
+    (l) => memeCodeBarres(l.gencod, gencod) || memeNart(l.nart, nart),
   );
 
   if (ligneIndex !== -1) {
