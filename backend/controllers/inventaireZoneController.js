@@ -1,17 +1,42 @@
 // backend/controllers/inventaireZoneController.js
 import fs from "fs";
+import mongoose from "mongoose";
 import asyncHandler from "../middleware/asyncHandler.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
 import FicheControle from "../models/FicheControleModel.js";
 import Zone from "../models/ZoneModel.js";
+import User from "../models/UserModel.js";
 import {
   getInventaireDirs,
   makeInventaireSlug,
 } from "../services/ficheControleService.js";
 
 const PHASES = ["papillonnage", "bipage", "controle"];
+
+/**
+ * Résout l'AGENT crédité d'une phase. Le coupon détachable n'identifie que la
+ * zone : l'agent est choisi dans la liste au moment du scan (`agentUserId`).
+ * La liste n'est PAS bornée aux utilisateurs de la société de l'inventaire —
+ * un inventaire est souvent renforcé par du personnel d'une autre société du
+ * groupe. Sans choix, on crédite la personne connectée (ancien comportement).
+ * @returns {Promise<{ id, nom } | null>} null si l'id fourni ne correspond à
+ *          aucun utilisateur (l'appelant répond alors 400).
+ */
+const resoudreAgent = async (agentUserId, utilisateurConnecte) => {
+  if (agentUserId) {
+    if (!mongoose.isValidObjectId(agentUserId)) return null;
+    const agent = await User.findById(agentUserId).select("nom prenom email");
+    if (!agent) return null;
+    return { id: agent._id, nom: nomComplet(agent) };
+  }
+  return { id: utilisateurConnecte._id, nom: nomComplet(utilisateurConnecte) };
+};
+
+/** "Prénom Nom" (repli e-mail) — même formatage que le suivi bipage. */
+const nomComplet = (u) =>
+  u ? `${u.prenom || ""} ${u.nom || ""}`.trim() || u.email || "" : "";
 
 // ===========================================
 // HELPERS
@@ -184,7 +209,11 @@ const initInventaireZone = asyncHandler(async (req, res) => {
  * @desc    Biper un code-barres → marque la phase correspondante
  * @route   POST /api/inventaires-zones/:entrepriseId/bip
  * @access  Private/Admin
- * @body    { code }
+ * @body    { code, agentUserId? }
+ *
+ * `agentUserId` : l'agent qui a réellement fait le travail, choisi dans la
+ * liste au moment du scan (le coupon ne porte aucune identité). Absent →
+ * la personne connectée est créditée.
  *
  * VERROU RE-BIPAGE : si la zone scannée via son EAN "bipage" a déjà été
  * bipée ET imprimée (FicheControle.printed === true), le re-bipage est refusé.
@@ -193,11 +222,17 @@ const initInventaireZone = asyncHandler(async (req, res) => {
  */
 const biperZone = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
-  const { code } = req.body;
+  const { code, agentUserId } = req.body;
 
   if (!code || !String(code).trim()) {
     res.status(400);
     throw new Error("Code-barres requis");
+  }
+
+  const agent = await resoudreAgent(agentUserId, req.user);
+  if (!agent) {
+    res.status(400);
+    throw new Error("Agent introuvable : re-sélectionnez la personne.");
   }
 
   const session = await InventaireZoneSession.findOne({
@@ -253,7 +288,8 @@ const biperZone = asyncHandler(async (req, res) => {
   if (!dejaFait) {
     zone[phase].fait = true;
     zone[phase].at = new Date();
-    zone[phase].by = req.user._id;
+    zone[phase].by = agent.id;
+    zone[phase].saisiPar = req.user._id;
     session.markModified("zones");
     await session.save();
   }
@@ -263,7 +299,10 @@ const biperZone = asyncHandler(async (req, res) => {
     action: dejaFait ? "deja_fait" : "marque",
     zone: { code: zone.code, libelle: zone.libelle },
     phase,
-    message: `Zone ${zone.code} — ${phase} ${dejaFait ? "déjà fait" : "validé"}`,
+    agent: dejaFait ? null : { _id: agent.id, nom: agent.nom },
+    message: `Zone ${zone.code} — ${phase} ${
+      dejaFait ? "déjà fait" : `validé (${agent.nom})`
+    }`,
     progress: computeProgress(session),
   });
 });
@@ -280,10 +319,17 @@ const biperZone = asyncHandler(async (req, res) => {
 const getActiveSession = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
 
+  // Les agents crédités des phases sont peuplés : l'écran affiche « fait par
+  // X » sur chaque pastille, sinon la désignation de l'agent au scan resterait
+  // invisible tant qu'on n'ouvre pas l'écran « Agents de l'inventaire ».
   const session = await InventaireZoneSession.findOne({
     entreprise: entreprise._id,
     statut: "actif",
-  }).populate("createdBy", "nom prenom");
+  })
+    .populate("createdBy", "nom prenom")
+    .populate("zones.papillonnage.by", "nom prenom email")
+    .populate("zones.bipage.by", "nom prenom email")
+    .populate("zones.controle.by", "nom prenom email");
 
   if (!session) {
     return res.json({ active: null });
@@ -347,12 +393,12 @@ const getHistorique = asyncHandler(async (req, res) => {
  * @desc    Cocher/décocher manuellement une phase d'une zone
  * @route   PUT /api/inventaires-zones/:entrepriseId/zone/:code/:phase
  * @access  Private/Admin
- * @body    { fait: boolean }
+ * @body    { fait: boolean, agentUserId? }
  */
 const setPhaseManuelle = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const { code, phase } = req.params;
-  const { fait } = req.body;
+  const { fait, agentUserId } = req.body;
 
   if (!PHASES.includes(phase)) {
     res.status(400);
@@ -376,14 +422,24 @@ const setPhaseManuelle = asyncHandler(async (req, res) => {
   }
 
   const valeur = !!fait;
+  // Même règle que le bip : on crédite l'agent désigné, à défaut la personne
+  // connectée. Décocher efface les deux traces.
+  const agent = valeur ? await resoudreAgent(agentUserId, req.user) : null;
+  if (valeur && !agent) {
+    res.status(400);
+    throw new Error("Agent introuvable : re-sélectionnez la personne.");
+  }
+
   zone[phase].fait = valeur;
   zone[phase].at = valeur ? new Date() : null;
-  zone[phase].by = valeur ? req.user._id : null;
+  zone[phase].by = valeur ? agent.id : null;
+  zone[phase].saisiPar = valeur ? req.user._id : null;
   session.markModified("zones");
   await session.save();
 
   res.json({
     zone: { code: zone.code, phase, fait: valeur },
+    agent: agent ? { _id: agent.id, nom: agent.nom } : null,
     progress: computeProgress(session),
   });
 });
@@ -478,10 +534,36 @@ const deleteSession = asyncHandler(async (req, res) => {
   res.json({ message: "Session supprimée" });
 });
 
+/**
+ * @desc    Liste des utilisateurs sélectionnables comme agent au scan d'un
+ *          coupon. VOLONTAIREMENT NON BORNÉE à la société de l'inventaire :
+ *          un inventaire est régulièrement renforcé par du personnel d'une
+ *          autre société du groupe, qui doit pouvoir être crédité. La route
+ *          reste admin + accès société, et ne renvoie que l'identité (aucun
+ *          droit, aucune donnée société).
+ * @route   GET /api/inventaires-zones/:entrepriseId/agents-possibles
+ * @access  Private/Admin
+ */
+const getAgentsPossibles = asyncHandler(async (req, res) => {
+  const users = await User.find({ isActive: true })
+    .select("nom prenom email")
+    .sort({ nom: 1, prenom: 1 })
+    .lean();
+
+  res.json(
+    users.map((u) => ({
+      _id: u._id,
+      nom: nomComplet(u),
+      email: u.email || "",
+    })),
+  );
+});
+
 export {
   initInventaireZone,
   annulerInventaireZone,
   biperZone,
+  getAgentsPossibles,
   getActiveSession,
   getProgress,
   getHistorique,

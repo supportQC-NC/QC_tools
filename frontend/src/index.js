@@ -54,6 +54,7 @@ import AssistantIAScreen from "./screens/user/AssistantIAScreen";
 import VeilleScreen from "./screens/user/VeilleScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminSuiviBipageScreen from "./screens/admin/AdminSuiviBipageScreen";
+import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
@@ -415,6 +416,10 @@ const router = createBrowserRouter(
         />
         <Route path="/admin/recap-zones" element={<AdminRecapZonesScreen />} />
         <Route path="/admin/suivi-bipage" element={<AdminSuiviBipageScreen />} />
+        <Route
+          path="/admin/agents-inventaire"
+          element={<AdminAgentsInventaireScreen />}
+        />
       </Route>
 
       {/* Données · Inventaire Proforma -> module "inventaire_proforma_admin" */}

@@ -21,11 +21,13 @@ import {
   useSetPhaseManuelleMutation,
   useGetZoneHistoriqueQuery,
   useDeleteZoneSessionMutation,
+  useGetAgentsPossiblesQuery,
 } from "../../slices/inventaireZoneApiSlice";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import ImportComptageZone from "../../components/Admin/ImportComptageZone";
+import UserPicker from "../../components/ui/UserPicker/UserPicker";
 import "./AdminProgressionScreen.css";
 
 const POLL = 4000;
@@ -45,6 +47,14 @@ const STATUT_META = {
   papillonnage: { label: "Papillonnage", color: "#f59e0b" },
   todo: { label: "Pas commencé", color: "#ff6b6b" },
 };
+// Nom de l'agent crédité d'une phase. Le serveur peuple `by` ; on retombe sur
+// une chaîne vide si la phase est ancienne (avant la désignation d'agent).
+const nomAgentPhase = (p) => {
+  const u = p?.by;
+  if (!u || typeof u !== "object") return "";
+  return `${u.prenom || ""} ${u.nom || ""}`.trim() || u.email || "";
+};
+
 const zoneStatut = (z) => {
   const pap = !!z?.papillonnage?.fait;
   const bip = !!z?.bipage?.fait;
@@ -58,6 +68,11 @@ const zoneStatut = (z) => {
 const AdminInventaireProgressionScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [bipCode, setBipCode] = useState("");
+  // Agent crédité des coupons scannés. Le coupon détachable ne porte aucune
+  // identité : c'est ici qu'on dit QUI a fait le travail. La sélection reste
+  // en place d'un scan à l'autre — un agent rapporte en général plusieurs
+  // coupons d'affilée.
+  const [agentUserId, setAgentUserId] = useState("");
   const [bipFeedback, setBipFeedback] = useState(null); // { tone, message }
   const [search, setSearch] = useState("");
   const [showInitConfirm, setShowInitConfirm] = useState(false);
@@ -67,6 +82,13 @@ const AdminInventaireProgressionScreen = () => {
   const bipInputRef = useRef(null);
 
   const { data: entreprises } = useGetMyEntreprisesQuery();
+
+  // TOUS les comptes actifs, pas seulement ceux de la société : un inventaire
+  // est souvent renforcé par du personnel d'une autre société du groupe.
+  const { data: agentsPossibles } = useGetAgentsPossiblesQuery(
+    selectedEntreprise,
+    { skip: !selectedEntreprise },
+  );
 
   const {
     data: activeData,
@@ -121,6 +143,7 @@ const AdminInventaireProgressionScreen = () => {
     setBipCode("");
     setSearch("");
     setShowHistorique(false);
+    setAgentUserId("");
   }, [selectedEntreprise]);
 
   const handleConfirmInit = async () => {
@@ -164,6 +187,7 @@ const AdminInventaireProgressionScreen = () => {
       const res = await biperZone({
         entrepriseId: selectedEntreprise,
         code,
+        agentUserId,
       }).unwrap();
       const tone =
         res.action === "deja_fait" || res.action === "verrouille"
@@ -202,6 +226,7 @@ const AdminInventaireProgressionScreen = () => {
         code,
         phase,
         fait: !currentFait,
+        agentUserId,
       }).unwrap();
     } catch {
       // silencieux : le polling resynchronise
@@ -347,6 +372,22 @@ const AdminInventaireProgressionScreen = () => {
               Scannez le code-barres du coupon (papillonnage / bipage / contrôle)
               rapporté par l'agent : la phase est aussitôt marquée réalisée.
             </p>
+            <div className="bip-agent">
+              <label htmlFor="bip-agent-picker">Réalisé par</label>
+              <UserPicker
+                id="bip-agent-picker"
+                users={agentsPossibles || []}
+                value={agentUserId}
+                onChange={setAgentUserId}
+                placeholder="Moi (par défaut)"
+                emptyLabel="Moi (par défaut)"
+              />
+              <span className="bip-agent-hint">
+                Le coupon n'identifie pas l'agent : choisissez-le ici, il sera
+                crédité de la zone dans « Agents de l'inventaire ». La sélection
+                reste active pour les coupons suivants.
+              </span>
+            </div>
             <div className="bip-row">
               <input
                 ref={bipInputRef}
@@ -481,7 +522,15 @@ const AdminInventaireProgressionScreen = () => {
                               }
                               title={
                                 fait
-                                  ? `Fait — cliquer pour annuler`
+                                  ? `Fait${
+                                      nomAgentPhase(z[ph])
+                                        ? ` par ${nomAgentPhase(z[ph])}`
+                                        : ""
+                                    }${
+                                      z[ph]?.at
+                                        ? ` le ${formatDate(z[ph].at)}`
+                                        : ""
+                                    } — cliquer pour annuler`
                                   : `À faire — cliquer pour valider`
                               }
                             >

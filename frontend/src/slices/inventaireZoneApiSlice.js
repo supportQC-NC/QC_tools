@@ -24,14 +24,23 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["InventaireZone"],
     }),
 
-    // Biper un code-barres
+    // Biper un code-barres. `agentUserId` = l'agent qui a réellement fait la
+    // phase (le coupon ne porte aucune identité) ; absent → la personne
+    // connectée est créditée.
     biperZone: builder.mutation({
-      query: ({ entrepriseId, code }) => ({
+      query: ({ entrepriseId, code, agentUserId }) => ({
         url: `${BASE}/${entrepriseId}/bip`,
         method: "POST",
-        body: { code },
+        body: { code, ...(agentUserId && { agentUserId }) },
       }),
-      invalidatesTags: ["InventaireZone"],
+      invalidatesTags: ["InventaireZone", "SuiviBipage"],
+    }),
+
+    // Utilisateurs sélectionnables comme agent : TOUS les comptes actifs, pas
+    // seulement ceux de la société (renforts d'une autre société du groupe).
+    getAgentsPossibles: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/agents-possibles`,
+      providesTags: ["AgentsInventaire"],
     }),
 
     // Session active détaillée
@@ -54,12 +63,12 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
 
     // Correction manuelle d'une phase
     setPhaseManuelle: builder.mutation({
-      query: ({ entrepriseId, code, phase, fait }) => ({
+      query: ({ entrepriseId, code, phase, fait, agentUserId }) => ({
         url: `${BASE}/${entrepriseId}/zone/${encodeURIComponent(code)}/${phase}`,
         method: "PUT",
-        body: { fait },
+        body: { fait, ...(agentUserId && { agentUserId }) },
       }),
-      invalidatesTags: ["InventaireZone"],
+      invalidatesTags: ["InventaireZone", "SuiviBipage"],
     }),
 
     // Supprimer une session archivée
@@ -77,6 +86,7 @@ export const {
   useInitInventaireZoneMutation,
   useAnnulerInventaireZoneMutation,
   useBiperZoneMutation,
+  useGetAgentsPossiblesQuery,
   useGetActiveSessionQuery,
   useGetZoneProgressQuery,
   useGetZoneHistoriqueQuery,

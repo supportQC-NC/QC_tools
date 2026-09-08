@@ -4,6 +4,7 @@ import {
   initInventaireZone,
   annulerInventaireZone,
   biperZone,
+  getAgentsPossibles,
   getActiveSession,
   getProgress,
   getHistorique,
@@ -42,6 +43,16 @@ router.post(
   admin,
   checkEntrepriseAccess,
   biperZone,
+);
+
+// Utilisateurs sélectionnables comme agent au scan d'un coupon (tous, pas
+// seulement ceux de la société : cf. commentaire du contrôleur)
+router.get(
+  "/:entrepriseId/agents-possibles",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  getAgentsPossibles,
 );
 
 // Session active détaillée

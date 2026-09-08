@@ -15,6 +15,7 @@ import {
   getRecapZonePdf,
   deleteCollecte,
   getSuiviBipage,
+  getAgentsInventaire,
   updateObservationCollecte,
 } from "../controllers/inventaireCollecteController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -46,6 +47,16 @@ router
     checkEntrepriseAccess,
     checkModuleAccess("inventaire", "read"),
     getSuiviBipage,
+  );
+// Agents de l'inventaire (écran dédié) : synthèse par personne, collecteur +
+// coupons détachables réunis.
+router
+  .route("/agents-inventaire/:entrepriseId")
+  .get(
+    protect,
+    checkEntrepriseAccess,
+    checkModuleAccess("inventaire", "read"),
+    getAgentsInventaire,
   );
 router
   .route("/suivi-bipage/:entrepriseId/:id/observation")

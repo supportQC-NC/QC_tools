@@ -10,12 +10,14 @@
 // le terminal, l'écran fonctionne donc aussi sur les bipages déjà faits.
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import {
   HiClock,
   HiRefresh,
   HiSearch,
   HiDownload,
   HiUserGroup,
+  HiArrowRight,
   HiCheckCircle,
   HiPencilAlt,
 } from "react-icons/hi";
@@ -280,30 +282,18 @@ const AdminSuiviBipageScreen = () => {
             </div>
           )}
 
-          {agents.length > 1 && (
-            <div className="suivi-bipage-agents">
-              <h2>
-                <HiUserGroup /> Par agent
-              </h2>
-              <div className="agents-grid">
-                {agents.map((a) => (
-                  <div className="agent-card" key={a.user || a.nom}>
-                    <div className="agent-nom">{a.nom}</div>
-                    <div className="agent-stats">
-                      <span>
-                        <b>{a.nbBipages}</b> zone{a.nbBipages > 1 ? "s" : ""}
-                      </span>
-                      <span>
-                        <b>{a.totalArticles}</b> articles
-                      </span>
-                      <span>
-                        <b>{fmtDuree(a.tempsActifMs)}</b> effectif
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* La synthèse par personne a son propre écran : elle réunit le
+              collecteur ET les coupons détachables, que cet écran-ci ne voit
+              pas. On ne duplique donc pas les cartes ici. */}
+          {agents.length > 0 && (
+            <Link className="suivi-bipage-lien-agents" to="/admin/agents-inventaire">
+              <HiUserGroup />
+              <span>
+                <b>{agents.length}</b> agent{agents.length > 1 ? "s" : ""} sur cet
+                inventaire — voir la synthèse par personne (zones, coupons, temps)
+              </span>
+              <HiArrowRight />
+            </Link>
           )}
 
           <div className="suivi-bipage-tablewrap">

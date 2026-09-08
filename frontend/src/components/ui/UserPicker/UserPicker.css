@@ -1,0 +1,135 @@
+/* src/components/ui/UserPicker/UserPicker.css
+   Sélecteur d'utilisateur avec recherche. Habillage aligné sur les champs
+   admin (variables --admin-* définies globalement dans index.css). */
+
+.user-picker {
+  position: relative;
+  min-width: 240px;
+}
+
+.user-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  color: var(--admin-text-secondary, #a7a7b8);
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.user-picker-trigger:hover:not(:disabled) {
+  border-color: var(--admin-primary, #4da6ff);
+}
+
+.user-picker-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.user-picker-trigger.has-value {
+  color: var(--admin-text, #f0f0f5);
+  font-weight: 600;
+}
+
+.user-picker-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-picker-clear,
+.user-picker-caret {
+  flex-shrink: 0;
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.user-picker-clear:hover {
+  opacity: 1;
+  color: var(--admin-danger, #ef4444);
+}
+
+.user-picker-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  background: var(--admin-bg-secondary, #12121a);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.user-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--admin-border, #2a2a3a);
+  color: var(--admin-text-secondary, #a7a7b8);
+}
+
+.user-picker-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--admin-text, #f0f0f5);
+  font-size: 0.9rem;
+}
+
+.user-picker-list {
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.user-picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--admin-text, #f0f0f5);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-picker-item:hover {
+  background: var(--admin-bg-hover, #22222e);
+}
+
+.user-picker-item.selected {
+  background: rgba(77, 166, 255, 0.18);
+  font-weight: 600;
+}
+
+.user-picker-nom {
+  line-height: 1.2;
+}
+
+.user-picker-mail {
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+.user-picker-vide {
+  padding: 12px 10px;
+  color: var(--admin-text-secondary, #a7a7b8);
+  font-size: 0.85rem;
+  text-align: center;
+}

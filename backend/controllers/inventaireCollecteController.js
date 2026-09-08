@@ -990,6 +990,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
+import User from "../models/UserModel.js";
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -2190,6 +2191,180 @@ const getSuiviBipage = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Les AGENTS d'un inventaire : tout le monde ayant travaillé dessus,
+ *          avec ce qu'il a fait. Deux sources, réunies par utilisateur :
+ *            · le collecteur (`InventaireCollecte`) → zones bipées, articles,
+ *              unités, temps effectif / brut ;
+ *            · les coupons détachables (`session.zones[].<phase>.by`) →
+ *              papillonnage / bipage / contrôle validés.
+ *          Un agent peut n'apparaître que d'un côté (il a rapporté des coupons
+ *          sans jamais toucher au collecteur, ou l'inverse) : les deux sources
+ *          sont donc fusionnées, jamais l'une au détriment de l'autre.
+ * @route   GET /api/inventaires-collecte/agents-inventaire/:entrepriseId
+ * @query   session=active|toutes|<id>
+ * @access  Private (module inventaire, read)
+ */
+const getAgentsInventaire = asyncHandler(async (req, res) => {
+  const { entrepriseId } = req.params;
+  const { session: sessionFiltre = "active" } = req.query;
+
+  const entreprise = await Entreprise.findById(entrepriseId);
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  const PHASES = ["papillonnage", "bipage", "controle"];
+
+  const sessions = await InventaireZoneSession.find({ entreprise: entreprise._id })
+    .select("nom statut createdAt zones")
+    .sort({ createdAt: -1 })
+    .lean();
+  const sessionActive = sessions.find((s) => s.statut === "actif") || null;
+
+  // Périmètre : même convention que le suivi bipage.
+  let sessionsRetenues;
+  const filtre = { entreprise: entreprise._id };
+  if (sessionFiltre === "toutes") {
+    sessionsRetenues = sessions;
+  } else if (sessionFiltre && sessionFiltre !== "active") {
+    sessionsRetenues = sessions.filter((s) => String(s._id) === String(sessionFiltre));
+    filtre.session = sessionFiltre;
+  } else {
+    sessionsRetenues = sessionActive ? [sessionActive] : [];
+    filtre.session = sessionActive ? sessionActive._id : null;
+  }
+
+  const collectes = await InventaireCollecte.find(filtre)
+    .populate("user", "nom prenom email")
+    .lean();
+
+  // ── Agrégation par utilisateur ───────────────────────────────────────────
+  const parAgent = new Map();
+  const agent = (id, nom, email) => {
+    const cle = id ? String(id) : "?";
+    if (!parAgent.has(cle)) {
+      parAgent.set(cle, {
+        user: id || null,
+        nom: nom || "(inconnu)",
+        email: email || "",
+        nbZones: 0,
+        nbTermines: 0,
+        nbEnCours: 0,
+        totalArticles: 0,
+        totalQuantite: 0,
+        tempsActifMs: 0,
+        tempsBrutMs: 0,
+        phases: { papillonnage: 0, bipage: 0, controle: 0 },
+        totalPhases: 0,
+        premiereActiviteAt: null,
+        derniereActiviteAt: null,
+        zones: [],
+      });
+    }
+    const a = parAgent.get(cle);
+    if (nom && a.nom === "(inconnu)") a.nom = nom;
+    if (email && !a.email) a.email = email;
+    return a;
+  };
+
+  const marquerActivite = (a, date) => {
+    if (!date) return;
+    const d = new Date(date);
+    if (!a.premiereActiviteAt || d < a.premiereActiviteAt) a.premiereActiviteAt = d;
+    if (!a.derniereActiviteAt || d > a.derniereActiviteAt) a.derniereActiviteAt = d;
+  };
+
+  for (const c of collectes) {
+    const a = agent(c.user?._id, nomUtilisateur(c.user), c.user?.email);
+    const temps = calculerTempsBipage(c);
+    a.nbZones += 1;
+    if (c.status === "exporte") a.nbTermines += 1;
+    else a.nbEnCours += 1;
+    a.totalArticles += c.totalArticles || 0;
+    a.totalQuantite += c.totalQuantite || 0;
+    a.tempsActifMs += temps.tempsActifMs;
+    a.tempsBrutMs += temps.tempsBrutMs;
+    a.zones.push({
+      code: c.zoneCode,
+      libelle: c.zoneLibelle || "",
+      type: c.zoneType || "",
+      status: c.status,
+      tempsActifMs: temps.tempsActifMs,
+      totalArticles: c.totalArticles || 0,
+      at: c.exportedAt || c.createdAt,
+    });
+    marquerActivite(a, c.createdAt);
+    marquerActivite(a, c.exportedAt);
+  }
+
+  // Coupons détachables : l'agent crédité est `zone[phase].by`.
+  const idsPhases = new Set();
+  for (const s of sessionsRetenues) {
+    for (const z of s.zones || []) {
+      for (const ph of PHASES) {
+        if (z[ph]?.fait && z[ph].by) idsPhases.add(String(z[ph].by));
+      }
+    }
+  }
+  // Les agents connus uniquement par les coupons n'ont pas de collecte : il
+  // faut aller chercher leur identité (et ils peuvent venir d'une AUTRE société).
+  const nomsPhases = new Map();
+  if (idsPhases.size) {
+    const users = await User.find({ _id: { $in: [...idsPhases] } })
+      .select("nom prenom email")
+      .lean();
+    users.forEach((u) => nomsPhases.set(String(u._id), u));
+  }
+
+  for (const s of sessionsRetenues) {
+    for (const z of s.zones || []) {
+      for (const ph of PHASES) {
+        const p = z[ph];
+        if (!p?.fait || !p.by) continue;
+        const u = nomsPhases.get(String(p.by));
+        const a = agent(p.by, nomUtilisateur(u), u?.email);
+        a.phases[ph] += 1;
+        a.totalPhases += 1;
+        marquerActivite(a, p.at);
+      }
+    }
+  }
+
+  const agents = [...parAgent.values()]
+    .map((a) => ({
+      ...a,
+      // Le classement met en tête celui qui a le plus produit, coupons compris.
+      score: a.nbZones + a.totalPhases,
+      moyenneParZoneMs: a.nbZones ? Math.round(a.tempsActifMs / a.nbZones) : 0,
+      zones: a.zones.sort((x, y) => new Date(y.at) - new Date(x.at)),
+    }))
+    .sort((x, y) => y.score - x.score || x.nom.localeCompare(y.nom));
+
+  res.json({
+    session: sessionActive
+      ? { _id: sessionActive._id, nom: sessionActive.nom, createdAt: sessionActive.createdAt }
+      : null,
+    sessions: sessions.map((s) => ({
+      _id: s._id,
+      nom: s.nom,
+      statut: s.statut,
+      createdAt: s.createdAt,
+    })),
+    seuilPauseMs: PAUSE_BIPAGE_MS,
+    totaux: {
+      nbAgents: agents.length,
+      nbZones: agents.reduce((t, a) => t + a.nbZones, 0),
+      nbPhases: agents.reduce((t, a) => t + a.totalPhases, 0),
+      totalArticles: agents.reduce((t, a) => t + a.totalArticles, 0),
+      totalQuantite: agents.reduce((t, a) => t + a.totalQuantite, 0),
+      tempsActifMs: agents.reduce((t, a) => t + a.tempsActifMs, 0),
+    },
+    agents,
+  });
+});
+
+/**
  * @desc    Écrire l'observation « suivi » d'un bipage (depuis le web).
  *          N'écrase JAMAIS l'observation laissée par l'agent sur le collecteur.
  * @route   PATCH /api/inventaires-collecte/suivi-bipage/:entrepriseId/:id/observation
@@ -2226,6 +2401,7 @@ export {
   getSessionActive,
   createCollecte,
   getSuiviBipage,
+  getAgentsInventaire,
   updateObservationCollecte,
   getCollectesEnCours,
   getCollecteById,

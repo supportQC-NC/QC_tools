@@ -180,6 +180,11 @@ export const moduleMenuStructure = [
         path: "/admin/suivi-bipage",
         icon: HiClock,
       },
+      {
+        label: "Agents de l'inventaire",
+        path: "/admin/agents-inventaire",
+        icon: HiUserGroup,
+      },
     ],
   },
   {
@@ -697,6 +702,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
   "/admin/suivi-bipage":
     "Qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
+  "/admin/agents-inventaire":
+    "Toutes les personnes ayant travaillé sur l'inventaire : zones, coupons, temps.",
   "/admin/fiches-controle": "Fiches de contrôle d'inventaire.",
   "/admin/inventaire-proforma": "Inventaire à partir d'une proforma.",
   // Commerciaux

@@ -204,6 +204,15 @@ miroir **non-sécuritaire** côté client est dans `frontend/src/config/adminMod
 sociétés (modification et rattachement d'équipe), pas seulement les membres de son
 équipe.
 
+⚠️ **Une exception au scoping société, assumée** : la liste des agents
+sélectionnables au scan d'un coupon d'inventaire
+(`GET /api/inventaires-zones/:entrepriseId/agents-possibles`) renvoie **tous** les
+comptes actifs, pas seulement ceux de la société — un inventaire est
+régulièrement renforcé par du personnel d'une autre société du groupe, qui doit
+pouvoir être crédité de son travail. La route reste `admin` +
+`checkEntrepriseAccess` et ne renvoie que l'identité (nom, e-mail) : aucun droit,
+aucune donnée société.
+
 ### Le registre des modules vit à trois endroits
 
 `backend/config/adminModules.js` (source de vérité), son miroir
@@ -547,7 +556,7 @@ quantité et non un simple rattachement.
 Repères pour situer un écran / un routeur. Les préfixes API sont sous `/api/`.
 
 **Gestion (terrain)** — `stock` (recherche article), `inventaire` (zones,
-progression, récap, suivi bipage, fiches de contrôle), `reapro`,
+progression, récap, suivi bipage, agents de l'inventaire, fiches de contrôle), `reapro`,
 `demande_reappro`, `proforma`, `ctr_commande`, `reception` + `reception_manuelle`,
 `prep_commande` + `prep_commande_manuelle`, `envoi_cde_fournisseur`,
 `ctrl_info_produit`, `releve`, `etiquettes`, `changement_prix`,

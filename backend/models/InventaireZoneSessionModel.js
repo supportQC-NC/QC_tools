@@ -16,7 +16,18 @@ const phaseSchema = new mongoose.Schema(
   {
     fait: { type: Boolean, default: false },
     at: { type: Date, default: null },
+    // `by` = l'AGENT qui a réalisé la phase sur le terrain. Le coupon détachable
+    // ne porte aucune identité : la personne au poste choisit l'agent dans la
+    // liste au moment du scan. À défaut de choix, c'est elle qui est créditée.
     by: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    // `saisiPar` = qui a scanné le coupon / coché la case dans l'application.
+    // Distinct de `by` : sans lui on perdrait la trace de la saisie dès qu'un
+    // agent est désigné.
+    saisiPar: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { _id: false },
 );

@@ -594,3 +594,30 @@
     flex-direction: column;
   }
 }
+/* Sélecteur de l'agent crédité au scan d'un coupon.
+   Le coupon détachable ne porte aucune identité : le choix se fait ici. */
+.bip-agent {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 300px);
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.bip-agent label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.bip-agent-hint {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 700px) {
+  .bip-agent {
+    grid-template-columns: 1fr;
+  }
+}

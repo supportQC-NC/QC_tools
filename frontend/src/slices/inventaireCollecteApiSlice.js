@@ -27,6 +27,17 @@ export const inventaireCollecteApiSlice = apiSlice.injectEndpoints({
       providesTags: ["SuiviBipage"],
     }),
 
+    // ─── Agents de l'inventaire ──────────────────────────────────────────
+    // Une ligne par personne ayant travaillé sur l'inventaire : zones bipées
+    // au collecteur ET coupons détachables rapportés.
+    getAgentsInventaire: builder.query({
+      query: ({ entrepriseId, session }) => ({
+        url: `${BASE}/agents-inventaire/${entrepriseId}`,
+        params: { ...(session && { session }) },
+      }),
+      providesTags: ["SuiviBipage"],
+    }),
+
     updateObservationBipage: builder.mutation({
       query: ({ entrepriseId, id, observation }) => ({
         url: `${BASE}/suivi-bipage/${entrepriseId}/${id}/observation`,
@@ -41,5 +52,6 @@ export const inventaireCollecteApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetRecapZonesQuery,
   useGetSuiviBipageQuery,
+  useGetAgentsInventaireQuery,
   useUpdateObservationBipageMutation,
 } = inventaireCollecteApiSlice;
