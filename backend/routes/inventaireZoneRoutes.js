@@ -2,6 +2,7 @@
 import express from "express";
 import {
   initInventaireZone,
+  setFiltreProformas,
   annulerInventaireZone,
   biperZone,
   getAgentsPossibles,
@@ -34,6 +35,16 @@ router.post(
   admin,
   checkEntrepriseAccess,
   annulerInventaireZone,
+);
+
+// Sélection des proformas du « comptage sans collecteur » : définie une fois
+// pour tout l'inventaire, modifiable ensuite.
+router.put(
+  "/:entrepriseId/filtre-proformas",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  setFiltreProformas,
 );
 
 // Bip d'un code-barres

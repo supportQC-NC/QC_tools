@@ -6,11 +6,23 @@ const BASE = "/api/inventaires-zones";
 export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Initialiser un inventaire (archive l'actif précédent)
+    // `filtreProformas` = plage de dates + clients du « comptage sans
+    // collecteur », saisis UNE FOIS au démarrage de l'inventaire.
     initInventaireZone: builder.mutation({
-      query: ({ entrepriseId, nom }) => ({
+      query: ({ entrepriseId, nom, filtreProformas }) => ({
         url: `${BASE}/init/${entrepriseId}`,
         method: "POST",
-        body: { nom },
+        body: { nom, ...(filtreProformas && { filtreProformas }) },
+      }),
+      invalidatesTags: ["InventaireZone"],
+    }),
+
+    // Correction de cette sélection en cours d'inventaire.
+    setFiltreProformas: builder.mutation({
+      query: ({ entrepriseId, dateDebut, dateFin, clients }) => ({
+        url: `${BASE}/${entrepriseId}/filtre-proformas`,
+        method: "PUT",
+        body: { dateDebut, dateFin, clients },
       }),
       invalidatesTags: ["InventaireZone"],
     }),
@@ -84,6 +96,7 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useInitInventaireZoneMutation,
+  useSetFiltreProformasMutation,
   useAnnulerInventaireZoneMutation,
   useBiperZoneMutation,
   useGetAgentsPossiblesQuery,

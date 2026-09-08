@@ -81,6 +81,13 @@ const AdminInventaireProgressionScreen = () => {
   const [bipFeedback, setBipFeedback] = useState(null); // { tone, message }
   const [search, setSearch] = useState("");
   const [showInitConfirm, setShowInitConfirm] = useState(false);
+  // Sélection des proformas du « comptage sans collecteur », saisie une seule
+  // fois ici : elle est ensuite portée par l'inventaire.
+  const [initProformas, setInitProformas] = useState({
+    dateDebut: "",
+    dateFin: "",
+    clients: "",
+  });
   const [showAnnulerConfirm, setShowAnnulerConfirm] = useState(false);
   const [showHistorique, setShowHistorique] = useState(false);
 
@@ -157,7 +164,10 @@ const AdminInventaireProgressionScreen = () => {
     setShowInitConfirm(false);
     setBipFeedback(null);
     try {
-      await initInventaire({ entrepriseId: selectedEntreprise }).unwrap();
+      await initInventaire({
+        entrepriseId: selectedEntreprise,
+        filtreProformas: initProformas,
+      }).unwrap();
     } catch (err) {
       setBipFeedback({
         tone: "error",
@@ -504,6 +514,7 @@ const AdminInventaireProgressionScreen = () => {
           <ImportComptageZone
             entrepriseId={selectedEntreprise}
             zones={zones}
+            filtreProformas={session?.filtreProformas}
             onMessage={(message, tone) =>
               setBipFeedback({ tone: tone === "error" ? "error" : "success", message })
             }
@@ -653,6 +664,62 @@ const AdminInventaireProgressionScreen = () => {
                   </>
                 )}
               </p>
+
+              {/* Sélection des proformas : demandée UNE SEULE FOIS, ici. Les
+                  imports « comptage sans collecteur » s'en serviront ensuite
+                  sans jamais rien redemander. Modifiable plus tard depuis le
+                  bloc de comptage. */}
+              <div className="init-proformas">
+                <h3>Proformas du comptage sans collecteur</h3>
+                <p>
+                  Plage de dates et clients des proformas qui serviront à
+                  compter les rayons sans collecteur. Renseignés une fois pour
+                  tout l'inventaire ; facultatif si vous n'importez que des
+                  fichiers Excel.
+                </p>
+                <div className="init-proformas-champs">
+                  <label>
+                    Du
+                    <input
+                      type="date"
+                      value={initProformas.dateDebut}
+                      onChange={(e) =>
+                        setInitProformas((f) => ({
+                          ...f,
+                          dateDebut: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    au
+                    <input
+                      type="date"
+                      value={initProformas.dateFin}
+                      onChange={(e) =>
+                        setInitProformas((f) => ({
+                          ...f,
+                          dateFin: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="init-proformas-grow">
+                    Client(s)
+                    <input
+                      type="text"
+                      placeholder="9900 ou 9900, 9901…"
+                      value={initProformas.clients}
+                      onChange={(e) =>
+                        setInitProformas((f) => ({
+                          ...f,
+                          clients: e.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
             <div className="modal-footer">
               <button

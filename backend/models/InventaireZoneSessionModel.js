@@ -70,6 +70,24 @@ const sessionSchema = new mongoose.Schema(
       enum: ["actif", "archive"],
       default: "actif",
     },
+    // Sélection des proformas servant au « comptage sans collecteur ».
+    // Définie UNE FOIS pour tout l'inventaire (à l'initialisation, modifiable
+    // ensuite) : avant, l'opérateur ressaisissait la plage de dates et les
+    // clients à CHAQUE import, alors que ce sont les mêmes du début à la fin.
+    // Les dates sont conservées telles que saisies (`AAAA-MM-JJ`) : les
+    // convertir en Date décalerait le jour selon le fuseau.
+    filtreProformas: {
+      dateDebut: { type: String, default: "" },
+      dateFin: { type: String, default: "" },
+      // Clients bruts, tels que saisis ("9900, 9901") — découpés à la lecture.
+      clients: { type: String, default: "" },
+      definiAt: { type: Date, default: null },
+      definiPar: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+    },
     zones: [zoneProgressSchema],
     totalZones: { type: Number, default: 0 },
     totalPhases: { type: Number, default: 0 },

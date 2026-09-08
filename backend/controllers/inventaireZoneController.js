@@ -34,6 +34,19 @@ const resoudreAgent = async (agentUserId, utilisateurConnecte) => {
   return { id: utilisateurConnecte._id, nom: nomComplet(utilisateurConnecte) };
 };
 
+/**
+ * Normalise la sélection de proformas du « comptage sans collecteur ».
+ * Dates gardées telles quelles (`AAAA-MM-JJ`) ; clients gardés en une chaîne
+ * lisible, découpée côté recherche.
+ */
+const normaliserFiltreProformas = (f, utilisateur) => ({
+  dateDebut: String(f?.dateDebut || "").trim(),
+  dateFin: String(f?.dateFin || "").trim(),
+  clients: String(f?.clients || "").trim(),
+  definiAt: new Date(),
+  definiPar: utilisateur?._id || null,
+});
+
 /** "Prénom Nom" (repli e-mail) — même formatage que le suivi bipage. */
 const nomComplet = (u) =>
   u ? `${u.prenom || ""} ${u.nom || ""}`.trim() || u.email || "" : "";
@@ -121,7 +134,7 @@ const sessionResume = (session) => ({
  */
 const initInventaireZone = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
-  const { nom } = req.body;
+  const { nom, filtreProformas } = req.body;
 
   const zones = await Zone.find({ entreprise: entreprise._id }).sort({
     code: 1,
@@ -192,6 +205,8 @@ const initInventaireZone = asyncHandler(async (req, res) => {
     totalZones: zonesSnapshot.length,
     totalPhases: zonesSnapshot.length * PHASES.length,
     createdBy: req.user._id,
+    // Sélection des proformas : renseignée une fois, au démarrage.
+    filtreProformas: normaliserFiltreProformas(filtreProformas, req.user),
   });
 
   res.status(201).json({
@@ -584,8 +599,38 @@ const getAgentsPossibles = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * @desc    Définir / corriger la sélection de proformas de l'inventaire actif
+ *          (plage de dates + clients). Elle est saisie UNE FOIS et sert à tous
+ *          les imports « comptage sans collecteur » qui suivent.
+ * @route   PUT /api/inventaires-zones/:entrepriseId/filtre-proformas
+ * @body    { dateDebut, dateFin, clients }
+ * @access  Private/Admin
+ */
+const setFiltreProformas = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif");
+  }
+
+  session.filtreProformas = normaliserFiltreProformas(req.body, req.user);
+  await session.save();
+
+  res.json({
+    message: "Sélection des proformas enregistrée",
+    filtreProformas: session.filtreProformas,
+  });
+});
+
 export {
   initInventaireZone,
+  setFiltreProformas,
   annulerInventaireZone,
   biperZone,
   getAgentsPossibles,

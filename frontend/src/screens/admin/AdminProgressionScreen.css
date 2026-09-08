@@ -645,3 +645,59 @@
   line-height: 1.45;
   color: var(--text-secondary);
 }
+
+/* Sélection des proformas dans la modale d'initialisation : saisie une fois
+   pour tout l'inventaire, plus jamais redemandée à chaque import. */
+.init-proformas {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.init-proformas h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.init-proformas p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.init-proformas-champs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.init-proformas-champs label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.init-proformas-grow {
+  flex: 1;
+  min-width: 180px;
+}
+
+.init-proformas-champs input {
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.init-proformas-champs input:focus {
+  outline: none;
+  border-color: #f59e0b;
+}

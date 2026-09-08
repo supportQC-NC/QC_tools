@@ -636,7 +636,7 @@ const contenu = (r) => {
 
   r.h2("Ou se trouve le module");
   r.p(
-    "Dans la barre laterale de l'application web, chapitre Inventaire Zones. Il regroupe six ecrans, " +
+    "Dans la barre laterale de l'application web, chapitre Inventaire Zones. Il regroupe sept ecrans, " +
       "presentes ici dans l'ordre du deroulement d'un inventaire.",
   );
   r.tableau(
@@ -649,9 +649,10 @@ const contenu = (r) => {
       ["Fiches inventaires", "Avant", "Creer les zones et imprimer les fiches rayons."],
       ["Progression inventaire", "Avant / pendant", "Lancer l'inventaire, scanner les coupons, suivre l'avancement, importer un comptage fait sans collecteur."],
       ["Detail des bipages", "Pendant / apres", "Consulter et corriger les lignes deja comptees, recommencer une zone."],
-      ["Fiches de controle", "Pendant", "Retrouver, ouvrir et reimprimer les fiches PDF."],
+      ["Fiches de controle", "Pendant", "Retrouver, ouvrir et telecharger les fiches PDF pour les imprimer."],
       ["Recap par zone", "Pendant / apres", "Voir l'avancement en couleurs et les ecarts chiffres."],
       ["Suivi bipage", "Pendant / apres", "Savoir qui a bipe quelle zone, quand et en combien de temps."],
+      ["Agents de l'inventaire", "Pendant / apres", "La liste des personnes qui ont travaille sur l'inventaire, avec leurs zones et leurs coupons."],
     ],
   );
   r.legende(
@@ -760,6 +761,13 @@ const contenu = (r) => {
     "Un dossier horodate est cree sur le reseau pour recevoir les fichiers de comptage. Deux " +
       "inventaires portant le meme nom auront malgre tout deux dossiers distincts : aucun risque de " +
       "melanger les fichiers d'une annee sur l'autre.",
+  );
+  r.p(
+    "La fenetre d'initialisation demande aussi la PLAGE DE DATES et les CLIENTS des proformas qui " +
+      "serviront a compter les rayons sans collecteur (chapitre 5). Ces criteres valent pour tout " +
+      "l'inventaire : ils ne seront plus jamais redemandes. Laissez-les vides si vous n'importez " +
+      "que des fichiers Excel ; ils restent modifiables ensuite depuis le bloc Comptage sans " +
+      "collecteur.",
   );
   r.p(
     "A partir de cet instant, les agents peuvent entrer dans l'inventaire depuis leur collecteur. " +
@@ -874,9 +882,19 @@ const contenu = (r) => {
   );
   r.etapes([
     "Placez le curseur dans le champ Scannez ou saisissez un code-barres puis Entree.",
-    "Scannez le coupon rapporte. La phase correspondante est marquee realisee immediatement, et un message confirme le rayon et la phase.",
-    "Enchainez les coupons : le champ reste actif entre deux scans.",
+    "Scannez le coupon rapporte. L'application reconnait le rayon et la phase, mais ne valide encore rien.",
+    "Une fenetre demande QUI a realise ce travail : cherchez la personne par son nom, puis validez. C'est cette validation qui marque la phase.",
+    "Enchainez les coupons : le champ de scan reprend la main, et la derniere personne choisie est reproposee.",
   ]);
+  r.encadre(
+    "Pourquoi on demande le nom a chaque coupon",
+    "Le coupon detachable ne porte aucune identite : sans cette question, la phase serait creditee " +
+      "a la personne assise au poste, jamais a l'agent qui a fait le rayon. La liste propose TOUS " +
+      "les comptes de l'application, pas seulement ceux de la societe : un renfort venu d'une autre " +
+      "societe du groupe doit pouvoir etre credite. Si vous validez sans choisir personne, la phase " +
+      "est mise a votre nom. Annuler la fenetre ne valide rien.",
+    "info",
+  );
   r.p("Les messages possibles :");
   r.tableau(
     [
@@ -884,7 +902,7 @@ const contenu = (r) => {
       { t: "Signification", w: 66 },
     ],
     [
-      ["Zone X - Papillonnage valide", "La phase vient d'etre marquee. Rien d'autre a faire."],
+      ["Zone X - Papillonnage valide (Nom)", "La phase vient d'etre marquee au nom de la personne indiquee. Rien d'autre a faire."],
       ["Zone X - Bipage deja fait", "Le coupon avait deja ete scanne. Sans consequence."],
       ["Zone X identifiee", "Vous avez scanne le QR principal et non un coupon : aucune phase n'a ete marquee. Scannez le bon coupon."],
       ["Code-barres inconnu dans cet inventaire", "Le coupon n'appartient pas a cet inventaire : fiche d'une ancienne session, ou d'une autre societe."],
@@ -900,14 +918,17 @@ const contenu = (r) => {
   );
   r.p(
     "Le tableau des zones, en dessous, permet aussi de cocher ou decocher une phase a la main. " +
+      "Cocher ouvre la meme fenetre de designation que le scan ; decocher est immediat. " +
       "Reservez-le aux cas ou le coupon a ete perdu ou le rayon reellement vide : le scan reste la " +
-      "regle, car il conserve l'heure et l'identite de qui a declare.",
+      "regle, car il conserve l'heure et l'identite de qui a declare. En survolant une pastille " +
+      "verte, vous lisez qui a valide la phase et quand.",
   );
 
   r.h2("Integrer un comptage fait sans collecteur");
   r.p(
-    "Le meme ecran porte le bloc Comptage sans collecteur : on y choisit une zone, puis on lui " +
-      "importe un fichier Excel ou une proforma de l'ERP. Le detail est au chapitre 5.",
+    "Le meme ecran porte le bloc Comptage sans collecteur, REPLIE par defaut : cliquez sur son " +
+      "titre pour le derouler. On y choisit une zone, puis on lui importe un fichier Excel ou une " +
+      "proforma de l'ERP. Le detail est au chapitre 5.",
   );
   r.encadre(
     "Pourquoi ici et pas dans Detail des bipages",
@@ -985,11 +1006,17 @@ const contenu = (r) => {
   );
   r.encadre(
     "Si une fiche ne sort pas de l'imprimante",
-    "L'impression est assuree par un poste du reseau, pas par le serveur. Si rien ne sort, verifiez " +
-      "d'abord que ce poste est allume et que l'agent d'impression y tourne. En attendant, la fiche " +
-      "reste disponible : ouvrez son PDF depuis l'ecran Fiches de controle, ou demandez une " +
-      "reimpression avec le bouton Reimprimer.",
+    "L'impression automatique est assuree par un poste du reseau, pas par le serveur. Si rien ne " +
+      "sort, verifiez que ce poste est allume et que l'agent d'impression y tourne. La fiche reste " +
+      "de toute facon disponible depuis l'ecran Fiches de controle : l'icone en forme d'oeil " +
+      "l'ouvre en apercu, l'icone de telechargement l'enregistre sur votre poste, et vous " +
+      "l'imprimez depuis votre lecteur PDF.",
     "attention",
+  );
+  r.p(
+    "Le PDF reste consultable meme si le fichier a disparu du dossier reseau : l'application le " +
+      "reconstruit a l'identique a partir du comptage. L'apercu et le telechargement ne dependent " +
+      "donc pas du poste d'impression.",
   );
 
   r.h2("Corriger un comptage : ecran Detail des bipages");
@@ -1034,7 +1061,41 @@ const contenu = (r) => {
   );
   r.p(
     "L'ecran affiche aussi l'observation laissee par l'agent au moment du depot, et permet d'ajouter " +
-      "une observation de suivi cote bureau. Un regroupement Par agent donne les totaux par personne.",
+      "une observation de suivi cote bureau.",
+  );
+
+  r.h2("La synthese par personne : ecran Agents de l'inventaire");
+  r.p(
+    "Une ligne par personne ayant travaille sur l'inventaire, quelle que soit sa facon d'y avoir " +
+      "participe. L'ecran reunit les deux sources : ce qui a ete fait au collecteur et les coupons " +
+      "detachables rapportes au poste. Quelqu'un qui n'a fait que du papillonnage y figure donc au " +
+      "meme titre que celui qui a bipe toute la journee.",
+  );
+  r.tableau(
+    [
+      { t: "Colonne", w: 26 },
+      { t: "Ce qu'elle donne", w: 74 },
+    ],
+    [
+      ["Zones bipees", "Le nombre de rayons comptes au collecteur, dont ceux encore ouverts."],
+      ["Coupons", "Les coupons valides a son nom, detailles P (papillonnage), B (bipage), C (controle)."],
+      ["Articles / Unites", "Ce qui a ete compte au collecteur."],
+      ["Temps effectif / brut", "Memes definitions que dans Suivi bipage."],
+      ["Moy. / zone", "Temps effectif moyen par rayon compte : le repere pour dimensionner le prochain inventaire."],
+      ["Activite", "Premiere et derniere trace de travail sur l'inventaire."],
+    ],
+  );
+  r.p(
+    "Cliquez sur une ligne pour deplier le detail : d'un cote les rayons bipes avec leur temps, de " +
+      "l'autre les rayons papillonnes, comptes ou controles au coupon avec la date. Le bouton Excel " +
+      "exporte la synthese et ces deux details.",
+  );
+  r.encadre(
+    "Un agent n'apparait que si on l'a designe",
+    "Les coupons ne sont credites qu'a la personne choisie dans la fenetre qui suit le scan " +
+      "(chapitre 4). Si l'on valide sans choisir, c'est la personne au poste qui apparait dans cet " +
+      "ecran : prenez l'habitude de designer l'agent, c'est ce qui rend la synthese exploitable.",
+    "attention",
   );
 
   // ═══ 5. CAS PARTICULIERS ═══
@@ -1080,9 +1141,11 @@ const contenu = (r) => {
   r.h2("Le mode operatoire commun");
   r.p(
     "Les deux imports se font au meme endroit et de la meme facon : ecran Progression inventaire, " +
-      "bloc Comptage sans collecteur.",
+      "bloc Comptage sans collecteur. Ce bloc est replie par defaut : cliquez sur son titre pour " +
+      "le derouler.",
   );
   r.etapes([
+    "Deroulez le bloc Comptage sans collecteur.",
     "Choisissez la ZONE dans la liste deroulante. Elle porte le code du rayon, son libelle et son emplacement : un meme code au magasin et au dock apparait deux fois, ce sont deux zones distinctes.",
     "Choisissez le MODE : Comptage (+) pour ajouter, Deduction (-) pour retrancher.",
     "Cliquez sur Importer un Excel, ou sur Depuis une proforma pour aller chercher le document dans l'ERP.",
@@ -1155,8 +1218,14 @@ const contenu = (r) => {
   r.h2("Compter depuis une proforma");
   r.p(
     "Certaines equipes saisissent leur comptage sous forme de proforma dans l'ERP. Le bouton Depuis " +
-      "une proforma ouvre la liste : renseignez une plage de dates, un ou plusieurs numeros de " +
-      "client, puis cochez les documents a integrer dans la zone choisie.",
+      "une proforma ouvre directement la LISTE des documents concernes : il n'y a rien a saisir, " +
+      "il suffit de cocher ceux a integrer dans la zone choisie.",
+  );
+  r.p(
+    "La plage de dates et les clients ont ete renseignes UNE SEULE FOIS, a l'initialisation de " +
+      "l'inventaire (chapitre 2). Ils sont rappeles en haut de la fenetre et dans le bloc de " +
+      "comptage ; le bouton Modifier permet de les corriger, ce qui vaut aussitot pour tous les " +
+      "imports suivants.",
   );
   r.puces([
     "Toute proforma portant au moins une ligne article est integrable. Seule une proforma sans aucune ligne est refusee : il n'y a rien a compter.",
@@ -1165,10 +1234,11 @@ const contenu = (r) => {
     "Plusieurs proformas peuvent etre integrees d'un coup sur la meme zone : leurs quantites s'additionnent.",
   ]);
   r.encadre(
-    "Filtrez avant de chercher",
-    "La recherche exige une plage de dates ou un numero de client : sans filtre, toute la table des " +
+    "Pourquoi une selection est obligatoire",
+    "Il faut au moins une plage de dates ou un numero de client : sans filtre, toute la table des " +
       "proformas serait balayee, ce qui prend plusieurs dizaines de secondes sur les grosses " +
-      "societes.",
+      "societes. Si rien n'a ete renseigne au lancement de l'inventaire, la fenetre vous le dit et " +
+      "propose de le faire — une seule fois, la aussi.",
     "info",
   );
 
@@ -1205,7 +1275,7 @@ const contenu = (r) => {
   r.puces([
     "Recap par zone : les ecarts chiffres, par zone ou par fournisseur, avec leur valorisation en francs. Chaque zone peut etre editee en PDF au meme format que la fiche de controle.",
     "Detail des bipages : export CSV de toutes les lignes comptees, filtrable par zone.",
-    "Suivi bipage : temps passe par agent et par zone, utile pour dimensionner le prochain inventaire.",
+    "Suivi bipage : temps passe par zone. Agents de l'inventaire : la meme lecture par personne, coupons compris. Utiles pour dimensionner le prochain inventaire.",
   ]);
 
   r.h2("Cloturer");
@@ -1254,7 +1324,7 @@ const contenu = (r) => {
     ],
     [
       "La fiche de controle ne s'imprime pas",
-      "L'impression est assuree par un poste du reseau, pas par le serveur. Verifiez que ce poste est allume et que l'agent d'impression y tourne. La fiche reste ouvrable en PDF depuis l'ecran Fiches de controle, et reimprimable.",
+      "L'impression automatique est assuree par un poste du reseau, pas par le serveur. Verifiez que ce poste est allume et que l'agent d'impression y tourne. La fiche reste ouvrable en apercu et telechargeable depuis l'ecran Fiches de controle : vous l'imprimez alors depuis votre poste.",
     ],
     [
       "L'import refuse : aucune zone choisie",
@@ -1378,8 +1448,12 @@ const contenu = (r) => {
 
 // ── Sommaire (ecrit apres coup sur la page reservee) ─────────────────────────
 
-const ecrireSommaire = (doc, sommaire, pageSommaire) => {
-  doc.switchToPage(pageSommaire);
+const ecrireSommaire = (doc, sommaire, pages) => {
+  // `pages` = les index (0-based) des pages RÉSERVÉES au sommaire. Il en faut
+  // plusieurs dès que le guide dépasse la quarantaine d'entrées : on bascule
+  // sur la suivante quand la première est pleine, plutôt que de tronquer.
+  let indexPage = 0;
+  doc.switchToPage(pages[indexPage]);
   doc.font("Helvetica-Bold").fontSize(21).fillColor(C.texte);
   doc.text("Sommaire", M, M, { width: LARGEUR });
   let y = doc.y + 4;
@@ -1388,12 +1462,16 @@ const ecrireSommaire = (doc, sommaire, pageSommaire) => {
 
   let omises = 0;
   sommaire.forEach((e) => {
-    // Garde-fou : le sommaire tient sur UNE page réservée. S'il déborde, on ne
-    // tronque pas en silence — le script le signale pour qu'on allège les
-    // titres ou qu'on réserve une seconde page.
+    // Garde-fou : si même les pages réservées ne suffisent pas, on ne tronque
+    // pas en silence — le script le signale pour qu'on en réserve une de plus.
     if (y > BAS - 16) {
-      omises += 1;
-      return;
+      indexPage += 1;
+      if (indexPage >= pages.length) {
+        omises += 1;
+        return;
+      }
+      doc.switchToPage(pages[indexPage]);
+      y = M;
     }
     const estChapitre = e.niveau === 1;
     const x = estChapitre ? M : M + 18;
@@ -1479,15 +1557,16 @@ doc.pipe(flux);
 
 couverture(doc);
 
-// Page 2 : reservee au sommaire, remplie a la fin.
+// Pages 2 et 3 : reservees au sommaire, remplies a la fin.
 doc.addPage();
-const PAGE_SOMMAIRE = 1; // index 0-based dans le buffer
+doc.addPage();
+const PAGES_SOMMAIRE = [1, 2]; // index 0-based dans le buffer
 
 const rendu = new Rendu(doc);
 contenu(rendu);
 
 const total = doc.bufferedPageRange().count;
-const omises = ecrireSommaire(doc, rendu.sommaire, PAGE_SOMMAIRE);
+const omises = ecrireSommaire(doc, rendu.sommaire, PAGES_SOMMAIRE);
 piedsDePage(doc, total);
 
 doc.flushPages();
@@ -1499,7 +1578,7 @@ flux.on("finish", () => {
   console.log(`${total} pages, ${taille} Ko, ${rendu.sommaire.length} entrees de sommaire.`);
   if (omises) {
     console.warn(
-      `ATTENTION : ${omises} entree(s) de sommaire n'ont pas tenu sur la page reservee.`,
+      `ATTENTION : ${omises} entree(s) de sommaire n'ont pas tenu sur les ${PAGES_SOMMAIRE.length} pages reservees.`,
     );
   }
 });
