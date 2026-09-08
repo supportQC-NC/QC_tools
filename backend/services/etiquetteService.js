@@ -379,6 +379,44 @@ const drawTitreSection = (rl, titre, xDroite) => {
   rl.drawString(xDroite - w, rl.H - TITRE_SECTION_Y, titre);
 };
 
+// Marque de ligne : le même code que le titre, répété dans la marge DROITE en
+// face de chaque rangée d'étiquettes.
+//
+// POURQUOI : la feuille se découpe en BANDES horizontales, une par rangée. Le
+// titre en haut à droite disparaît alors sur toutes les bandes sauf la
+// première, et un paquet de bandes coupées n'est plus identifiable. Le code
+// répété en bout de rangée reste sur chaque bande.
+//
+// Il est écrit HORIZONTALEMENT, dans le sens de lecture des étiquettes : une
+// bande posée à plat se lit sans la tourner. La taille s'adapte à la marge
+// disponible (~1,9 cm sur A4 paysage) et le texte est tronqué en dernier
+// recours, plutôt que de déborder dans la zone rognée par l'imprimante.
+const MARQUE_LIGNE_MAX = 10;
+const MARQUE_LIGNE_MIN = 6;
+const MARQUE_LIGNE_ECART = 5; // écart entre le bord des étiquettes et la marque
+
+const drawMarqueLigne = (rl, titre, x, largeur, yCentre) => {
+  if (!titre || largeur <= 8) return;
+  let texte = String(titre);
+
+  // 1) réduire la taille tant que ça dépasse ; 2) tronquer si ça dépasse encore.
+  let taille = MARQUE_LIGNE_MAX;
+  const mesure = (t, s) =>
+    rl.doc.font("Helvetica-Bold").fontSize(s).widthOfString(t);
+  while (taille > MARQUE_LIGNE_MIN && mesure(texte, taille) > largeur) {
+    taille -= 0.5;
+  }
+  while (texte.length > 1 && mesure(texte + "…", taille) > largeur) {
+    texte = texte.slice(0, -1);
+  }
+  if (texte !== String(titre)) texte += "…";
+
+  rl.setFillColorRGB(0, 0, 0);
+  rl.setFont("Helvetica-Bold", taille);
+  // Centrage optique sur la hauteur de la rangée.
+  rl.drawString(x, yCentre - taille * 0.35, texte);
+};
+
 /**
  * Grille d'étiquettes standard (5x4 cm).
  *
@@ -407,30 +445,50 @@ const drawStandard = (rl, sections, opts = {}) => {
   const startYTop = (H - gridH) / 2; // marge haute (mesurée depuis le haut)
   const perPage = cols * rows;
 
+  // Marge droite disponible pour la marque de ligne (grille centrée → elle vaut
+  // startX), moins l'écart aux étiquettes et une sécurité anti-rognage.
+  const xMarque = startX + gridW + MARQUE_LIGNE_ECART;
+  // 0,5 cm réservé au bord droit : c'est la zone non imprimable habituelle
+  // (~5 mm), la même qui avait déjà obligé à descendre le titre de section.
+  const largeurMarque = W - xMarque - 0.5 * CM;
+
   let premierePage = true;
   sections.forEach((section) => {
     const articles = section.articles || [];
     if (articles.length === 0) return;
 
-    // Nouvelle section = nouvelle feuille (sauf pour la toute première).
-    if (!premierePage) rl.showPage();
-    premierePage = false;
-    drawTitreSection(rl, section.titre, startX + gridW);
+    // Pages parcourues explicitement : il faut savoir combien de RANGÉES sont
+    // occupées sur la page pour ne marquer que celles-là (une marque en face
+    // d'une rangée vide ferait croire à une bande manquante).
+    for (let debut = 0; debut < articles.length; debut += perPage) {
+      // Nouvelle section OU page suivante = nouvelle feuille (sauf la toute
+      // première). Le titre est répété sur chaque feuille : un paquet de
+      // 3 feuilles doit rester identifiable après avoir été séparé.
+      if (!premierePage) rl.showPage();
+      premierePage = false;
+      drawTitreSection(rl, section.titre, startX + gridW);
 
-    articles.forEach((record, i) => {
-      const idxOnPage = i % perPage;
-      if (idxOnPage === 0 && i > 0) {
-        rl.showPage();
-        // Le titre est répété sur chaque feuille de la section : un paquet de
-        // 3 feuilles doit rester identifiable après avoir été séparé.
-        drawTitreSection(rl, section.titre, startX + gridW);
+      const surLaPage = Math.min(perPage, articles.length - debut);
+      const lignesOccupees = Math.ceil(surLaPage / cols);
+      for (let row = 0; row < lignesOccupees; row++) {
+        const yHaut = H - (startYTop + row * (labelH + gap));
+        drawMarqueLigne(
+          rl,
+          section.titre,
+          xMarque,
+          largeurMarque,
+          yHaut - labelH / 2,
+        );
       }
-      const col = idxOnPage % cols;
-      const row = Math.floor(idxOnPage / cols);
-      const x = startX + col * (labelW + gap);
-      const y = H - (startYTop + row * (labelH + gap)) - labelH;
-      drawStandardCell(rl, record, x, y, labelW, labelH, opts);
-    });
+
+      for (let k = 0; k < surLaPage; k++) {
+        const col = k % cols;
+        const row = Math.floor(k / cols);
+        const x = startX + col * (labelW + gap);
+        const y = H - (startYTop + row * (labelH + gap)) - labelH;
+        drawStandardCell(rl, articles[debut + k], x, y, labelW, labelH, opts);
+      }
+    }
   });
 };
 
@@ -950,7 +1008,9 @@ export const genererEtiquettesCustomPDF = async ({
  *                             gisement/groupe)
  * @param {Array}  [p.sections] [{ titre, articles }] — une section par gisement
  *                             ou par groupe. Chacune démarre une NOUVELLE
- *                             feuille et porte son titre en haut à droite.
+ *                             feuille, porte son titre en haut à droite et
+ *                             le répète en marge de chaque rangée (découpage
+ *                             en bandes).
  *                             N'a d'effet que sur les étiquettes « standard »,
  *                             les seules à en tuiler plusieurs par feuille ;
  *                             les autres types impriment déjà un article par

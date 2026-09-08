@@ -8,6 +8,7 @@ import {
   HiRefresh,
   HiSearch,
   HiTrash,
+  HiInformationCircle,
 } from "react-icons/hi";
 import {
   useGetBipagesQuery,
@@ -35,6 +36,9 @@ const AdminBipagesScreen = () => {
   const [seuil, setSeuil] = useState(""); // seuil |écart| en XPF
   const [perimetre, setPerimetre] = useState("comptes"); // comptes | stock
   const [ecartsLoading, setEcartsLoading] = useState("");
+  // Bulle d'aide du périmètre : la distinction « comptés / stock complet »
+  // change complètement le document, elle mérite mieux qu'une infobulle native.
+  const [aidePerimetre, setAidePerimetre] = useState(false);
 
   const dirty = useRef(new Set());
 
@@ -43,6 +47,23 @@ const AdminBipagesScreen = () => {
     const t = setTimeout(() => setSearch(searchInput), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  // La bulle d'aide se ferme au clic ailleurs et à Échap, comme tout popover.
+  useEffect(() => {
+    if (!aidePerimetre) return undefined;
+    const fermer = (e) => {
+      if (!e.target.closest?.(".ecarts-aide")) setAidePerimetre(false);
+    };
+    const parEchap = (e) => {
+      if (e.key === "Escape") setAidePerimetre(false);
+    };
+    document.addEventListener("mousedown", fermer);
+    document.addEventListener("keydown", parEchap);
+    return () => {
+      document.removeEventListener("mousedown", fermer);
+      document.removeEventListener("keydown", parEchap);
+    };
+  }, [aidePerimetre]);
 
   // efface le message d'info après quelques secondes
   useEffect(() => {
@@ -302,12 +323,59 @@ const AdminBipagesScreen = () => {
             </label>
 
             <label>
-              Périmètre
+              <span className="ecarts-label-aide">
+                Périmètre
+                <span className="ecarts-aide">
+                  <button
+                    type="button"
+                    className="ecarts-aide-btn"
+                    onClick={(e) => {
+                      // Le bouton vit dans un <label> : sans ça, le clic
+                      // déclencherait aussi l'ouverture du <select> associé.
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setAidePerimetre((o) => !o);
+                    }}
+                    aria-expanded={aidePerimetre}
+                    aria-label="À quoi sert le périmètre ?"
+                    title="À quoi sert le périmètre ?"
+                  >
+                    <HiInformationCircle />
+                  </button>
+                  {aidePerimetre && (
+                    <div
+                      className="ecarts-aide-bulle"
+                      role="tooltip"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <b>Quels articles entrent dans le document ?</b>
+                      <p>
+                        <b>Articles comptés</b> — seulement ceux qui ont été
+                        bipés. Un article en stock que personne n'a compté
+                        n'apparaît pas.
+                      </p>
+                      <p>
+                        <b>Stock complet</b> — les articles comptés <i>plus</i>{" "}
+                        tous ceux dont l'ERP dit qu'il reste du stock. Ceux qui
+                        n'ont jamais été comptés sortent avec une quantité de 0
+                        et un écart négatif égal à tout leur stock.
+                      </p>
+                      <p className="ecarts-aide-regle">
+                        <b>Pendant l'inventaire</b>, gardez « Articles comptés » :
+                        les rayons pas encore faits rempliraient le document
+                        d'écarts négatifs qui ne veulent rien dire.{" "}
+                        <b>Une fois tous les rayons comptés</b>, passez à « Stock
+                        complet » : ce qui ressort à 0 a été oublié, ou a
+                        réellement disparu.
+                      </p>
+                    </div>
+                  )}
+                </span>
+              </span>
               <select
                 className="filter-select"
                 value={perimetre}
                 onChange={(e) => setPerimetre(e.target.value)}
-                title="Articles comptés : seulement ce qui a été bipé. Stock complet : ajoute les articles en stock jamais comptés, qui ressortent en écart négatif."
               >
                 <option value="comptes">Articles comptés</option>
                 <option value="stock">Stock complet</option>
