@@ -114,6 +114,26 @@ export const nomAgent = (entreprise, code) => {
 // il n'existe pas de champ nommé OBSERV.
 const CHAMP_OBSERVATION = "TEXTE";
 
+/**
+ * Une ligne de `prodet` est-elle un ARTICLE à compter ?
+ *
+ * Deux formes de lignes de commentaire cohabitent dans les proformas de l'ERP :
+ *  - NART vide (ligne de texte libre) ;
+ *  - NART contenant « ! » — c'est la convention de saisie des commentaires
+ *    (constatée sur les proformas QC, confirmée par le client le 09/09/2026).
+ * Aucune des deux ne doit produire de LigneBipage : ce ne sont pas des
+ * articles, elles n'ont pas de stock, et elles ressortiraient en « article
+ * inconnu » dans le détail des bipages et sur la fiche de contrôle.
+ */
+const estLigneArticle = (ligne) => {
+  const nart = trim(ligne?.NART);
+  return !!nart && !nart.includes("!");
+};
+
+/** Les seules lignes d'une proforma qui comptent comme des articles. */
+const lignesArticles = (cache, numfact) =>
+  (cache.prodetByNumfact.get(numfact) || []).filter(estLigneArticle);
+
 const memeJour = (d) => {
   if (!d) return null;
   const dt = d instanceof Date ? d : new Date(d);
@@ -260,7 +280,10 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
     const observation = trim(p[CHAMP_OBSERVATION]);
     const lecture = parserZoneEmplacement(observation, emplacements);
     const numfact = trim(p.NUMFACT);
-    const lignes = cache.prodetByNumfact.get(numfact) || [];
+    // Compte les ARTICLES, pas les lignes du document : une proforma faite de
+    // commentaires seuls annoncerait sinon des lignes qu'aucun import ne
+    // produirait.
+    const lignes = lignesArticles(cache, numfact);
 
     proformas.push({
       numfact,
@@ -430,9 +453,10 @@ export const previsualiserImportProformas = async (
       });
       continue;
     }
-    const aCompter = (cache.prodetByNumfact.get(numfact) || [])
-      .map((l) => ({ code: trim(l.NART), quantite: Number(l.QTE) || 0 }))
-      .filter((l) => l.code);
+    const aCompter = lignesArticles(cache, numfact).map((l) => ({
+      code: trim(l.NART),
+      quantite: Number(l.QTE) || 0,
+    }));
     if (!aCompter.length) {
       proformas.push({
         numfact,
@@ -592,11 +616,12 @@ export const importerProformas = async (
       continue;
     }
 
-    const lignesProforma = cache.prodetByNumfact.get(numfact) || [];
-    // Les lignes de commentaire (sans NART) ne sont pas des articles bipés.
-    const aCompter = lignesProforma
-      .map((l) => ({ code: trim(l.NART), quantite: Number(l.QTE) || 0 }))
-      .filter((l) => l.code);
+    // Les lignes de commentaire (NART vide ou contenant « ! ») ne sont pas des
+    // articles bipés : voir `estLigneArticle`.
+    const aCompter = lignesArticles(cache, numfact).map((l) => ({
+      code: trim(l.NART),
+      quantite: Number(l.QTE) || 0,
+    }));
 
     if (!aCompter.length) {
       resultats.push({ numfact, statut: "erreur", message: "Aucune ligne article" });

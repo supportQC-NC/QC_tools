@@ -1281,7 +1281,8 @@ const contenu = (r) => {
       "imports suivants.",
   );
   r.puces([
-    "Toute proforma portant au moins une ligne article est integrable. Seule une proforma sans aucune ligne est refusee : il n'y a rien a compter.",
+    "Toute proforma portant au moins une ligne article est integrable. Seule une proforma qui n'en porte aucune est refusee : il n'y a rien a compter.",
+    "Les lignes de COMMENTAIRE sont ignorees : celles sans code article, et celles dont le code contient un point d'exclamation. Elles ne sont ni comptees dans le nombre de lignes annonce, ni integrees au detail des bipages.",
     "L'observation du document est affichee a titre indicatif, elle ne decide plus de rien.",
     "Le vendeur de la proforma est repris comme agent du comptage.",
     "Plusieurs proformas peuvent etre integrees d'un coup sur la meme zone : leurs quantites s'additionnent.",
