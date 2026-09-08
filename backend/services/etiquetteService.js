@@ -347,23 +347,36 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   }
 };
 
+// Distance entre le HAUT de la feuille et la ligne de base du titre de section.
+//
+// ⚠️ 1,2 cm et pas moins : à 0,55 cm (premier essai), le haut des lettres
+// arrivait à ~2 mm du bord et la plupart des imprimantes le rognaient — le
+// groupe était illisible sur les tirages. À 1,2 cm, le texte commence à ~9 mm
+// du bord, au-delà de la zone non imprimable habituelle (~5 mm), et son bas
+// reste à ~25 pt au-dessus de la première rangée d'étiquettes.
+const TITRE_SECTION_Y = 1.2 * CM;
+const TITRE_SECTION_TAILLE = 13;
+
 /**
  * Titre de section, en HAUT À DROITE de la feuille A4, en gras.
  *
- * ⚠️ Il est dessiné dans la MARGE de la feuille, jamais sur une étiquette :
- * la grille est centrée verticalement et laisse ~62 pt libres en haut (5x4 cm
- * sur A4 paysage), largement de quoi loger une ligne de 13 pt. La taille et le
- * nombre d'étiquettes par page ne changent donc pas d'un iota.
+ * ⚠️ Il est dessiné dans la MARGE de la feuille, jamais sur une étiquette : la
+ * grille est centrée verticalement et laisse ~62 pt libres en haut (5x4 cm sur
+ * A4 paysage). La taille et le nombre d'étiquettes par page ne changent donc
+ * pas d'un iota.
+ *
+ * `xDroite` = bord droit de la GRILLE (et non de la feuille) : le titre tombe
+ * ainsi dans l'alignement de la dernière colonne d'étiquettes, ce qui le place
+ * à ~55 pt du bord de la feuille — hors de portée du rognage latéral.
  */
-const drawTitreSection = (rl, titre) => {
+const drawTitreSection = (rl, titre, xDroite) => {
   if (!titre) return;
-  const marginDroite = 0.6 * CM;
   rl.setFillColorRGB(0, 0, 0);
-  rl.setFont("Helvetica-Bold", 13);
+  rl.setFont("Helvetica-Bold", TITRE_SECTION_TAILLE);
   // Aligné à droite : on mesure pour poser le coin gauche du texte.
-  rl.doc.font("Helvetica-Bold").fontSize(13);
+  rl.doc.font("Helvetica-Bold").fontSize(TITRE_SECTION_TAILLE);
   const w = rl.doc.widthOfString(String(titre));
-  rl.drawString(rl.W - marginDroite - w, rl.H - 0.55 * CM, titre);
+  rl.drawString(xDroite - w, rl.H - TITRE_SECTION_Y, titre);
 };
 
 /**
@@ -402,7 +415,7 @@ const drawStandard = (rl, sections, opts = {}) => {
     // Nouvelle section = nouvelle feuille (sauf pour la toute première).
     if (!premierePage) rl.showPage();
     premierePage = false;
-    drawTitreSection(rl, section.titre);
+    drawTitreSection(rl, section.titre, startX + gridW);
 
     articles.forEach((record, i) => {
       const idxOnPage = i % perPage;
@@ -410,7 +423,7 @@ const drawStandard = (rl, sections, opts = {}) => {
         rl.showPage();
         // Le titre est répété sur chaque feuille de la section : un paquet de
         // 3 feuilles doit rester identifiable après avoir été séparé.
-        drawTitreSection(rl, section.titre);
+        drawTitreSection(rl, section.titre, startX + gridW);
       }
       const col = idxOnPage % cols;
       const row = Math.floor(idxOnPage / cols);
