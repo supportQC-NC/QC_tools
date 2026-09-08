@@ -7,6 +7,7 @@ import {
   exportCsv,
   recommencerZone,
   listProformasBipage,
+  apercuImportProformas,
   importProformasBipage,
   modeleExcelBipage,
   importExcelBipage,
@@ -42,6 +43,8 @@ router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAcce
 
 // ─── Import depuis les proformas de l'ERP ─────────────────────────────────
 router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAccess, listProformasBipage);
+// Aperçu AVANT écriture : impact article par article + état des phases de la zone.
+router.post("/:entrepriseId/proformas/apercu", protect, canReadImport, checkEntrepriseAccess, apercuImportProformas);
 router.post("/:entrepriseId/import-proformas", protect, canWriteImport, checkEntrepriseAccess, importProformasBipage);
 
 // ─── Import depuis un fichier Excel ───────────────────────────────────────

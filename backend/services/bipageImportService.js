@@ -294,6 +294,231 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
 };
 
 /**
+ * État des phases d'une zone dans la session, pour prévenir AVANT d'importer.
+ * Une zone déjà contrôlée est le cas sensible : le contrôle a porté sur un
+ * comptage donné, le modifier après coup invalide ce contrôle.
+ */
+export const etatZoneImport = (session, zone) => {
+  const cible = (session.zones || []).find(
+    (z) => z.code === zone.code && (z.type || "") === (zone.type || ""),
+  );
+  const lire = (phase) => ({
+    fait: !!cible?.[phase]?.fait,
+    at: cible?.[phase]?.at || null,
+  });
+  return {
+    papillonnage: lire("papillonnage"),
+    bipage: lire("bipage"),
+    controle: lire("controle"),
+  };
+};
+
+/**
+ * Clé de rapprochement d'un article entre le comptage existant et l'import.
+ * Le NART résolu par le catalogue fait foi ; à défaut (article inconnu de
+ * l'ERP) on retombe sur le code brut. ⚠️ Comparaison seulement : on ne touche
+ * ni aux zéros de tête ni à la casse des valeurs stockées.
+ */
+const cleArticle = (nart, code) => (trim(nart) || trim(code)).toUpperCase();
+
+/** Référence d'import d'une proforma (clé d'idempotence). */
+const referenceProforma = (numfact, zoneCode, emplacement, deduction) =>
+  `${deduction ? "deduction proforma" : "proforma"} ${numfact} ${zoneCode}${
+    emplacement ? `_${emplacement}` : ""
+  }`;
+
+/**
+ * Ce qui est DÉJÀ compté sur une zone, article par article, toutes sources
+ * confondues (collecteur, Excel, proformas déjà intégrées).
+ *
+ * `referencesExclues` : les lignes qu'un ré-import va REMPLACER ne doivent pas
+ * compter comme « déjà là », sinon l'aperçu annoncerait un résultat faux au
+ * second passage.
+ */
+export const comptageExistant = async (session, zone, referencesExclues = []) => {
+  const filtre = {
+    session: session._id,
+    zoneCode: zone.code,
+    zoneType: zone.type || "",
+  };
+  if (referencesExclues.length) {
+    filtre.datFileName = { $nin: referencesExclues };
+  }
+  const lignes = await LigneBipage.find(filtre)
+    .select("nart eanArticle qteScan designation")
+    .lean();
+
+  const parArticle = new Map();
+  for (const l of lignes) {
+    const cle = cleArticle(l.nart, l.eanArticle);
+    if (!cle) continue;
+    const acc = parArticle.get(cle) || { quantite: 0, designation: "" };
+    acc.quantite += Number(l.qteScan) || 0;
+    if (!acc.designation && l.designation) acc.designation = l.designation;
+    parArticle.set(cle, acc);
+  }
+  return parArticle;
+};
+
+/**
+ * APERÇU d'un import de proformas : ce que l'opération va changer, article par
+ * article, SANS RIEN ÉCRIRE.
+ *
+ * POURQUOI : en mode déduction surtout, la question n'est pas « combien la
+ * proforma porte-t-elle » mais « que restera-t-il sur la zone ». On rapproche
+ * donc le mouvement du comptage déjà en place et on signale les deux cas qui
+ * demandent une décision humaine :
+ *   · `nouveau`  — l'article n'a jamais été compté sur cette zone (en
+ *     déduction, retirer ce qui n'a pas été compté donne un résultat négatif) ;
+ *   · `negatif`  — la déduction dépasse ce qui était compté.
+ * On ne borne PAS la déduction au comptage existant : un résultat négatif est
+ * une anomalie de terrain qu'il faut voir, pas un chiffre à corriger en douce.
+ */
+export const previsualiserImportProformas = async (
+  entreprise,
+  session,
+  zone,
+  selection = [],
+  mode = "inventaire",
+) => {
+  const deduction = mode === "deduction";
+  const zoneCode = trim(zone?.code);
+  const emplacement = trim(zone?.type);
+
+  const numfacts = [];
+  const vus = new Set();
+  for (const brut of Array.isArray(selection) ? selection : [selection]) {
+    const numfact =
+      brut && typeof brut === "object" ? trim(brut.numfact) : trim(brut);
+    if (!numfact || vus.has(numfact)) continue;
+    vus.add(numfact);
+    numfacts.push(numfact);
+  }
+
+  const etat = etatZoneImport(session, zone);
+  const references = numfacts.map((n) =>
+    referenceProforma(n, zoneCode, emplacement, deduction),
+  );
+  const dejaCompte = await comptageExistant(session, zone, references);
+
+  // ⚠️ Cas piégeux : en production le .DAT du collecteur est traité par le poste
+  // d'impression. Une zone peut donc avoir été DÉPOSÉE sans qu'aucune
+  // LigneBipage n'existe encore — l'aperçu annoncerait alors « 0 déjà compté »
+  // et toutes les références en « nouvelle ». On le signale plutôt que de
+  // laisser lire un chiffre faux.
+  const comptageEnAttente =
+    dejaCompte.size === 0 &&
+    !!(await InventaireCollecte.exists({
+      session: session._id,
+      zoneCode: zone.code,
+      zoneType: zone.type || "",
+    }));
+
+  const cache = await proformaCacheService.getProformas(entreprise);
+
+  // Mouvement cumulé de la sélection, article par article.
+  const mouvements = new Map();
+  const proformas = [];
+  for (const numfact of numfacts) {
+    const idx = cache.indexByNumfact.get(numfact);
+    const p = idx !== undefined ? cache.proformaRecords[idx] : null;
+    if (!p) {
+      proformas.push({
+        numfact,
+        statut: "erreur",
+        message: "Proforma introuvable",
+      });
+      continue;
+    }
+    const aCompter = (cache.prodetByNumfact.get(numfact) || [])
+      .map((l) => ({ code: trim(l.NART), quantite: Number(l.QTE) || 0 }))
+      .filter((l) => l.code);
+    if (!aCompter.length) {
+      proformas.push({
+        numfact,
+        statut: "erreur",
+        message: "Aucune ligne article",
+      });
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const { rows } = await construireLignes(entreprise, aCompter);
+    for (const r of rows) {
+      const cle = cleArticle(r.nart === "-" ? "" : r.nart, r.code);
+      if (!cle) continue;
+      const acc = mouvements.get(cle) || {
+        cle,
+        code: r.code,
+        nart: r.nart === "-" ? "" : r.nart,
+        designation: r.designation,
+        stock: typeof r.stock === "number" ? r.stock : null,
+        inconnu: !!r.nonTrouve,
+        quantite: 0,
+      };
+      acc.quantite += r.qte;
+      if (!acc.designation && r.designation) acc.designation = r.designation;
+      mouvements.set(cle, acc);
+    }
+
+    proformas.push({
+      numfact,
+      statut: "ok",
+      datfact: p.DATFACT || null,
+      tiers: trim(p.TIERS),
+      nomClient: trim(p.NOM),
+      lignes: rows.length,
+      unites: rows.reduce((t, r) => t + r.qte, 0),
+    });
+  }
+
+  const articles = [...mouvements.values()].map((m) => {
+    const avant = dejaCompte.get(m.cle)?.quantite || 0;
+    const mouvement = deduction ? -m.quantite : m.quantite;
+    const apres = avant + mouvement;
+    return {
+      code: m.code,
+      nart: m.nart,
+      designation: m.designation || dejaCompte.get(m.cle)?.designation || "",
+      stock: m.stock,
+      inconnu: m.inconnu,
+      avant,
+      mouvement,
+      apres,
+      // Jamais compté sur cette zone : en comptage c'est une référence qui
+      // s'ajoute, en déduction c'est un retrait « à vide ».
+      nouveau: !dejaCompte.has(m.cle),
+      negatif: apres < 0,
+    };
+  });
+
+  // Ce qui demande une décision remonte : négatifs, puis nouveautés.
+  articles.sort((a, b) => {
+    if (a.negatif !== b.negatif) return a.negatif ? -1 : 1;
+    if (a.nouveau !== b.nouveau) return a.nouveau ? -1 : 1;
+    return (a.designation || "").localeCompare(b.designation || "");
+  });
+
+  return {
+    mode: deduction ? "deduction" : "inventaire",
+    zone: { code: zoneCode, libelle: trim(zone?.libelle), type: emplacement },
+    etat,
+    comptageEnAttente,
+    proformas,
+    articles,
+    totaux: {
+      nbProformas: proformas.filter((x) => x.statut === "ok").length,
+      nbArticles: articles.length,
+      nbNouveaux: articles.filter((a) => a.nouveau).length,
+      nbNegatifs: articles.filter((a) => a.negatif).length,
+      unitesMouvement: articles.reduce((t, a) => t + a.mouvement, 0),
+      unitesAvant: articles.reduce((t, a) => t + a.avant, 0),
+      unitesApres: articles.reduce((t, a) => t + a.apres, 0),
+    },
+  };
+};
+
+/**
  * Intègre les proformas choisies dans la session d'inventaire active, SUR UNE
  * ZONE CHOISIE DANS L'ÉCRAN.
  *
@@ -381,9 +606,7 @@ export const importerProformas = async (
     const { rows } = await construireLignes(entreprise, aCompter);
     // Référence distincte par mode : une même proforma peut être intégrée en
     // comptage PUIS en déduction sans que l'un écrase l'autre (comme l'Excel).
-    const reference = `${deduction ? "deduction proforma" : "proforma"} ${numfact} ${zoneCode}${
-      emplacement ? `_${emplacement}` : ""
-    }`;
+    const reference = referenceProforma(numfact, zoneCode, emplacement, deduction);
     // L'agent saisi à la main l'emporte sur le vendeur de la proforma (REPRES
     // n'est pas toujours celui qui a effectivement bipé le rayon).
     const agentCode = item.agentCode || trim(p.REPRES);
@@ -644,6 +867,8 @@ export default {
   parserZoneEmplacement,
   getProformasEligibles,
   importerProformas,
+  previsualiserImportProformas,
+  etatZoneImport,
   genererModeleExcelBipage,
   importerExcelBipage,
 };

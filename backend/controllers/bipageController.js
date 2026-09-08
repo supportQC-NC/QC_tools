@@ -14,6 +14,7 @@ import {
 import {
   getProformasEligibles,
   importerProformas,
+  previsualiserImportProformas,
   genererModeleExcelBipage,
   importerExcelBipage,
   resoudreZoneImport,
@@ -417,6 +418,45 @@ const listProformasBipage = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    APERÇU d'un import de proformas sur une zone : ce qui va changer,
+ *          article par article, sans rien écrire. Sert d'écran de confirmation.
+ *          Répond en particulier à deux questions qu'on ne pouvait pas se poser
+ *          avant : la zone a-t-elle déjà été contrôlée, et que restera-t-il sur
+ *          chaque article une fois la déduction appliquée.
+ * @route   POST /api/bipages/:entrepriseId/proformas/apercu
+ * @body    { zoneCode, emplacement, items|numfacts, mode? }
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const apercuImportProformas = asyncHandler(async (req, res) => {
+  const { items, numfacts = [], zoneCode, emplacement } = req.body;
+  const selection = Array.isArray(items) && items.length ? items : numfacts;
+  if (!Array.isArray(selection) || selection.length === 0) {
+    res.status(400);
+    throw new Error("Aucune proforma sélectionnée.");
+  }
+  const mode = req.body.mode === "deduction" ? "deduction" : "inventaire";
+
+  const session = await sessionActiveOuErreur(req.entreprise, res);
+
+  let zone;
+  try {
+    zone = await resoudreZoneImport(req.entreprise._id, zoneCode, emplacement);
+  } catch (e) {
+    res.status(400);
+    throw e;
+  }
+
+  const apercu = await previsualiserImportProformas(
+    req.entreprise,
+    session,
+    zone,
+    selection,
+    mode,
+  );
+  res.json(apercu);
+});
+
+/**
  * @desc    Intègre les proformas choisies SUR UNE ZONE CHOISIE dans l'écran.
  * @route   POST /api/bipages/:entrepriseId/import-proformas
  * @body    { zoneCode, emplacement, items|numfacts, mode? }
@@ -550,6 +590,7 @@ export {
   exportCsv,
   recommencerZone,
   listProformasBipage,
+  apercuImportProformas,
   importProformasBipage,
   modeleExcelBipage,
   importExcelBipage,

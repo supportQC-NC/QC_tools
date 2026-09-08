@@ -938,6 +938,20 @@ const contenu = (r) => {
     "info",
   );
 
+  r.h2("Filtrer par emplacement");
+  r.p(
+    "Au-dessus du tableau des zones, une liste deroulante limite l'affichage a un emplacement " +
+      "(MAGASIN, DOCK, ou Sans emplacement). Elle ne filtre pas que le tableau : les compteurs " +
+      "d'avancement au-dessus se recalculent sur le perimetre affiche. On lit donc directement " +
+      "ou en est le dock, sans le diluer dans le magasin.",
+  );
+  r.p(
+    "Quand un emplacement est isole, le pourcentage global de l'inventaire reste rappele en petit " +
+      "sous le grand chiffre : on ne perd jamais de vue l'avancement reel. Le champ de recherche " +
+      "s'applique en plus du filtre, et le compteur a droite indique combien de zones sont " +
+      "affichees sur le total.",
+  );
+
   r.h2("Voir ou en est l'inventaire : ecran Recap par zone");
   r.p(
     "Une carte par rayon, coloree selon son avancement. C'est la vue a projeter pendant l'inventaire " +
@@ -1149,6 +1163,7 @@ const contenu = (r) => {
     "Choisissez la ZONE dans la liste deroulante. Elle porte le code du rayon, son libelle et son emplacement : un meme code au magasin et au dock apparait deux fois, ce sont deux zones distinctes.",
     "Choisissez le MODE : Comptage (+) pour ajouter, Deduction (-) pour retrancher.",
     "Cliquez sur Importer un Excel, ou sur Depuis une proforma pour aller chercher le document dans l'ERP.",
+    "Pour une proforma : cochez les documents, cliquez sur Verifier, lisez l'ecran de verification (etat de la zone et effet article par article), puis confirmez.",
     "Verifiez le message de confirmation : il rappelle la zone, le nombre de lignes et d'unites integrees.",
   ]);
   r.encadre(
@@ -1165,6 +1180,44 @@ const contenu = (r) => {
       "retranche selon le mode. On peut donc completer un comptage de collecteur par un Excel, ou " +
       "cumuler plusieurs proformas sur le meme rayon.",
   );
+  r.h3("Verifier avant d'integrer");
+  r.p(
+    "Pour une proforma, le bouton n'integre plus directement : il ouvre d'abord un ecran de " +
+      "verification. Rien n'est ecrit tant que vous n'avez pas confirme.",
+  );
+  r.p("Cet ecran repond a trois questions :");
+  r.tableau(
+    [
+      { t: "Ce qu'il montre", w: 32 },
+      { t: "Pourquoi c'est la", w: 68 },
+    ],
+    [
+      [
+        "L'etat de la zone",
+        "Papillonnage, bipage et controle deja declares. Si la zone a deja ete CONTROLEE, un bandeau rouge vous en avertit et il faut cocher une case pour continuer : le controle avait porte sur le comptage actuel, l'integration le rend caduc.",
+      ],
+      [
+        "Article par article",
+        "Ce qui etait deja compte sur la zone, le mouvement de la proforma, et le resultat. En deduction, on voit donc ce qui restera reellement, pas seulement ce que la proforma retire.",
+      ],
+      [
+        "Les cas a decider",
+        "Nouvelle reference : l'article n'avait jamais ete compte sur cette zone, il s'ajoute. Negatif : la deduction depasse ce qui avait ete compte.",
+      ],
+    ],
+  );
+  r.encadre(
+    "Une deduction plus grande que le comptage n'est pas corrigee toute seule",
+    "Si vous deduisez 5 pieces d'un article compte 3 fois, le resultat affiche -2, en rouge. " +
+      "L'application ne ramene pas le chiffre a zero : un resultat negatif veut dire que le " +
+      "comptage ou la proforma est faux, et c'est une information a traiter, pas a masquer. " +
+      "Verifiez avant de confirmer.",
+    "attention",
+  );
+  r.legende(
+    "L'import Excel, lui, s'applique directement : il vient en general d'un rayon compte sur papier, sans comptage prealable a rapprocher.",
+  );
+
   r.encadre(
     "Le meme fichier importe deux fois ne compte qu'une fois",
     "Reimporter le MEME fichier sur la MEME zone dans le MEME mode remplace l'import precedent au " +

@@ -55,6 +55,42 @@ const nomAgentPhase = (p) => {
   return `${u.prenom || ""} ${u.nom || ""}`.trim() || u.email || "";
 };
 
+// Libellé de l'entrée « zones sans emplacement » du filtre. Valeur sentinelle :
+// une chaîne vide dans un <select> vaut « tous les emplacements ».
+const SANS_EMPLACEMENT = "__sans__";
+
+/**
+ * Avancement d'un lot de zones, mêmes règles que `computeProgress` du serveur
+ * (une zone = 3 phases). Recalculé ici pour que le filtre d'emplacement fasse
+ * bouger les compteurs sans aller-retour serveur.
+ */
+const calculerProgression = (lot) => {
+  const compteurs = { papillonnage: 0, bipage: 0, controle: 0 };
+  lot.forEach((z) => {
+    PHASES.forEach((ph) => {
+      if (z[ph]?.fait) compteurs[ph] += 1;
+    });
+  });
+  const totalZones = lot.length;
+  const totalPhases = totalZones * PHASES.length;
+  const faites = PHASES.reduce((t, ph) => t + compteurs[ph], 0);
+  const parPhase = {};
+  PHASES.forEach((ph) => {
+    parPhase[ph] = {
+      faites: compteurs[ph],
+      total: totalZones,
+      pct: totalZones ? Math.round((compteurs[ph] / totalZones) * 100) : 0,
+    };
+  });
+  return {
+    totalZones,
+    totalPhases,
+    faites,
+    pct: totalPhases ? Math.round((faites / totalPhases) * 100) : 0,
+    parPhase,
+  };
+};
+
 const zoneStatut = (z) => {
   const pap = !!z?.papillonnage?.fait;
   const bip = !!z?.bipage?.fait;
@@ -80,6 +116,10 @@ const AdminInventaireProgressionScreen = () => {
   const [dernierAgentId, setDernierAgentId] = useState("");
   const [bipFeedback, setBipFeedback] = useState(null); // { tone, message }
   const [search, setSearch] = useState("");
+  // Filtre d'emplacement (MAGASIN, DOCK…). Il agit sur le tableau ET sur
+  // l'avancement : pendant un inventaire on pilote une zone géographique à la
+  // fois, et le pourcentage global ne dit rien de l'avancement du dock.
+  const [emplacement, setEmplacement] = useState("");
   const [showInitConfirm, setShowInitConfirm] = useState(false);
   // Sélection des proformas du « comptage sans collecteur », saisie une seule
   // fois ici : elle est ensuite portée par l'inventaire.
@@ -130,15 +170,39 @@ const AdminInventaireProgressionScreen = () => {
 
   const zones = useMemo(() => session?.zones || [], [session]);
 
+  // Emplacements réellement présents dans l'inventaire (jamais une liste en
+  // dur : chaque société a les siens). Les zones sans emplacement sont
+  // regroupées sous une entrée explicite plutôt que d'être invisibles.
+  const emplacements = useMemo(() => {
+    const set = new Set();
+    zones.forEach((z) => set.add((z.type || "").trim()));
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [zones]);
+
+  const zonesEmplacement = useMemo(() => {
+    if (!emplacement) return zones;
+    if (emplacement === SANS_EMPLACEMENT)
+      return zones.filter((z) => !(z.type || "").trim());
+    return zones.filter((z) => (z.type || "").trim() === emplacement);
+  }, [zones, emplacement]);
+
   const filteredZones = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return zones;
-    return zones.filter((z) =>
+    if (!q) return zonesEmplacement;
+    return zonesEmplacement.filter((z) =>
       [z.code, z.libelle, z.type].some((v) =>
         (v || "").toLowerCase().includes(q),
       ),
     );
-  }, [zones, search]);
+  }, [zonesEmplacement, search]);
+
+  // Avancement du PÉRIMÈTRE AFFICHÉ. Recalculé côté client sur les mêmes règles
+  // que le serveur (une zone = 3 phases) : sans ça, filtrer sur le dock
+  // laisserait un pourcentage global qui ne parle de rien.
+  const progressFiltre = useMemo(
+    () => calculerProgression(zonesEmplacement),
+    [zonesEmplacement],
+  );
 
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
 
@@ -154,6 +218,7 @@ const AdminInventaireProgressionScreen = () => {
     setBipFeedback(null);
     setBipCode("");
     setSearch("");
+    setEmplacement("");
     setShowHistorique(false);
     setDesignation(null);
     setAgentUserId("");
@@ -520,16 +585,32 @@ const AdminInventaireProgressionScreen = () => {
             }
           />
 
-          {/* Progression */}
+          {/* Progression — du périmètre affiché, avec rappel du total quand un
+              emplacement est isolé. */}
           {progress && (
             <div className="prog-cards">
               <div className="prog-global">
-                <div className="prog-global-pct">{progress.pct}%</div>
+                <div className="prog-global-pct">{progressFiltre.pct}%</div>
                 <div className="prog-global-label">
-                  Avancement global
+                  {emplacement
+                    ? `Avancement · ${
+                        emplacement === SANS_EMPLACEMENT
+                          ? "sans emplacement"
+                          : emplacement
+                      }`
+                    : "Avancement global"}
                   <span>
-                    {progress.faites}/{progress.totalPhases} phases
+                    {progressFiltre.faites}/{progressFiltre.totalPhases} phases
+                    {" · "}
+                    {progressFiltre.totalZones} zone
+                    {progressFiltre.totalZones > 1 ? "s" : ""}
                   </span>
+                  {emplacement && (
+                    <span className="prog-global-total">
+                      Tous emplacements : {progress.pct}% ({progress.faites}/
+                      {progress.totalPhases})
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="prog-bars">
@@ -538,24 +619,53 @@ const AdminInventaireProgressionScreen = () => {
                     key={ph}
                     label={PHASE_META[ph].label}
                     color={PHASE_META[ph].color}
-                    pct={progress.parPhase[ph].pct}
-                    count={progress.parPhase[ph].faites}
-                    total={progress.parPhase[ph].total}
+                    pct={progressFiltre.parPhase[ph].pct}
+                    count={progressFiltre.parPhase[ph].faites}
+                    total={progressFiltre.parPhase[ph].total}
                   />
                 ))}
               </div>
             </div>
           )}
 
-          {/* Recherche */}
-          <div className="search-box">
-            <HiSearch />
-            <input
-              type="text"
-              placeholder="Filtrer les zones (code, libellé)…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          {/* Filtres du tableau */}
+          <div className="zones-filtres">
+            <select
+              className="filter-select"
+              value={emplacement}
+              onChange={(e) => setEmplacement(e.target.value)}
+              title="N'afficher qu'un emplacement (magasin, dock…)"
+            >
+              <option value="">Tous les emplacements</option>
+              {emplacements.map((e) =>
+                e ? (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ) : (
+                  <option key={SANS_EMPLACEMENT} value={SANS_EMPLACEMENT}>
+                    Sans emplacement
+                  </option>
+                ),
+              )}
+            </select>
+
+            <div className="search-box">
+              <HiSearch />
+              <input
+                type="text"
+                placeholder="Filtrer les zones (code, libellé)…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <span className="zones-compte">
+              {filteredZones.length} zone{filteredZones.length > 1 ? "s" : ""}
+              {filteredZones.length !== zones.length
+                ? ` sur ${zones.length}`
+                : ""}
+            </span>
           </div>
 
           {/* Tableau zones */}
@@ -593,7 +703,10 @@ const AdminInventaireProgressionScreen = () => {
                         />
                       </td>
                       <td className="code-cell">{z.code}</td>
-                      <td>{z.libelle}</td>
+                      <td>
+                        {z.libelle}
+                        {z.type && <span className="zone-type">{z.type}</span>}
+                      </td>
                       {PHASES.map((ph) => {
                         const fait = !!z[ph]?.fait;
                         return (

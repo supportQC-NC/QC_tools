@@ -36,9 +36,11 @@ import {
   HiChevronDown,
   HiChevronRight,
   HiPencilAlt,
+  HiExclamationCircle,
 } from "react-icons/hi";
 import {
   useLazyGetProformasBipageQuery,
+  useApercuImportProformasMutation,
   useImportProformasBipageMutation,
   useImportExcelBipageMutation,
   getModeleExcelBipageUrl,
@@ -407,8 +409,12 @@ const ProformasModal = ({
 }) => {
   const [selection, setSelection] = useState([]); // [numfact]
   const [erreur, setErreur] = useState("");
+  // Aperçu d'impact : rien n'est écrit tant qu'il n'est pas confirmé.
+  const [apercu, setApercu] = useState(null);
 
   const [chercher, { data, isFetching }] = useLazyGetProformasBipageQuery();
+  const [demanderApercu, { isLoading: calculApercu }] =
+    useApercuImportProformasMutation();
   const [importer, { isLoading: importing }] =
     useImportProformasBipageMutation();
 
@@ -453,6 +459,25 @@ const ProformasModal = ({
       s.includes(numfact) ? s.filter((n) => n !== numfact) : [...s, numfact],
     );
 
+  // ÉTAPE 1 — on ne valide plus dans le vide : on affiche d'abord ce que
+  // l'opération va faire au comptage déjà en place (et l'état de la zone).
+  const verifier = async () => {
+    setErreur("");
+    try {
+      const r = await demanderApercu({
+        entrepriseId,
+        zoneCode: zone.code,
+        emplacement: zone.type || "",
+        mode,
+        items: selection.map((numfact) => ({ numfact })),
+      }).unwrap();
+      setApercu(r);
+    } catch (e) {
+      setErreur(e?.data?.message || "Aperçu impossible.");
+    }
+  };
+
+  // ÉTAPE 2 — écriture réelle, après confirmation de l'aperçu.
   const valider = async () => {
     setErreur("");
     try {
@@ -463,8 +488,10 @@ const ProformasModal = ({
         mode,
         items: selection.map((numfact) => ({ numfact })),
       }).unwrap();
+      setApercu(null);
       onDone(r?.message || "Proformas intégrées.");
     } catch (e) {
+      setApercu(null);
       setErreur(e?.data?.message || "Import impossible.");
     }
   };
@@ -626,13 +653,231 @@ const ProformasModal = ({
           </button>
           <button
             className={`btn-primary ${deduction ? "icz-btn-deduction" : ""}`}
-            onClick={valider}
-            disabled={selection.length === 0 || importing}
+            onClick={verifier}
+            disabled={selection.length === 0 || calculApercu}
           >
             <HiUpload />{" "}
-            {importing
+            {calculApercu
+              ? "Calcul…"
+              : `Vérifier ${selection.length} proforma(s)`}
+          </button>
+        </div>
+      </div>
+
+      {apercu && (
+        <ApercuImportModal
+          apercu={apercu}
+          enCours={importing}
+          onRetour={() => setApercu(null)}
+          onConfirmer={valider}
+        />
+      )}
+    </div>
+  );
+};
+
+// ───────────────────────────────────────────────────────────────────────────
+//  MODALE « Vérifier avant d'intégrer »
+//
+//  Un import n'arrive jamais sur une zone vierge : elle a souvent déjà été
+//  papillonnée, comptée, parfois contrôlée. Cet écran répond aux deux questions
+//  qu'on ne pouvait pas se poser avant de valider :
+//    · la zone a-t-elle déjà été CONTRÔLÉE ? (le contrôle a porté sur un
+//      comptage donné : le modifier après coup l'invalide) ;
+//    · article par article, que restera-t-il ? La déduction se lit sur ce qui
+//      est DÉJÀ compté, et les références absentes du comptage sont signalées.
+//  Rien n'est écrit tant que « Confirmer » n'a pas été cliqué.
+// ───────────────────────────────────────────────────────────────────────────
+
+const fmtQte = (n) => {
+  const v = Number(n) || 0;
+  // Quantités au mètre : 3 décimales, zéros de fin supprimés.
+  return v.toFixed(3).replace(/\.?0+$/, "") || "0";
+};
+
+const fmtMouvement = (n) => (n > 0 ? `+${fmtQte(n)}` : fmtQte(n));
+
+const ApercuImportModal = ({ apercu, enCours, onRetour, onConfirmer }) => {
+  const [assume, setAssume] = useState(false);
+  const deduction = apercu.mode === "deduction";
+  const dejaControlee = !!apercu.etat?.controle?.fait;
+  const t = apercu.totaux || {};
+  const echecs = (apercu.proformas || []).filter((p) => p.statut === "erreur");
+
+  return (
+    <div className="icz-overlay" onClick={onRetour}>
+      <div className="icz-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="icz-modal-head">
+          <h2>
+            <HiExclamationCircle /> Vérifier avant d'intégrer
+          </h2>
+          <button className="btn-icon" onClick={onRetour} title="Fermer">
+            <HiX />
+          </button>
+        </div>
+
+        {/* Le cas qui doit arrêter la main de l'opérateur. */}
+        {dejaControlee && (
+          <div className="icz-alerte">
+            <HiExclamationCircle />
+            <div>
+              <b>Cette zone a déjà été contrôlée</b>
+              {apercu.etat.controle.at
+                ? ` le ${new Date(apercu.etat.controle.at).toLocaleString("fr-FR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}`
+                : ""}
+              . Le contrôle a porté sur le comptage actuel : l'intégration va le
+              modifier, et le contrôle ne vaudra plus pour la nouvelle valeur.
+              Refaites-le après, ou annulez.
+              <label className="icz-assume">
+                <input
+                  type="checkbox"
+                  checked={assume}
+                  onChange={(e) => setAssume(e.target.checked)}
+                />
+                J'ai compris, intégrer quand même
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Le comptage du collecteur n'est visible qu'une fois le .DAT traité
+            par le poste d'impression : sans ce rappel, on lirait « 0 déjà
+            compté » sur une zone pourtant déposée. */}
+        {apercu.comptageEnAttente && (
+          <div className="icz-msg attention">
+            Cette zone a été déposée sur le collecteur mais son fichier de
+            comptage n'est pas encore traité : le « déjà compté » ci-dessous est
+            donc à zéro. Attendez la fiche de contrôle avant d'intégrer, sinon
+            les quantités seront rapprochées d'un comptage incomplet.
+          </div>
+        )}
+
+        <div className="icz-etat-zone">
+          <span>
+            Zone <b>{apercu.zone?.code}</b>
+            {apercu.zone?.type ? ` (${apercu.zone.type})` : ""} —{" "}
+            {deduction ? "déduction" : "comptage"}
+          </span>
+          <span className="icz-phases">
+            {["papillonnage", "bipage", "controle"].map((ph) => (
+              <span
+                key={ph}
+                className={`icz-phase ${apercu.etat?.[ph]?.fait ? "faite" : ""}`}
+              >
+                {ph === "controle" ? "contrôle" : ph}
+                {apercu.etat?.[ph]?.fait ? " ✓" : " —"}
+              </span>
+            ))}
+          </span>
+        </div>
+
+        <div className="icz-resultats">
+          <span>
+            {t.nbProformas} proforma(s) · <b>{t.nbArticles}</b> article(s) ·{" "}
+            {fmtQte(t.unitesAvant)} déjà compté(s) → <b>{fmtQte(t.unitesApres)}</b>{" "}
+            après ({fmtMouvement(t.unitesMouvement)})
+            {t.nbNouveaux > 0 && (
+              <>
+                {" "}
+                · <b>{t.nbNouveaux}</b> nouvelle(s) référence(s)
+              </>
+            )}
+            {t.nbNegatifs > 0 && (
+              <>
+                {" "}
+                · <b className="icz-txt-neg">{t.nbNegatifs}</b> résultat(s)
+                négatif(s)
+              </>
+            )}
+          </span>
+        </div>
+
+        {echecs.length > 0 && (
+          <div className="icz-msg err">
+            {echecs.length} proforma(s) ignorée(s) :{" "}
+            {echecs.map((p) => `${p.numfact} (${p.message})`).join(", ")}.
+          </div>
+        )}
+
+        <div className="icz-modal-table">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Article</th>
+                <th>Désignation</th>
+                <th className="num-cell">Déjà compté</th>
+                <th className="num-cell">Mouvement</th>
+                <th className="num-cell">Résultat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(apercu.articles || []).length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="no-data">
+                    Aucun article à intégrer.
+                  </td>
+                </tr>
+              ) : (
+                apercu.articles.map((a) => (
+                  <tr
+                    key={a.nart || a.code}
+                    className={a.negatif ? "icz-row-neg" : ""}
+                  >
+                    <td className="mono">
+                      {a.nart || a.code}
+                      {a.nouveau && (
+                        <span className="icz-badge-new" title="Jamais compté sur cette zone">
+                          nouvelle réf.
+                        </span>
+                      )}
+                    </td>
+                    <td className="desig-cell">
+                      {a.designation || (a.inconnu ? "Article non trouvé" : "—")}
+                    </td>
+                    <td className="num-cell">{fmtQte(a.avant)}</td>
+                    <td
+                      className={`num-cell ${
+                        a.mouvement < 0 ? "icz-txt-neg" : "icz-txt-pos"
+                      }`}
+                    >
+                      {fmtMouvement(a.mouvement)}
+                    </td>
+                    <td className="num-cell">
+                      <b>{fmtQte(a.apres)}</b>
+                      {a.negatif && (
+                        <span
+                          className="icz-badge-neg"
+                          title="La déduction dépasse ce qui avait été compté"
+                        >
+                          négatif
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="icz-modal-actions">
+          <button className="btn-icon" onClick={onRetour}>
+            Retour
+          </button>
+          <button
+            className={`btn-primary ${deduction ? "icz-btn-deduction" : ""}`}
+            onClick={onConfirmer}
+            disabled={enCours || (dejaControlee && !assume)}
+          >
+            <HiUpload />{" "}
+            {enCours
               ? "Intégration…"
-              : `${deduction ? "Déduire" : "Intégrer"} ${selection.length} proforma(s)`}
+              : `Confirmer : ${deduction ? "déduire" : "intégrer"} ${
+                  t.nbArticles
+                } article(s)`}
           </button>
         </div>
       </div>

@@ -701,3 +701,54 @@
   outline: none;
   border-color: #f59e0b;
 }
+
+/* Barre de filtres du tableau des zones : emplacement + recherche.
+   Le filtre d'emplacement pilote AUSSI les compteurs d'avancement au-dessus. */
+.zones-filtres {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.zones-filtres .filter-select {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 190px;
+  cursor: pointer;
+}
+
+.zones-filtres .filter-select:focus {
+  outline: none;
+  border-color: #8b5cf6;
+}
+
+.zones-compte {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Rappel du total quand un emplacement est isolé : sans lui, on perdrait de vue
+   l'avancement réel de l'inventaire. */
+.prog-global-total {
+  margin-top: 4px;
+  font-size: 10.5px !important;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* Emplacement rappelé à côté du libellé de la zone. */
+.zone-type {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}

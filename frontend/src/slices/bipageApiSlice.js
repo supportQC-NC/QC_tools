@@ -60,6 +60,16 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       keepUnusedDataFor: 30,
     }),
 
+    // Aperçu AVANT écriture : impact article par article (déjà compté →
+    // mouvement → résultat) et état des phases de la zone.
+    apercuImportProformas: builder.mutation({
+      query: ({ entrepriseId, zoneCode, emplacement, items, mode }) => ({
+        url: `${BASE}/${entrepriseId}/proformas/apercu`,
+        method: "POST",
+        body: { zoneCode, emplacement, items, mode },
+      }),
+    }),
+
     importProformasBipage: builder.mutation({
       // La ZONE est choisie dans l'écran et vaut pour toute la sélection ;
       // `items` ne porte plus que les numéros (et l'agent si on le surcharge).
@@ -106,6 +116,7 @@ export const {
   useUpdateBipageMutation,
   useRecommencerZoneMutation,
   useLazyGetProformasBipageQuery,
+  useApercuImportProformasMutation,
   useImportProformasBipageMutation,
   useImportExcelBipageMutation,
 } = bipageApiSlice;
