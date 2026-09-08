@@ -222,6 +222,29 @@
   opacity: 1;
 }
 
+/* Vider toute la sélection d'un coup. Reste collé à droite du champ : avec 30
+   puces sur plusieurs lignes, un bouton perdu dans le flux serait introuvable. */
+.etiq-gism1-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.etiq-gism1-clear:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
 .etiq-gism1-search {
   flex: 1;
   min-width: 120px;

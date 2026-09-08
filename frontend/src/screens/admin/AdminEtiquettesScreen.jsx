@@ -88,6 +88,7 @@ const SearchableMultiSelect = ({
   items,
   selected,
   onToggle,
+  onClear,
   loading,
   placeholder,
 }) => {
@@ -146,7 +147,33 @@ const SearchableMultiSelect = ({
           }}
           onFocus={() => setOpen(true)}
           placeholder={selected.length ? "Ajouter…" : ""}
+          onKeyDown={(e) => {
+            // Retour arrière sur une recherche vide : retire la dernière puce.
+            // Geste attendu d'un champ à puces, et une sortie de plus quand on
+            // s'est trompé d'un seul code.
+            if (e.key === "Backspace" && !search && selected.length) {
+              onToggle(selected[selected.length - 1]);
+            }
+          }}
         />
+
+        {/* Vider la sélection d'un coup : à 30 gisements cochés, les retirer un
+            par un n'est pas une option. */}
+        {selected.length > 0 && (
+          <button
+            type="button"
+            className="etiq-gism1-clear"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSearch("");
+              onClear?.();
+            }}
+            title={`Tout effacer (${selected.length})`}
+            aria-label="Tout effacer"
+          >
+            <HiX /> Tout effacer
+          </button>
+        )}
       </div>
 
       {open && (
@@ -762,6 +789,7 @@ const AdminEtiquettesScreen = () => {
               items={gism1Data?.gism1}
               selected={selectedGism1}
               onToggle={toggleGism1}
+              onClear={() => setSelectedGism1([])}
               loading={loadingGism1}
               placeholder="Rechercher et sélectionner un ou plusieurs gisements…"
             />
@@ -781,6 +809,7 @@ const AdminEtiquettesScreen = () => {
               items={groupeData?.groupes}
               selected={selectedGroupe}
               onToggle={toggleGroupe}
+              onClear={() => setSelectedGroupe([])}
               loading={loadingGroupe}
               placeholder="Rechercher et sélectionner un ou plusieurs groupes…"
             />
