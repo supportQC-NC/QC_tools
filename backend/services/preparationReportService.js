@@ -288,7 +288,7 @@
 // // ===========================================
 // // FICHIER DE TRANSFERT DE STOCK (DOCK)
 // // ===========================================
-// // Une ligne par article prélevé au dock (qtePrepareeDock > 0).
+// Une ligne par article prélevé au dock (qtePrepareeDock > 0).
 // const construireContenuTransfert = (preparation) => {
 //   let contenu = "";
 //   (preparation.lignes || []).forEach((l) => {
@@ -515,24 +515,6 @@ const totalPrepare = (l) =>
 // mètre), on coupe seulement le bruit du flottant.
 const q3 = (v) => Math.round(num(v) * 1000) / 1000;
 
-// Quantité de la ligne placée dans une unité de colisage donnée.
-const qteDansUnite = (l, uniteKey) =>
-  (l.repartitionColis || []).reduce(
-    (s, a) => (safeTrim(a.unite) === uniteKey ? s + num(a.quantite) : s),
-    0,
-  );
-
-// Quantité de la ligne déjà colisée, toutes unités confondues.
-const qteColisee = (l) =>
-  (l.repartitionColis || []).reduce((s, a) => s + num(a.quantite), 0);
-
-// La préparation porte-t-elle une répartition de colisage ?
-// Non => les feuilles retombent sur l'ancien comportement (contenu complet sur
-// chaque feuille) : les versions de l'app mobile déjà déployées n'envoient que
-// les compteurs, elles ne doivent pas se retrouver avec des feuilles vides.
-const aUneRepartition = (preparation) =>
-  (preparation.lignes || []).some((l) => (l.repartitionColis || []).length > 0);
-
 // ===========================================
 // LIGNES DU RAPPORT (§11 CDC)
 // Articles présentés dans L'ORDRE DE LA PROFORMA (NL croissant).
@@ -599,62 +581,6 @@ const COLS = [
   { key: "qtePrep", label: "TOTAL", w: 34, align: "center" },
   { key: "ecart", label: "ÉCART", w: 36, align: "center" },
 ];
-
-// Colonnes de la FEUILLE DE COLISAGE. Volontairement différentes de celles du
-// rapport : sur un colis, ce qui compte est « combien il y en a DANS CE colis »,
-// pas l'écart avec la commande, qui est global au document.
-const COLS_COLISAGE = [
-  { key: "n", label: "N°", w: 20, align: "center" },
-  { key: "code", label: "CODE", w: 50, align: "left" },
-  { key: "designation", label: "DÉSIGNATION", w: 185, align: "left" },
-  { key: "gencodeBipe", label: "GENCODE BIPÉ", w: 82, align: "left" },
-  { key: "fournisseur", label: "FOURNISSEUR", w: 88, align: "left" },
-  { key: "qteUnite", label: "QTÉ ICI", w: 55, align: "center" },
-  { key: "qtePrep", label: "TOTAL PRÉP.", w: 55, align: "center" },
-];
-
-/**
- * Lignes d'UNE feuille de colisage.
- * @param uniteKey  clé d'unité (« colis1 »…) ; null = tout le contenu préparé
- *                  (repli quand aucune répartition n'a été saisie).
- * @param avecReste true sur la PREMIÈRE feuille : les quantités préparées que
- *                  l'opérateur n'a affectées à aucune unité y sont reportées,
- *                  repérées « ? ». Rien ne doit disparaître du colisage.
- */
-const construireLignesColisage = (preparation, uniteKey, avecReste = false) => {
-  const lignes = (preparation.lignes || []).slice();
-  lignes.sort((a, b) => (a.nl ?? 0) - (b.nl ?? 0));
-
-  let n = 0;
-  let totalUnite = 0;
-  let nbReste = 0;
-  const rows = [];
-
-  lignes.forEach((l) => {
-    const prepare = q3(totalPrepare(l));
-    if (prepare <= 0) return;
-    const affectee = uniteKey === null ? prepare : q3(qteDansUnite(l, uniteKey));
-    const reste = avecReste ? Math.max(0, q3(prepare - qteColisee(l))) : 0;
-    const qte = q3(affectee + reste);
-    if (qte <= 0) return;
-
-    n += 1;
-    totalUnite = q3(totalUnite + qte);
-    if (reste > 0) nbReste += 1;
-    rows.push({
-      n,
-      code: safeTrim(l.nart),
-      designation: safeTrim(l.designation),
-      gencodeBipe: safeTrim(l.gencodeBipeDock) || safeTrim(l.gencodeBipeMagasin),
-      fournisseur: safeTrim(l.fournisseurNom),
-      qteUnite: reste > 0 ? `${qte} ?` : qte,
-      qtePrep: prepare,
-      reste,
-    });
-  });
-
-  return { rows, totalUnite, nbReste };
-};
 
 const fitText = (doc, text, maxWidth) => {
   const str = text == null ? "" : String(text);
@@ -821,13 +747,11 @@ const ecrirePDFPreparation = async ({ header, rows, commentaire, outPath }) => {
 };
 
 // ===========================================
-// FEUILLE DE COLISAGE (§13 CDC)
-// Une feuille A4 PAR unité (colis / palette / longueur) : client, n° de
-// document, identité de l'unité, colisage total, puis LE CONTENU DE CETTE
-// UNITÉ — pas la commande entière. La répartition vient de l'opérateur
-// (`ligne.repartitionColis`, saisie sur le collecteur en fin de préparation) :
-// sans elle on ne saurait pas quoi mettre sur quelle feuille, et les N feuilles
-// seraient identiques — donc inutiles à celui qui ouvre les colis.
+// COLISAGE — COMPTEURS SEULS
+// L'opérateur déclare en fin de préparation COMBIEN de colis, palettes et
+// longueurs partent ; ce nombre est rappelé sur le rapport et dans l'email.
+// Il n'y a PLUS de feuille de colisage par unité, ni de répartition article
+// par article (fonctionnalité retirée le 09/09/2026, décision client).
 // ===========================================
 
 // Libellé « 3 colis + 1 palette + 2 longueurs » à partir des compteurs.
@@ -838,153 +762,6 @@ const buildColisageTotalLabel = ({ nbColis, nbPalettes, nbLongueurs }) => {
   if (nbPalettes > 0) parts.push(plur(nbPalettes, "palette", "palettes"));
   if (nbLongueurs > 0) parts.push(plur(nbLongueurs, "longueur", "longueurs"));
   return parts.join(" + ") || "—";
-};
-
-// Liste des unités à coliser (colis 1..N, palette 1..M, longueur 1..L).
-// Exporté : le contrôleur s'en sert pour valider la répartition envoyée par
-// l'app (une clé d'unité inconnue est refusée, pas silencieusement ignorée).
-export const listerUnitesColisage = ({ nbColis, nbPalettes, nbLongueurs }) => {
-  const unites = [];
-  for (let i = 1; i <= nbColis; i++)
-    unites.push({ type: "Colis", index: i, total: nbColis, key: `colis${i}` });
-  for (let i = 1; i <= nbPalettes; i++)
-    unites.push({ type: "Palette", index: i, total: nbPalettes, key: `palette${i}` });
-  for (let i = 1; i <= nbLongueurs; i++)
-    unites.push({ type: "Longueur", index: i, total: nbLongueurs, key: `longueur${i}` });
-  return unites;
-};
-
-const ecrirePDFColisage = async ({ header, rows, footer, outPath }) => {
-  const mod = await import("pdfkit").catch(() => {
-    throw new Error("Module 'pdfkit' introuvable. Lancez : npm i pdfkit (backend).");
-  });
-  const PDFDocument = mod.default;
-
-  const margin = 30;
-  const doc = new PDFDocument({ size: "A4", margin });
-  const stream = fs.createWriteStream(outPath);
-  doc.pipe(stream);
-
-  const left = margin;
-  const right = doc.page.width - margin;
-  const tableWidth = COLS_COLISAGE.reduce((s, c) => s + c.w, 0);
-
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(16)
-    .text("FEUILLE DE COLISAGE", left, margin, { width: right - left, align: "center" });
-  // Identité de l'unité, bien visible.
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(20)
-    .fillColor("#1f6feb")
-    .text(header.identite, left, margin + 24, { width: right - left, align: "center" });
-  doc.fillColor("#000");
-
-  let y = margin + 56;
-
-  // Bloc infos (2 colonnes, 2 lignes).
-  const infoH = 18;
-  const colB = left + (right - left) / 2;
-  const halfW = (right - left) / 2;
-  const drawInfo = (x, w, label, value) => {
-    doc.font("Helvetica-Bold").fontSize(9).text(`${label} :`, x + 4, y + 5, { width: 84 });
-    doc
-      .font("Helvetica")
-      .fontSize(9)
-      .text(value || "", x + 90, y + 5, { width: w - 94, lineBreak: false });
-  };
-  const blocH = infoH * 2;
-  doc.rect(left, y, right - left, blocH).stroke();
-  doc.moveTo(colB, y).lineTo(colB, y + blocH).stroke();
-  doc.moveTo(left, y + infoH).lineTo(right, y + infoH).stroke();
-
-  drawInfo(left, halfW, header.refLabel, header.numpro);
-  drawInfo(colB, halfW, "Client", header.client);
-  y += infoH;
-  drawInfo(left, halfW, "Colisage total", header.colisageTotal);
-  drawInfo(colB, halfW, "Date prépa", header.datePrepa);
-  y += infoH + 12;
-
-  // Tableau articles (mêmes colonnes que le rapport, ordre proforma).
-  const rowH = 16;
-  const drawHeader = () => {
-    let x = left;
-    doc.rect(left, y, tableWidth, rowH).fillAndStroke("#e8e8e8", "#000");
-    doc.fillColor("#000").font("Helvetica-Bold").fontSize(7.5);
-    COLS_COLISAGE.forEach((c) => {
-      doc.text(c.label, x + 2, y + 5, { width: c.w - 4, align: c.align, lineBreak: false });
-      x += c.w;
-    });
-    y += rowH;
-  };
-  const ensureSpace = () => {
-    if (y + rowH > doc.page.height - margin - 24) {
-      doc.addPage();
-      y = margin;
-      drawHeader();
-    }
-  };
-
-  drawHeader();
-  doc.font("Helvetica").fontSize(7.5);
-  doc.strokeColor("#999");
-  rows.forEach((r) => {
-    ensureSpace();
-    let x = left;
-    COLS_COLISAGE.forEach((c) => {
-      doc.rect(x, y, c.w, rowH).stroke();
-      const raw = r[c.key] === null || r[c.key] === undefined ? "" : String(r[c.key]);
-      // Quantité non affectée reportée ici (« 12 ? ») : en rouge, celui qui
-      // ouvre le colis doit vérifier où elle se trouve réellement.
-      const color = c.key === "qteUnite" && r.reste > 0 ? "#c0392b" : "#000";
-      const val = fitText(doc, raw, c.w - 4);
-      doc.fillColor(color).text(val, x + 2, y + 5, {
-        width: c.w - 4,
-        align: c.align,
-        lineBreak: false,
-      });
-      x += c.w;
-    });
-    y += rowH;
-  });
-
-  // Pied : volume de l'unité + avertissement sur les quantités non réparties.
-  y += 10;
-  if (y > doc.page.height - margin - 40) {
-    doc.addPage();
-    y = margin;
-  }
-  doc
-    .fillColor("#000")
-    .font("Helvetica-Bold")
-    .fontSize(9)
-    .text(
-      `${rows.length} article(s) — ${footer?.totalUnite ?? 0} unité(s) dans ${header.identite}`,
-      left,
-      y,
-      { width: right - left },
-    );
-  if (footer?.nbReste > 0) {
-    y += 13;
-    doc
-      .fillColor("#c0392b")
-      .font("Helvetica-Bold")
-      .fontSize(8)
-      .text(
-        `${footer.nbReste} ligne(s) « ? » : quantité préparée non affectée à un colis, reportée ici par défaut.`,
-        left,
-        y,
-        { width: right - left },
-      );
-  }
-  doc.fillColor("#000");
-
-  doc.end();
-  await new Promise((resolve, reject) => {
-    stream.on("finish", resolve);
-    stream.on("error", reject);
-  });
 };
 
 // ===========================================
@@ -1052,54 +829,15 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     outPath: filePath,
   });
 
-  // ---- 1bis) Feuilles de colisage : une par colis / palette / longueur ----
+  // ---- 1bis) Colisage : le NOMBRE déclaré, rien de plus ----
   const refLabel = preparation.type === "reservation" ? "Réservation" : "Proforma";
-  const compteurs = {
-    nbColis: num(preparation.colisage?.nbColis),
-    nbPalettes: num(preparation.colisage?.nbPalettes),
-    nbLongueurs: num(preparation.colisage?.nbLongueurs),
+  const colisage = {
+    total: buildColisageTotalLabel({
+      nbColis: num(preparation.colisage?.nbColis),
+      nbPalettes: num(preparation.colisage?.nbPalettes),
+      nbLongueurs: num(preparation.colisage?.nbLongueurs),
+    }),
   };
-  const colisageTotalLabel = buildColisageTotalLabel(compteurs);
-  const unites = listerUnitesColisage(compteurs);
-  // Pas de répartition saisie (app mobile antérieure) : on retombe sur l'ancien
-  // comportement, chaque feuille portant tout le contenu préparé.
-  const repartie = aUneRepartition(preparation);
-  const colisage = { total: colisageTotalLabel, feuilles: [] };
-  for (const [i, u] of unites.entries()) {
-    try {
-      // Le reste non affecté atterrit sur la première feuille : rien ne doit
-      // disparaître entre la préparation et le colisage.
-      const contenu = construireLignesColisage(
-        preparation,
-        repartie ? u.key : null,
-        repartie && i === 0,
-      );
-      const nomFeuille =
-        sanitizeFileName(
-          `Colisage_${header.client}_${header.numpro}_${u.type}${u.index}`,
-        ) + ".pdf";
-      const cheminFeuille = path.join(dossier, nomFeuille);
-      await ecrirePDFColisage({
-        header: {
-          ...header,
-          refLabel,
-          colisageTotal: colisageTotalLabel,
-          identite: `${u.type} ${u.index} / ${u.total}`,
-        },
-        rows: contenu.rows,
-        footer: { totalUnite: contenu.totalUnite, nbReste: contenu.nbReste },
-        outPath: cheminFeuille,
-      });
-      colisage.feuilles.push({
-        libelle: `${u.type} ${u.index} / ${u.total}`,
-        fileName: nomFeuille,
-        filePath: cheminFeuille,
-        generatedAt: new Date(),
-      });
-    } catch (e) {
-      console.error(`[PREPA colisage ${u.key}] génération impossible:`, e.message);
-    }
-  }
 
   // ---- Email ----
   const destinataires = (entreprise.emailsRapportPreparation || []).filter(Boolean);
@@ -1114,13 +852,7 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
         email: destinataires,
         subject: `Préparation commande — ${refLabel} ${header.numpro} (${header.client})`,
         html: buildEmailHtml(header, stats, preparation),
-        attachments: [
-          { filename: fileName, path: filePath },
-          ...colisage.feuilles.map((f) => ({
-            filename: f.fileName,
-            path: f.filePath,
-          })),
-        ],
+        attachments: [{ filename: fileName, path: filePath }],
       });
       emailSentAt = new Date();
     } catch (error) {

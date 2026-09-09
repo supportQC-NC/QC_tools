@@ -480,24 +480,34 @@ métier **opposées** :
 successives — **1 · DOCK** puis **2 · MAGASIN** — et l'on commence *toujours*
 par le dock. Pour chaque article : `qteDock = min(qté demandée, S2)`, le reste
 part au magasin (S1). Un article peut donc apparaître **deux fois**, avec la
-quantité propre à chaque zone (repère `>` sur la ligne). La répartition et
+quantité propre à chaque zone. La répartition et
 l'ordonnancement (gisement, priorité de parcours) ne sont **pas redéveloppés** :
 `preparationManuelleService` appelle `analyserProforma()` de
 `services/preparationService.js`, celui de la préparation scannée.
 
 ⚠️ Le reliquat magasin n'est **pas** borné par S1 : si le stock total ne couvre
-pas la demande, la ligne part quand même au magasin avec un repère `!` et le
-stock de la zone affiché — l'agent voit la rupture probable avant de chercher.
+pas la demande, la ligne part quand même au magasin — l'agent la découvre au
+rayon, la fiche ne l'annonce plus (voir les colonnes retirées ci-dessous).
 
-**Les trois colonnes de droite de la fiche**, dans cet ordre et jamais
-autrement : `QTÉ CDE` (ce que le client a commandé, toutes zones confondues),
-`À PRENDRE` (la part de cette zone) puis `CTRL` (vide). Retirer `QTÉ CDE` rend
-la fiche illisible dès qu'un article est à cheval : « à prendre 25 » sur une
-commande de 50 ne dit pas s'il en manque 25 ou s'ils sont dans l'autre zone.
-La colonne `DISPO` ne porte un chiffre **que** lorsque la zone n'a pas le
-compte (avec le repère `!`) : un stock affiché à côté d'une quantité à prendre
-se lit comme une seconde quantité à prendre — erreur constatée en relecture
-client sur une ligne « dispo 90 / à prendre 3 ».
+**Colonnes de la fiche**, dans l'ordre : case à cocher, `NL`, `CODE` (NART, 6
+caractères), `DÉSIGNATION`, `GENCODE`, `FOURNISSEUR`, `RÉF.`, `GISEMENT` (5
+caractères), `RAYON` (le reste de la largeur), puis le trio de droite — `QTÉ
+CDE` (ce que le client a commandé, toutes zones confondues), `À PRENDRE` (la
+part de cette zone) et `CTRL` (la seule case vide). Ce trio ne change **jamais**
+d'ordre : retirer `QTÉ CDE` rend la fiche illisible dès qu'un article est à
+cheval — « à prendre 25 » sur une commande de 50 ne dit pas s'il en manque 25 ou
+s'ils sont dans l'autre zone. La largeur totale est calée sur `CW` (`RAYON`
+absorbe le reste) : toucher une largeur oblige à revérifier que les en-têtes
+tiennent, `GISEMENT` était le plus juste.
+
+⚠️ **Retirés le 10/09/2026 à la demande du client** : la colonne de repères qui
+suivait `CODE` (`!` rupture probable, `>` article aussi à prendre dans l'autre
+zone) et la colonne `DISPO`. Elles ne servaient pas sur le terrain. Les données
+restent calculées (`manquant`, `autreZone`, `stockZone` dans
+`preparationManuelleService`) et l'aperçu web garde sa colonne « Dispo zone » —
+ne pas les réintroduire dans le PDF sans décision explicite. `FOURNISSEUR`
+(nom résolu depuis `article.FOURN`) a été ajouté au même moment : au dock, les
+arrivages sont rangés par fournisseur.
 
 **Gisement** : la fiche article porte un code d'emplacement **par zone** —
 `GISM2` = dock, `GISM1` = magasin. La colonne GISEMENT affiche celui de la zone
@@ -539,28 +549,16 @@ figurent sur le bandeau de chaque section, là où l'agent en a besoin.
 ## Colisage de la préparation scannée
 
 En fin de préparation l'opérateur déclare un nombre de **colis / palettes /
-longueurs**, et une **feuille A4 par unité** est générée à côté du rapport
-(`preparationReportService.genererSorties`).
+longueurs** (`PreparationModel.colisage`). Ce nombre est repris sur le rapport
+et dans l'email — c'est tout.
 
-⚠️ Cette feuille doit porter **le contenu de SON unité**, pas la commande
-entière : sinon les N feuilles sont identiques et n'apprennent rien à celui qui
-ouvre le colis (constat client du 04/09/2026). La répartition est saisie sur le
-collecteur juste avant la génération (écran « Répartir les articles ») et stockée
-par ligne dans `PreparationModel.lignes[].repartitionColis` =
-`[{ unite, quantite }]`, `unite` étant la clé produite par
-`listerUnitesColisage` (`colis1`, `palette2`, `longueur1`…). Un article peut
-être **scindé** entre plusieurs unités (50 m de câble sur 2 palettes), d'où une
-quantité et non un simple rattachement.
-
-- La répartition transite avec les compteurs sur `PUT /api/preparations/:id/colisage`
-  (champ `repartition` facultatif). Le contrôleur **refuse** une unité inconnue
-  ou un cumul supérieur à la quantité préparée.
-- **Repli assumé** : `repartitionColis` vide partout → ancien comportement
-  (contenu complet sur chaque feuille). Les APK déjà déployées n'envoient que
-  les compteurs, elles ne doivent pas produire des feuilles vides.
-- Ce que l'opérateur n'a affecté à aucune unité est reporté sur la **première**
-  feuille, marqué `?` en rouge avec une note en pied : rien ne disparaît entre la
-  préparation et le colisage.
+⚠️ Les **feuilles de colisage** (une A4 par unité, avec le contenu de son colis)
+et la **répartition article par article** (`lignes[].repartitionColis`, écran
+« Répartir les articles » du collecteur) ont été **retirées le 09/09/2026** à la
+demande du client : seuls les compteurs sont conservés. Ne pas les réintroduire
+sans décision explicite — le code correspondant (`ecrirePDFColisage`,
+`listerUnitesColisage`, `construireLignesColisage`) a été supprimé, pas mis en
+commentaire.
 
 ## Carte des domaines fonctionnels
 

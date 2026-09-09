@@ -31,7 +31,6 @@ const GRIS_LIGNE = "#d1d5db";
 const GRIS_FOND = "#f3f4f6";
 const GRIS_BANDE = "#f7f8f9";
 const GRIS_REGLURE = "#e5e7eb";
-const ROUGE = "#b91c1c";
 
 // Couleurs de repérage des deux zones de prélèvement.
 const ZONES = {
@@ -121,7 +120,16 @@ const logoBuffer = (entreprise) => {
 // GISEMENT porte le CODE d'emplacement de la zone parcourue (GISM2 au dock,
 // GISM1 au magasin) : c'est lui qui guide le déplacement de l'agent, il est
 // donc en gras. RAYON n'est renseigné que si la société a un dictionnaire Excel
-// des gisements (libellé + sous-rayon).
+// des gisements (libellé + sous-rayon). FOURNISSEUR vient de la fiche article
+// (FOURN résolu en nom) : c'est un repère de rangement au dock, où les palettes
+// arrivent par fournisseur.
+//
+// ⚠️ Retirés le 10/09/2026 à la demande du client : la colonne de repères
+// (« ! » rupture probable, « > » article aussi à prendre dans l'autre zone) et
+// la colonne DISPO. Elles ne servaient pas sur le terrain. Les données
+// correspondantes (`manquant`, `autreZone`, `stockZone`) restent produites par
+// `preparationManuelleService` — ne pas les réintroduire dans la fiche sans
+// décision explicite.
 //
 // Le trio de droite se lit de gauche à droite et DOIT rester dans cet ordre :
 //   QTÉ CDE   = ce que le client a commandé sur la proforma (le total) ;
@@ -130,14 +138,15 @@ const logoBuffer = (entreprise) => {
 // Sans « QTÉ CDE », l'agent qui voit « à prendre 25 » sur une commande de 50 ne
 // peut pas savoir s'il manque quelque chose ou si le reste vient d'ailleurs.
 // ---------------------------------------------------------------------------
-const DESIGNATION_W = 240;
+const DESIGNATION_W = 200;
 
 const buildColonnes = () => {
   const cols = [
     { key: "check", label: "", w: 16, align: "center" },
     { key: "nl", label: "NL", w: 22, align: "center" },
-    { key: "nart", label: "CODE", w: 44, align: "left" },
-    { key: "flag", label: "", w: 18, align: "center" },
+    // CODE = NART, jamais plus de 6 caractères ; GISEMENT jamais plus de 5.
+    // La place gagnée va à RÉF. et au FOURNISSEUR, que l'agent lit vraiment.
+    { key: "nart", label: "CODE", w: 34, align: "left" },
     {
       key: "designation",
       label: "DÉSIGNATION",
@@ -145,10 +154,10 @@ const buildColonnes = () => {
       align: "left",
     },
     { key: "gencod", label: "GENCODE", w: 58, align: "left" },
-    { key: "refer", label: "RÉF.", w: 46, align: "left" },
-    { key: "gisement", label: "GISEMENT", w: 58, align: "left" },
+    { key: "fournisseur", label: "FOURNISSEUR", w: 96, align: "left" },
+    { key: "refer", label: "RÉF.", w: 72, align: "left" },
+    { key: "gisement", label: "GISEMENT", w: 44, align: "left" },
     { key: "rayon", label: "RAYON", w: 0, align: "left" },
-    { key: "stock", label: "DISPO", w: 42, align: "center" },
     { key: "qteCde", label: "QTÉ CDE", w: 52, align: "center" },
     { key: "aPrendre", label: "À PRENDRE", w: 62, align: "center" },
     { key: "ctrl", label: "CTRL", w: 52, align: "center", saisie: true },
@@ -562,7 +571,7 @@ const drawTableHeader = (doc, cols, y) => {
 // Une ligne article : tout est imprimé (bande grise alternée) SAUF la colonne
 // « CTRL », laissée BLANCHE pour que l'agent y note la quantité réellement
 // prise en cas d'écart.
-const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
+const drawLigne = (doc, cols, xSaisie, ligne, y, index) => {
   if (index % 2 === 1) {
     doc
       .save()
@@ -606,19 +615,11 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
 
   cell("nl", ligne.nl ? fmtNb(ligne.nl) : "", { size: 6.8, color: GRIS_LABEL });
   cell("nart", ligne.nart, { bold: true });
-  // Repères cumulables : ! = stock de la zone insuffisant (rupture probable),
-  // > = l'article est aussi à prendre dans l'AUTRE zone (ne pas s'étonner de le
-  // revoir plus loin sur la fiche).
-  const reperes = [ligne.manquant > 0 ? "!" : "", ligne.autreZone ? ">" : ""].join(
-    "",
-  );
-  cell("flag", reperes, {
-    bold: true,
-    size: 7.5,
-    color: ligne.manquant > 0 ? ROUGE : ZONES[zone].couleur,
-  });
   cell("designation", ligne.designation);
   cell("gencod", ligne.gencod, { size: 7, color: GRIS_LABEL });
+  // Fournisseur de l'article : au dock, les arrivages sont rangés par
+  // fournisseur — c'est souvent lui qui mène à la palette.
+  cell("fournisseur", ligne.fournisseurNom, { size: 7, color: GRIS_TXT });
   cell("refer", ligne.refer, { size: 7, color: GRIS_LABEL });
   // Code d'emplacement de la zone en cours (GISM2 dock / GISM1 magasin) : en
   // gras, c'est lui que l'agent cherche des yeux pour se déplacer.
@@ -626,16 +627,6 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
   // Libellé du dictionnaire Excel des gisements, quand la société en a un.
   const rayon = [ligne.rayon, ligne.sousRayon].filter(Boolean).join(" · ");
   cell("rayon", rayon, { size: 7, color: GRIS_TXT });
-  // ⚠️ NE JAMAIS imprimer le stock quand il couvre le besoin : un « 90 » posé
-  // à côté d'un « 3 » se lit comme une quantité à prendre (erreur constatée en
-  // relecture client). La colonne ne sert qu'à l'ALERTE : on n'y met un chiffre
-  // que lorsque la zone n'a pas de quoi servir la ligne — c'est alors le nombre
-  // d'unités réellement trouvables sur place.
-  cell("stock", ligne.manquant > 0 ? fmtNb(ligne.stockZone) : "", {
-    bold: true,
-    size: 7,
-    color: ROUGE,
-  });
 
   // Quantité commandée sur la proforma : le total dû au client, toutes zones
   // confondues. Grisée et plus petite que « à prendre » pour qu'on ne puisse
@@ -664,9 +655,9 @@ const drawLigne = (doc, cols, xSaisie, ligne, y, index, zone) => {
  * @param {object} p.proforma      entête { numfact, clientNom, clientCode, vendeurCode, vendeurNom, datfact, etat, etatLabel }
  * @param {Array}  p.lignesDock    lignes à prendre au dock (S2), déjà ordonnées
  * @param {Array}  p.lignesMagasin lignes à prendre au magasin (S1), déjà ordonnées
- *                                 [{ nl, nart, designation, refer, gencod, gisement,
- *                                    rayon, sousRayon, qteCommandee, aPrendre,
- *                                    stockZone, manquant, autreZone }]
+ *                                 [{ nl, nart, designation, refer, fournisseurNom,
+ *                                    gencod, gisement, rayon, sousRayon,
+ *                                    qteCommandee, aPrendre }]
  * @param {Array}  p.commentaires  commentaires de la proforma (TEXTE + lignes « ! »)
  * @param {object} p.totaux        { totalDock, totalMagasin } — volumes des
  *                                 bandeaux de section (la page 1 n'affiche
@@ -753,7 +744,7 @@ export const genererFichePreparationPDF = async ({
         y = drawBandeZone(doc, zone, y, { ...infosBande, suite: true });
         y = drawTableHeader(doc, cols, y);
       }
-      y = drawLigne(doc, cols, xSaisie, ligne, y, index, zone);
+      y = drawLigne(doc, cols, xSaisie, ligne, y, index);
       index += 1;
     });
 
@@ -763,7 +754,7 @@ export const genererFichePreparationPDF = async ({
   // ── Pieds de page (numérotation connue une fois toutes les pages écrites) ──
   const range = doc.bufferedPageRange();
   const legende =
-    "Parcours : DOCK (S2) puis MAGASIN (S1) · QTÉ CDE = quantité de la proforma (toutes zones) · À PRENDRE = part à prélever ICI · CTRL = quantité réellement prise si elle diffère · DISPO n'est rempli que si la zone n'a pas le compte (!) · > = le solde est à prendre dans l'autre zone";
+    "Parcours : DOCK (S2) puis MAGASIN (S1) · QTÉ CDE = quantité de la proforma (toutes zones) · À PRENDRE = part à prélever ICI · CTRL = quantité réellement prise si elle diffère";
   for (let i = 0; i < range.count; i += 1) {
     doc.switchToPage(range.start + i);
     const fy = PAGE_H - M - 10;

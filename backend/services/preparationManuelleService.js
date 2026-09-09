@@ -210,6 +210,9 @@ export const getPreparationComplete = async (entreprise, numpro) => {
       nart: l.nart,
       designation: l.designation,
       refer: l.refer,
+      // Nom du fournisseur (FOURN de la fiche article, résolu par
+      // analyserProforma) : imprimé sur la fiche depuis le 10/09/2026.
+      fournisseurNom: l.fournisseurNom || "",
       gencod: l.gencod,
       gism1: l.gism1,
       gism2: l.gism2,
