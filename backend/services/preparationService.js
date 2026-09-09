@@ -18,6 +18,10 @@ import proformaCacheService from "./proformaCacheService.js";
 import articleCacheService from "./articleService.js";
 import fournissCacheService from "./fournissCacheService.js";
 import gisementsService, { lookupGisement } from "./gisementsService.js";
+import {
+  buildIndexRayons,
+  lookupRayon,
+} from "./dictionnaireRayonsService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const num = (v) => {
@@ -85,9 +89,7 @@ export const ordonnerMagasin = (lignes) => {
       (a, b) =>
         (a.priorite ?? Number.POSITIVE_INFINITY) -
           (b.priorite ?? Number.POSITIVE_INFINITY) ||
-        String(a.gism1).localeCompare(String(b.gism1), "fr", {
-          sensitivity: "base",
-        }) ||
+        comparerCodeGisement(a.gism1, b.gism1) ||
         a.nl - b.nl,
     );
   const sansGisement = mag
@@ -107,6 +109,60 @@ export const ordonnerMagasin = (lignes) => {
     l.ordreMagasin = i + 1;
   });
   return lignes;
+};
+
+/**
+ * Comparateur de CODES DE GISEMENT, pour ranger une zone dans l'ordre du
+ * parcours physique.
+ *
+ * Le code se lit en deux parties séparées par le PREMIER « _ » : ce qui
+ * précède est l'allée (A, B, I, A2…), ce qui suit le repère dans l'allée
+ * (1, 2d, 10, 12g…). Chaque partie est comparée en ordre NATUREL — lettres
+ * dans l'ordre alphabétique, nombres dans l'ordre numérique.
+ *
+ * ⚠️ Un `localeCompare` sur le code entier (l'ancien tri) donne
+ * « A_1, A_10, A_11, A_12d, A_2d » : l'agent redescend l'allée au lieu de la
+ * parcourir. Ici on obtient « A_1, A_2d, A_9, A_10, A_11, A_12d ».
+ */
+const segmentsNaturels = (v) =>
+  String(v || "")
+    .toUpperCase()
+    .split(/(\d+)/)
+    .filter((x) => x !== "")
+    .map((x) => (/^\d+$/.test(x) ? Number(x) : x));
+
+const comparerNaturel = (a, b) => {
+  const sa = segmentsNaturels(a);
+  const sb = segmentsNaturels(b);
+  for (let i = 0; i < Math.max(sa.length, sb.length); i += 1) {
+    const x = sa[i];
+    const y = sb[i];
+    if (x === undefined) return -1; // « A » avant « A2 »
+    if (y === undefined) return 1;
+    const xNum = typeof x === "number";
+    const yNum = typeof y === "number";
+    if (xNum && yNum) {
+      if (x !== y) return x - y;
+    } else if (xNum !== yNum) {
+      return xNum ? -1 : 1; // un nombre avant une lettre à rang égal
+    } else if (x !== y) {
+      return x.localeCompare(y, "fr", { sensitivity: "base" });
+    }
+  }
+  return 0;
+};
+
+export const comparerCodeGisement = (a, b) => {
+  const couper = (v) => {
+    const s = String(v || "").trim();
+    const i = s.indexOf("_");
+    return i === -1 ? [s, ""] : [s.slice(0, i), s.slice(i + 1)];
+  };
+  const [alleeA, repereA] = couper(a);
+  const [alleeB, repereB] = couper(b);
+  return (
+    comparerNaturel(alleeA, alleeB) || comparerNaturel(repereA, repereB)
+  );
 };
 
 /**
@@ -140,12 +196,13 @@ export const ordonnerDock = (lignes) => {
     .sort((a, b) => {
       const ga = gisementDock(a);
       const gb = gisementDock(b);
+      // La priorité du dictionnaire reste prioritaire quand elle est saisie ;
+      // à défaut (cas de QC : aucune renseignée), c'est l'ordre naturel des
+      // codes qui range l'allée.
       return (
         (ga.priorite ?? Number.POSITIVE_INFINITY) -
           (gb.priorite ?? Number.POSITIVE_INFINITY) ||
-        String(ga.code).localeCompare(String(gb.code), "fr", {
-          sensitivity: "base",
-        }) ||
+        comparerCodeGisement(ga.code, gb.code) ||
         a.nl - b.nl
       );
     });
@@ -311,8 +368,35 @@ export const analyserProforma = async (entreprise, numpro) => {
 
   const details = await proformaCacheService.getProdetByNumfact(entreprise, numfact);
 
-  // Fichier des gisements (libellé rayon + sous-rayon + priorité de parcours).
+  // Libellés et priorités de parcours des rayons.
+  //
+  // SOURCE DE VÉRITÉ : le DICTIONNAIRE DES RAYONS de l'application (écran
+  // Données ▸ Dictionnaire des rayons), indexé par CODE + EMPLACEMENT. C'est
+  // indispensable : le même code existe au dock et au magasin avec deux
+  // libellés différents, et l'ancien fichier `<TRIG>_gissement.xlsx`, indexé
+  // par code seul, renvoyait donc un libellé sur deux au mauvais rayon.
+  //
+  // L'ancien fichier reste en REPLI, pour les sociétés qui n'ont pas encore
+  // renseigné leur dictionnaire — jamais en priorité.
+  const { index: rayonsIndex } = await buildIndexRayons(entreprise);
   const { map: gisMap } = await gisementsService.getGisements(entreprise);
+
+  // Résolution d'un gisement pour UNE zone donnée : dictionnaire d'abord
+  // (code + emplacement), repli sur le fichier gisements (code seul).
+  const resoudreRayon = (code, emplacement) => {
+    if (!code) return null;
+    const duDico = lookupRayon(rayonsIndex, code, emplacement);
+    if (duDico) {
+      return {
+        libelle: duDico.libelle,
+        sousRayon: "",
+        priorite: duDico.priorite,
+        source: "dictionnaire",
+      };
+    }
+    const ancien = lookupGisement(gisMap, code);
+    return ancien ? { ...ancien, source: "gissement" } : null;
+  };
 
   // Table { NART -> gencodes acceptables (renvois inclus) } construite une fois.
   let gencodesParNart = new Map();
@@ -356,9 +440,10 @@ export const analyserProforma = async (entreprise, numpro) => {
     // Gisement (Excel <TRIG>_gissement.xlsx : code -> libellé + sous-rayon +
     // priorité). Un lookup PAR ZONE : la fiche article porte GISM1 pour le rayon
     // et GISM2 pour le dock, et chaque phase se parcourt dans l'ordre de SA zone.
-    const gis = lookupGisement(gisMap, gism1);
+    // MAGASIN = GISM1, DOCK = GISM2 — chacun cherché à SON emplacement.
+    const gis = resoudreRayon(gism1, "MAGASIN");
     const aGisement = !!(gism1 && gis);
-    const gisDock = lookupGisement(gisMap, gism2);
+    const gisDock = resoudreRayon(gism2, "DOCK");
     const aGisementDock = !!(gism2 && gisDock);
 
     // Tous les gencodes possibles (renvois inclus) + gencode principal en tête.
@@ -418,6 +503,7 @@ export const analyserProforma = async (entreprise, numpro) => {
 
 export default {
   resolveVendeur,
+  comparerCodeGisement,
   ordonnerDock,
   ordonnerMagasin,
   getProformasAPreparer,

@@ -143,6 +143,55 @@ export const readDictionnaire = async (entreprise) => {
   };
 };
 
+/**
+ * Index du dictionnaire pour la PRÉPARATION : `CODE|EMPLACEMENT` →
+ * `{ libelle, priorite, emplacement }`.
+ *
+ * ⚠️ L'emplacement fait partie de la clé, et ce n'est pas un détail : un même
+ * code de rayon existe au DOCK et au MAGASIN avec des libellés DIFFÉRENTS
+ * (« A_1 » = EPI GANTS au dock, Ventilateurs muraux au magasin chez QC).
+ * Indexer par code seul renvoyait le libellé du premier trouvé — donc le
+ * mauvais une fois sur deux sur la fiche de préparation.
+ *
+ * Les sous-zones matérialisées (« A_1_B », type « sous ») sont ignorées : la
+ * fiche parle du rayon, pas de sa découpe en mètres linéaires.
+ */
+export const buildIndexRayons = async (entreprise) => {
+  const index = new Map();
+  let fichier = "";
+  try {
+    const dico = await readDictionnaire(entreprise);
+    fichier = dico.fichier || "";
+    if (!dico.exists) return { index, fichier, exists: false };
+    for (const r of dico.rows || []) {
+      const code = safeTrim(r.gism1).toUpperCase();
+      if (!code) continue;
+      const emplacement = normEmplacement(r.emplacement);
+      const cle = `${code}|${emplacement}`;
+      // Première ligne gagnante : un doublon exact (même code, même
+      // emplacement) est une erreur de saisie, pas une seconde zone.
+      if (index.has(cle)) continue;
+      index.set(cle, {
+        libelle: safeTrim(r.libelle),
+        priorite: r.priorite,
+        emplacement,
+      });
+    }
+    return { index, fichier, exists: true };
+  } catch {
+    // Dictionnaire illisible (partage injoignable, fichier verrouillé) :
+    // l'appelant retombera sur l'ancien fichier de gisements.
+    return { index, fichier, exists: false };
+  }
+};
+
+/** Cherche un rayon par son code ET son emplacement. */
+export const lookupRayon = (index, code, emplacement) => {
+  const c = safeTrim(code).toUpperCase();
+  if (!c || !index) return null;
+  return index.get(`${c}|${normEmplacement(emplacement)}`) || null;
+};
+
 // Analyse un buffer xlsx uploadé (import de masse) et renvoie ses lignes de zone
 // [{ gism1, libelle, metrage, priorite, emplacement }].
 export const parseWorkbookRows = async (buffer) => {

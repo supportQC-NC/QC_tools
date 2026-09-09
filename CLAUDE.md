@@ -501,12 +501,23 @@ client sur une ligne « dispo 90 / à prendre 3 ».
 
 **Gisement** : la fiche article porte un code d'emplacement **par zone** —
 `GISM2` = dock, `GISM1` = magasin. La colonne GISEMENT affiche celui de la zone
-parcourue (et le dictionnaire Excel des gisements, quand la société en a un, est
-interrogé avec ce code-là). Ne pas afficher GISM1 sur une ligne dock : chez QC
+parcourue, et son libellé vient du **dictionnaire des rayons** de l'application
+(`<TRIG>_dictionnaire_rayons.xlsx`, écran Données ▸ Dictionnaire des rayons),
+interrogé sur le couple **code + emplacement** (`buildIndexRayons` /
+`lookupRayon`). ⚠️ Le couple est obligatoire : chez QC, **53 codes existent aux
+deux emplacements et 34 y portent un libellé différent** (`A_1` = « Ventilateurs
+muraux » au magasin, « EPI GANTS » au dock). L'ancien fichier
+`<TRIG>_gissement.xlsx`, indexé par code seul, ne sert plus que de **repli** pour
+les sociétés sans dictionnaire. Ne pas afficher GISM1 sur une ligne dock : chez QC
 les deux diffèrent presque toujours (dock `J_2` vs rayon `C_4`).
 `analyserProforma` expose les DEUX jeux (code, libellé, sous-rayon, priorité) et
-**ordonne chaque phase sur le gisement de sa zone** : le dock par la priorité de
-GISM2, le magasin par celle de GISM1. **L'app collecteur suit exactement le même
+**ordonne chaque phase sur le gisement de sa zone** : le dock sur GISM2, le
+magasin sur GISM1. **Règle de tri (décision client du 09/09/2026)** : la
+`priorite` du dictionnaire l'emporte quand elle est renseignée ; à défaut — cas
+de QC, où aucune ne l'est — les codes sont rangés dans l'ordre **naturel**
+(`comparerCodeGisement` : découpage au premier `_`, allée en alphabétique,
+repère en numérique). Un `localeCompare` brut donnait « A_1, A_10, A_11, A_2d »
+et faisait redescendre l'allée à l'agent ; on obtient « A_1, A_2d, A_9, A_10 ». **L'app collecteur suit exactement le même
 ordre** — elle trie sur les `ordreDock` / `ordreMagasin` calculés par le serveur
 et affiche le gisement de la zone en cours ; ne jamais retrier côté mobile, les
 deux supports divergeraient. Le repli reste l'ordre de la proforma (NL)
