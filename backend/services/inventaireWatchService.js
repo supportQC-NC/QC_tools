@@ -314,6 +314,7 @@ const traiterFichier = async (
         eanArticle: r.code,
         qteScan: r.qte,
         nart: r.nart === "-" ? "" : r.nart,
+        gencod: r.gencod || "",
         designation: r.designation,
         observation: "",
         stock: typeof r.stock === "number" ? r.stock : null,

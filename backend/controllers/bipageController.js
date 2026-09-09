@@ -46,7 +46,9 @@ const buildFilter = (session, query) => {
 
   if (query.search) {
     const rx = new RegExp(escapeRegex(query.search.trim()), "i");
-    filter.$or = [{ nart: rx }, { eanArticle: rx }];
+    // `gencod` est dans la recherche parce qu'il est AFFICHÉ : l'utilisateur
+    // qui lit un code-barres à l'écran doit pouvoir le retaper ici.
+    filter.$or = [{ nart: rx }, { eanArticle: rx }, { gencod: rx }];
   }
   return filter;
 };
@@ -121,6 +123,33 @@ const backfillZoneType = async (session) => {
  * @route   GET /api/bipages/:entrepriseId?zone=&type=&search=
  * @access  Private/Admin
  */
+/**
+ * Complète `gencod` en mémoire pour les lignes qui n'en ont pas (bipages
+ * antérieurs à l'ajout du champ). Lecture seule, sur le cache articles déjà
+ * chargé : coût négligeable, et l'écran affiche le bon code-barres dès la
+ * première ouverture, sans migration.
+ */
+const completerGencod = async (entreprise, lignes) => {
+  const aResoudre = lignes.filter((l) => !l.gencod && l.nart);
+  if (!aResoudre.length) return;
+  const dejaVu = new Map();
+  for (const l of aResoudre) {
+    const cle = String(l.nart).trim().toUpperCase();
+    if (!dejaVu.has(cle)) {
+      let gencod = "";
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const rec = await articleCacheService.findByNart(entreprise, l.nart);
+        if (rec) gencod = String(rec.GENCOD || "").trim();
+      } catch {
+        gencod = "";
+      }
+      dejaVu.set(cle, gencod);
+    }
+    l.gencod = dejaVu.get(cle);
+  }
+};
+
 const getBipages = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const session = await InventaireZoneSession.findOne({
@@ -142,7 +171,13 @@ const getBipages = asyncHandler(async (req, res) => {
   const filter = buildFilter(session, req.query);
   const lignes = await LigneBipage.find(filter)
     .sort({ zoneType: 1, zoneCode: 1, datFileName: 1, ordre: 1 })
-    .limit(5000);
+    .limit(5000)
+    .lean();
+
+  // Rattrapage des lignes bipées AVANT l'ajout du champ `gencod` : on le
+  // résout depuis le cache articles pour l'affichage, sans réécrire en base
+  // (une lecture ne doit pas écrire). Les lignes créées depuis le portent.
+  await completerGencod(entreprise, lignes);
 
   const { zonesMeta, types } = await buildZonesMeta(session);
 
@@ -407,16 +442,22 @@ const updateBipage = asyncHandler(async (req, res) => {
         record = null;
       }
       if (record) {
+        // Le NART fait foi : désignation, code-barres et stock du NOUVEL
+        // article remplacent ceux de l'ancien. Sans le gencod, la colonne
+        // GENCODE de l'écran resterait sur celui de l'article précédent.
         ligne.designation = (record.DESIGN || "").trim();
+        ligne.gencod = (record.GENCOD || "").trim();
         ligne.stock = articleCacheService.calculateStockTotal(record);
         ligne.found = true;
       } else {
         ligne.designation = "Article non trouvé";
+        ligne.gencod = "";
         ligne.stock = null;
         ligne.found = false;
       }
     } else {
       ligne.designation = "";
+      ligne.gencod = "";
       ligne.stock = null;
       ligne.found = false;
     }
@@ -445,12 +486,13 @@ const exportCsv = asyncHandler(async (req, res) => {
   await backfillZoneType(session);
 
   const filter = buildFilter(session, req.query);
-  const lignes = await LigneBipage.find(filter).sort({
-    zoneType: 1,
-    zoneCode: 1,
-    datFileName: 1,
-    ordre: 1,
-  });
+  const lignes = await LigneBipage.find(filter)
+    .sort({ zoneType: 1, zoneCode: 1, datFileName: 1, ordre: 1 })
+    .lean();
+
+  // Même rattrapage que la liste : le CSV doit porter le code-barres, y
+  // compris pour les bipages antérieurs au champ `gencod`.
+  await completerGencod(entreprise, lignes);
 
   const sep = ";";
   const esc = (v) => {
@@ -460,7 +502,8 @@ const exportCsv = asyncHandler(async (req, res) => {
   const header = [
     "ZONE",
     "EMPLACEMENT",
-    "EAN_ARTICLE",
+    "CODE_SCANNE",
+    "GENCODE",
     "QTE_SCAN",
     "NART",
     "DESIGNATION",
@@ -472,6 +515,7 @@ const exportCsv = asyncHandler(async (req, res) => {
       l.zoneCode,
       l.zoneType || "",
       l.eanArticle,
+      l.gencod || "",
       l.qteScan,
       l.nart,
       l.designation,

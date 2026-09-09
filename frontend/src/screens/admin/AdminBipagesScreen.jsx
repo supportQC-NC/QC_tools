@@ -21,6 +21,19 @@ import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminBipagesScreen.css";
 
+/**
+ * Trois points animés, affichés le temps que le serveur re-résolve un article
+ * après un changement de NART. Sans ça, l'ancienne désignation reste à l'écran
+ * pendant l'aller-retour et on croit que la saisie n'a rien fait.
+ */
+const PointsChargement = () => (
+  <span className="cell-loading" aria-label="Recherche de l'article…">
+    <i />
+    <i />
+    <i />
+  </span>
+);
+
 const AdminBipagesScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
@@ -41,6 +54,10 @@ const AdminBipagesScreen = () => {
   const [aidePerimetre, setAidePerimetre] = useState(false);
 
   const dirty = useRef(new Set());
+  // Lignes dont le NART vient d'être modifié : leur désignation et leur
+  // code-barres sont re-résolus par le serveur, on l'affiche pendant l'attente.
+  const nartModifie = useRef(new Set());
+  const [enResolution, setEnResolution] = useState(() => new Set());
 
   // debounce de la recherche
   useEffect(() => {
@@ -107,16 +124,32 @@ const AdminBipagesScreen = () => {
 
   const updateLocal = (id, field, value) => {
     dirty.current.add(id);
+    // Seul le NART entraîne une re-résolution côté serveur : changer la
+    // quantité ou l'observation ne doit pas faire clignoter les colonnes.
+    if (field === "nart") nartModifie.current.add(id);
     setLignes((prev) =>
       prev.map((l) => (l._id === id ? { ...l, [field]: value } : l)),
     );
   };
+
+  const marquerResolution = (id, actif) =>
+    setEnResolution((prev) => {
+      const n = new Set(prev);
+      if (actif) n.add(id);
+      else n.delete(id);
+      return n;
+    });
 
   const saveLine = async (id) => {
     if (!dirty.current.has(id)) return;
     dirty.current.delete(id);
     const ligne = lignes.find((l) => l._id === id);
     if (!ligne) return;
+    // Le NART a changé : désignation et code-barres vont être re-résolus dans
+    // le catalogue. On le montre plutôt que de laisser l'ancienne valeur à
+    // l'écran, qui donnerait l'impression que rien ne s'est passé.
+    const resout = nartModifie.current.delete(id);
+    if (resout) marquerResolution(id, true);
     try {
       const res = await updateBipage({
         entrepriseId: selectedEntreprise,
@@ -130,6 +163,8 @@ const AdminBipagesScreen = () => {
       setLignes((prev) => prev.map((l) => (l._id === id ? res : l)));
     } catch {
       /* on garde la saisie locale ; l'admin peut réessayer */
+    } finally {
+      if (resout) marquerResolution(id, false);
     }
   };
 
@@ -487,7 +522,9 @@ const AdminBipagesScreen = () => {
                 <tr>
                   <th>Zone</th>
                   <th>Emplacement</th>
-                  <th>EAN article</th>
+                  <th title="Code-barres de l'article dans le catalogue, re-résolu quand le NART change">
+                    Gencode
+                  </th>
                   <th>Qté scan</th>
                   <th>NART</th>
                   <th>Désignation</th>
@@ -514,7 +551,13 @@ const AdminBipagesScreen = () => {
                     >
                       <td className="zone-cell">{l.zoneCode}</td>
                       <td className="zone-cell">{l.zoneType || "—"}</td>
-                      <td className="mono">{l.eanArticle}</td>
+                      <td className="mono">
+                        {enResolution.has(l._id) ? (
+                          <PointsChargement />
+                        ) : (
+                          l.gencod || "—"
+                        )}
+                      </td>
                       <td>
                         <input
                           className="cell-input num"
@@ -539,7 +582,13 @@ const AdminBipagesScreen = () => {
                           onKeyDown={onCellKeyDown}
                         />
                       </td>
-                      <td className="desig-cell">{l.designation}</td>
+                      <td className="desig-cell">
+                        {enResolution.has(l._id) ? (
+                          <PointsChargement />
+                        ) : (
+                          l.designation
+                        )}
+                      </td>
                       <td className="agent-cell">
                         {l.agentNom || l.agentCode ? (
                           <>

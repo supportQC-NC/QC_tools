@@ -191,6 +191,7 @@ export const construireLignes = async (entreprise, lignesDat) => {
       entries.push({
         code: l.code,
         nart: "-",
+        gencod: "",
         designation: "Article non trouvé",
         reference: "",
         qte: l.quantite,
@@ -201,9 +202,12 @@ export const construireLignes = async (entreprise, lignesDat) => {
     } else {
       const nart = (record.NART || "").trim();
       const stock = articleCacheService.calculateStockTotal(record);
+      const gencod = (record.GENCOD || "").trim();
       entries.push({
         code: l.code,
         nart: nart || "-",
+        // Code-barres du CATALOGUE, distinct du code scanné (`code`).
+        gencod,
         designation: (record.DESIGN || "").trim(),
         reference: (record.REFER || "").trim(),
         qte: l.quantite,
@@ -246,6 +250,7 @@ export const construireLignes = async (entreprise, lignesDat) => {
       n: i + 1,
       code: e.code,
       nart: e.nart,
+      gencod: e.gencod || "",
       att: flags.join(" "),
       designation: e.designation,
       reference: e.reference,

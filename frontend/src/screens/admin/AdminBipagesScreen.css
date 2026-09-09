@@ -507,3 +507,51 @@
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+
+/* Trois points animés : le temps que le serveur re-résolve l'article après un
+   changement de NART. Ils occupent la place de la valeur, sans faire sauter
+   la ligne. */
+.cell-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 1em;
+}
+
+.cell-loading i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  animation: cell-loading-pulse 1.05s infinite ease-in-out;
+}
+
+.cell-loading i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.cell-loading i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes cell-loading-pulse {
+  0%,
+  75%,
+  100% {
+    opacity: 0.22;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* Respect de la préférence système : pas d'animation, mais les points restent
+   visibles pour signaler l'attente. */
+@media (prefers-reduced-motion: reduce) {
+  .cell-loading i {
+    animation: none;
+    opacity: 0.6;
+  }
+}

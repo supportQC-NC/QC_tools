@@ -35,7 +35,11 @@ const ligneBipageSchema = new mongoose.Schema(
     nart: { type: String, default: "" },
     observation: { type: String, default: "" },
 
-    // Dérivés (article.DBF)
+    // Dérivés (article.DBF) — re-résolus dès que `nart` change.
+    // ⚠️ `gencod` est le CODE-BARRES de l'article du catalogue ; à ne pas
+    // confondre avec `eanArticle`, qui est le code BRUT scanné par le
+    // collecteur (souvent un NART quand l'article n'a pas de code-barres).
+    gencod: { type: String, default: "" },
     designation: { type: String, default: "" },
     stock: { type: Number, default: null },
     found: { type: Boolean, default: false },
