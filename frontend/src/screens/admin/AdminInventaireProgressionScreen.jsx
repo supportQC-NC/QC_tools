@@ -294,12 +294,24 @@ const AdminInventaireProgressionScreen = () => {
         return;
       }
 
+      // Garde-fou : on n'a demandé qu'une RÉSOLUTION. Si le serveur répond
+      // qu'il a marqué la phase, c'est qu'il n'a pas honoré `previsualiser`
+      // (backend en retard sur le front) — la phase a été écrite sans que
+      // personne n'ait été désigné. On le dit, plutôt que de laisser croire
+      // que le parcours s'est déroulé normalement.
+      if (res.action === "marque" || res.action === "deja_fait") {
+        setBipFeedback({
+          tone: "warning",
+          message: `${messageBip(res)} — validée sans désignation : le serveur n'a pas pris en compte la demande. Mettez le backend à jour.`,
+        });
+        setBipCode("");
+        if (bipInputRef.current) bipInputRef.current.focus();
+        return;
+      }
+
       // Zone seulement identifiée, phase déjà faite ou verrouillée : rien à
       // désigner, on affiche le message tel quel.
-      const tone =
-        res.action === "identifiee"
-          ? "info"
-          : "warning";
+      const tone = res.action === "identifiee" ? "info" : "warning";
       setBipFeedback({ tone, message: messageBip(res) });
       setBipCode("");
       if (bipInputRef.current) bipInputRef.current.focus();

@@ -36,16 +36,28 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["InventaireZone"],
     }),
 
-    // Biper un code-barres. `agentUserId` = l'agent qui a réellement fait la
-    // phase (le coupon ne porte aucune identité) ; absent → la personne
-    // connectée est créditée.
+    // Biper un code-barres.
+    //
+    // ⚠️ `previsualiser` DOIT être transmis : c'est lui qui fait du scan une
+    // simple résolution du code, sans rien marquer, le temps de demander QUI a
+    // fait le travail. Omis, le serveur valide la phase immédiatement au nom de
+    // la personne connectée et la fenêtre de désignation ne s'ouvre jamais.
+    // `agentUserId` = l'agent réellement crédité ; absent → la personne
+    // connectée.
     biperZone: builder.mutation({
-      query: ({ entrepriseId, code, agentUserId }) => ({
+      query: ({ entrepriseId, code, agentUserId, previsualiser }) => ({
         url: `${BASE}/${entrepriseId}/bip`,
         method: "POST",
-        body: { code, ...(agentUserId && { agentUserId }) },
+        body: {
+          code,
+          ...(agentUserId && { agentUserId }),
+          ...(previsualiser && { previsualiser: true }),
+        },
       }),
-      invalidatesTags: ["InventaireZone", "SuiviBipage"],
+      // Une prévisualisation n'écrit rien : inutile de refaire tomber le cache
+      // de la session à chaque scan.
+      invalidatesTags: (result, error, arg) =>
+        arg?.previsualiser ? [] : ["InventaireZone", "SuiviBipage"],
     }),
 
     // Utilisateurs sélectionnables comme agent : TOUS les comptes actifs, pas
