@@ -433,12 +433,18 @@ const getHistorique = asyncHandler(async (req, res) => {
  * @desc    Cocher/décocher manuellement une phase d'une zone
  * @route   PUT /api/inventaires-zones/:entrepriseId/zone/:code/:phase
  * @access  Private/Admin
- * @body    { fait: boolean, agentUserId? }
+ * @body    { fait: boolean, agentUserId?, emplacement? }
+ *
+ * ⚠️ `emplacement` n'est pas facultatif dans les faits : un même code de zone
+ * existe au MAGASIN et au DOCK (A_1, A_10, A_11… chez QC) et ce sont DEUX
+ * zones distinctes. Sans lui, on validait la première trouvée — donc souvent
+ * la mauvaise. Il n'est toléré absent que si le code est unique dans la
+ * session ; sinon on refuse plutôt que de deviner.
  */
 const setPhaseManuelle = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const { code, phase } = req.params;
-  const { fait, agentUserId } = req.body;
+  const { fait, agentUserId, emplacement } = req.body;
 
   if (!PHASES.includes(phase)) {
     res.status(400);
@@ -455,10 +461,32 @@ const setPhaseManuelle = asyncHandler(async (req, res) => {
     throw new Error("Aucun inventaire actif");
   }
 
-  const zone = session.zones.find((z) => z.code === code);
-  if (!zone) {
+  const memeCode = (session.zones || []).filter((z) => z.code === code);
+  if (memeCode.length === 0) {
     res.status(404);
     throw new Error("Zone non trouvée dans cet inventaire");
+  }
+
+  const empl = String(emplacement ?? "").trim();
+  let zone;
+  if (empl) {
+    zone = memeCode.find((z) => (z.type || "").trim() === empl);
+    if (!zone) {
+      res.status(404);
+      throw new Error(
+        `Zone ${code} introuvable à l'emplacement ${empl} dans cet inventaire.`,
+      );
+    }
+  } else if (memeCode.length > 1) {
+    // Deux zones, deux comptages : on ne tranche pas à la place de l'appelant.
+    res.status(400);
+    throw new Error(
+      `La zone ${code} existe à plusieurs emplacements (${memeCode
+        .map((z) => z.type || "sans emplacement")
+        .join(", ")}) : précisez lequel.`,
+    );
+  } else {
+    [zone] = memeCode;
   }
 
   const valeur = !!fait;
@@ -478,7 +506,7 @@ const setPhaseManuelle = asyncHandler(async (req, res) => {
   await session.save();
 
   res.json({
-    zone: { code: zone.code, phase, fait: valeur },
+    zone: { code: zone.code, type: zone.type || "", phase, fait: valeur },
     agent: agent ? { _id: agent.id, nom: agent.nom } : null,
     progress: computeProgress(session),
   });

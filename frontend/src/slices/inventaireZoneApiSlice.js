@@ -87,10 +87,16 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
 
     // Correction manuelle d'une phase
     setPhaseManuelle: builder.mutation({
-      query: ({ entrepriseId, code, phase, fait, agentUserId }) => ({
+      // ⚠️ `emplacement` est INDISPENSABLE : le même code de zone existe au
+      // MAGASIN et au DOCK, ce sont deux zones et deux comptages distincts.
+      query: ({ entrepriseId, code, phase, fait, agentUserId, emplacement }) => ({
         url: `${BASE}/${entrepriseId}/zone/${encodeURIComponent(code)}/${phase}`,
         method: "PUT",
-        body: { fait, ...(agentUserId && { agentUserId }) },
+        body: {
+          fait,
+          ...(agentUserId && { agentUserId }),
+          emplacement: emplacement ?? "",
+        },
       }),
       invalidatesTags: ["InventaireZone", "SuiviBipage"],
     }),

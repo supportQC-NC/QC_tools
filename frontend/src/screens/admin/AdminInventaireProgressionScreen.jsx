@@ -335,6 +335,7 @@ const AdminInventaireProgressionScreen = () => {
           ? await setPhaseManuelle({
               entrepriseId: selectedEntreprise,
               code: designation.zone.code,
+              emplacement: designation.zone.type || "",
               phase: designation.phase,
               fait: true,
               agentUserId,
@@ -349,9 +350,11 @@ const AdminInventaireProgressionScreen = () => {
         tone: res.action === "deja_fait" ? "warning" : "success",
         message:
           designation.source === "manuel"
-            ? `${designation.zone.code} · ${
-                PHASE_META[designation.phase]?.label
-              } — validé${res.agent?.nom ? ` (${res.agent.nom})` : ""}`
+            ? `${designation.zone.code}${
+                designation.zone.type ? ` (${designation.zone.type})` : ""
+              } · ${PHASE_META[designation.phase]?.label} — validé${
+                res.agent?.nom ? ` (${res.agent.nom})` : ""
+              }`
             : messageBip(res),
       });
     } catch (err) {
@@ -403,6 +406,7 @@ const AdminInventaireProgressionScreen = () => {
       await setPhaseManuelle({
         entrepriseId: selectedEntreprise,
         code: zone.code,
+        emplacement: zone.type || "",
         phase,
         fait: false,
       }).unwrap();
@@ -706,7 +710,7 @@ const AdminInventaireProgressionScreen = () => {
                   filteredZones.map((z) => {
                     const st = zoneStatut(z);
                     return (
-                    <tr key={z.code}>
+                    <tr key={`${z.code}||${z.type || ""}`}>
                       <td className="statut-col">
                         <span
                           className="statut-dot"
