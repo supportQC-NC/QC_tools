@@ -34,6 +34,60 @@ const FIELDS = [
   { key: "datesPromo", label: "Dates promo" },
 ];
 
+// ── Images importées par l'utilisateur ──────────────────────────────────────
+// Le PDF final est produit par pdfkit, qui n'embarque QUE du PNG et du JPEG.
+// Une image est donc redimensionnée puis ré-encodée dans l'un des deux avant
+// d'entrer dans le modèle — c'est aussi ce qui garde le template léger : il est
+// stocké tel quel en base (champ `config`), une photo d'appareil de 4 Mo y
+// tiendrait mal et gonflerait chaque impression.
+const IMAGE_MAX_PX = 1200; // côté le plus long après redimensionnement
+const IMAGE_TYPES = "image/png,image/jpeg";
+
+// Redimensionne si besoin et renvoie { src, wNat, hNat } (data URL).
+const preparerImage = (file) =>
+  new Promise((resolve, reject) => {
+    const lecteur = new FileReader();
+    lecteur.onerror = () => reject(new Error("Fichier illisible."));
+    lecteur.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Image illisible."));
+      img.onload = () => {
+        const ratio = Math.min(
+          1,
+          IMAGE_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight),
+        );
+        if (ratio === 1 && file.size <= 400 * 1024) {
+          // Petite image : on la garde telle quelle, sans ré-encodage (pas de
+          // perte de qualité inutile sur un logo PNG à fond transparent).
+          resolve({
+            src: lecteur.result,
+            wNat: img.naturalWidth,
+            hNat: img.naturalHeight,
+          });
+          return;
+        }
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * ratio);
+        c.height = Math.round(img.naturalHeight * ratio);
+        const ctx = c.getContext("2d");
+        // La transparence du PNG est conservée ; un JPEG est ré-encodé en JPEG.
+        const png = file.type === "image/png";
+        if (!png) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, c.width, c.height);
+        }
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        resolve({
+          src: png ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.9),
+          wNat: c.width,
+          hNat: c.height,
+        });
+      };
+      img.src = lecteur.result;
+    };
+    lecteur.readAsDataURL(file);
+  });
+
 // Longueurs MAX réelles des champs → l'aperçu affiche un texte d'exemple de cette
 // longueur pour aider à dimensionner/positionner l'élément (le PDF final utilise
 // toujours la vraie valeur de l'article). NART = 6 car., désignation = 50 car.
@@ -103,6 +157,11 @@ const CustomEtiquetteDesigner = ({
         ],
   );
   const [selectedId, setSelectedId] = useState(null);
+  // Import d'image : le champ fichier est caché, déclenché par le bouton, et
+  // sert aussi bien à AJOUTER qu'à REMPLACER l'image de l'élément sélectionné.
+  const fichierRef = useRef(null);
+  const [remplaceId, setRemplaceId] = useState(null);
+  const [imgMsg, setImgMsg] = useState("");
   const labelRef = useRef(null);
   const stageRef = useRef(null);
   const [stageW, setStageW] = useState(480); // largeur utile de l'aperçu (mesurée)
@@ -156,6 +215,55 @@ const CustomEtiquetteDesigner = ({
   const addRect = () =>
     add({ kind: "rect", w: 120, h: 60, lineWidth: 2, color: "#000000", fill: false, fillColor: "#dddddd" });
   const addLogo = () => add({ kind: "logo", w: 90, h: 60 });
+
+  // Ouvre le sélecteur de fichier. `pourId` non nul = remplacer l'image d'un
+  // élément existant plutôt qu'en créer un.
+  const ouvrirImport = (pourId = null) => {
+    setRemplaceId(pourId);
+    setImgMsg("");
+    if (fichierRef.current) {
+      fichierRef.current.value = "";
+      fichierRef.current.click();
+    }
+  };
+
+  const onFichierImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // ⚠️ pdfkit n'embarque pas de PDF dans une page : le dire franchement
+    // plutôt que de laisser l'utilisateur poser une image qui ne sortira pas.
+    if (file.type === "application/pdf") {
+      setImgMsg(
+        "Le PDF ne peut pas être posé tel quel sur une étiquette. Exportez la page en PNG ou en JPEG, puis réimportez-la.",
+      );
+      return;
+    }
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      setImgMsg("Formats acceptés : PNG et JPEG.");
+      return;
+    }
+    try {
+      const { src, wNat, hNat } = await preparerImage(file);
+      // Taille de départ : 120 px de large, hauteur au prorata — l'utilisateur
+      // ajuste ensuite, le ratio est conservé par défaut.
+      const w = 120;
+      const h = Math.max(10, Math.round((hNat / wNat) * w));
+      if (remplaceId) {
+        setElements((prev) =>
+          prev.map((el) =>
+            el.id === remplaceId ? { ...el, src, ratio: wNat / hNat } : el,
+          ),
+        );
+      } else {
+        add({ kind: "image", src, w, h, ratio: wNat / hNat, garderRatio: true });
+      }
+      setImgMsg("");
+    } catch (err) {
+      setImgMsg(err.message || "Import impossible.");
+    } finally {
+      setRemplaceId(null);
+    }
+  };
   const addBarcode = () => add({ kind: "barcode", w: 120, h: 50 });
 
   const updateSel = (patch) =>
@@ -171,7 +279,12 @@ const CustomEtiquetteDesigner = ({
       return el.orientation === "v"
         ? { w: el.thickness || 1, h: el.length || 0 }
         : { w: el.length || 0, h: el.thickness || 1 };
-    if (el.kind === "rect" || el.kind === "logo" || el.kind === "barcode")
+    if (
+      el.kind === "rect" ||
+      el.kind === "logo" ||
+      el.kind === "barcode" ||
+      el.kind === "image"
+    )
       return { w: el.w || 0, h: el.h || 0 };
     // text / field : mesuré dans le DOM
     const node = labelRef.current?.querySelector(`[data-id="${el.id}"]`);
@@ -238,6 +351,21 @@ const CustomEtiquetteDesigner = ({
     } else if (el.kind === "logo") {
       extra = { width: el.w * scale, height: el.h * scale };
       inner = <span className="ced-ph">LOGO</span>;
+    } else if (el.kind === "image") {
+      extra = { width: el.w * scale, height: el.h * scale };
+      inner = el.src ? (
+        <img
+          src={el.src}
+          alt=""
+          className="ced-img"
+          draggable={false}
+          // L'aperçu doit montrer ce que le PDF imprimera : l'image est
+          // ÉTIRÉE dans le cadre, exactement comme `drawImage` côté serveur.
+          style={{ width: "100%", height: "100%" }}
+        />
+      ) : (
+        <span className="ced-ph">IMAGE</span>
+      );
     } else if (el.kind === "barcode") {
       extra = { width: el.w * scale, height: el.h * scale };
       inner = <span className="ced-ph">▮▯▮▯ code-barres</span>;
@@ -318,10 +446,24 @@ const CustomEtiquetteDesigner = ({
         <button type="button" onClick={addLine}><HiMinus /> Trait</button>
         <button type="button" onClick={addRect}><HiStop /> Rectangle</button>
         <button type="button" onClick={addLogo}><HiPhotograph /> Logo</button>
+        {/* Image libre : l'utilisateur pose SON visuel (PNG/JPEG), en plus du
+            logo de la société. */}
+        <button type="button" onClick={() => ouvrirImport(null)}>
+          <HiPhotograph /> Image
+        </button>
+        <input
+          ref={fichierRef}
+          type="file"
+          accept={`${IMAGE_TYPES},application/pdf`}
+          style={{ display: "none" }}
+          onChange={onFichierImage}
+        />
         {dataMode && (
           <button type="button" onClick={addBarcode}><HiQrcode /> Code-barres</button>
         )}
       </div>
+
+      {imgMsg && <div className="ced-msg">{imgMsg}</div>}
 
       <div className="ced-main">
         {/* Aperçu / scène */}
@@ -351,6 +493,7 @@ const CustomEtiquetteDesigner = ({
                   {selected.kind === "line" && "Trait"}
                   {selected.kind === "rect" && "Rectangle"}
                   {selected.kind === "logo" && "Logo"}
+                  {selected.kind === "image" && "Image"}
                   {selected.kind === "barcode" && "Code-barres"}
                 </span>
                 <button type="button" className="ced-del" onClick={removeSel}><HiTrash /></button>
@@ -482,17 +625,85 @@ const CustomEtiquetteDesigner = ({
                 </>
               )}
 
-              {(selected.kind === "logo" || selected.kind === "barcode") && (
+              {(selected.kind === "logo" ||
+                selected.kind === "barcode" ||
+                selected.kind === "image") && (
                 <div className="ced-prow">
                   <div className="ced-field">
                     <label>Largeur (px)</label>
-                    <input type="number" min="10" value={selected.w} onChange={(e) => updateSel({ w: parseInt(e.target.value, 10) || 10 })} />
+                    <input
+                      type="number"
+                      min="10"
+                      value={selected.w}
+                      onChange={(e) => {
+                        const w = parseInt(e.target.value, 10) || 10;
+                        // Une image importée garde ses proportions par défaut :
+                        // une photo étirée sur une étiquette se voit tout de
+                        // suite, et personne ne pense à recalculer la hauteur.
+                        const lie =
+                          selected.kind === "image" &&
+                          selected.garderRatio &&
+                          selected.ratio;
+                        updateSel(
+                          lie
+                            ? { w, h: Math.max(10, Math.round(w / selected.ratio)) }
+                            : { w },
+                        );
+                      }}
+                    />
                   </div>
                   <div className="ced-field">
                     <label>Hauteur (px)</label>
-                    <input type="number" min="10" value={selected.h} onChange={(e) => updateSel({ h: parseInt(e.target.value, 10) || 10 })} />
+                    <input
+                      type="number"
+                      min="10"
+                      value={selected.h}
+                      onChange={(e) => {
+                        const h = parseInt(e.target.value, 10) || 10;
+                        const lie =
+                          selected.kind === "image" &&
+                          selected.garderRatio &&
+                          selected.ratio;
+                        updateSel(
+                          lie
+                            ? { h, w: Math.max(10, Math.round(h * selected.ratio)) }
+                            : { h },
+                        );
+                      }}
+                    />
                   </div>
                 </div>
+              )}
+
+              {selected.kind === "image" && (
+                <>
+                  <label className="ced-check">
+                    <input
+                      type="checkbox"
+                      checked={!!selected.garderRatio}
+                      onChange={(e) => updateSel({ garderRatio: e.target.checked })}
+                    />
+                    <span>Conserver les proportions</span>
+                  </label>
+                  <div className="ced-center">
+                    <button type="button" onClick={() => ouvrirImport(selected.id)}>
+                      Remplacer l'image
+                    </button>
+                    {selected.ratio && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSel({
+                            h: Math.max(10, Math.round(selected.w / selected.ratio)),
+                          })
+                        }
+                        title="Recalculer la hauteur d'après la largeur"
+                      >
+                        Rétablir le ratio
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
 
               {/* Position + centrage */}

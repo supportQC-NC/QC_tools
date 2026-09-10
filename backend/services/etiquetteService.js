@@ -225,7 +225,9 @@ const isPngOrJpeg = (buf) => {
   return false;
 };
 
-// Décode un logo UPLOADÉ stocké en base64 (data URL "data:image/png;base64,…").
+// Décode une image en base64 (data URL « data:image/png;base64,… »). Sert au
+// logo UPLOADÉ de la société ET aux images libres posées sur une étiquette
+// custom : mêmes contraintes, pdfkit n embarque que du PNG et du JPEG.
 // Renvoie un Buffer PNG/JPEG (accepté par pdfkit) ou null.
 const bufferFromLogoDataUrl = (logo) => {
   const s = logo == null ? "" : String(logo).trim();
@@ -928,6 +930,23 @@ const drawCustomLabel = (rl, layout, cellX, cellBottomY, wpt, hpt, ctx = {}) => 
           rl.drawImage(logoBuf, cellX + exPt, yBottom, wPt, hPt);
         } catch {
           /* pdfkit : PNG/JPEG uniquement */
+        }
+      }
+    } else if (kind === "image") {
+      // Image importée par l'utilisateur, transportée en data URL dans le
+      // layout. ⚠️ pdfkit n'embarque que du PNG et du JPEG : le designer
+      // ré-encode déjà dans l'un des deux, mais une étiquette enregistrée avant
+      // cette règle (ou bricolée à la main) peut porter autre chose — on
+      // ignore alors l'élément plutôt que de casser toute la planche.
+      const buf = bufferFromLogoDataUrl(el.src);
+      if (buf) {
+        const wPt = (Number(el.w) || 0) * PX;
+        const hPt = (Number(el.h) || 0) * PX;
+        const yBottom = cellBottomY + hpt - eyPt - hPt;
+        try {
+          rl.drawImage(buf, cellX + exPt, yBottom, wPt, hPt);
+        } catch {
+          /* format non embarquable : élément ignoré */
         }
       }
     } else if (kind === "barcode") {
