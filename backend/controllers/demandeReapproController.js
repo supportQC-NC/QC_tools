@@ -4,6 +4,14 @@ import DemandeReappro from "../models/DemandeReapproModel.js";
 // Réappro LIBRE (scan sans liste, depuis l'app mobile) : autre collection,
 // même écran de suivi.
 import Reappro from "../models/ReaproModel.js";
+// Sélection d'articles partagée avec les demandes de bipage : même liste, même
+// dictionnaire des rayons. Ce qui change ici, c'est le gisement AFFICHÉ (dock)
+// et le tri (ce qui manque en rayon d'abord).
+import {
+  getArticlesRayonVide,
+  getArticlesParFournisseur,
+  getFournisseursAvecArticles,
+} from "../services/bipageSelectionService.js";
 import {
   getMagasinArticlesByGisements,
   resolveArticleForReappro,
@@ -166,6 +174,53 @@ const importerProformas = asyncHandler(async (req, res) => {
 });
 
 // @desc    Statistiques de préparation par opérateur (CDC §1)
+// ===========================================================================
+// SÉLECTION D'ARTICLES POUR UNE LISTE DE RÉAPPRO
+// ===========================================================================
+//
+// Le réappro, c'est remplir le RAYON : on cherche donc les articles dont le
+// magasin est à zéro (`S1 = 0`) alors qu'il reste du stock en RÉSERVE
+// (`S2..S5 > 0`) — peu importe le dépôt, c'est de la marchandise à descendre.
+// Le gisement affiché est celui du DOCK (GISM2, libellé du dictionnaire à
+// l'emplacement DOCK) : c'est là que l'opérateur va la chercher.
+
+// @desc    Articles à rayon vide (S1 = 0, stock en réserve S2..S5)
+// @route   GET /api/demande-reappro/:nomDossierDBF/rayon-vide?limit=&fourn=
+const getRayonVideReappro = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const r = await getArticlesRayonVide(entreprise, {
+    limit: req.query.limit,
+    fourn: req.query.fourn,
+    emplacement: "DOCK",
+  });
+  res.json({ ...r, affiches: r.articles.length });
+});
+
+// @desc    Fournisseurs ayant des articles
+// @route   GET /api/demande-reappro/:nomDossierDBF/fournisseurs
+const getFournisseursReappro = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const fournisseurs = await getFournisseursAvecArticles(entreprise);
+  res.json({ total: fournisseurs.length, fournisseurs });
+});
+
+// @desc    Articles d'un fournisseur, rayon vide en tête
+// @route   GET /api/demande-reappro/:nomDossierDBF/fournisseur/:fourn/articles
+const getArticlesFournisseurReappro = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const r = await getArticlesParFournisseur(entreprise, req.params.fourn, {
+    limit: req.query.limit,
+    emplacement: "DOCK",
+  });
+  res.json({ ...r, affiches: r.articles.length });
+});
+
 // ===========================================================================
 // SUIVI DES RÉAPPROS EN COURS
 // ===========================================================================
@@ -952,6 +1007,9 @@ export {
   importerProformas,
   getStatsPreparateurs,
   getSuiviReappros,
+  getRayonVideReappro,
+  getFournisseursReappro,
+  getArticlesFournisseurReappro,
   updateDemande,
   updateUrgence,
   deleteDemande,

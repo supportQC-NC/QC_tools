@@ -53,10 +53,12 @@ export const demandeBipageApiSlice = apiSlice.injectEndpoints({
       }),
     }),
     createDemandeBipagePanier: builder.mutation({
-      query: ({ nomDossierDBF, articles, priorite, commentaire }) => ({
+      // `libelle` : une sélection venue de la liste « rayon vide » doit se
+      // reconnaître sur le collecteur, pas s'appeler « Sélection manuelle ».
+      query: ({ nomDossierDBF, articles, priorite, commentaire, libelle }) => ({
         url: `${URL}/${nomDossierDBF}/panier`,
         method: "POST",
-        body: { articles, priorite, commentaire },
+        body: { articles, priorite, commentaire, libelle },
       }),
     }),
     getArticleBipage: builder.query({

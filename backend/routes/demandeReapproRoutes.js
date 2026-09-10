@@ -9,6 +9,9 @@ import {
   importerProformas,
   getStatsPreparateurs,
   getSuiviReappros,
+  getRayonVideReappro,
+  getFournisseursReappro,
+  getArticlesFournisseurReappro,
   updateDemande,
   updateUrgence,
   deleteDemande,
@@ -74,6 +77,20 @@ router.get(
 router.post(
   "/:nomDossierDBF/panier",
   protect, canWrite, checkEntrepriseAccess, createDemandePanier,
+);
+
+// Sélection d'articles : rayon vide (S1=0 + réserve) et par fournisseur.
+router.get(
+  "/:nomDossierDBF/rayon-vide",
+  protect, canRead, checkEntrepriseAccess, getRayonVideReappro,
+);
+router.get(
+  "/:nomDossierDBF/fournisseurs",
+  protect, canRead, checkEntrepriseAccess, getFournisseursReappro,
+);
+router.get(
+  "/:nomDossierDBF/fournisseur/:fourn/articles",
+  protect, canRead, checkEntrepriseAccess, getArticlesFournisseurReappro,
 );
 
 // Suivi des réappros EN COURS : listes poussées depuis le web + réappros

@@ -4,7 +4,6 @@ import {
   HiChartBar,
   HiCube,
   HiViewGrid,
-  HiSearch,
   HiClipboardList,
   HiRefresh,
   HiInformationCircle,

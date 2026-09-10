@@ -13,7 +13,12 @@ import { analyserProforma } from "../services/preparationService.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import { ecrireTransfertBipage } from "../services/demandeBipageTransfertService.js";
-import { getArticlesParGroupes } from "../services/bipageSelectionService.js";
+import {
+  getArticlesParGroupes,
+  getArticlesRayonVide,
+  getArticlesParFournisseur,
+  getFournisseursAvecArticles,
+} from "../services/bipageSelectionService.js";
 
 const ACTIF = ["en_attente", "en_cours"];
 
@@ -224,8 +229,52 @@ const createDemandeGroupe = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Articles ABSENTS DU RAYON : S1 = 0 mais du stock en réserve (S2..S5)
+// @route   GET /api/demande-bipage/:nomDossierDBF/rayon-vide?limit=
+//
+// Liste de travail, pas une demande : l'utilisateur coche ce qu'il veut faire
+// biper, puis crée UNE demande avec sa sélection (route /panier).
+// Les MEILLEURES VENTES sont en tête (Σ|V1..V12|, la formule du réappro) : à
+// près de 2 000 lignes chez QC, c'est le seul ordre qui a un sens — on va
+// compter d'abord ce qui se vend et qui manque en rayon.
+const getRayonVide = asyncHandler(async (req, res) => {
+  const entreprise = entOf(req);
+  const { total, articles, fournisseurs } = await getArticlesRayonVide(
+    entreprise,
+    { limit: req.query.limit, fourn: req.query.fourn },
+  );
+  res.json({ total, affiches: articles.length, articles, fournisseurs });
+});
+
+// @desc    Fournisseurs ayant des articles (pour la sélection par fournisseur)
+// @route   GET /api/demande-bipage/:nomDossierDBF/fournisseurs
+//
+// Servi par le module bipage lui-même plutôt que par /api/fournisseurs, gardé
+// par le module `stock` : un opérateur qui crée des demandes n'a pas forcément
+// ce droit-là.
+const getFournisseursBipage = asyncHandler(async (req, res) => {
+  const entreprise = entOf(req);
+  const fournisseurs = await getFournisseursAvecArticles(entreprise);
+  res.json({ total: fournisseurs.length, fournisseurs });
+});
+
+// @desc    Articles d'UN fournisseur, prêts à cocher (rayon vide en tête)
+// @route   GET /api/demande-bipage/:nomDossierDBF/fournisseur/:fourn/articles
+const getArticlesFournisseur = asyncHandler(async (req, res) => {
+  const entreprise = entOf(req);
+  const r = await getArticlesParFournisseur(entreprise, req.params.fourn, {
+    limit: req.query.limit,
+  });
+  res.json({ ...r, affiches: r.articles.length });
+});
+
 // @desc    Résout un NART (saisie manuelle) -> article
 // @route   GET /api/demande-bipage/:nomDossierDBF/article/:nart
+//
+// La réponse porte le détail des stocks par dépôt (s1..s5) ET les LIBELLÉS de
+// la société (`mappingEntrepots`) : « S2 » ne dit rien, « Dock » si. Chaque
+// société nomme ses entrepôts comme elle veut, l'écran ne doit rien coder en
+// dur.
 const getArticleBipage = asyncHandler(async (req, res) => {
   const entreprise = entOf(req);
   const art = await resolveArticleForReappro(entreprise, req.params.nart);
@@ -233,7 +282,17 @@ const getArticleBipage = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Article introuvable (NART inconnu).");
   }
-  res.json(art);
+  const m = entreprise.mappingEntrepots || {};
+  res.json({
+    ...art,
+    stocksLabels: {
+      S1: m.S1 || "Magasin",
+      S2: m.S2 || "S2",
+      S3: m.S3 || "S3",
+      S4: m.S4 || "S4",
+      S5: m.S5 || "S5",
+    },
+  });
 });
 
 // @desc    Crée UNE demande à partir d'un panier manuel { articles:[{nart,quantite}] }
@@ -268,11 +327,17 @@ const createDemandePanier = asyncHandler(async (req, res) => {
     throw new Error("Aucun article valide (NART inconnu).");
   }
 
+  // Libellé libre : une sélection venue de la liste « rayon vide » n'est pas
+  // une « sélection manuelle » quelconque, et l'agent doit le lire sur son
+  // collecteur.
+  const libelle =
+    String(req.body.libelle || "").trim().slice(0, 120) || "Sélection manuelle";
+
   const demande = await DemandeBipage.create({
     entreprise: key,
     source: "manuel",
-    sourceRef: "Manuelle",
-    libelle: "Sélection manuelle",
+    sourceRef: String(req.body.sourceRef || "Manuelle").trim().slice(0, 60),
+    libelle,
     priorite: normPriorite(req.body.priorite),
     statut: "en_attente",
     articles,
@@ -478,6 +543,9 @@ export {
   createDemandeProforma,
   createDemandeGisement,
   createDemandeGroupe,
+  getRayonVide,
+  getFournisseursBipage,
+  getArticlesFournisseur,
   createDemandePanier,
   getArticleBipage,
   getDemandes,

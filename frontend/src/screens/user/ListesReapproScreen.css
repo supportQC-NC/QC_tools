@@ -467,3 +467,110 @@
   color: var(--admin-text);
   text-align: right;
 }
+
+/* ── Sélection d'articles dans la modale de création ─────────────────────
+   Rayon vide / par fournisseur : on coche, on ajoute au panier. */
+.lr-source-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 6px;
+  flex-wrap: wrap;
+}
+.lr-tab {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lr-tab.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.lr-sel-zone {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.lr-sel-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.lr-sel-bar select,
+.lr-sel-bar input[type="text"],
+.lr-sel-bar input:not([type]) {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.lr-sel-bar select {
+  max-width: 320px;
+}
+.lr-sel-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* La liste peut faire 500 lignes : elle défile dans sa propre boîte, les
+   boutons de la modale restent atteignables. */
+.lr-sel-wrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.lr-sel-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-tertiary);
+  z-index: 1;
+}
+.lr-sel-table tbody tr {
+  cursor: pointer;
+}
+.lr-sel-table tbody tr:hover {
+  background: var(--bg-tertiary);
+}
+.lr-sel-on {
+  background: rgba(77, 166, 255, 0.14);
+}
+.lr-sel-prio td:first-child {
+  box-shadow: inset 2px 0 0 #f59e0b;
+}
+.lr-prio-mark {
+  color: #f59e0b;
+  margin-right: 5px;
+}
+
+/* Code de gisement en gras, libellé du dictionnaire dessous. */
+.lr-gis-code {
+  display: block;
+  font-weight: 700;
+}
+.lr-gis-lib {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Magasin à zéro : c'est ce qui déclenche le réappro. */
+.lr-zero {
+  color: #f59e0b;
+  font-weight: 700;
+}

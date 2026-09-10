@@ -4,6 +4,9 @@ import {
   createDemandeProforma,
   createDemandeGisement,
   createDemandeGroupe,
+  getRayonVide,
+  getFournisseursBipage,
+  getArticlesFournisseur,
   createDemandePanier,
   getArticleBipage,
   getDemandes,
@@ -60,6 +63,22 @@ router.post(
 router.post(
   "/:nomDossierDBF/panier",
   protect, canWrite, checkEntrepriseAccess, createDemandePanier,
+);
+
+// Articles absents du rayon (S1 = 0, stock en réserve) — liste de sélection.
+router.get(
+  "/:nomDossierDBF/rayon-vide",
+  protect, canRead, checkEntrepriseAccess, getRayonVide,
+);
+
+// Sélection par fournisseur : la liste, puis les articles d'un fournisseur.
+router.get(
+  "/:nomDossierDBF/fournisseurs",
+  protect, canRead, checkEntrepriseAccess, getFournisseursBipage,
+);
+router.get(
+  "/:nomDossierDBF/fournisseur/:fourn/articles",
+  protect, canRead, checkEntrepriseAccess, getArticlesFournisseur,
 );
 
 // Suivi (scopé entreprise) — AVANT la route « liste », sinon « suivi » serait

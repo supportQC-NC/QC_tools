@@ -581,7 +581,7 @@ d'inventaire. Le premier est dans le dossier Terrain ▸ Bipage, le second dans
 Inventaire Zones.
 
 Les demandes de bipage se créent depuis une **proforma**, un **gisement**, un
-**groupe** (famille d'articles) ou un panier manuel — une demande par gisement /
+**groupe** (famille d'articles), la liste **« rayon vide »** ou un panier manuel — une demande par gisement /
 par groupe, pour que deux agents puissent se partager le travail. ⚠️ La sélection
 par groupe passe par `bipageSelectionService.getArticlesParGroupes`, **pas** par
 `getMagasinArticlesByGisements` du réappro : celui-ci ne retient que les articles
@@ -589,6 +589,36 @@ absents du rayon (S1 = 0 et stock > 0), ce qui est la question du réappro, pas
 celle du comptage. Elle écarte les articles techniques (NART < 100000) et, par
 défaut, ceux sans stock — chez QC le groupe `XXX` compte 13 000 références, dont
 4 693 en stock : sans ce garde-fou la demande est inexploitable sur un collecteur.
+
+⚠️ **Réappro et bipage ne posent pas la même question** (décision client du
+10/09/2026) : le **réappro** remplit le RAYON — on cherche donc les articles à
+`S1 = 0` avec du stock en **réserve `S2..S5`**, et on affiche le gisement du
+**DOCK** (`GISM2` + son libellé), là où l'opérateur va chercher. Le **bipage**
+est libre : on compte ce qu'on veut, **quel que soit le stock** ; sa sélection
+par fournisseur est simplement triée par meilleures ventes (`tri=ventes`).
+D'où le partage : la liste « rayon vide » vit sur l'écran **Listes de réappro**,
+pas sur les demandes de bipage. Les deux écrans se servent du MÊME service
+(`bipageSelectionService`), avec `emplacement` (MAGASIN/DOCK) qui ne change que
+**l'affichage**, jamais le critère de sélection.
+
+⚠️ **Les deux gisements d'un article** : `GISM1` = le rayon (emplacement
+**MAGASIN**), `GISM2` = la réserve (emplacement **DOCK**). Leur libellé vient du
+dictionnaire des rayons interrogé sur le couple **code + emplacement** — chez QC
+le même code porte souvent deux noms différents (`D_2d` = « forêt métaux » au
+magasin, `H_1` = « VIS AUTO ZN » au dock pour le même article). Les tableaux de
+sélection affichent les deux, code en gras et libellé dessous.
+
+La liste **« rayon vide »** (`getArticlesRayonVide`) répond à cette question :
+quels articles sont **absents du rayon** (`S1 = 0`) alors qu'il reste du stock en
+**réserve** (`S2..S5 > 0`) — soit il y a à descendre, soit le stock ERP est faux.
+Elle est triée **meilleures ventes d'abord** (`Σ|V1..V12|`, la formule du réappro
+local et de l'analyse réappro) : chez QC 1 906 articles sont concernés, l'ordre
+alphabétique n'y servirait à rien. L'utilisateur coche ce qu'il veut et la
+sélection part en UNE demande via `/panier`, dont le **libellé est désormais
+paramétrable** — sans quoi l'agent lirait « Sélection manuelle » sur son
+collecteur. Les articles **renvoyés vers un autre code** (`GENDOUBL` rempli)
+sont écartés de toutes ces listes et comptés à part : faire biper un code que
+l'ERP n'utilise plus n'a pas de sens.
 
 **Communication** — `mailing` (campagnes clients par blocs, segments,
 automatisations, stats d'ouverture/clic, désinscription), `communication_client`

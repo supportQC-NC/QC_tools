@@ -10,7 +10,7 @@
 // La création manuelle (§3) se fait ici : nom, observation, urgence, puis un
 // panier de codes (NART, gencode ou référence fournisseur) + quantités. La
 // quantité n'est PAS bornée au stock : la disponibilité n'est pas contrôlée.
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import * as XLSX from "xlsx";
 import {
@@ -79,7 +79,10 @@ const fmtDate = (iso) =>
         minute: "2-digit",
       })
     : "—";
-const fmtNb = (n) => (Number(n) || 0).toLocaleString("fr-FR");
+// ⚠️ Stocks et ventes viennent de champs DBF N(x.3) : beaucoup d'articles se
+// vendent au mètre, on ne les arrondit jamais à l'unité.
+const fmtNb = (n) =>
+  (Number(n) || 0).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
 const fmtJour = (d) => d.toISOString().slice(0, 10);
 
 // Durées lisibles d'un coup d'œil : « 45 s », « 8 min 20 s », « 2 h 05 ».
@@ -809,6 +812,91 @@ const DetailModal = ({ demande, chargement, onClose }) => (
 );
 
 /* ------------------------------------------------------------------ */
+/* Sélection d'articles pour une liste de réappro.
+ *
+ * ⚠️ RÉAPPRO = remplir le RAYON. On cherche donc les articles dont le magasin
+ * est à ZÉRO (S1 = 0) alors qu'il reste du stock en RÉSERVE (S2 à S5, tous
+ * dépôts confondus) : il y a de la marchandise à descendre, ou le stock ERP est
+ * faux. Le gisement montré est celui du DOCK (GISM2 + son libellé du
+ * dictionnaire des rayons, cherché à l'emplacement DOCK) : c'est là que
+ * l'opérateur va chercher. Le gisement magasin est rappelé à côté — c'est là
+ * qu'il repose la marchandise.
+ *
+ * Les meilleures ventes des 12 derniers mois passent devant : à près de
+ * 2 000 lignes, c'est le seul ordre utile.
+ */
+const TableauSelection = ({ articles, selection, onBasculer, vide }) => (
+  <div className="lr-sel-wrap">
+    <table className="lr-table lr-table-compact lr-sel-table">
+      <thead>
+        <tr>
+          <th />
+          <th>Article</th>
+          <th>Désignation</th>
+          <th>Dock (GISM2)</th>
+          <th>Rayon (GISM1)</th>
+          <th className="lr-num">Ventes 12 mois</th>
+          <th className="lr-num">Magasin</th>
+          <th className="lr-num">Réserve</th>
+        </tr>
+      </thead>
+      <tbody>
+        {articles.length === 0 ? (
+          <tr>
+            <td colSpan={8} className="lr-hint">
+              {vide}
+            </td>
+          </tr>
+        ) : (
+          articles.map((a) => (
+            <tr
+              key={a.nart}
+              className={`${selection.has(a.nart) ? "lr-sel-on" : ""} ${
+                a.prioritaire ? "lr-sel-prio" : ""
+              }`}
+              onClick={() => onBasculer(a.nart)}
+            >
+              <td>
+                <input
+                  type="checkbox"
+                  checked={selection.has(a.nart)}
+                  onChange={() => onBasculer(a.nart)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </td>
+              <td className="lr-mono">
+                {a.prioritaire && (
+                  <span className="lr-prio-mark" title="Rayon vide, stock en réserve">
+                    ★
+                  </span>
+                )}
+                {a.nart}
+              </td>
+              <td>{a.design}</td>
+              <td>
+                <span className="lr-gis-code">{a.gism2 || "—"}</span>
+                {a.rayonDock && <span className="lr-gis-lib">{a.rayonDock}</span>}
+              </td>
+              <td>
+                <span className="lr-gis-code">{a.gism1 || "—"}</span>
+                {a.rayonMagasin && (
+                  <span className="lr-gis-lib">{a.rayonMagasin}</span>
+                )}
+              </td>
+              <td className="lr-num">{fmtNb(a.ventes12)}</td>
+              <td className={`lr-num ${Number(a.s1) === 0 ? "lr-zero" : ""}`}>
+                {fmtNb(a.s1)}
+              </td>
+              <td className="lr-num">{fmtNb(a.stockReserves)}</td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
 /* Création manuelle : entête + panier de codes (NART / gencode / REFER) */
 const CreationModal = ({ nomDossierDBF, onClose, onCree }) => {
   const [nom, setNom] = useState("");
@@ -821,6 +909,136 @@ const CreationModal = ({ nomDossierDBF, onClose, onCree }) => {
   const [quantite, setQuantite] = useState("1");
   const [panier, setPanier] = useState([]);
   const [msg, setMsg] = useState(null);
+
+  // Source des articles : saisie code par code (historique), liste « rayon
+  // vide », ou tout le catalogue d'un fournisseur.
+  const [source, setSource] = useState("saisie");
+  const [rv, setRv] = useState(null); // { total, articles, fournisseurs }
+  const [rvFourn, setRvFourn] = useState("");
+  const [rvSearch, setRvSearch] = useState("");
+  const [chargement, setChargement] = useState(false);
+  const [fournListe, setFournListe] = useState([]);
+  const [fournSel, setFournSel] = useState("");
+  const [fournArts, setFournArts] = useState(null);
+  const [fournSearch, setFournSearch] = useState("");
+  const [prioSeul, setPrioSeul] = useState(true);
+  const [selection, setSelection] = useState(new Set());
+
+  const basculer = (nart) =>
+    setSelection((prev) => {
+      const n = new Set(prev);
+      if (n.has(nart)) n.delete(nart);
+      else n.add(nart);
+      return n;
+    });
+
+  // Liste « rayon vide » — rechargée à chaque changement de fournisseur (le
+  // filtre est appliqué côté serveur : la liste est bornée, filtrer localement
+  // ne verrait que les lignes déjà chargées).
+  useEffect(() => {
+    if (source !== "rayon_vide" || !nomDossierDBF) return undefined;
+    let vivant = true;
+    setChargement(true);
+    const url = `/api/demande-reappro/${nomDossierDBF}/rayon-vide?limit=500${
+      rvFourn ? `&fourn=${encodeURIComponent(rvFourn)}` : ""
+    }`;
+    fetch(url, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (vivant) setRv(r || { total: 0, articles: [] });
+      })
+      .catch(() => {
+        if (vivant) setRv({ total: 0, articles: [] });
+      })
+      .finally(() => {
+        if (vivant) setChargement(false);
+      });
+    return () => {
+      vivant = false;
+    };
+  }, [source, nomDossierDBF, rvFourn]);
+
+  // Fournisseurs (une seule fois).
+  useEffect(() => {
+    if (source !== "fournisseur" || !nomDossierDBF || fournListe.length)
+      return undefined;
+    let vivant = true;
+    fetch(`/api/demande-reappro/${nomDossierDBF}/fournisseurs`, {
+      credentials: "include",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (vivant) setFournListe(r?.fournisseurs || []);
+      })
+      .catch(() => {});
+    return () => {
+      vivant = false;
+    };
+  }, [source, nomDossierDBF, fournListe.length]);
+
+  // Articles du fournisseur choisi.
+  useEffect(() => {
+    if (!fournSel || !nomDossierDBF) {
+      setFournArts(null);
+      return undefined;
+    }
+    let vivant = true;
+    setChargement(true);
+    fetch(
+      `/api/demande-reappro/${nomDossierDBF}/fournisseur/${encodeURIComponent(fournSel)}/articles?limit=1000`,
+      { credentials: "include" },
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (vivant) setFournArts(r || { total: 0, articles: [] });
+      })
+      .catch(() => {
+        if (vivant) setFournArts({ total: 0, articles: [] });
+      })
+      .finally(() => {
+        if (vivant) setChargement(false);
+      });
+    return () => {
+      vivant = false;
+    };
+  }, [fournSel, nomDossierDBF]);
+
+  const filtrer = (arts, q, prio) => {
+    let out = arts || [];
+    if (prio) out = out.filter((a) => a.prioritaire);
+    const s = q.trim().toLowerCase();
+    if (!s) return out;
+    return out.filter((a) =>
+      [a.nart, a.design, a.gism1, a.gism2, a.rayonDock, a.rayonMagasin, a.fournNom]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(s)),
+    );
+  };
+  const rvFiltres = useMemo(
+    () => filtrer(rv?.articles, rvSearch, false),
+    [rv, rvSearch],
+  );
+  const faFiltres = useMemo(
+    () => filtrer(fournArts?.articles, fournSearch, prioSeul),
+    [fournArts, fournSearch, prioSeul],
+  );
+  const visibles = source === "rayon_vide" ? rvFiltres : faFiltres;
+
+  // Les articles cochés rejoignent le panier (quantité 1 par défaut, ajustable
+  // ensuite : la quantité demandée n'est pas bornée au stock).
+  const ajouterSelection = () => {
+    const source2 = source === "rayon_vide" ? rv?.articles : fournArts?.articles;
+    const parNart = new Map((source2 || []).map((a) => [a.nart, a]));
+    setPanier((prev) => {
+      const deja = new Set(prev.map((p) => p.nart));
+      const ajouts = [...selection]
+        .filter((n) => !deja.has(n))
+        .map((n) => ({ ...parNart.get(n), quantite: 1 }));
+      return [...prev, ...ajouts];
+    });
+    setSelection(new Set());
+    setMsg(null);
+  };
 
   const [resoudre, { isFetching: resolution }] = useLazyGetArticleReapproQuery();
   const [creerPanier, { isLoading: envoi }] = useCreateDemandePanierMutation();
@@ -946,6 +1164,134 @@ const CreationModal = ({ nomDossierDBF, onClose, onCree }) => {
           Nomme le fichier <code>.dat</code> déposé dans collect_sec. Son
           contenu, lui, ne change jamais.
         </p>
+
+        {/* D'où viennent les articles de la liste. */}
+        <div className="lr-source-tabs">
+          {[
+            ["saisie", "Saisie par code"],
+            ["rayon_vide", "Rayon vide"],
+            ["fournisseur", "Par fournisseur"],
+          ].map(([v, lib]) => (
+            <button
+              key={v}
+              type="button"
+              className={`lr-tab ${source === v ? "on" : ""}`}
+              onClick={() => {
+                setSource(v);
+                setSelection(new Set());
+              }}
+            >
+              {lib}
+            </button>
+          ))}
+        </div>
+
+        {source !== "saisie" && (
+          <div className="lr-sel-zone">
+            <p className="lr-hint">
+              Articles dont le <b>magasin est à zéro</b> alors qu'il reste du
+              stock en <b>réserve (S2 à S5)</b> : il y a à descendre, ou le stock
+              est faux. Le <b>gisement dock</b> dit où aller le chercher, le
+              gisement rayon où le reposer. Meilleures ventes en tête.
+            </p>
+
+            <div className="lr-sel-bar">
+              {source === "rayon_vide" ? (
+                <select
+                  value={rvFourn}
+                  onChange={(e) => {
+                    setRvFourn(e.target.value);
+                    setSelection(new Set());
+                  }}
+                >
+                  <option value="">Tous les fournisseurs</option>
+                  {(rv?.fournisseurs || []).map((f) => (
+                    <option key={f.code} value={f.code}>
+                      {f.nom || f.code} ({f.nb})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={fournSel}
+                  onChange={(e) => {
+                    setFournSel(e.target.value);
+                    setSelection(new Set());
+                  }}
+                >
+                  <option value="">— Choisir un fournisseur —</option>
+                  {fournListe.map((f) => (
+                    <option key={f.code} value={f.code}>
+                      {f.nom || f.code} · {f.nbArticles} art.
+                      {f.nbRayonVide ? ` · ${f.nbRayonVide} rayon vide` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <input
+                value={source === "rayon_vide" ? rvSearch : fournSearch}
+                onChange={(e) =>
+                  source === "rayon_vide"
+                    ? setRvSearch(e.target.value)
+                    : setFournSearch(e.target.value)
+                }
+                placeholder="Filtrer : code, désignation, gisement…"
+              />
+
+              {source === "fournisseur" && (
+                <label className="lr-sel-check">
+                  <input
+                    type="checkbox"
+                    checked={prioSeul}
+                    onChange={(e) => setPrioSeul(e.target.checked)}
+                  />
+                  <span>Seulement rayon vide</span>
+                </label>
+              )}
+
+              <button
+                type="button"
+                className="lr-btn"
+                onClick={() => setSelection(new Set(visibles.map((a) => a.nart)))}
+                disabled={visibles.length === 0}
+              >
+                Tout cocher ({visibles.length})
+              </button>
+              <button
+                type="button"
+                className="lr-btn lr-btn-primary"
+                onClick={ajouterSelection}
+                disabled={selection.size === 0}
+              >
+                <HiPlus /> Ajouter à la liste ({selection.size})
+              </button>
+            </div>
+
+            <p className="lr-hint">
+              {chargement
+                ? "Analyse des articles en cours…"
+                : source === "rayon_vide"
+                  ? `${rv?.total ?? 0} article(s) concerné(s) · ${rvFiltres.length} affiché(s)`
+                  : fournArts
+                    ? `${fournArts.total} article(s) · ${fournArts.rayonVide} à rayon vide · ${faFiltres.length} affiché(s)${
+                        fournArts.renvoyes
+                          ? ` · ${fournArts.renvoyes} renvoyé(s) écarté(s)`
+                          : ""
+                      }`
+                    : "Choisissez un fournisseur."}
+            </p>
+
+            <TableauSelection
+              articles={visibles}
+              selection={selection}
+              onBasculer={basculer}
+              vide={
+                chargement ? "Chargement…" : "Aucun article ne correspond."
+              }
+            />
+          </div>
+        )}
 
         <form className="lr-add-row" onSubmit={ajouter}>
           <input
