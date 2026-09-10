@@ -110,6 +110,12 @@ const AdminInfobullesScreen = () => {
       onSave={(nextLayout) => saveLayout(nextLayout).unwrap()}
       saveLabel="Enregistrer l'organisation"
       saveSuccess="Organisation du menu enregistrée pour tous les utilisateurs."
+      // Recharge l'organisation par défaut DANS L'ÉDITEUR sans rien écrire :
+      // rien n'est perdu tant qu'on n'a pas cliqué « Enregistrer ».
+      onReset={async () => {}}
+      resetLayout={getDefaultLayout()}
+      resetLabel="Recharger le menu par défaut"
+      resetSuccess="Menu par défaut rechargé — cliquez « Enregistrer l'organisation » pour l'appliquer."
       renderItemBody={renderItemBody}
       statusSlot={hintMsg ? <span className="mb-msg">{hintMsg}</span> : null}
     />

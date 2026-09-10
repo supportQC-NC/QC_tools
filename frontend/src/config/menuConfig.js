@@ -71,7 +71,9 @@ export const adminMenuStructure = [
       { label: "Envoi Cde Fournisseur", path: "/admin/envoi-cde-fournisseur", icon: HiMail },
       { label: "Proformas", path: "/admin/proformas", icon: HiDocumentReport },
       { label: "Factures", path: "/admin/factures", icon: HiCurrencyDollar },
-      { label: "Bipages", path: "/admin/demandes-bipage", icon: HiClipboardList },
+      // « Bipages » tout court se confondait avec « Détail des bipages » (les
+      // lignes lues) : ici on CRÉE les demandes envoyées aux collecteurs.
+      { label: "Demandes de bipage", path: "/admin/demandes-bipage", icon: HiClipboardList },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
       { label: "Suivi des entrées", path: "/admin/suivi-entrees", icon: HiTruck },
       { label: "Entrées sur réservation", path: "/admin/resa-entrees", icon: HiClipboardCheck },
@@ -857,28 +859,92 @@ export const getMenuCatalog = () => {
   return out;
 };
 
-// Structure par défaut (repli si la base est vide) = calque de la structure code.
+// ── Dossier « Terrain » du menu par défaut (décision client du 10/09/2026) ───
+// Tout ce qui se prépare, se compte ou se reçoit AVEC UN COLLECTEUR tient dans
+// un seul dossier, un sous-dossier par métier. Chaque sous-dossier porte à la
+// fois l'écran qui CRÉE les demandes envoyées à l'application mobile et celui
+// qui SUIT ce qui est en cours sur les collecteurs — c'est le même geste de
+// travail, ils ne doivent pas être à deux endroits du menu.
+// Les onglets cités ici sont retirés des chapitres dérivés de la structure code
+// (sinon ils apparaîtraient deux fois).
+const DOSSIER_TERRAIN = [
+  { key: "terrain", label: "Terrain", icon: "truck", parent: null, items: [] },
+  {
+    key: "terrain_reappro",
+    label: "Réappro",
+    icon: "cart",
+    parent: "terrain",
+    // Listes de réappro = création des demandes (envoyées au collecteur) ET
+    // suivi des listes en cours / terminées, avec les statistiques préparateurs.
+    items: ["/demandes-reappro", "/admin/analyse-reappro", "/admin/reappro-local"],
+  },
+  {
+    key: "terrain_prepa",
+    label: "Préparation de commande",
+    icon: "cube",
+    parent: "terrain",
+    items: ["/preparation-manuelle"],
+  },
+  {
+    key: "terrain_reception",
+    label: "Réception de commande",
+    icon: "truck",
+    parent: "terrain",
+    items: ["/reception-manuelle", "/admin/suivi-receptions"],
+  },
+  {
+    key: "terrain_bipage",
+    label: "Bipage",
+    icon: "device",
+    parent: "terrain",
+    // Demandes de bipage = ce qui part vers l'app mobile ; Suivi bipage = qui
+    // bipe quoi, en cours et terminé ; Détail des bipages = les lignes lues.
+    items: ["/admin/demandes-bipage", "/admin/suivi-bipage", "/admin/bipages"],
+  },
+];
+
+// Structure par défaut (repli si la base est vide) = calque de la structure
+// code, plus le dossier « Terrain » ci-dessus.
 export const getDefaultLayout = () => {
   const chapitres = [];
   const topItems = [];
+  // Onglets déjà rangés dans « Terrain » : ils ne repartent pas dans leur
+  // chapitre d'origine.
+  const prisParTerrain = new Set(DOSSIER_TERRAIN.flatMap((d) => d.items));
   const walkTop = (nodes) =>
     (nodes || []).forEach((n) => {
       if (n.type === "subgroup") {
-        chapitres.push({
-          key: slug(n.label),
-          label: n.label,
-          icon: "",
-          items: (n.items || []).map((i) => i.path).filter(Boolean),
-        });
-      } else if (n.path) {
+        const items = (n.items || [])
+          .map((i) => i.path)
+          .filter((path) => path && !prisParTerrain.has(path));
+        // Un chapitre vidé par le regroupement disparaît (ex. « Réappro »,
+        // « Préparation », « Réception » de la structure code).
+        if (items.length) {
+          chapitres.push({
+            key: slug(n.label),
+            label: n.label,
+            icon: "",
+            parent: null,
+            items,
+          });
+        }
+      } else if (n.path && !prisParTerrain.has(n.path)) {
         topItems.push(n.path);
       }
     });
   walkTop(adminMenuStructure);
   walkTop(moduleMenuStructure);
   if (topItems.length) {
-    chapitres.unshift({ key: "general", label: "Général", icon: "", items: topItems });
+    chapitres.unshift({
+      key: "general",
+      label: "Général",
+      icon: "",
+      parent: null,
+      items: topItems,
+    });
   }
+  // « Terrain » juste après « Général » : c'est le travail quotidien.
+  chapitres.splice(topItems.length ? 1 : 0, 0, ...DOSSIER_TERRAIN.map((d) => ({ ...d })));
   return { chapitres, masques: [] };
 };
 
@@ -927,8 +993,22 @@ export const buildSidebar = (userInfo, layout, hints) => {
     });
   }
 
-  // 2. Chapitres définis par l'admin.
-  for (const ch of lay.chapitres || []) {
+  // 2. Dossiers définis par l'admin (ou par l'utilisateur en mode perso).
+  //    L'arborescence est stockée À PLAT : chaque dossier porte la `key` de son
+  //    parent (null = racine). On la remonte ici en sous-groupes imbriqués.
+  //    Un dossier n'est rendu que s'il reste quelque chose dedans : des onglets
+  //    visibles, ou un sous-dossier qui l'est.
+  const chapitres = lay.chapitres || [];
+  const enfantsDe = new Map();
+  chapitres.forEach((ch) => {
+    const parent = ch.parent || null;
+    if (!enfantsDe.has(parent)) enfantsDe.set(parent, []);
+    enfantsDe.get(parent).push(ch);
+  });
+
+  const vusChapitres = new Set();
+  const construireDossier = (ch) => {
+    vusChapitres.add(ch.key);
     const items = [];
     for (const path of ch.items || []) {
       placed.add(path);
@@ -937,15 +1017,31 @@ export const buildSidebar = (userInfo, layout, hints) => {
       if (!cat || !catalogItemVisible(userInfo, cat)) continue;
       items.push({ label: cat.label, path: cat.path, icon: cat.icon });
     }
-    if (items.length) {
-      subgroups.push({
-        type: "subgroup",
-        label: ch.label || "Sans nom",
-        icon: chapterIcon(ch.icon),
-        items,
-      });
-    }
-  }
+    // Les sous-dossiers viennent APRÈS les onglets du dossier : on voit d'abord
+    // les liens directs, puis les regroupements.
+    const enfants = (enfantsDe.get(ch.key) || [])
+      .map(construireDossier)
+      .filter(Boolean);
+    if (!items.length && !enfants.length) return null;
+    return {
+      type: "subgroup",
+      label: ch.label || "Sans nom",
+      icon: chapterIcon(ch.icon),
+      items: [...items, ...enfants],
+    };
+  };
+
+  (enfantsDe.get(null) || []).forEach((ch) => {
+    const noeud = construireDossier(ch);
+    if (noeud) subgroups.push(noeud);
+  });
+  // Filet : un dossier dont le parent a disparu (document ancien, édition
+  // concurrente) remonte à la racine plutôt que d'emporter ses onglets avec lui.
+  chapitres.forEach((ch) => {
+    if (vusChapitres.has(ch.key)) return;
+    const noeud = construireDossier(ch);
+    if (noeud) subgroups.push(noeud);
+  });
 
   // 3. Non classé : onglets du catalogue non rangés, non masqués, visibles.
   const nonClasses = catalog

@@ -214,3 +214,34 @@
   padding: 8px;
   font-style: italic;
 }
+
+/* =============================================
+   SOUS-DOSSIERS
+   Un sous-dossier est la MÊME carte, posée en retrait dans son dossier parent :
+   on voit d'un coup d'œil ce qui est imbriqué, et le glisser-déposer marche
+   pareil dans les deux (chaque carte a sa propre zone de dépôt).
+   ============================================= */
+.mb-subchapters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 2px 10px;
+  padding-left: 10px;
+  border-left: 2px dashed var(--admin-border, #334155);
+}
+.mb-chapter.mb-subchapter {
+  background: var(--admin-input-bg, #1e293b);
+  padding: 8px;
+}
+.mb-chapter.mb-subchapter > .mb-chapter-head .mb-chapter-name {
+  font-size: 0.9em;
+}
+/* Le sélecteur d'icône d'un sous-dossier reste discret tant qu'on ne le
+   survole pas : sinon deux rangées d'icônes par carte saturent la colonne. */
+.mb-chapter.mb-subchapter > .mb-iconpick {
+  opacity: 0.55;
+}
+.mb-chapter.mb-subchapter:hover > .mb-iconpick,
+.mb-chapter.mb-subchapter:focus-within > .mb-iconpick {
+  opacity: 1;
+}

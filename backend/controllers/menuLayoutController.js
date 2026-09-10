@@ -8,13 +8,24 @@ import UserMenuLayout from "../models/UserMenuLayoutModel.js";
 
 const trim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
+// Profondeur maximale de l'arborescence : dossier > sous-dossier. Au-delà, la
+// sidebar devient illisible (indentation) et le constructeur ingérable.
+const PROFONDEUR_MAX = 2;
+
 // Nettoyage/validation partagé : un `path` ne peut apparaître qu'une seule fois
-// au total (dans un chapitre OU dans les masqués). Renvoie { chapitres, masques }.
+// au total (dans un chapitre OU dans les masqués). Les dossiers sont renvoyés à
+// plat, chacun avec sa `key` de parent, dans l'ordre d'affichage (un enfant
+// suit toujours son parent). Renvoie { chapitres, masques }.
 const sanitizeLayout = (rawChapitres, rawMasques) => {
   const vus = new Set();
-  const chapitres = [];
+  const brut = [];
+  const cles = new Set();
   (Array.isArray(rawChapitres) ? rawChapitres : []).forEach((c, i) => {
-    const key = trim(c.key) || `chap_${i}`;
+    let key = trim(c.key) || `chap_${i}`;
+    // Deux dossiers ne peuvent pas partager la même clé : c'est elle qui porte
+    // le rattachement des sous-dossiers.
+    while (cles.has(key)) key = `${key}_${i}`;
+    cles.add(key);
     const items = [];
     (Array.isArray(c.items) ? c.items : []).forEach((p) => {
       const path = trim(p);
@@ -23,8 +34,45 @@ const sanitizeLayout = (rawChapitres, rawMasques) => {
         items.push(path);
       }
     });
-    chapitres.push({ key, label: trim(c.label), icon: trim(c.icon), items });
+    brut.push({
+      key,
+      label: trim(c.label),
+      icon: trim(c.icon),
+      parent: trim(c.parent) || null,
+      items,
+    });
   });
+
+  // Un parent inconnu, un auto-rattachement ou un cycle ramènent le dossier à
+  // la racine : mieux vaut un dossier mal placé qu'une arborescence perdue.
+  const parKey = new Map(brut.map((c) => [c.key, c]));
+  const profondeur = (c, vus2 = new Set()) => {
+    if (!c.parent || vus2.has(c.key)) return 1;
+    const p = parKey.get(c.parent);
+    if (!p) return 1;
+    vus2.add(c.key);
+    return 1 + profondeur(p, vus2);
+  };
+  brut.forEach((c) => {
+    if (!c.parent) return;
+    if (c.parent === c.key || !parKey.has(c.parent)) c.parent = null;
+  });
+  brut.forEach((c) => {
+    if (c.parent && profondeur(c) > PROFONDEUR_MAX) c.parent = null;
+  });
+
+  // Remise en ordre « parent puis ses enfants », l'ordre d'arrivée faisant foi
+  // entre frères : le front n'a plus qu'à lire le tableau de haut en bas.
+  const chapitres = [];
+  const empiler = (parent) => {
+    brut
+      .filter((c) => (c.parent || null) === parent)
+      .forEach((c) => {
+        chapitres.push(c);
+        empiler(c.key);
+      });
+  };
+  empiler(null);
   const masques = [];
   (Array.isArray(rawMasques) ? rawMasques : []).forEach((p) => {
     const path = trim(p);

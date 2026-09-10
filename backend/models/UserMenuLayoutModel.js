@@ -13,6 +13,9 @@ const chapitreSchema = new mongoose.Schema(
     label: { type: String, default: "" },
     icon: { type: String, default: "" },
     items: { type: [String], default: [] },
+    // Sous-dossiers : même forme que MenuLayout (arborescence à plat, `parent`
+    // = key du dossier conteneur, null pour un dossier racine).
+    parent: { type: String, default: null },
   },
   { _id: false },
 );

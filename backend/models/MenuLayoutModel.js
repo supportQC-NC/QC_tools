@@ -12,6 +12,12 @@ const chapitreSchema = new mongoose.Schema(
     label: { type: String, default: "" },
     icon: { type: String, default: "" }, // nom d'icône (map côté front), vide = défaut
     items: { type: [String], default: [] }, // paths d'onglets, dans l'ordre
+    // Sous-dossiers : arborescence à plat. `parent` porte la `key` du dossier
+    // conteneur (null = dossier racine), et l'ORDRE du tableau `chapitres` est
+    // l'ordre d'affichage en profondeur d'abord — un enfant suit toujours son
+    // parent. À plat plutôt qu'imbriqué : pas de schéma récursif Mongoose, et
+    // les documents existants (sans `parent`) restent valides tels quels.
+    parent: { type: String, default: null },
   },
   { _id: false },
 );

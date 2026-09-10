@@ -43,13 +43,31 @@ const MonMenuScreen = () => {
   const pruneToCatalog = useCallback(
     (layout) => {
       const allowed = new Set(catalog.map((c) => c.path));
+      const chapitres = (layout.chapitres || []).map((ch) => ({
+        ...ch,
+        parent: ch.parent || null,
+        items: (ch.items || []).filter((p) => allowed.has(p)),
+      }));
+      // On garde un dossier s'il lui reste un onglet OU un sous-dossier gardé :
+      // jeter un parent devenu vide couperait ses sous-dossiers de l'arbre (ils
+      // remonteraient à la racine).
+      const gardes = new Set();
+      let bouge = true;
+      while (bouge) {
+        bouge = false;
+        chapitres.forEach((ch) => {
+          if (gardes.has(ch.key)) return;
+          const aEnfantGarde = chapitres.some(
+            (c) => c.parent === ch.key && gardes.has(c.key),
+          );
+          if (ch.items.length > 0 || aEnfantGarde) {
+            gardes.add(ch.key);
+            bouge = true;
+          }
+        });
+      }
       return {
-        chapitres: (layout.chapitres || [])
-          .map((ch) => ({
-            ...ch,
-            items: (ch.items || []).filter((p) => allowed.has(p)),
-          }))
-          .filter((ch) => ch.items.length > 0),
+        chapitres: chapitres.filter((ch) => gardes.has(ch.key)),
         masques: (layout.masques || []).filter((p) => allowed.has(p)),
       };
     },

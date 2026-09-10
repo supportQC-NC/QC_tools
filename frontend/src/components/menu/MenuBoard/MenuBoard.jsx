@@ -23,6 +23,7 @@ import {
   HiEyeOff,
   HiSelector,
   HiSave,
+  HiFolderAdd,
 } from "react-icons/hi";
 import {
   DndContext,
@@ -49,6 +50,54 @@ const MASQUES = "masques";
 
 // Préfixe d'id d'un conteneur « dossier/chapitre » (les autres ids sont des paths).
 const cid = (key) => `c:${key}`;
+
+// Profondeur maximale : dossier > sous-dossier. Le serveur applique la même
+// limite (`PROFONDEUR_MAX` dans menuLayoutController) : au-delà, la sidebar
+// devient illisible et le tableau ingérable.
+const PROFONDEUR_MAX = 2;
+
+// L'arborescence est stockée À PLAT (`parent` = key du dossier conteneur, null
+// pour un dossier racine) et l'ordre du tableau est l'ordre d'affichage, en
+// profondeur d'abord. Ces deux fonctions font l'aller-retour avec un arbre, la
+// forme commode pour déplacer un dossier AVEC ses sous-dossiers.
+const enArbre = (meta) => {
+  const parParent = new Map();
+  (meta || []).forEach((c) => {
+    const parent = c.parent || null;
+    if (!parParent.has(parent)) parParent.set(parent, []);
+    parParent.get(parent).push({ ...c });
+  });
+  const construire = (parent) =>
+    (parParent.get(parent) || []).map((c) => ({
+      ...c,
+      enfants: construire(c.key),
+    }));
+  return construire(null);
+};
+
+const aplatirArbre = (arbre, parent = null, out = []) => {
+  (arbre || []).forEach((n) => {
+    out.push({ key: n.key, label: n.label, icon: n.icon, parent });
+    aplatirArbre(n.enfants, n.key, out);
+  });
+  return out;
+};
+
+// Clés de tous les descendants d'un dossier (suppression, déplacement).
+const descendants = (meta, key) => {
+  const out = [];
+  const pile = [key];
+  while (pile.length) {
+    const k = pile.pop();
+    (meta || []).forEach((c) => {
+      if ((c.parent || null) === k) {
+        out.push(c.key);
+        pile.push(c.key);
+      }
+    });
+  }
+  return out;
+};
 
 // ── Carte d'onglet déplaçable ────────────────────────────────────────────────
 // Le corps (`children`) est injecté par MenuBoard : libellé simple par défaut,
@@ -139,9 +188,23 @@ const MenuBoard = ({
       const meta = [];
       const map = { [NONCLASSE]: [], [MASQUES]: [] };
       const placed = new Set();
+      const clesConnues = new Set(
+        ((lay && lay.chapitres) || []).map((c) => c.key).filter(Boolean),
+      );
       for (const ch of (lay && lay.chapitres) || []) {
         const key = ch.key || `chap_${meta.length}`;
-        meta.push({ key, label: ch.label || "Sans nom", icon: ch.icon || "folder" });
+        // Un parent inconnu (document ancien, dossier supprimé ailleurs) fait
+        // remonter le dossier à la racine plutôt que de le faire disparaître.
+        const parent =
+          ch.parent && ch.parent !== key && clesConnues.has(ch.parent)
+            ? ch.parent
+            : null;
+        meta.push({
+          key,
+          label: ch.label || "Sans nom",
+          icon: ch.icon || "folder",
+          parent,
+        });
         map[cid(key)] = [];
         for (const p of ch.items || []) {
           if (byPath.has(p) && !placed.has(p)) {
@@ -212,29 +275,77 @@ const MenuBoard = ({
     });
   };
 
-  // ── Gestion des dossiers/chapitres ─────────────────────────────────────────
-  const addChapter = () => {
-    const key = `chap_${Date.now()}`;
-    setChapMeta((m) => [...m, { key, label: `Nouveau ${chapterNoun}`, icon: "folder" }]);
+  // ── Gestion des dossiers / sous-dossiers ───────────────────────────────────
+  // `parent = null` -> dossier racine ; sinon sous-dossier du dossier `parent`.
+  // Le nouveau dossier est inséré juste APRÈS le dernier descendant de son
+  // parent, pour que le tableau reste en profondeur d'abord.
+  const addChapter = (parent = null) => {
+    const key = `chap_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const nom = parent ? `Nouveau sous-${chapterNoun}` : `Nouveau ${chapterNoun}`;
+    setChapMeta((m) => {
+      const nouveau = { key, label: nom, icon: "folder", parent };
+      if (!parent) return [...m, nouveau];
+      const bloc = [parent, ...descendants(m, parent)];
+      let dernier = -1;
+      m.forEach((c, i) => {
+        if (bloc.includes(c.key)) dernier = i;
+      });
+      const copie = [...m];
+      copie.splice(dernier + 1, 0, nouveau);
+      return copie;
+    });
     setItems((it) => ({ ...it, [cid(key)]: [] }));
   };
   const renameChapter = (key, label) =>
     setChapMeta((m) => m.map((c) => (c.key === key ? { ...c, label } : c)));
   const setChapterIcon = (key, icon) =>
     setChapMeta((m) => m.map((c) => (c.key === key ? { ...c, icon } : c)));
-  const moveChapter = (index, dir) => {
-    const j = index + dir;
-    if (j < 0 || j >= chapMeta.length) return;
-    setChapMeta((m) => arrayMove(m, index, j));
+
+  // Monter / descendre : on déplace le dossier AVEC ses sous-dossiers, et
+  // seulement entre frères — un dossier ne change jamais de parent par ce biais.
+  const moveChapter = (key, dir) => {
+    setChapMeta((m) => {
+      const cible = m.find((c) => c.key === key);
+      if (!cible) return m;
+      const parent = cible.parent || null;
+      const arbre = enArbre(m);
+      const trouverFratrie = (noeuds) => {
+        if (noeuds.some((n) => n.key === key)) return noeuds;
+        for (const n of noeuds) {
+          const trouve = trouverFratrie(n.enfants || []);
+          if (trouve) return trouve;
+        }
+        return null;
+      };
+      const fratrie = parent === null ? arbre : trouverFratrie(arbre);
+      if (!fratrie) return m;
+      const i = fratrie.findIndex((n) => n.key === key);
+      const j = i + dir;
+      if (j < 0 || j >= fratrie.length) return m;
+      // arrayMove muterait une copie détachée : on remplace le contenu du
+      // tableau de fratrie en place, puis on ré-aplatit tout l'arbre.
+      const ordonne = arrayMove(fratrie, i, j);
+      fratrie.length = 0;
+      ordonne.forEach((n) => fratrie.push(n));
+      return aplatirArbre(arbre);
+    });
   };
+
+  // Supprimer un dossier supprime aussi ses sous-dossiers ; TOUS les onglets
+  // qu'ils contenaient repartent en « Non classé » (rien n'est perdu).
   const deleteChapter = (key) => {
+    const cles = [key, ...descendants(chapMeta, key)];
     setItems((it) => {
-      const moved = it[cid(key)] || [];
-      const next = { ...it, [NONCLASSE]: [...it[NONCLASSE], ...moved] };
-      delete next[cid(key)];
+      const next = { ...it };
+      const recuperes = [];
+      cles.forEach((k) => {
+        recuperes.push(...(next[cid(k)] || []));
+        delete next[cid(k)];
+      });
+      next[NONCLASSE] = [...next[NONCLASSE], ...recuperes];
       return next;
     });
-    setChapMeta((m) => m.filter((c) => c.key !== key));
+    setChapMeta((m) => m.filter((c) => !cles.includes(c.key)));
   };
 
   // Reconstruit le layout { chapitres, masques } à partir de l'état d'édition.
@@ -243,10 +354,15 @@ const MenuBoard = ({
       key: c.key,
       label: c.label,
       icon: c.icon,
+      parent: c.parent || null,
       items: items[cid(c.key)] || [],
     })),
     masques: items[MASQUES] || [],
   });
+
+  // Dossiers d'un niveau donné, dans l'ordre d'affichage.
+  const enfantsDe = (parent) =>
+    chapMeta.filter((c) => (c.parent || null) === parent);
 
   // ── Actions (délèguent la persistance au parent) ───────────────────────────
   const handleSave = async () => {
@@ -288,6 +404,103 @@ const MenuBoard = ({
       );
     });
 
+  // Rendu d'un dossier. RÉCURSIF : `niveau` 1 = dossier racine, 2 = sous-dossier
+  // (au-delà, plus de bouton « sous-dossier » — cf. PROFONDEUR_MAX).
+  const renderChapitre = (ch, idx, freres, niveau) => {
+    const IconC = chapterIcon(ch.icon);
+    const dropId = cid(ch.key);
+    const sousDossiers = enfantsDe(ch.key);
+    return (
+      <div
+        className={`mb-chapter ${niveau > 1 ? "mb-subchapter" : ""}`}
+        key={ch.key}
+      >
+        <div className="mb-chapter-head">
+          <span className="mb-chapter-ic">
+            <IconC />
+          </span>
+          <input
+            className="mb-chapter-name"
+            value={ch.label}
+            onChange={(e) => renameChapter(ch.key, e.target.value)}
+          />
+          <div className="mb-chapter-actions">
+            {niveau < PROFONDEUR_MAX && (
+              <button
+                className="mb-btn"
+                onClick={() => addChapter(ch.key)}
+                title={`Ajouter un sous-${chapterNoun} dans « ${ch.label} »`}
+              >
+                <HiFolderAdd />
+              </button>
+            )}
+            <button
+              className="mb-btn"
+              disabled={idx === 0}
+              onClick={() => moveChapter(ch.key, -1)}
+              title="Monter"
+            >
+              <HiChevronUp />
+            </button>
+            <button
+              className="mb-btn"
+              disabled={idx === freres.length - 1}
+              onClick={() => moveChapter(ch.key, 1)}
+              title="Descendre"
+            >
+              <HiChevronDown />
+            </button>
+            <button
+              className="mb-btn danger"
+              onClick={() => deleteChapter(ch.key)}
+              title={
+                sousDossiers.length
+                  ? "Supprimer (sous-dossiers compris ; les onglets repassent en Non classé)"
+                  : "Supprimer (les onglets repassent en Non classé)"
+              }
+            >
+              <HiTrash />
+            </button>
+          </div>
+        </div>
+        <div className="mb-iconpick">
+          {Object.keys(CHAPTER_ICONS).map((name) => {
+            const I = CHAPTER_ICONS[name];
+            return (
+              <button
+                key={name}
+                className={`mb-iconbtn ${ch.icon === name ? "on" : ""}`}
+                onClick={() => setChapterIcon(ch.key, name)}
+                title={name}
+              >
+                <I />
+              </button>
+            );
+          })}
+        </div>
+        <Dropzone id={dropId}>
+          <SortableContext
+            items={items[dropId] || []}
+            strategy={verticalListSortingStrategy}
+          >
+            {renderCards(dropId)}
+            {(items[dropId] || []).length === 0 && (
+              <div className="mb-empty">Glissez des onglets ici</div>
+            )}
+          </SortableContext>
+        </Dropzone>
+
+        {/* Sous-dossiers : même carte, en retrait. Ils suivent les onglets du
+            dossier, comme dans la sidebar. */}
+        {sousDossiers.length > 0 && (
+          <div className="mb-subchapters">
+            {sousDossiers.map((sc, i, fr) => renderChapitre(sc, i, fr, niveau + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!ready) {
     return (
       <div className="ib-wrap">
@@ -303,7 +516,7 @@ const MenuBoard = ({
       {intro && <p className="ib-intro">{intro}</p>}
 
       <div className="mb-toolbar">
-        <button className="ib-btn" onClick={addChapter}>
+        <button className="ib-btn" onClick={() => addChapter(null)}>
           <HiPlus /> Ajouter un {chapterNoun}
         </button>
         <button className="ib-btn primary" onClick={handleSave} disabled={saving}>
@@ -326,59 +539,10 @@ const MenuBoard = ({
         onDragEnd={onDragEnd}
       >
         <div className="mb-grid">
-          {/* Dossiers / chapitres */}
-          {chapMeta.map((ch, idx) => {
-            const IconC = chapterIcon(ch.icon);
-            const dropId = cid(ch.key);
-            return (
-              <div className="mb-chapter" key={ch.key}>
-                <div className="mb-chapter-head">
-                  <span className="mb-chapter-ic">
-                    <IconC />
-                  </span>
-                  <input
-                    className="mb-chapter-name"
-                    value={ch.label}
-                    onChange={(e) => renameChapter(ch.key, e.target.value)}
-                  />
-                  <div className="mb-chapter-actions">
-                    <button className="mb-btn" disabled={idx === 0} onClick={() => moveChapter(idx, -1)} title="Monter">
-                      <HiChevronUp />
-                    </button>
-                    <button className="mb-btn" disabled={idx === chapMeta.length - 1} onClick={() => moveChapter(idx, 1)} title="Descendre">
-                      <HiChevronDown />
-                    </button>
-                    <button className="mb-btn danger" onClick={() => deleteChapter(ch.key)} title="Supprimer (les onglets repassent en Non classé)">
-                      <HiTrash />
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-iconpick">
-                  {Object.keys(CHAPTER_ICONS).map((name) => {
-                    const I = CHAPTER_ICONS[name];
-                    return (
-                      <button
-                        key={name}
-                        className={`mb-iconbtn ${ch.icon === name ? "on" : ""}`}
-                        onClick={() => setChapterIcon(ch.key, name)}
-                        title={name}
-                      >
-                        <I />
-                      </button>
-                    );
-                  })}
-                </div>
-                <Dropzone id={dropId}>
-                  <SortableContext items={items[dropId] || []} strategy={verticalListSortingStrategy}>
-                    {renderCards(dropId)}
-                    {(items[dropId] || []).length === 0 && (
-                      <div className="mb-empty">Glissez des onglets ici</div>
-                    )}
-                  </SortableContext>
-                </Dropzone>
-              </div>
-            );
-          })}
+          {/* Dossiers, et leurs sous-dossiers imbriqués (profondeur 2 max). */}
+          {enfantsDe(null).map((ch, idx, freres) =>
+            renderChapitre(ch, idx, freres, 1),
+          )}
 
           {/* Non classé */}
           <div className="mb-chapter mb-special">

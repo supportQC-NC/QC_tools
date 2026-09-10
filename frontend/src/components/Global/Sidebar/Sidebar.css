@@ -287,9 +287,11 @@
   margin-left: 8px;
   border-left: 1px solid var(--border);
   overflow: hidden;
-  /* Le sous-groupe « Analyse » compte 13 entrées : 500px tronquait les
-     dernières (Performance Dock, Collecteurs, Carte des collecteurs). */
-  max-height: 2000px;
+  /* ⚠️ Piège connu : un `max-height` trop court coupe la fin d'un dossier —
+     le lien EST dans le DOM mais invisible. « Analyse » compte 13 entrées, et
+     un dossier peut désormais contenir des SOUS-DOSSIERS eux aussi dépliés :
+     on garde une valeur très large plutôt que juste suffisante. */
+  max-height: 6000px;
   transition:
     max-height 0.25s ease,
     opacity 0.2s ease,
@@ -819,4 +821,114 @@
 /* Repliée : on masque le switch (pas de place pour le texte). */
 .sidebar.collapsed .sidebar-mode-switch {
   display: none;
+}
+
+/* =============================================
+   SOUS-DOSSIERS (niveau 2)
+   Un cran d'indentation de plus et un en-tête plus discret que le dossier
+   parent : sans ça, impossible de voir d'un coup d'œil ce qui est imbriqué.
+   ============================================= */
+.sidebar-subgroup.niveau-1 > .sidebar-subgroup-header {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 6px 10px;
+  color: var(--text-muted);
+}
+
+.sidebar-subgroup.niveau-1 > .sidebar-subgroup-header .subgroup-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.sidebar-subgroup.niveau-1 > .sidebar-subgroup-items {
+  padding-left: 10px;
+  margin-left: 6px;
+  border-left-style: dashed;
+}
+
+/* La sidebar repliée (icônes seules) n'a pas la place d'imbriquer. */
+.sidebar.collapsed .sidebar-subgroup.niveau-1 > .sidebar-subgroup-items {
+  padding-left: 0;
+  margin-left: 0;
+  border-left: none;
+}
+
+/* =============================================
+   RECHERCHE DE MODULE
+   Les dossiers étant repliés à l'ouverture, ce champ est le chemin rapide
+   vers un écran : trois lettres au lieu de trois dossiers à dérouler.
+   ============================================= */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 8px;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+}
+
+.sidebar-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.sidebar-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.sidebar-search-clear {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.sidebar-search-clear:hover {
+  color: var(--text-primary);
+}
+
+/* Sidebar en mode icônes : le champ n'a plus de place, on le masque. */
+.sidebar.collapsed .sidebar-search {
+  display: none;
+}
+
+.sidebar-results {
+  padding: 0 4px;
+}
+
+.sidebar-result {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chemin du dossier qui contient le résultat : deux modules peuvent porter un
+   libellé proche, c'est lui qui les départage. */
+.sidebar-result-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 0 12px 6px 42px;
+  margin-top: -4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-noresult {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 10px 14px;
+  margin: 0;
 }

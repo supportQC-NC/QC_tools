@@ -608,18 +608,48 @@ le planificateur n'est pas branché.
 
 Trois couches, à ne pas confondre :
 
-1. **Catalogue** — `frontend/src/config/menuConfig.js` (977 lignes) : liste des
+1. **Catalogue** — `frontend/src/config/menuConfig.js` : liste des
    onglets disponibles, libellés, icônes, infobulles par défaut, et les helpers
    `getMenuCatalog`, `getDefaultLayout`, `buildSidebar`. C'est du **code** ; un
    nouvel écran s'y déclare.
 2. **Organisation globale** — `MenuLayoutModel` (singleton `scope: "default"`) :
-   chapitres ordonnés, rangement des onglets, onglets masqués. Édité par l'admin en
+   dossiers ordonnés, rangement des onglets, onglets masqués. Édité par l'admin en
    drag & drop sur `/admin/infobulles` (`@dnd-kit`). C'est la **source de vérité**
    de l'affichage ; repli sur `getDefaultLayout()`. Un nouveau module non rangé
    tombe en « Non classé ».
 3. **Organisation personnelle** — `UserMenuLayoutModel` (un doc par utilisateur,
    flag `useCustom`) : chaque utilisateur peut réorganiser SA sidebar via
-   `/mon-menu`, sans impacter les autres.
+   `/mon-menu`, sans impacter les autres — dossiers et sous-dossiers compris.
+
+**Dossiers et sous-dossiers** (10/09/2026) : l'arborescence est stockée **à plat**
+— chaque dossier porte la `key` de son `parent` (null = racine), et l'ordre du
+tableau `chapitres` est l'ordre d'affichage, en profondeur d'abord. À plat plutôt
+qu'imbriqué : pas de schéma Mongoose récursif, et les documents antérieurs (sans
+`parent`) restent valides tels quels. **Profondeur maximale 2** (dossier >
+sous-dossier), appliquée des deux côtés — `PROFONDEUR_MAX` dans
+`menuLayoutController.js` (serveur, qui recale aussi les parents inconnus, les
+cycles et l'ordre) et dans `MenuBoard.jsx` (le bouton « sous-dossier »
+n'apparaît qu'au niveau 1). `buildSidebar` remonte l'arbre : un dossier n'est
+rendu que s'il lui reste un onglet visible **ou** un sous-dossier visible, et les
+sous-dossiers s'affichent **après** les onglets du dossier.
+
+⚠️ **La sidebar s'ouvre entièrement repliée** (décision client) : l'état des
+dossiers ouverts n'est plus persisté en localStorage — le retenir rouvrait la
+moitié du menu à chaque démarrage. C'est le **champ de recherche** sous le switch
+Défaut/Perso qui sert de chemin rapide : il aplatit tout le menu, filtre sans
+accent ni casse (tous les mots saisis doivent être présents) et affiche le
+chemin du dossier sous chaque résultat.
+
+**Menu par défaut** : `getDefaultLayout()` calque la structure du code, plus un
+dossier **« Terrain »** écrit à la main (`DOSSIER_TERRAIN`) qui regroupe le
+travail au collecteur en quatre sous-dossiers — Réappro, Préparation de commande,
+Réception de commande, Bipage. Chaque sous-dossier porte à la fois l'écran qui
+**crée** les demandes envoyées à l'app mobile et celui qui **suit** ce qui est en
+cours. Les onglets qu'il contient sont retirés de leur chapitre d'origine (sinon
+ils sortiraient deux fois). ⚠️ Ce défaut ne s'applique QUE si aucun `MenuLayout`
+n'existe en base : sur une instance déjà configurée, l'admin doit cliquer
+« Recharger le menu par défaut » sur `/admin/infobulles` (recharge l'éditeur sans
+rien écrire) puis « Enregistrer l'organisation ».
 
 `<ModuleRoute module="…">` s'appuie sur `PATH_MODULE_MAP` de
 `frontend/src/config/adminModules.js` ; `<PrivateRoute>`, `<TeamRoute>`,

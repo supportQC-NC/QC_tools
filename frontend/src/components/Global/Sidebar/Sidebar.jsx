@@ -1,9 +1,15 @@
 // src/components/Global/Sidebar/Sidebar.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { getMenuHint, buildSidebar } from "../../../config/menuConfig";
-import { HiHome, HiX, HiChevronDown, HiChevronUp } from "react-icons/hi";
+import {
+  HiHome,
+  HiX,
+  HiChevronDown,
+  HiChevronUp,
+  HiSearch,
+} from "react-icons/hi";
 import { useSidebar } from "../../../contexte/SidebarContext";
 import { useGetNotificationCountsQuery } from "../../../slices/notificationApiSlice";
 import { useGetMenuHintsQuery } from "../../../slices/menuHintsApiSlice";
@@ -59,24 +65,29 @@ const Sidebar = () => {
   // Context sidebar (pour mobile ET collapsed)
   const { isOpen, isMobile, isCollapsed, closeSidebar } = useSidebar();
 
-  // États pour les sections et sous-groupes collapsibles
-  const [collapsedSections, setCollapsedSections] = useState(() => {
-    const saved = localStorage.getItem("sidebar-sections");
-    return saved ? JSON.parse(saved) : {};
-  });
+  // Dossiers ouverts. ⚠️ On repart de ZÉRO à chaque chargement : à l'ouverture
+  // de l'application, TOUS les dossiers et sous-dossiers sont repliés (décision
+  // client) — la sidebar tient alors dans l'écran, et on déplie ce dont on a
+  // besoin. L'état n'est donc volontairement plus persisté en localStorage :
+  // le retenir rouvrirait la moitié du menu au prochain démarrage.
+  const [openSections, setOpenSections] = useState({});
 
-  // Sauvegarder l'état des sections dans localStorage
-  useEffect(() => {
-    localStorage.setItem("sidebar-sections", JSON.stringify(collapsedSections));
-  }, [collapsedSections]);
-
-  // Toggle section/subgroup collapsed
+  // Ouvre / referme un dossier (absent de l'objet = replié).
   const toggleSection = (key) => {
-    setCollapsedSections((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+  const estReplie = (key) => !openSections[key];
+
+  // ── Recherche d'un module dans tout le menu ──────────────────────────────
+  // Les dossiers étant repliés par défaut, c'est LE chemin rapide vers un
+  // écran : on tape trois lettres au lieu de dérouler trois dossiers.
+  const [recherche, setRecherche] = useState("");
+  const normaliser = (v) =>
+    (v || "")
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
 
   // Render un item de menu (lien)
   const renderMenuItem = (item, key) => {
@@ -105,17 +116,18 @@ const Sidebar = () => {
     );
   };
 
-  // Render un sous-groupe
-  const renderSubgroup = (subgroup, parentKey) => {
+  // Render un dossier. RÉCURSIF : un dossier peut contenir des sous-dossiers,
+  // qui sont eux-mêmes des sous-groupes (`niveau` ne sert qu'à l'indentation).
+  const renderSubgroup = (subgroup, parentKey, niveau = 0) => {
     const key = `${parentKey}-${subgroup.label}`;
-    const isSubgroupCollapsed = collapsedSections[key];
+    const replie = estReplie(key);
     const IconComponent = subgroup.icon || HiHome;
 
     return (
-      <div key={key} className="sidebar-subgroup">
-        {/* Header du sous-groupe */}
+      <div key={key} className={`sidebar-subgroup niveau-${niveau}`}>
+        {/* Header du dossier */}
         <button
-          className={`sidebar-subgroup-header ${isSubgroupCollapsed ? "collapsed" : ""}`}
+          className={`sidebar-subgroup-header ${replie ? "collapsed" : ""}`}
           onClick={() => toggleSection(key)}
         >
           <span className="subgroup-icon">
@@ -123,23 +135,25 @@ const Sidebar = () => {
           </span>
           <span className="subgroup-label">{subgroup.label}</span>
           <span className="subgroup-arrow">
-            {isSubgroupCollapsed ? <HiChevronDown /> : <HiChevronUp />}
+            {replie ? <HiChevronDown /> : <HiChevronUp />}
           </span>
         </button>
 
-        {/* Items du sous-groupe */}
+        {/* Contenu : onglets puis sous-dossiers */}
         <div
-          className={`sidebar-subgroup-items ${isSubgroupCollapsed ? "collapsed" : ""}`}
+          className={`sidebar-subgroup-items ${replie ? "collapsed" : ""}`}
         >
           {subgroup.items.map((item, idx) =>
-            renderMenuItem(item, `${key}-item-${idx}`),
+            item.type === "subgroup"
+              ? renderSubgroup(item, `${key}-${idx}`, niveau + 1)
+              : renderMenuItem(item, `${key}-item-${idx}`),
           )}
         </div>
       </div>
     );
   };
 
-  // Render les items d'une section (peut contenir items et subgroups)
+  // Render les items d'une section (peut contenir items et dossiers)
   const renderSectionItems = (items, sectionKey) => {
     return items.map((item, idx) => {
       if (item.type === "subgroup") {
@@ -150,10 +164,34 @@ const Sidebar = () => {
     });
   };
 
+  // Tous les onglets du menu, à plat (dossiers traversés) : c'est la matière
+  // de la recherche. Le chemin des dossiers est conservé pour situer le
+  // résultat — deux modules peuvent porter un libellé proche.
+  const aplatir = (noeuds, chemin = []) =>
+    (noeuds || []).flatMap((n) =>
+      n.type === "subgroup"
+        ? aplatir(n.items, [...chemin, n.label])
+        : [{ ...n, chemin }],
+    );
+
+  const q = normaliser(recherche.trim());
+  const resultats = q
+    ? aplatir(menus.flatMap((s) => s.items || []))
+        .filter((it) => {
+          const cible = normaliser(
+            `${it.label} ${it.path} ${(it.chemin || []).join(" ")}`,
+          );
+          // Tous les mots saisis doivent être présents : « ana ca » trouve
+          // « Analyse CA » sans imposer l'ordre exact.
+          return q.split(/\s+/).every((mot) => cible.includes(mot));
+        })
+        .slice(0, 40)
+    : [];
+
   // Render une section principale
   const renderSection = (section, index) => {
     const sectionKey = `section-${section.label || index}`;
-    const isSectionCollapsed = collapsedSections[sectionKey];
+    const isSectionCollapsed = estReplie(sectionKey);
 
     // Section sans titre (constructeur de menu) : on rend directement les items
     // (les chapitres sont des sous-groupes avec leur propre en-tête).
@@ -238,7 +276,51 @@ const Sidebar = () => {
             </button>
           </div>
 
-          {menus.map((section, index) => renderSection(section, index))}
+          {/* Recherche de module : les dossiers étant repliés au démarrage,
+              c'est le chemin le plus court vers un écran. */}
+          <div className="sidebar-search">
+            <HiSearch />
+            <input
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Rechercher un module…"
+              aria-label="Rechercher un module"
+            />
+            {recherche && (
+              <button
+                type="button"
+                className="sidebar-search-clear"
+                onClick={() => setRecherche("")}
+                title="Effacer"
+              >
+                <HiX />
+              </button>
+            )}
+          </div>
+
+          {/* Pendant une recherche, on remplace l'arborescence par la liste
+              plate des correspondances : pas de dossier à déplier. */}
+          {q ? (
+            <div className="sidebar-section sidebar-results">
+              {resultats.length === 0 ? (
+                <p className="sidebar-noresult">Aucun module trouvé.</p>
+              ) : (
+                resultats.map((item, idx) => (
+                  <div key={`res-${item.path}-${idx}`} className="sidebar-result">
+                    {renderMenuItem(item, `res-item-${item.path}-${idx}`)}
+                    {item.chemin?.length > 0 && (
+                      <span className="sidebar-result-path">
+                        {item.chemin.join(" › ")}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            menus.map((section, index) => renderSection(section, index))
+          )}
         </nav>
 
         <div className="sidebar-footer">
