@@ -66,7 +66,7 @@ const assertProformaFiles = (entreprise, res) => {
 /**
  * @desc    Proformas à préparer (DBF) + statut de suivi des fiches papier.
  * @route   GET /api/preparation-manuelle/:nomDossierDBF/proformas
- * @query   page, limit, search, statut
+ * @query   page, limit, search, statut, vendeur, client
  * @access  Private (module prep_commande_manuelle, read) + entreprise
  */
 const getProformas = asyncHandler(async (req, res) => {
@@ -74,14 +74,14 @@ const getProformas = asyncHandler(async (req, res) => {
   const startTime = Date.now();
   assertProformaFiles(entreprise, res);
 
-  const { proformas, pagination, etatAPreparer } = await listerProformas(
-    entreprise,
-    {
+  const { proformas, pagination, etatAPreparer, filtres } =
+    await listerProformas(entreprise, {
       page: req.query.page,
       limit: req.query.limit,
       search: req.query.search,
-    },
-  );
+      vendeur: req.query.vendeur,
+      client: req.query.client,
+    });
 
   // Suivi Mongo des proformas de la page courante.
   const numfacts = proformas.map((p) => p.numfact);
@@ -105,6 +105,9 @@ const getProformas = asyncHandler(async (req, res) => {
   res.json({
     entreprise: formatEntreprise(entreprise),
     etatAPreparer,
+    // Listes déroulantes « Vendeur » / « Client » : calculées sur TOUTES les
+    // proformas à préparer, pas sur la page renvoyée.
+    filtres,
     pagination,
     _queryTime: `${Date.now() - startTime}ms`,
     proformas: lignes,

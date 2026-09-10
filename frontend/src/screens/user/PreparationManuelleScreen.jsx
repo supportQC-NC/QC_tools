@@ -75,6 +75,22 @@ const fmtQte = (v) =>
     ? Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 3 })
     : "—";
 
+// Valeur sentinelle des filtres serveur : proforma sans vendeur ou sans code
+// client (elle doit rester atteignable, sinon la commande devient invisible
+// dès qu'on filtre).
+const FILTRE_AUCUN = "__aucun__";
+
+// Libellé d'une option de filtre : « NOM (code) · n ». Le code reste affiché —
+// deux clients peuvent porter le même nom, et le vendeur n'a parfois que son
+// code (onglet Vendeurs de la fiche société non renseigné).
+const libelleFiltre = (o) => {
+  const nb = Number.isFinite(Number(o.nb)) ? ` · ${o.nb}` : "";
+  if (o.valeur === FILTRE_AUCUN) return `Non renseigné${nb}`;
+  const base =
+    o.label && o.label !== o.valeur ? `${o.label} (${o.valeur})` : o.valeur;
+  return `${base}${nb}`;
+};
+
 const PreparationManuelleScreen = () => {
   const nomDossierDBF = useSelector(selectGlobalDossier);
   const entreprise = useSelector(selectGlobalEntreprise);
@@ -82,6 +98,10 @@ const PreparationManuelleScreen = () => {
   const [rechercheSaisie, setRechercheSaisie] = useState("");
   const [search, setSearch] = useState("");
   const [statut, setStatut] = useState("");
+  // Filtres serveur (le tableau est paginé : filtrer localement ne verrait que
+  // la page affichée). Les listes déroulantes viennent de `data.filtres`.
+  const [vendeur, setVendeur] = useState("");
+  const [client, setClient] = useState("");
   const [page, setPage] = useState(1);
   const [apercu, setApercu] = useState(null); // numfact en aperçu
   const [busy, setBusy] = useState(""); // numfact en cours d'impression
@@ -94,7 +114,7 @@ const PreparationManuelleScreen = () => {
     error: queryError,
     refetch,
   } = useGetProformasAPreparerManuelQuery(
-    { nomDossierDBF, page, limit: 50, search, statut },
+    { nomDossierDBF, page, limit: 50, search, statut, vendeur, client },
     { skip: !nomDossierDBF },
   );
 
@@ -104,12 +124,31 @@ const PreparationManuelleScreen = () => {
   const proformas = useMemo(() => data?.proformas || [], [data]);
   const pagination = data?.pagination;
 
+  // Options des listes déroulantes. La valeur sélectionnée est réinjectée si
+  // elle a disparu de la facette (recherche modifiée) : sinon le <select>
+  // retomberait silencieusement sur « Tous » sans que le filtre soit levé.
+  const optionsFiltre = (liste, selection) => {
+    const options = (liste || []).map((o) => ({
+      valeur: o.valeur,
+      label: libelleFiltre(o),
+    }));
+
+    if (selection && !options.some((o) => o.valeur === selection)) {
+      options.unshift({ valeur: selection, label: selection });
+    }
+    return options;
+  };
+  const optionsVendeur = optionsFiltre(data?.filtres?.vendeurs, vendeur);
+  const optionsClient = optionsFiltre(data?.filtres?.clients, client);
+
   // Changement de société : on repart d'une liste propre.
   useEffect(() => {
     setPage(1);
     setSearch("");
     setRechercheSaisie("");
     setStatut("");
+    setVendeur("");
+    setClient("");
     setApercu(null);
     setError("");
   }, [nomDossierDBF]);
@@ -258,6 +297,56 @@ const PreparationManuelleScreen = () => {
         </form>
 
         <div className="pm-filters">
+          <label className="pm-field pm-field-large">
+            <span>Vendeur</span>
+            <select
+              value={vendeur}
+              onChange={(e) => {
+                setPage(1);
+                setVendeur(e.target.value);
+              }}
+            >
+              <option value="">Tous les vendeurs</option>
+              {optionsVendeur.map((o) => (
+                <option key={o.valeur} value={o.valeur}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="pm-field pm-field-large">
+            <span>Client</span>
+            <select
+              value={client}
+              onChange={(e) => {
+                setPage(1);
+                setClient(e.target.value);
+              }}
+            >
+              <option value="">Tous les clients</option>
+              {optionsClient.map((o) => (
+                <option key={o.valeur} value={o.valeur}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {(vendeur || client) && (
+            <button
+              type="button"
+              className="pm-btn pm-btn-ghost"
+              onClick={() => {
+                setPage(1);
+                setVendeur("");
+                setClient("");
+              }}
+            >
+              Tout afficher
+            </button>
+          )}
+
           <label className="pm-field">
             <span>Statut</span>
             <select

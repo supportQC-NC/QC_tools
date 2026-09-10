@@ -120,6 +120,13 @@
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
 }
+/* Vendeur / client : les libellés vont de « 12 » à « SARL LES TROIS FRERES
+   NOUMEA (C01234) · 7 ». On borne la largeur du <select> pour que la barre
+   d'outils ne se déforme pas — la liste déroulante, elle, s'ouvre en entier. */
+.pm-field-large select {
+  min-width: 170px;
+  max-width: 230px;
+}
 .pm-check {
   display: inline-flex;
   align-items: center;

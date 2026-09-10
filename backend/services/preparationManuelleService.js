@@ -71,14 +71,63 @@ export const checkProformaFiles = (entreprise) => {
  * @param {object} entreprise document Entreprise
  * @param {object} options    { page, limit, search }
  */
+// Clés de filtrage. Un document sans vendeur (REPRES vide) ou sans code client
+// reste atteignable : il tombe dans la valeur sentinelle « __aucun__ » plutôt
+// que de disparaître silencieusement des listes déroulantes.
+export const FILTRE_AUCUN = "__aucun__";
+
+const cleVendeur = (entreprise, record) =>
+  resolveVendeur(entreprise, record.REPRES).code || FILTRE_AUCUN;
+
+const cleClient = (record) =>
+  record.TIERS != null && safeTrim(record.TIERS) !== ""
+    ? safeTrim(record.TIERS)
+    : FILTRE_AUCUN;
+
+// [{ valeur, label, nb }] trié par libellé, pour alimenter un <select>.
+const agregerFacette = (records, cle, libelle) => {
+  const par = new Map();
+  records.forEach((r) => {
+    const v = cle(r);
+    const entree = par.get(v);
+    if (entree) {
+      entree.nb += 1;
+      if (!entree.label) entree.label = safeTrim(libelle(r));
+      return;
+    }
+    par.set(v, { valeur: v, label: safeTrim(libelle(r)), nb: 1 });
+  });
+  return [...par.values()]
+    .map((e) => ({
+      ...e,
+      label: e.label || (e.valeur === FILTRE_AUCUN ? "" : e.valeur),
+    }))
+    .sort((a, b) => {
+      // « Sans … » toujours en fin de liste.
+      if (a.valeur === FILTRE_AUCUN) return 1;
+      if (b.valeur === FILTRE_AUCUN) return -1;
+      // `numeric` : sans lui, les vendeurs affichés par leur code (fiche
+      // société sans onglet Vendeurs) sortent « 3 » après « 29 ».
+      return a.label.localeCompare(b.label, "fr", {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+};
+
 export const listerProformas = async (entreprise, options = {}) => {
   const page = parseInt(options.page, 10) || 1;
   const limit = parseInt(options.limit, 10) || 50;
   const search = safeTrim(options.search).toLowerCase();
+  const vendeurFiltre = safeTrim(options.vendeur);
+  const clientFiltre = safeTrim(options.client);
 
   const cache = await proformaCacheService.getProformas(entreprise);
 
-  const resultats = cache.proformaRecords.filter((record) => {
+  // Base : les proformas à préparer qui passent la recherche texte. C'est sur
+  // ELLE que sont construites les listes déroulantes, pas sur la page courante
+  // (50 lignes) — sinon un vendeur disparaîtrait du filtre dès la page 2.
+  const base = cache.proformaRecords.filter((record) => {
     if (Number(record.ETAT) !== ETAT_A_PREPARER) return false;
     if (search) {
       const champs = [record.NUMFACT, record.NOM, record.TEXTE]
@@ -88,6 +137,29 @@ export const listerProformas = async (entreprise, options = {}) => {
     }
     return true;
   });
+
+  const passeVendeur = (r) =>
+    !vendeurFiltre || cleVendeur(entreprise, r) === vendeurFiltre;
+  const passeClient = (r) => !clientFiltre || cleClient(r) === clientFiltre;
+
+  const resultats = base.filter((r) => passeVendeur(r) && passeClient(r));
+
+  // Facettes : chaque liste est comptée sur la base filtrée par L'AUTRE
+  // critère. Choisir un vendeur restreint donc la liste des clients (et
+  // l'inverse), mais la valeur déjà choisie ne disparaît jamais de sa propre
+  // liste.
+  const filtres = {
+    vendeurs: agregerFacette(
+      base.filter(passeClient),
+      (r) => cleVendeur(entreprise, r),
+      (r) => resolveVendeur(entreprise, r.REPRES).nom,
+    ),
+    clients: agregerFacette(
+      base.filter(passeVendeur),
+      cleClient,
+      (r) => safeTrim(r.NOM),
+    ),
+  };
 
   // Les plus récentes en tête (les proformas sans date partent en fin).
   resultats.sort((a, b) => {
@@ -134,6 +206,7 @@ export const listerProformas = async (entreprise, options = {}) => {
 
   return {
     etatAPreparer: ETAT_A_PREPARER,
+    filtres,
     pagination: {
       page,
       limit,

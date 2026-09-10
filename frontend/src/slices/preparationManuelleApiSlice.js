@@ -17,6 +17,8 @@ export const preparationManuelleApiSlice = apiSlice.injectEndpoints({
         limit = 50,
         search = "",
         statut = "",
+        vendeur = "",
+        client = "",
       }) => ({
         url: `${URL}/${nomDossierDBF}/proformas`,
         params: {
@@ -24,6 +26,10 @@ export const preparationManuelleApiSlice = apiSlice.injectEndpoints({
           limit,
           ...(search ? { search } : {}),
           ...(statut ? { statut } : {}),
+          // Filtres serveur : la liste est paginée à 50, un filtrage local ne
+          // verrait que la page affichée.
+          ...(vendeur ? { vendeur } : {}),
+          ...(client ? { client } : {}),
         },
       }),
       providesTags: ["PreparationManuelle"],
