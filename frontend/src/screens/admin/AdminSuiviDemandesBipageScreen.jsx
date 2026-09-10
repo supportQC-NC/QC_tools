@@ -14,10 +14,15 @@ import {
   HiRefresh,
   HiSearch,
   HiDeviceMobile,
+  HiEye,
+  HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
-import { useGetSuiviDemandesBipageQuery } from "../../slices/demandeBipageApiSlice";
+import {
+  useGetSuiviDemandesBipageQuery,
+  useLazyGetLignesBipageQuery,
+} from "../../slices/demandeBipageApiSlice";
 // Feuille de style COMMUNE aux écrans de suivi terrain (bipage, réappro).
 import "./SuiviTerrain.css";
 
@@ -31,7 +36,109 @@ const SOURCE_LABEL = {
   gisement: "Gisement",
   groupe: "Groupe",
   manuel: "Manuelle",
+  libre: "Bipage libre",
 };
+
+// ⚠️ Quantités : champs DBF N(x.3) — jamais d'arrondi à l'unité.
+const fmtQte = (v) =>
+  Number.isFinite(Number(v))
+    ? Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 3 })
+    : "—";
+
+/* Détail d'un bipage : les articles réellement bipés.
+ *
+ * Deux formes selon l'origine :
+ *   - DEMANDE : la liste demandée, avec ce qui a été bipé en face — les lignes
+ *     non bipées restent visibles (c'est le travail qui reste), et les articles
+ *     bipés hors liste sont ajoutés en fin plutôt que perdus ;
+ *   - LIBRE : ce que l'agent a scanné de sa propre initiative, avec l'heure.
+ */
+const DetailBipageModal = ({ detail, chargement, onFermer }) => (
+  <div className="st-modal-overlay" onClick={onFermer}>
+    <div className="st-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="st-modal-head">
+        <h2>
+          {detail?.libelle || "Détail du bipage"}
+          {detail?.type === "libre" && (
+            <span className="st-prio st-prio-urgent">Libre</span>
+          )}
+        </h2>
+        <button className="st-btn-icon" onClick={onFermer} title="Fermer">
+          <HiX />
+        </button>
+      </div>
+
+      {chargement ? (
+        <p className="st-intro">Chargement…</p>
+      ) : !detail ? (
+        <p className="st-intro">Détail indisponible.</p>
+      ) : (
+        <>
+          <p className="st-intro">
+            {detail.total} ligne(s)
+            {detail.type === "demande"
+              ? " — la liste demandée, et ce qui a été bipé en face."
+              : " — scannées librement au collecteur."}
+          </p>
+          <div className="st-modal-body">
+            <table className="st-table">
+              <thead>
+                <tr>
+                  <th>Article</th>
+                  <th>Désignation</th>
+                  <th>Gencode</th>
+                  <th className="st-num">Quantité bipée</th>
+                  <th>État</th>
+                  {detail.type === "libre" && <th>Bipé le</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {detail.lignes.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="st-empty">
+                      Rien n'a encore été bipé.
+                    </td>
+                  </tr>
+                ) : (
+                  detail.lignes.map((l, i) => (
+                    <tr key={`${l.nart}-${i}`}>
+                      <td>
+                        {l.nart}
+                        {l.inconnu && (
+                          <span className="st-comment">article inconnu</span>
+                        )}
+                        {l.horsListe && (
+                          <span className="st-comment">hors liste</span>
+                        )}
+                      </td>
+                      <td>{l.design || "—"}</td>
+                      <td>{l.gencod || "—"}</td>
+                      <td className="st-num">
+                        {l.quantite === null ? "—" : fmtQte(l.quantite)}
+                      </td>
+                      <td>
+                        <span
+                          className={`st-statut st-statut-${
+                            l.bipe === false ? "en_attente" : "realisee"
+                          }`}
+                        >
+                          {l.bipe === false ? "Pas bipé" : "Bipé"}
+                        </span>
+                      </td>
+                      {detail.type === "libre" && (
+                        <td>{fmtDate(l.scannedAt)}</td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
 const PRIORITE_LABEL = { urgent: "Urgent", a_faire: "À faire", normal: "Normal" };
 
 // Fenêtres proposées. « Tout l'historique » reste possible mais n'est pas le
@@ -75,6 +182,27 @@ const AdminSuiviDemandesBipageScreen = () => {
   const [statut, setStatut] = useState("tous");
   const [jours, setJours] = useState(30);
   const [search, setSearch] = useState("");
+  const [origine, setOrigine] = useState("tous");
+  const [detail, setDetail] = useState(null);
+  const [detailOuvert, setDetailOuvert] = useState(false);
+
+  const [chargerLignes, { isFetching: chargementDetail }] =
+    useLazyGetLignesBipageQuery();
+
+  const ouvrirDetail = async (d) => {
+    setDetail(null);
+    setDetailOuvert(true);
+    try {
+      const r = await chargerLignes({
+        nomDossierDBF,
+        type: d.type || "demande",
+        id: d._id,
+      }).unwrap();
+      setDetail(r);
+    } catch {
+      setDetail(null);
+    }
+  };
 
   const { data, isFetching, refetch } = useGetSuiviDemandesBipageQuery(
     { nomDossierDBF, statut: statut === "tous" ? undefined : statut, jours },
@@ -86,13 +214,14 @@ const AdminSuiviDemandesBipageScreen = () => {
 
   const filtrees = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return demandes;
-    return demandes.filter((d) =>
-      [d.libelle, d.sourceRef, d.createdByNom, d.realisedByNom]
+    return demandes.filter((d) => {
+      if (origine !== "tous" && (d.type || "demande") !== origine) return false;
+      if (!q) return true;
+      return [d.libelle, d.sourceRef, d.createdByNom, d.realisedByNom]
         .filter(Boolean)
-        .some((v) => v.toLowerCase().includes(q)),
-    );
-  }, [demandes, search]);
+        .some((v) => v.toLowerCase().includes(q));
+    });
+  }, [demandes, search, origine]);
 
   if (!nomDossierDBF) {
     return (
@@ -118,6 +247,17 @@ const AdminSuiviDemandesBipageScreen = () => {
           <HiRefresh className={isFetching ? "st-spin" : ""} />
         </button>
       </div>
+      {detailOuvert && (
+        <DetailBipageModal
+          detail={detail}
+          chargement={chargementDetail}
+          onFermer={() => {
+            setDetailOuvert(false);
+            setDetail(null);
+          }}
+        />
+      )}
+
       <p className="st-intro">
         Ce que les collecteurs ont reçu et bipé, demande par demande. Le comptage
         d'inventaire par zone se suit ailleurs, sur « Suivi bipage inventaire ».
@@ -136,6 +276,10 @@ const AdminSuiviDemandesBipageScreen = () => {
         <div className="st-kpi st-kpi-ok">
           <span className="st-kpi-lbl">Réalisées</span>
           <span className="st-kpi-val">{fmtInt(totaux?.realisee ?? 0)}</span>
+        </div>
+        <div className="st-kpi">
+          <span className="st-kpi-lbl">Bipages libres</span>
+          <span className="st-kpi-val">{fmtInt(totaux?.libre ?? 0)}</span>
         </div>
         <div className="st-kpi">
           <span className="st-kpi-lbl">Articles demandés</span>
@@ -172,6 +316,14 @@ const AdminSuiviDemandesBipageScreen = () => {
           </select>
         </label>
         <label className="st-field">
+          <span>Origine</span>
+          <select value={origine} onChange={(e) => setOrigine(e.target.value)}>
+            <option value="tous">Toutes</option>
+            <option value="demande">Demandes</option>
+            <option value="libre">Bipages libres</option>
+          </select>
+        </label>
+        <label className="st-field">
           <span>Période</span>
           <select
             value={jours}
@@ -191,7 +343,8 @@ const AdminSuiviDemandesBipageScreen = () => {
         <table className="st-table">
           <thead>
             <tr>
-              <th>Demande</th>
+              <th>Origine</th>
+              <th>Bipage</th>
               <th>Source</th>
               <th>Priorité</th>
               <th>Statut</th>
@@ -203,12 +356,13 @@ const AdminSuiviDemandesBipageScreen = () => {
               <th className="st-num">Lignes bipées</th>
               <th className="st-num">Unités</th>
               <th className="st-num">Délai</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {filtrees.length === 0 ? (
               <tr>
-                <td colSpan={12} className="st-empty">
+                <td colSpan={14} className="st-empty">
                   {isFetching
                     ? "Chargement…"
                     : "Aucune demande de bipage sur cette période."}
@@ -216,7 +370,16 @@ const AdminSuiviDemandesBipageScreen = () => {
               </tr>
             ) : (
               filtrees.map((d) => (
-                <tr key={d._id}>
+                <tr key={`${d.type || "demande"}-${d._id}`}>
+                  <td>
+                    <span
+                      className={`st-prio ${
+                        d.type === "libre" ? "st-prio-urgent" : "st-prio-a_faire"
+                      }`}
+                    >
+                      {d.type === "libre" ? "Libre" : "Demande"}
+                    </span>
+                  </td>
                   <td>
                     <span className="st-libelle">{d.libelle || "—"}</span>
                     {d.commentaire && (
@@ -250,6 +413,17 @@ const AdminSuiviDemandesBipageScreen = () => {
                   <td className="st-num">{fmtInt(d.nbLignesBipees)}</td>
                   <td className="st-num">{fmtInt(d.unitesBipees)}</td>
                   <td className="st-num">{fmtDelai(d.delaiMinutes)}</td>
+                  <td>
+                    {/* Voir les articles bipés, y compris pendant le travail. */}
+                    <button
+                      className="st-btn-icon"
+                      onClick={() => ouvrirDetail(d)}
+                      title="Voir les articles bipés"
+                      aria-label="Voir les articles bipés"
+                    >
+                      <HiEye />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}

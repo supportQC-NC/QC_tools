@@ -15,10 +15,15 @@ import {
   HiSearch,
   HiDeviceMobile,
   HiClipboardList,
+  HiEye,
+  HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
-import { useGetSuiviReapprosQuery } from "../../slices/demandeReapproApiSlice";
+import {
+  useGetSuiviReapprosQuery,
+  useLazyGetLignesReapproQuery,
+} from "../../slices/demandeReapproApiSlice";
 // Feuille de style COMMUNE aux écrans de suivi terrain (bipage, réappro).
 import "./SuiviTerrain.css";
 
@@ -68,6 +73,114 @@ const fmtDuree = (ms) => {
 const fmtInt = (v) =>
   Number.isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString("fr-FR") : "—";
 
+// ⚠️ Quantités : champs DBF N(x.3), beaucoup d'articles se vendent au mètre.
+// Jamais d'arrondi à l'unité.
+const fmtQte = (v) =>
+  Number.isFinite(Number(v))
+    ? Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 3 })
+    : "—";
+
+const STATUT_LIGNE = {
+  a_faire: "À faire",
+  prise: "Prise",
+  introuvable: "Introuvable",
+};
+
+/* Détail d'un réappro : ce que l'opérateur a réellement pris, article par
+ * article. Ouvert aussi bien sur un réappro TERMINÉ que sur un réappro EN
+ * COURS — dans ce cas on voit ce qui est déjà fait et ce qui reste, c'est tout
+ * l'intérêt de regarder pendant qu'il travaille.
+ */
+const DetailModal = ({ detail, chargement, onFermer }) => (
+  <div className="st-modal-overlay" onClick={onFermer}>
+    <div className="st-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="st-modal-head">
+        <h2>
+          {detail?.libelle || "Détail du réappro"}
+          {detail?.type === "libre" && (
+            <span className="st-prio st-prio-urgent">Libre</span>
+          )}
+        </h2>
+        <button className="st-btn-icon" onClick={onFermer} title="Fermer">
+          <HiX />
+        </button>
+      </div>
+
+      {chargement ? (
+        <p className="st-intro">Chargement…</p>
+      ) : !detail ? (
+        <p className="st-intro">Détail indisponible.</p>
+      ) : (
+        <>
+          <p className="st-intro">
+            {detail.total} article(s)
+            {detail.type === "liste"
+              ? " — la quantité demandée vient de la liste, la quantité prise du collecteur."
+              : " — scannés librement au collecteur : ce qui est scanné EST le travail fait."}
+          </p>
+          <div className="st-modal-body">
+            <table className="st-table">
+              <thead>
+                <tr>
+                  <th>Article</th>
+                  <th>Désignation</th>
+                  <th>Gencode</th>
+                  {detail.type === "liste" && (
+                    <th className="st-num">Demandé</th>
+                  )}
+                  <th className="st-num">Pris</th>
+                  <th>État</th>
+                  <th>Bipé le</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.lignes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="st-empty">
+                      Rien n'a encore été bipé.
+                    </td>
+                  </tr>
+                ) : (
+                  detail.lignes.map((l, i) => (
+                    <tr key={`${l.nart}-${i}`}>
+                      <td>
+                        {l.nart}
+                        {l.inconnu && (
+                          <span className="st-comment">article inconnu</span>
+                        )}
+                      </td>
+                      <td>{l.design || "—"}</td>
+                      <td>{l.gencod || "—"}</td>
+                      {detail.type === "liste" && (
+                        <td className="st-num">{fmtQte(l.quantiteDemandee)}</td>
+                      )}
+                      <td className="st-num">{fmtQte(l.quantitePrise)}</td>
+                      <td>
+                        <span
+                          className={`st-statut st-statut-${
+                            l.statutLigne === "prise"
+                              ? "realisee"
+                              : l.statutLigne === "introuvable"
+                                ? "en_attente"
+                                : "en_cours"
+                          }`}
+                        >
+                          {STATUT_LIGNE[l.statutLigne] || l.statutLigne}
+                        </span>
+                      </td>
+                      <td>{fmtDate(l.traiteAt)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
+
 const AdminSuiviReapproScreen = () => {
   const nomDossierDBF = useSelector(selectGlobalDossier) || "";
 
@@ -75,6 +188,26 @@ const AdminSuiviReapproScreen = () => {
   const [type, setType] = useState("tous");
   const [jours, setJours] = useState(15);
   const [search, setSearch] = useState("");
+  const [detail, setDetail] = useState(null); // { libelle, type, lignes } | null
+  const [detailOuvert, setDetailOuvert] = useState(false);
+
+  const [chargerLignes, { isFetching: chargementDetail }] =
+    useLazyGetLignesReapproQuery();
+
+  const ouvrirDetail = async (l) => {
+    setDetail(null);
+    setDetailOuvert(true);
+    try {
+      const d = await chargerLignes({
+        nomDossierDBF,
+        type: l.type,
+        id: l.id,
+      }).unwrap();
+      setDetail(d);
+    } catch {
+      setDetail(null);
+    }
+  };
 
   const { data, isFetching, refetch } = useGetSuiviReapprosQuery(
     { nomDossierDBF, etat: etat === "tous" ? undefined : etat, jours },
@@ -210,12 +343,13 @@ const AdminSuiviReapproScreen = () => {
               <th className="st-num">Unités</th>
               <th className="st-num">Temps effectif</th>
               <th className="st-num">Temps brut</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {filtrees.length === 0 ? (
               <tr>
-                <td colSpan={11} className="st-empty">
+                <td colSpan={12} className="st-empty">
                   {isFetching
                     ? "Chargement…"
                     : "Aucun réappro sur cette période."}
@@ -266,12 +400,35 @@ const AdminSuiviReapproScreen = () => {
                   <td className="st-num">{fmtInt(l.unites)}</td>
                   <td className="st-num">{fmtDuree(l.tempsActifMs)}</td>
                   <td className="st-num">{fmtDuree(l.tempsBrutMs)}</td>
+                  <td>
+                    {/* Voir ce qui a été bipé — y compris pendant que
+                        l'opérateur travaille encore. */}
+                    <button
+                      className="st-btn-icon"
+                      onClick={() => ouvrirDetail(l)}
+                      title="Voir les articles bipés"
+                      aria-label="Voir les articles bipés"
+                    >
+                      <HiEye />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {detailOuvert && (
+        <DetailModal
+          detail={detail}
+          chargement={chargementDetail}
+          onFermer={() => {
+            setDetailOuvert(false);
+            setDetail(null);
+          }}
+        />
+      )}
 
       <p className="st-intro">
         <b>Temps effectif</b> : somme des intervalles entre deux gestes, silences

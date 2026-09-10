@@ -259,3 +259,58 @@
 .st-placeholder svg {
   font-size: 40px;
 }
+
+/* ── Détail d'un réappro / bipage (bouton œil) ──────────────────────────── */
+.st-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+}
+
+.st-modal {
+  width: min(1000px, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.st-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.st-modal-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 17px;
+}
+
+.st-modal-head .st-btn-icon {
+  margin-left: auto;
+}
+
+/* Une liste peut faire plusieurs centaines d'articles : elle défile dans la
+   modale, l'en-tête du tableau reste visible. */
+.st-modal-body {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.st-modal-body .st-table {
+  min-width: 720px;
+}

@@ -262,6 +262,82 @@ const msEntre = (debut, fin) => {
   return f - d;
 };
 
+// @desc    Le DÉTAIL d'un réappro : ce qui a été pris, article par article.
+// @route   GET /api/demande-reappro/:nomDossierDBF/suivi/:type/:id/lignes
+//          type = « liste » (DemandeReappro) | « libre » (Reappro)
+//
+// Marche aussi bien sur un réappro TERMINÉ que sur un réappro EN COURS : dans
+// ce dernier cas on voit ce qui est déjà fait et ce qui reste — c'est tout
+// l'intérêt de regarder pendant que l'opérateur travaille.
+const getLignesReappro = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const dossier = entreprise.nomDossierDBF;
+  const { type, id } = req.params;
+
+  if (type === "libre") {
+    const r = await Reappro.findById(id).lean();
+    // Périmètre société : l'id ne suffit pas, il faut qu'il appartienne bien à
+    // la société demandée.
+    if (!r || r.nomDossierDBF !== dossier) {
+      res.status(404);
+      throw new Error("Réappro introuvable");
+    }
+    const lignes = (r.lignes || []).map((l) => ({
+      nart: l.nart,
+      design: l.designation || "",
+      gencod: l.gencod || "",
+      refer: l.refer || "",
+      // Un réappro libre n'a pas de quantité « demandée » : ce qui est scanné
+      // EST le travail fait.
+      quantiteDemandee: null,
+      quantitePrise: l.quantite || 0,
+      statutLigne: "prise",
+      traiteAt: l.scannedAt || null,
+      stock: l.stocksSnapshot
+        ? Object.values(l.stocksSnapshot).reduce(
+            (s, v) => s + (Number(v) || 0),
+            0,
+          )
+        : null,
+      inconnu: !!l.isUnknown,
+    }));
+    return res.json({
+      type: "libre",
+      libelle: r.nom || "Réappro libre",
+      statut: r.status,
+      total: lignes.length,
+      lignes,
+    });
+  }
+
+  const d = await DemandeReappro.findById(id).lean();
+  if (!d || d.entreprise !== dossier) {
+    res.status(404);
+    throw new Error("Liste de réappro introuvable");
+  }
+  const lignes = (d.articles || []).map((a) => ({
+    nart: a.nart,
+    design: a.design || "",
+    gencod: a.gencod || "",
+    refer: a.refer || "",
+    fournNom: a.fournNom || "",
+    quantiteDemandee: a.quantiteDemandee ?? null,
+    quantitePrise: a.quantitePrise || 0,
+    statutLigne: a.statutLigne || "a_faire",
+    traiteAt: a.traiteAt || null,
+    stock: a.stock ?? null,
+  }));
+  return res.json({
+    type: "liste",
+    libelle: d.nom || d.gisement || "Liste de réappro",
+    statut: d.statut,
+    total: lignes.length,
+    lignes,
+  });
+});
+
 // @desc    Suivi unifié des réappros (listes + réappro libre)
 // @route   GET /api/demande-reappro/:nomDossierDBF/suivi?jours=&etat=
 // @access  Private (demande_reappro, read)
@@ -1007,6 +1083,7 @@ export {
   importerProformas,
   getStatsPreparateurs,
   getSuiviReappros,
+  getLignesReappro,
   getRayonVideReappro,
   getFournisseursReappro,
   getArticlesFournisseurReappro,

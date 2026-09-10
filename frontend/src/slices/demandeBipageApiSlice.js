@@ -25,6 +25,12 @@ export const demandeBipageApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 30,
     }),
+    // Détail d'un bipage (articles bipés), demande OU bipage libre.
+    getLignesBipage: builder.query({
+      query: ({ nomDossierDBF, type, id }) =>
+        `${URL}/${nomDossierDBF}/suivi/${type}/${id}/lignes`,
+      keepUnusedDataFor: 15,
+    }),
     createDemandeBipageProforma: builder.mutation({
       query: ({ nomDossierDBF, numpro, priorite, commentaire }) => ({
         url: `${URL}/${nomDossierDBF}/proforma`,
@@ -75,6 +81,7 @@ export const demandeBipageApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetDemandesBipageQuery,
   useGetSuiviDemandesBipageQuery,
+  useLazyGetLignesBipageQuery,
   useCreateDemandeBipageProformaMutation,
   useCreateDemandeBipageGisementMutation,
   useCreateDemandeBipageGroupeMutation,

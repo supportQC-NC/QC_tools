@@ -11,6 +11,7 @@ import {
   getArticleBipage,
   getDemandes,
   getSuivi,
+  getLignesBipage,
   getDemandeById,
   deleteDemande,
   getMobileDemandes,
@@ -79,6 +80,12 @@ router.get(
 router.get(
   "/:nomDossierDBF/fournisseur/:fourn/articles",
   protect, canRead, checkEntrepriseAccess, getArticlesFournisseur,
+);
+
+// Détail d'un bipage (articles bipés) — demande ou bipage libre.
+router.get(
+  "/:nomDossierDBF/suivi/:type/:id/lignes",
+  protect, canRead, checkEntrepriseAccess, getLignesBipage,
 );
 
 // Suivi (scopé entreprise) — AVANT la route « liste », sinon « suivi » serait

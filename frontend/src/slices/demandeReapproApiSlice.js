@@ -55,6 +55,12 @@ export const demandeReapproApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 30,
     }),
+    // Détail d'un réappro (articles pris), liste OU réappro libre.
+    getLignesReappro: builder.query({
+      query: ({ nomDossierDBF, type, id }) =>
+        `${URL}/${nomDossierDBF}/suivi/${type}/${id}/lignes`,
+      keepUnusedDataFor: 15,
+    }),
     getStatsPreparateurs: builder.query({
       query: ({ nomDossierDBF, debut, fin }) => ({
         url: `${URL}/${nomDossierDBF}/stats`,
@@ -97,6 +103,7 @@ export const demandeReapproApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetDemandesQuery,
   useGetSuiviReapprosQuery,
+  useLazyGetLignesReapproQuery,
   useGetDemandeDetailQuery,
   useLazyGetDemandeDetailQuery,
   useCreateDemandesMutation,

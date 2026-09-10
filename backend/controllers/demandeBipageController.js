@@ -13,6 +13,9 @@ import { analyserProforma } from "../services/preparationService.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import { ecrireTransfertBipage } from "../services/demandeBipageTransfertService.js";
+// Bipage LIBRE : l'agent scanne ce qu'il veut depuis l'app mobile, sans demande
+// préalable. Même collection que le réappro libre dans l'esprit, autre modèle.
+import BipageCollecte from "../models/BipageCollecteModel.js";
 import {
   getArticlesParGroupes,
   getArticlesRayonVide,
@@ -393,7 +396,7 @@ const getSuivi = asyncHandler(async (req, res) => {
     match.createdAt = { $gte: new Date(Date.now() - fenetre * 86400000) };
   }
 
-  const lignes = await DemandeBipage.aggregate([
+  const demandes = await DemandeBipage.aggregate([
     { $match: match },
     { $sort: { createdAt: -1 } },
     { $limit: 500 },
@@ -435,18 +438,183 @@ const getSuivi = asyncHandler(async (req, res) => {
     },
   ]);
 
+  // Bipages LIBRES : même fenêtre, même écran. Sans eux, tout ce qu'un agent
+  // bipe de sa propre initiative reste invisible.
+  const matchLibre = { nomDossierDBF: entreprise.nomDossierDBF };
+  if (match.createdAt) matchLibre.createdAt = match.createdAt;
+  const libres = await BipageCollecte.aggregate([
+    { $match: matchLibre },
+    { $sort: { createdAt: -1 } },
+    { $limit: 500 },
+    {
+      $lookup: {
+        from: "users",
+        localField: "user",
+        foreignField: "_id",
+        as: "agent",
+      },
+    },
+    {
+      $project: {
+        nom: 1,
+        status: 1,
+        totalArticles: 1,
+        totalQuantite: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        exportedAt: 1,
+        fichierExport: 1,
+        dernierScan: { $max: "$lignes.scannedAt" },
+        agent: { $arrayElemAt: ["$agent", 0] },
+      },
+    },
+  ]);
+
+  const nomAgent = (u) =>
+    [u?.prenom, u?.nom].filter(Boolean).join(" ") || u?.email || "";
+
+  const lignesDemandes = demandes.map((d) => ({ ...d, type: "demande" }));
+  const lignesLibres = libres.map((b) => ({
+    _id: b._id,
+    type: "libre",
+    libelle: b.nom || "Bipage libre",
+    source: "libre",
+    sourceRef: "",
+    priorite: "",
+    // Un bipage libre n'a que deux états : en cours, ou rendu (exporté).
+    statut: b.status === "en_cours" ? "en_cours" : "realisee",
+    commentaire: "",
+    // Rien n'est « demandé » : ce qui est scanné EST le travail.
+    nbArticles: b.totalArticles || 0,
+    createdAt: b.createdAt,
+    createdByNom: nomAgent(b.agent),
+    realisedAt: b.exportedAt || (b.status !== "en_cours" ? b.updatedAt : null),
+    realisedByNom: nomAgent(b.agent),
+    transfertFichier: b.fichierExport || "",
+    nbLignesBipees: b.totalArticles || 0,
+    unitesBipees: b.totalQuantite || 0,
+    delaiMinutes: null,
+    dernierScan: b.dernierScan || null,
+  }));
+
+  // Délai création → réalisation des bipages libres, même unité que les
+  // demandes (minutes).
+  lignesLibres.forEach((l) => {
+    if (!l.realisedAt || !l.createdAt) return;
+    const ms = new Date(l.realisedAt) - new Date(l.createdAt);
+    if (ms >= 0) l.delaiMinutes = Math.round(ms / 60000);
+  });
+
+  const lignes = [...lignesDemandes, ...lignesLibres].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+
   const totaux = lignes.reduce(
     (acc, l) => {
       acc[l.statut] = (acc[l.statut] || 0) + 1;
+      acc[l.type] = (acc[l.type] || 0) + 1;
       acc.articles += l.nbArticles || 0;
       acc.lignesBipees += l.nbLignesBipees || 0;
       acc.unites += l.unitesBipees || 0;
       return acc;
     },
-    { en_attente: 0, en_cours: 0, realisee: 0, articles: 0, lignesBipees: 0, unites: 0 },
+    {
+      en_attente: 0,
+      en_cours: 0,
+      realisee: 0,
+      demande: 0,
+      libre: 0,
+      articles: 0,
+      lignesBipees: 0,
+      unites: 0,
+    },
   );
 
   res.json({ fenetreJours: fenetre, totaux, demandes: lignes });
+});
+
+// @desc    Le DÉTAIL d'un bipage : les articles réellement bipés.
+// @route   GET /api/demande-bipage/:nomDossierDBF/suivi/:type/:id/lignes
+//          type = « demande » (DemandeBipage) | « libre » (BipageCollecte)
+//
+// Marche sur un bipage TERMINÉ comme sur un bipage EN COURS : on voit ce qui
+// est déjà rentré pendant que l'agent travaille.
+const getLignesBipage = asyncHandler(async (req, res) => {
+  const entreprise = entOf(req);
+  const dossier = entreprise.nomDossierDBF;
+  const { type, id } = req.params;
+
+  if (type === "libre") {
+    const b = await BipageCollecte.findById(id).lean();
+    // Le périmètre société se vérifie ici aussi : un id ne suffit pas.
+    if (!b || b.nomDossierDBF !== dossier) {
+      res.status(404);
+      throw new Error("Bipage introuvable");
+    }
+    return res.json({
+      type: "libre",
+      libelle: b.nom || "Bipage libre",
+      statut: b.status,
+      total: (b.lignes || []).length,
+      lignes: (b.lignes || []).map((l) => ({
+        nart: l.nart,
+        design: l.designation || "",
+        gencod: l.gencod || "",
+        refer: l.refer || "",
+        quantite: l.quantite || 0,
+        scannedAt: l.scannedAt || null,
+        inconnu: !!l.isUnknown,
+      })),
+    });
+  }
+
+  const d = await DemandeBipage.findById(id).lean();
+  if (!d || d.entreprise !== dossier) {
+    res.status(404);
+    throw new Error("Demande introuvable");
+  }
+  // Une demande porte DEUX listes : les articles demandés, et ce que l'agent a
+  // effectivement bipé. On les croise sur le NART pour montrer les deux d'un
+  // coup — et faire ressortir ce qui n'a pas été trouvé.
+  const parNart = new Map(
+    (d.lignesRealisees || []).map((l) => [String(l.nart || "").trim(), l]),
+  );
+  const lignes = (d.articles || []).map((a) => {
+    const fait = parNart.get(String(a.nart || "").trim());
+    parNart.delete(String(a.nart || "").trim());
+    return {
+      nart: a.nart,
+      design: a.design || "",
+      gencod: a.gencod || "",
+      refer: "",
+      fournNom: a.fournNom || "",
+      quantite: fait ? fait.quantite || 0 : null,
+      bipe: !!fait,
+      scannedAt: null,
+    };
+  });
+  // Articles bipés qui n'étaient PAS dans la demande (hors liste) : ils
+  // existent, il faut les montrer plutôt que de les perdre.
+  parNart.forEach((l) => {
+    lignes.push({
+      nart: l.nart,
+      design: "",
+      gencod: l.gencod || "",
+      refer: "",
+      quantite: l.quantite || 0,
+      bipe: true,
+      horsListe: true,
+      scannedAt: null,
+    });
+  });
+
+  return res.json({
+    type: "demande",
+    libelle: d.libelle || "Demande de bipage",
+    statut: d.statut,
+    total: lignes.length,
+    lignes,
+  });
 });
 
 // @desc    Détail d'une demande (avec ses articles)
@@ -550,6 +718,7 @@ export {
   getArticleBipage,
   getDemandes,
   getSuivi,
+  getLignesBipage,
   getDemandeById,
   deleteDemande,
   getMobileDemandes,

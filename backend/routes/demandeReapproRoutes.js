@@ -9,6 +9,7 @@ import {
   importerProformas,
   getStatsPreparateurs,
   getSuiviReappros,
+  getLignesReappro,
   getRayonVideReappro,
   getFournisseursReappro,
   getArticlesFournisseurReappro,
@@ -98,6 +99,12 @@ router.get(
 router.get(
   "/:nomDossierDBF/suivi",
   protect, canRead, checkEntrepriseAccess, getSuiviReappros,
+);
+
+// Détail d'un réappro (articles pris) — liste ou réappro libre.
+router.get(
+  "/:nomDossierDBF/suivi/:type/:id/lignes",
+  protect, canRead, checkEntrepriseAccess, getLignesReappro,
 );
 
 // Statistiques de préparation (par opérateur, sur une période)
