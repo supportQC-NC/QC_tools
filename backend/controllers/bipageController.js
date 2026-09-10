@@ -31,6 +31,10 @@ import {
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** « Prénom Nom » (repli e-mail) — même formatage que le suivi bipage. */
+const nomUtilisateur = (u) =>
+  u ? `${u.prenom || ""} ${u.nom || ""}`.trim() || u.email || "" : "";
+
 /**
  * Construit le filtre Mongo des lignes bipées à partir des query params.
  *  - type   : emplacement (MAGASIN/DOCK/…) → filtre directement sur zoneType
@@ -44,12 +48,33 @@ const buildFilter = (session, query) => {
   if (query.type) filter.zoneType = query.type;
   if (query.zone) filter.zoneCode = query.zone;
 
+  // Les deux clauses ci-dessous sont chacune un $or : les cumuler dans
+  // `filter.$or` ferait que la seconde ÉCRASE la première (une recherche
+  // annulerait le filtre de provenance). On les compose donc dans un $and.
+  const clauses = [];
+
   if (query.search) {
     const rx = new RegExp(escapeRegex(query.search.trim()), "i");
     // `gencod` est dans la recherche parce qu'il est AFFICHÉ : l'utilisateur
     // qui lit un code-barres à l'écran doit pouvoir le retaper ici.
-    filter.$or = [{ nart: rx }, { eanArticle: rx }, { gencod: rx }];
+    clauses.push({ $or: [{ nart: rx }, { eanArticle: rx }, { gencod: rx }] });
   }
+
+  // Provenance : ne garder que ce qui a été touché à la main.
+  //   ajoutees   : lignes créées depuis l'écran (source "manuel") ;
+  //   modifiees  : lignes issues du terrain dont le NART ou la quantité a été
+  //                corrigé ;
+  //   touchees   : les deux à la fois — « tout ce qui n'est pas brut de
+  //                collecteur », la question qu'on se pose en fin d'inventaire.
+  if (query.marque === "ajoutees") clauses.push({ source: "manuel" });
+  else if (query.marque === "modifiees") clauses.push({ modifie: true });
+  else if (query.marque === "touchees") {
+    clauses.push({ $or: [{ source: "manuel" }, { modifie: true }] });
+  }
+
+  if (clauses.length === 1) Object.assign(filter, clauses[0]);
+  else if (clauses.length > 1) filter.$and = clauses;
+
   return filter;
 };
 
@@ -425,6 +450,11 @@ const updateBipage = asyncHandler(async (req, res) => {
 
   const { qteScan, nart, observation } = req.body;
 
+  // Valeurs AVANT saisie : servent à décider si la ligne a réellement changé.
+  // ⚠️ Comparer aux valeurs déjà écrites plus bas donnerait toujours « égal ».
+  const qteAvant = Number(ligne.qteScan) || 0;
+  const nartAvant = String(ligne.nart || "");
+
   if (qteScan !== undefined) {
     ligne.qteScan = Number.isFinite(Number(qteScan)) ? Number(qteScan) : 0;
   }
@@ -463,8 +493,128 @@ const updateBipage = asyncHandler(async (req, res) => {
     }
   }
 
+  // ── Marquage de la correction ───────────────────────────────────────────
+  // Seuls la QUANTITÉ et le NART comptent : une observation ajoutée n'altère
+  // pas le comptage et ne doit pas faire passer la ligne pour corrigée.
+  // Les valeurs d'origine sont figées à la PREMIÈRE correction — une deuxième
+  // passe les écraserait et on perdrait ce que l'agent avait compté.
+  const qteChangee = (Number(ligne.qteScan) || 0) !== qteAvant;
+  const nartChange = String(ligne.nart || "") !== nartAvant;
+
+  if (qteChangee || nartChange) {
+    if (!ligne.modifie) {
+      ligne.qteScanOrigine = qteAvant;
+      ligne.nartOrigine = nartAvant;
+      ligne.modifie = true;
+    }
+    ligne.modifieAt = new Date();
+    ligne.modifiePar = req.user._id;
+    ligne.modifieParNom = nomUtilisateur(req.user);
+  }
+
   await ligne.save();
   res.json(ligne);
+});
+
+/**
+ * @desc    Ajoute une ligne de bipage À LA MAIN dans la zone actuellement
+ *          filtrée. La zone et l'emplacement NE SONT PAS saisis : ils viennent
+ *          du filtre de l'écran et sont vérifiés contre le snapshot de la
+ *          session. Sans cette règle, une faute de frappe créerait une ligne
+ *          rattachée à une zone inexistante, invisible dans tous les filtres et
+ *          pourtant comptée dans les écarts.
+ * @route   POST /api/bipages/:entrepriseId/ligne
+ * @access  Private (module bipage, write)
+ */
+const ajouterLigneBipage = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  const zoneCode = String(req.body.zoneCode || "").trim();
+  const zoneType = String(req.body.zoneType || "").trim();
+  const nart = String(req.body.nart || "").trim();
+  const observation = String(req.body.observation || "").trim();
+  const qteScan = Number(req.body.qteScan);
+
+  if (!zoneCode || !zoneType) {
+    res.status(400);
+    throw new Error(
+      "Zone et emplacement obligatoires : filtrez d'abord l'écran sur une zone.",
+    );
+  }
+  if (!nart) {
+    res.status(400);
+    throw new Error("NART obligatoire.");
+  }
+  if (!Number.isFinite(qteScan) || qteScan === 0) {
+    // 0 est refusé (une ligne à zéro n'apporte rien) ; le négatif reste permis,
+    // c'est la convention des lignes de déduction.
+    res.status(400);
+    throw new Error("Quantité obligatoire, et différente de 0.");
+  }
+
+  // La paire (code, emplacement) doit exister dans l'inventaire EN COURS.
+  const zone = (session.zones || []).find(
+    (z) => z.code === zoneCode && String(z.type || "").trim() === zoneType,
+  );
+  if (!zone) {
+    res.status(400);
+    throw new Error(
+      `Zone ${zoneCode} (${zoneType}) absente de cet inventaire.`,
+    );
+  }
+
+  // Résolution article : même règle que la correction d'un NART.
+  let record = null;
+  try {
+    record = await articleCacheService.findByNart(entreprise, nart);
+  } catch {
+    record = null;
+  }
+
+  // La ligne se range à la suite de celles de sa zone.
+  const derniere = await LigneBipage.findOne({
+    session: session._id,
+    zoneCode,
+    zoneType,
+  })
+    .sort({ ordre: -1 })
+    .select("ordre")
+    .lean();
+
+  const ligne = await LigneBipage.create({
+    entreprise: entreprise._id,
+    session: session._id,
+    // Aucun fichier derrière cette ligne : `datFileName` reste vide, ce qui la
+    // regroupe en tête de sa zone au tri (zoneType, zoneCode, datFileName…).
+    datFileName: "",
+    zoneCode,
+    zoneType,
+    ordre: (Number(derniere?.ordre) || 0) + 1,
+    // Le code brut « scanné » n'existe pas : on inscrit le NART saisi, comme le
+    // fait le collecteur pour un article sans code-barres.
+    eanArticle: nart,
+    qteScan,
+    nart,
+    observation,
+    designation: record ? (record.DESIGN || "").trim() : "Article non trouvé",
+    gencod: record ? (record.GENCOD || "").trim() : "",
+    stock: record ? articleCacheService.calculateStockTotal(record) : null,
+    found: !!record,
+    source: "manuel",
+    sourceRef: "",
+    // L'« agent » d'une ligne ajoutée est celui qui l'a saisie.
+    agentNom: nomUtilisateur(req.user),
+  });
+
+  res.status(201).json(ligne);
 });
 
 /**
@@ -856,6 +1006,7 @@ export {
   getBipages,
   exportEcartsBipage,
   updateBipage,
+  ajouterLigneBipage,
   exportCsv,
   recommencerZone,
   listProformasBipage,

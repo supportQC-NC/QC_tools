@@ -9,10 +9,15 @@ import {
   HiSearch,
   HiTrash,
   HiInformationCircle,
+  HiPencilAlt,
+  HiPlusCircle,
+  HiPlus,
+  HiX,
 } from "react-icons/hi";
 import {
   useGetBipagesQuery,
   useUpdateBipageMutation,
+  useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
   getBipagesCsvUrl,
 } from "../../slices/bipageApiSlice";
@@ -34,12 +39,35 @@ const PointsChargement = () => (
   </span>
 );
 
+/**
+ * Texte d'infobulle d'une ligne corrigée : ce qui a changé, et par qui.
+ * Les valeurs d'origine sont figées à la PREMIÈRE correction côté serveur, donc
+ * ce résumé compare toujours à ce que l'agent avait réellement compté, même
+ * après plusieurs passes de correction.
+ */
+const resumeCorrection = (l) => {
+  const bouts = [];
+  if (l.nartOrigine != null && l.nartOrigine !== l.nart) {
+    bouts.push(`NART ${l.nartOrigine || "(vide)"} → ${l.nart || "(vide)"}`);
+  }
+  if (l.qteScanOrigine != null && Number(l.qteScanOrigine) !== Number(l.qteScan)) {
+    bouts.push(`Qté ${l.qteScanOrigine} → ${l.qteScan}`);
+  }
+  const quoi = bouts.length ? bouts.join(" · ") : "Ligne corrigée";
+  const qui = l.modifieParNom ? ` — ${l.modifieParNom}` : "";
+  return `${quoi}${qui}`;
+};
+
 const AdminBipagesScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [type, setType] = useState("");
   const [zone, setZone] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  // Provenance : "" (tout) | ajoutees | modifiees | touchees.
+  // Répond à la question de fin d'inventaire : « qu'est-ce qui n'est pas brut
+  // de collecteur ? » — c'est ce qu'un contrôleur veut relire en priorité.
+  const [marque, setMarque] = useState("");
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -52,6 +80,15 @@ const AdminBipagesScreen = () => {
   // Bulle d'aide du périmètre : la distinction « comptés / stock complet »
   // change complètement le document, elle mérite mieux qu'une infobulle native.
   const [aidePerimetre, setAidePerimetre] = useState(false);
+
+  // Ajout manuel d'une ligne. Ouvert seulement quand l'écran est filtré sur UN
+  // emplacement ET UNE zone : la ligne héritera de ce couple, l'utilisateur ne
+  // le saisit pas (voir `peutAjouter` plus bas).
+  const [ajoutOuvert, setAjoutOuvert] = useState(false);
+  const [ajoutNart, setAjoutNart] = useState("");
+  const [ajoutQte, setAjoutQte] = useState("");
+  const [ajoutObs, setAjoutObs] = useState("");
+  const [ajoutErreur, setAjoutErreur] = useState("");
 
   const dirty = useRef(new Set());
   // Lignes dont le NART vient d'être modifié : leur désignation et leur
@@ -90,11 +127,13 @@ const AdminBipagesScreen = () => {
   }, [msg]);
 
   const { data, isLoading, isFetching, refetch } = useGetBipagesQuery(
-    { entrepriseId: selectedEntreprise, zone, type, search },
+    { entrepriseId: selectedEntreprise, zone, type, search, marque },
     { skip: !selectedEntreprise },
   );
 
   const [updateBipage] = useUpdateBipageMutation();
+  const [ajouterLigne, { isLoading: ajoutEnCours }] =
+    useAjouterLigneBipageMutation();
   const [recommencerZone, { isLoading: recommencing }] =
     useRecommencerZoneMutation();
 
@@ -172,6 +211,53 @@ const AdminBipagesScreen = () => {
     if (e.key === "Enter") e.target.blur();
   };
 
+  // ── Ajout manuel ─────────────────────────────────────────────────────────
+  // Règle métier : on n'ajoute une ligne QUE dans une zone déjà filtrée, avec
+  // son emplacement. Le couple (zone, emplacement) identifie la fiche rayon —
+  // un même code existe en MAGASIN et en DOCK — et le laisser saisir à la main
+  // reviendrait à autoriser des lignes rattachées à une zone inexistante.
+  const peutAjouter = !!(type && zone);
+
+  const fermerAjout = () => {
+    setAjoutOuvert(false);
+    setAjoutNart("");
+    setAjoutQte("");
+    setAjoutObs("");
+    setAjoutErreur("");
+  };
+
+  const validerAjout = async () => {
+    setAjoutErreur("");
+    const nart = ajoutNart.trim();
+    const qte = Number(ajoutQte);
+    if (!nart) {
+      setAjoutErreur("Saisissez le NART de l'article.");
+      return;
+    }
+    if (!Number.isFinite(qte) || qte === 0) {
+      setAjoutErreur("Saisissez une quantité différente de 0.");
+      return;
+    }
+    try {
+      await ajouterLigne({
+        entrepriseId: selectedEntreprise,
+        body: {
+          zoneCode: zone,
+          zoneType: type,
+          nart,
+          qteScan: qte,
+          observation: ajoutObs.trim(),
+        },
+      }).unwrap();
+      fermerAjout();
+      setMsg(`Ligne ajoutée dans ${zone} (${type}).`);
+    } catch (err) {
+      setAjoutErreur(
+        err?.data?.message || "Ajout impossible. Vérifiez la saisie.",
+      );
+    }
+  };
+
   // Feuille d'écarts (PDF ou Excel). Même document que « Inventaire proforma » :
   // c'est le même générateur côté serveur, seule la source du comptage change.
   const exporterEcarts = async (format) => {
@@ -232,6 +318,7 @@ const AdminBipagesScreen = () => {
         zone,
         type,
         search,
+        marque,
       })}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(`Export échoué (${res.status})`);
@@ -439,8 +526,8 @@ const AdminBipagesScreen = () => {
             </div>
 
             <span className="ecarts-hint">
-              Les filtres ci-dessous (emplacement, zone, recherche) cadrent aussi
-              le document.
+              Les filtres ci-dessous (emplacement, zone, provenance, recherche)
+              cadrent aussi le document.
             </span>
           </div>
 
@@ -469,6 +556,20 @@ const AdminBipagesScreen = () => {
                   {z}
                 </option>
               ))}
+            </select>
+
+            {/* Provenance de la ligne. « Ajoutées + modifiées » est la vue
+                de contrôle : tout ce qui ne vient pas brut du collecteur. */}
+            <select
+              className="filter-select"
+              value={marque}
+              onChange={(e) => setMarque(e.target.value)}
+              title="Ne montrer que les lignes touchées à la main"
+            >
+              <option value="">Toutes les lignes</option>
+              <option value="ajoutees">Ajoutées à la main</option>
+              <option value="modifiees">Modifiées</option>
+              <option value="touchees">Ajoutées + modifiées</option>
             </select>
 
             <div className="search-box">
@@ -516,10 +617,99 @@ const AdminBipagesScreen = () => {
 
           {msg ? <div className="bipages-msg">{msg}</div> : null}
 
+          {/* ── Ajout manuel d'une ligne ──────────────────────────────────
+              Le bouton n'apparaît QUE si l'écran est filtré sur un
+              emplacement ET une zone : la ligne créée appartiendra à ce
+              couple, que l'utilisateur ne saisit donc jamais. Quand le filtre
+              n'est pas assez précis, on explique ce qu'il manque plutôt que
+              d'afficher un bouton inerte. */}
+          <div className="ajout-bar">
+            {peutAjouter ? (
+              !ajoutOuvert && (
+                <button
+                  className="btn-secondary"
+                  onClick={() => setAjoutOuvert(true)}
+                >
+                  <HiPlus /> Ajouter une ligne dans {zone} ({type})
+                </button>
+              )
+            ) : (
+              <span className="ajout-hint">
+                <HiInformationCircle /> Pour ajouter une ligne à la main,
+                filtrez d'abord sur un <b>emplacement</b> et une <b>zone</b> :
+                la ligne leur sera rattachée.
+              </span>
+            )}
+          </div>
+
+          {peutAjouter && ajoutOuvert && (
+            <div className="ajout-form">
+              <div className="ajout-form-head">
+                <span className="ajout-cible">
+                  Nouvelle ligne — <b>{zone}</b> · {type}
+                </span>
+                <button
+                  className="ajout-close"
+                  onClick={fermerAjout}
+                  title="Annuler"
+                  aria-label="Annuler l'ajout"
+                >
+                  <HiX />
+                </button>
+              </div>
+              <div className="ajout-champs">
+                <label>
+                  <span>NART</span>
+                  <input
+                    type="text"
+                    value={ajoutNart}
+                    onChange={(e) => setAjoutNart(e.target.value)}
+                    placeholder="Code article"
+                    autoFocus
+                  />
+                </label>
+                <label>
+                  <span>Quantité</span>
+                  <input
+                    type="number"
+                    value={ajoutQte}
+                    onChange={(e) => setAjoutQte(e.target.value)}
+                    placeholder="0"
+                  />
+                </label>
+                <label className="ajout-obs">
+                  <span>Observation</span>
+                  <input
+                    type="text"
+                    value={ajoutObs}
+                    onChange={(e) => setAjoutObs(e.target.value)}
+                    placeholder="Facultatif"
+                  />
+                </label>
+                <button
+                  className="btn-primary"
+                  onClick={validerAjout}
+                  disabled={ajoutEnCours}
+                >
+                  {ajoutEnCours ? "Ajout…" : "Ajouter"}
+                </button>
+              </div>
+              {/* La désignation n'est pas demandée : elle est résolue par le
+                  serveur depuis le NART, comme lors d'une correction. Un NART
+                  inconnu donne « Article non trouvé » — la ligne est créée
+                  quand même, pour ne pas perdre un comptage. */}
+              {ajoutErreur ? (
+                <div className="ajout-erreur">{ajoutErreur}</div>
+              ) : null}
+            </div>
+          )}
+
           <div className="admin-bipages-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
+                  {/* Colonne de repères : corrigée / ajoutée à la main. */}
+                  <th className="marq-col" aria-label="Repères" />
                   <th>Zone</th>
                   <th>Emplacement</th>
                   <th title="Code-barres de l'article dans le catalogue, re-résolu quand le NART change">
@@ -536,7 +726,7 @@ const AdminBipagesScreen = () => {
               <tbody>
                 {lignes.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="no-data">
+                    <td colSpan={10} className="no-data">
                       Aucune ligne. Les bipages apparaissent ici dès qu'un .DAT
                       est traité.
                     </td>
@@ -547,8 +737,29 @@ const AdminBipagesScreen = () => {
                       key={l._id}
                       className={`${l.found ? "" : "row-unknown"} ${
                         l.modeImport === "deduction" ? "row-deduction" : ""
+                      } ${l.source === "manuel" ? "row-manuelle" : ""} ${
+                        l.modifie ? "row-modifiee" : ""
                       }`.trim()}
                     >
+                      {/* Repères de la ligne. L'infobulle de la correction dit
+                          CE QUI a changé : « corrigée » seul obligerait à
+                          rouvrir le .DAT pour le savoir. */}
+                      <td className="marq-cell">
+                        {l.source === "manuel" && (
+                          <HiPlusCircle
+                            className="marq marq-manuelle"
+                            title={`Ligne ajoutée à la main${
+                              l.agentNom ? ` par ${l.agentNom}` : ""
+                            }`}
+                          />
+                        )}
+                        {l.modifie && (
+                          <HiPencilAlt
+                            className="marq marq-modifiee"
+                            title={resumeCorrection(l)}
+                          />
+                        )}
+                      </td>
                       <td className="zone-cell">{l.zoneCode}</td>
                       <td className="zone-cell">{l.zoneType || "—"}</td>
                       <td className="mono">
@@ -594,8 +805,16 @@ const AdminBipagesScreen = () => {
                           <>
                             {l.agentNom || `Code ${l.agentCode}`}
                             {l.source && l.source !== "dat" && (
-                              <span className="src-badge">
-                                {l.source === "proforma" ? "proforma" : "excel"}
+                              <span
+                                className={`src-badge${
+                                  l.source === "manuel" ? " manuel" : ""
+                                }`}
+                              >
+                                {l.source === "proforma"
+                                  ? "proforma"
+                                  : l.source === "manuel"
+                                    ? "ajout manuel"
+                                    : "excel"}
                               </span>
                             )}
                             {l.modeImport === "deduction" && (

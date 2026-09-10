@@ -5,6 +5,7 @@ import {
   getBipages,
   exportEcartsBipage,
   updateBipage,
+  ajouterLigneBipage,
   exportCsv,
   recommencerZone,
   listProformasBipage,
@@ -56,6 +57,11 @@ router.get("/:entrepriseId/modele-excel", protect, canReadImport, checkEntrepris
 router.post("/:entrepriseId/import-excel", protect, canWriteImport, checkEntrepriseAccess, uploadExcel, importExcelBipage);
 
 router.get("/:entrepriseId", protect, canRead, checkEntrepriseAccess, getBipages);
+
+// Ajout d'une ligne A LA MAIN dans la zone filtree. La zone et l'emplacement
+// ne sont pas saisis : ils viennent du filtre et sont verifies contre le
+// snapshot de la session (voir le controleur).
+router.post("/:entrepriseId/ligne", protect, canWrite, checkEntrepriseAccess, ajouterLigneBipage);
 
 router.put("/:entrepriseId/:id", protect, canWrite, checkEntrepriseAccess, updateBipage);
 

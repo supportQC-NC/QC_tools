@@ -555,3 +555,177 @@
     opacity: 0.6;
   }
 }
+
+/* ── Repères de ligne : corrigée / ajoutée à la main ───────────────────────
+   Colonne étroite en tête de ligne. Le surlignage seul ne suffirait pas :
+   une ligne peut être à la fois inconnue, en déduction ET corrigée, et les
+   fonds finiraient par se confondre. L'icône, elle, reste lisible. */
+.marq-col {
+  width: 34px;
+}
+
+.marq-cell {
+  white-space: nowrap;
+  line-height: 0;
+}
+
+.marq {
+  width: 15px;
+  height: 15px;
+  vertical-align: middle;
+}
+
+.marq + .marq {
+  margin-left: 3px;
+}
+
+.marq-modifiee {
+  color: #f59e0b;
+}
+
+.marq-manuelle {
+  color: #3b82f6;
+}
+
+/* Surlignage : un filet à gauche plutôt qu'un fond plein, qui se cumulerait
+   mal avec .row-unknown (rouge) et .row-deduction (ambre). */
+.row-modifiee td:first-child {
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.row-manuelle td:first-child {
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+/* Ajoutée ET corrigée : l'ajout prime au filet, les deux icônes restent. */
+.row-manuelle.row-modifiee td:first-child {
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.row-modifiee td {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.row-manuelle td {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.src-badge.manuel {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+/* ── Ajout manuel d'une ligne ──────────────────────────────────────────── */
+.ajout-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ajout-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--admin-text-muted);
+}
+
+.ajout-hint b {
+  color: var(--admin-text-secondary);
+}
+
+.ajout-form {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: var(--admin-radius);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.ajout-form-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* La cible est RAPPELÉE en clair : c'est la garantie que la ligne partira
+   dans la bonne zone, puisque l'utilisateur ne la saisit pas. */
+.ajout-cible {
+  font-size: 13px;
+  color: var(--admin-text-secondary);
+}
+
+.ajout-cible b {
+  color: #3b82f6;
+}
+
+.ajout-close {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: transparent;
+  color: var(--admin-text-muted);
+  cursor: pointer;
+}
+
+.ajout-close:hover {
+  color: var(--admin-text);
+  border-color: var(--admin-primary);
+}
+
+.ajout-champs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.ajout-champs label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--admin-text-muted);
+}
+
+.ajout-champs label > span {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.ajout-champs input {
+  padding: 7px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 13px;
+  width: 150px;
+}
+
+.ajout-champs input:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+}
+
+.ajout-obs {
+  flex: 1;
+  min-width: 200px;
+}
+
+.ajout-obs input {
+  width: 100%;
+}
+
+.ajout-erreur {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ef4444;
+}

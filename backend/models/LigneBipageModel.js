@@ -48,9 +48,11 @@ const ligneBipageSchema = new mongoose.Schema(
     // "dat" : fichier déposé par le collecteur (cas historique) ;
     // "proforma" : intégrée depuis une proforma de l'ERP ;
     // "excel" : importée depuis un fichier Excel.
+    // "manuel" : ligne AJOUTEE a la main depuis l'ecran, pour une zone deja
+    // filtree (code + emplacement) — elle ne vient d'aucun fichier.
     source: {
       type: String,
-      enum: ["dat", "proforma", "excel"],
+      enum: ["dat", "proforma", "excel", "manuel"],
       default: "dat",
     },
     // N° de proforma ou nom du fichier Excel d'origine.
@@ -66,6 +68,25 @@ const ligneBipageSchema = new mongoose.Schema(
       enum: ["inventaire", "deduction"],
       default: "inventaire",
     },
+
+    // ---- Correction depuis l'ecran « Detail des bipages » ----------------
+    // Une ligne corrigee a la main ne porte plus ce qu'a compte l'agent : on le
+    // signale a l'ecran plutot que de laisser croire que tout vient du terrain.
+    // Seuls le NART et la QUANTITE marquent la ligne : une observation ajoutee
+    // ne change pas le comptage.
+    modifie: { type: Boolean, default: false },
+    modifieAt: { type: Date, default: null },
+    modifiePar: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    modifieParNom: { type: String, default: "" },
+    // Valeurs d'ORIGINE, figees a la PREMIERE correction (et jamais reecrites
+    // ensuite) : sans elles on sait qu'il y a eu correction, mais plus ce que
+    // l'agent avait reellement compte. `null` = jamais corrige.
+    qteScanOrigine: { type: Number, default: null },
+    nartOrigine: { type: String, default: null },
 
     // Agent qui a bipé : code vendeur (REPRES pour une proforma, bloc du nom de
     // fichier pour un Excel) et son identité au moment de l'import. Le .DAT du
