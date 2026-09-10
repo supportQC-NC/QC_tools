@@ -13,7 +13,6 @@ import React, { useMemo, useState } from "react";
 import {
   HiRefresh,
   HiSearch,
-  HiDeviceMobile,
   HiClipboardList,
   HiEye,
   HiX,
@@ -24,7 +23,9 @@ import {
   useGetSuiviReapprosQuery,
   useLazyGetLignesReapproQuery,
 } from "../../slices/demandeReapproApiSlice";
-// Feuille de style COMMUNE aux écrans de suivi terrain (bipage, réappro).
+// Briques d'affichage et feuille de style COMMUNES aux écrans de suivi
+// terrain (bipage, réappro, préparation).
+import { Val, Origine, Agent, Avancement } from "./SuiviTerrain";
 import "./SuiviTerrain.css";
 
 const STATUT_LABEL = {
@@ -98,7 +99,7 @@ const DetailModal = ({ detail, chargement, onFermer }) => (
         <h2>
           {detail?.libelle || "Détail du réappro"}
           {detail?.type === "libre" && (
-            <span className="st-prio st-prio-urgent">Libre</span>
+            <Origine mobile>Libre</Origine>
           )}
         </h2>
         <button className="st-btn-icon" onClick={onFermer} title="Fermer">
@@ -149,26 +150,30 @@ const DetailModal = ({ detail, chargement, onFermer }) => (
                           <span className="st-comment">article inconnu</span>
                         )}
                       </td>
-                      <td>{l.design || "—"}</td>
-                      <td>{l.gencod || "—"}</td>
+                      <td>
+                        <Val v={l.design} />
+                      </td>
+                      <td>
+                        <Val v={l.gencod} />
+                      </td>
                       {detail.type === "liste" && (
                         <td className="st-num">{fmtQte(l.quantiteDemandee)}</td>
                       )}
                       <td className="st-num">{fmtQte(l.quantitePrise)}</td>
                       <td>
+                        {/* a_faire / prise / introuvable sont déclarés tels
+                            quels dans SuiviTerrain.css : « À faire » garde
+                            donc la même couleur que dans le tableau, et
+                            « Introuvable » ressort comme un incident. */}
                         <span
-                          className={`st-statut st-statut-${
-                            l.statutLigne === "prise"
-                              ? "realisee"
-                              : l.statutLigne === "introuvable"
-                                ? "en_attente"
-                                : "en_cours"
-                          }`}
+                          className={`st-statut st-statut-${l.statutLigne}`}
                         >
                           {STATUT_LIGNE[l.statutLigne] || l.statutLigne}
                         </span>
                       </td>
-                      <td>{fmtDate(l.traiteAt)}</td>
+                      <td>
+                        <Val v={fmtDate(l.traiteAt)} />
+                      </td>
                     </tr>
                   ))
                 )}
@@ -259,11 +264,11 @@ const AdminSuiviReapproScreen = () => {
       </p>
 
       <div className="st-kpis">
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-warn">
           <span className="st-kpi-lbl">À faire</span>
           <span className="st-kpi-val">{fmtInt(totaux?.a_faire ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-info">
           <span className="st-kpi-lbl">En cours</span>
           <span className="st-kpi-val">{fmtInt(totaux?.en_cours ?? 0)}</span>
         </div>
@@ -271,19 +276,19 @@ const AdminSuiviReapproScreen = () => {
           <span className="st-kpi-lbl">Terminés</span>
           <span className="st-kpi-val">{fmtInt(totaux?.termine ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Depuis une liste</span>
           <span className="st-kpi-val">{fmtInt(totaux?.liste ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Réappros libres</span>
           <span className="st-kpi-val">{fmtInt(totaux?.libre ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Lignes prises</span>
           <span className="st-kpi-val">{fmtInt(totaux?.lignes ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Unités</span>
           <span className="st-kpi-val">{fmtInt(totaux?.unites ?? 0)}</span>
         </div>
@@ -343,7 +348,7 @@ const AdminSuiviReapproScreen = () => {
               <th className="st-num">Unités</th>
               <th className="st-num">Temps effectif</th>
               <th className="st-num">Temps brut</th>
-              <th />
+              <th className="st-col-act" />
             </tr>
           </thead>
           <tbody>
@@ -359,16 +364,14 @@ const AdminSuiviReapproScreen = () => {
               filtrees.map((l) => (
                 <tr key={`${l.type}-${l.id}`}>
                   <td>
-                    <span
-                      className={`st-prio ${
-                        l.type === "libre" ? "st-prio-urgent" : "st-prio-a_faire"
-                      }`}
-                    >
+                    <Origine mobile={l.type === "libre"}>
                       {l.type === "libre" ? "Libre" : "Liste"}
-                    </span>
+                    </Origine>
                   </td>
                   <td>
-                    <span className="st-libelle">{l.libelle}</span>
+                    <span className="st-libelle" title={l.libelle}>
+                      {l.libelle}
+                    </span>
                     <span className="st-comment">
                       {[l.detail, SOURCE_LABEL[l.source] || l.source]
                         .filter(Boolean)
@@ -381,30 +384,40 @@ const AdminSuiviReapproScreen = () => {
                     </span>
                   </td>
                   <td>
-                    {l.operateur ? (
-                      <span className="st-agent">
-                        <HiDeviceMobile /> {l.operateur}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
+                    <Agent nom={l.operateur} />
                   </td>
-                  <td>{fmtDate(l.debutAt)}</td>
-                  <td>{fmtDate(l.derniereActiviteAt)}</td>
-                  <td>{fmtDate(l.finAt)}</td>
-                  <td className="st-num">
-                    {l.type === "liste"
-                      ? `${fmtInt(l.lignesTraitees)} / ${fmtInt(l.nbArticles)}`
-                      : fmtInt(l.lignesTraitees)}
-                  </td>
-                  <td className="st-num">{fmtInt(l.unites)}</td>
-                  <td className="st-num">{fmtDuree(l.tempsActifMs)}</td>
-                  <td className="st-num">{fmtDuree(l.tempsBrutMs)}</td>
                   <td>
+                    <Val v={fmtDate(l.debutAt)} />
+                  </td>
+                  <td>
+                    <Val v={fmtDate(l.derniereActiviteAt)} />
+                  </td>
+                  <td>
+                    <Val v={fmtDate(l.finAt)} />
+                  </td>
+                  <td className="st-num">
+                    {/* Un réappro libre n'a pas de liste de départ : pas de
+                        dénominateur à afficher, donc pas de barre. */}
+                    <Avancement
+                      fait={l.lignesTraitees}
+                      total={l.type === "liste" ? l.nbArticles : null}
+                      format={fmtInt}
+                    />
+                  </td>
+                  <td className="st-num">
+                    <Val v={fmtInt(l.unites)} />
+                  </td>
+                  <td className="st-num">
+                    <Val v={fmtDuree(l.tempsActifMs)} />
+                  </td>
+                  <td className="st-num">
+                    <Val v={fmtDuree(l.tempsBrutMs)} />
+                  </td>
+                  <td className="st-col-act">
                     {/* Voir ce qui a été bipé — y compris pendant que
                         l'opérateur travaille encore. */}
                     <button
-                      className="st-btn-icon"
+                      className="st-btn-icon st-btn-sm"
                       onClick={() => ouvrirDetail(l)}
                       title="Voir les articles bipés"
                       aria-label="Voir les articles bipés"
@@ -430,10 +443,14 @@ const AdminSuiviReapproScreen = () => {
         />
       )}
 
-      <p className="st-intro">
+      {/* Le seuil de pause vient du serveur (`seuilPauseMs`), comme sur les
+          écrans de suivi bipage : le recopier en dur ici l'a déjà fait dériver
+          quand la valeur a changé. */}
+      <p className="st-note">
         <b>Temps effectif</b> : somme des intervalles entre deux gestes, silences
-        de plus de 5 minutes exclus. <b>Temps brut</b> : de l'ouverture à la
-        validation, pauses comprises.
+        de plus de {Math.round((data?.seuilPauseMs || 180000) / 60000)} minutes
+        exclus. <b>Temps brut</b> : de l'ouverture à la validation, pauses
+        comprises.
       </p>
     </div>
   );

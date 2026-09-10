@@ -479,14 +479,15 @@ const getSuiviReappros = asyncHandler(async (req, res) => {
   );
 
   res.json({ fenetreJours: fenetre, seuilPauseMs: PAUSE_MS, totaux, lignes });
-});
+});
+
 // @route   GET /api/demande-reappro/:nomDossierDBF/stats
 // @query   debut, fin (AAAA-MM-JJ) — défaut : 30 derniers jours
 // @access  Private — module demande_reappro (read) + accès entreprise
 //
 // Deux durées, volontairement affichées côte à côte :
 //  - tempsActif : somme des intervalles entre lignes validées, pauses de plus
-//    de 5 min exclues (`PAUSE_MS`) — c'est le « temps de réappro effectif » ;
+//    de 3 min exclues (`PAUSE_MS`) — c'est le « temps de réappro effectif » ;
 //  - tempsBrut  : fin - ouverture de la liste, pauses comprises.
 // Les listes préparées avant l'horodatage par ligne n'ont pas de temps actif :
 // elles sont comptées à part (`listesSansTemps`) plutôt que faussées à 0.
@@ -775,7 +776,12 @@ const PRIO_RANK = { urgent: 0, a_faire: 1, normal: 2 };
 
 // Au-delà de ce silence entre deux lignes, on considère que l'opérateur a fait
 // autre chose : l'intervalle n'entre pas dans le « temps de réappro effectif ».
-const PAUSE_MS = 5 * 60 * 1000;
+// Seuil abaissé de 5 à 3 minutes le 11/09/2026 (décision client) : 5 min
+// laissaient entrer dans le temps « effectif » des interruptions qui n'en font
+// pas partie. Ce seuil est partagé avec le bipage d'inventaire
+// (PAUSE_BIPAGE_MS) — les deux doivent bouger ensemble, sinon deux écrans de
+// suivi affichent des temps effectifs qui ne se comparent plus.
+const PAUSE_MS = 3 * 60 * 1000;
 
 const cleanCode = (v) => String(v ?? "").trim().toUpperCase();
 

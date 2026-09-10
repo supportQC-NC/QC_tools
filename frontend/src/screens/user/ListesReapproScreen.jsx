@@ -745,7 +745,7 @@ const StatsPanel = ({ nomDossierDBF, entreprise }) => {
             <strong>Temps effectif</strong> : temps réellement passé à préparer —
             on additionne les intervalles entre articles validés et on ignore les
             interruptions de plus de{" "}
-            {Math.round((data?.seuilPauseMs || 300000) / 60000)} minutes.{" "}
+            {Math.round((data?.seuilPauseMs || 180000) / 60000)} minutes.{" "}
             <strong>Temps brut</strong> : de l'ouverture de la liste à sa
             validation, pauses comprises.
           </p>

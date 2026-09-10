@@ -14,7 +14,6 @@ import React, { useMemo, useState } from "react";
 import {
   HiRefresh,
   HiSearch,
-  HiDeviceMobile,
   HiClipboardList,
   HiDocumentReport,
   HiMail,
@@ -22,8 +21,9 @@ import {
 import { useSelector } from "react-redux";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { useGetSuiviPreparationsQuery } from "../../slices/suiviPreparationApiSlice";
-// Feuille de style COMMUNE aux écrans de suivi terrain (bipage, réappro,
-// préparation).
+// Briques d'affichage et feuille de style COMMUNES aux écrans de suivi
+// terrain (bipage, réappro, préparation).
+import { Val, Origine, Agent, Avancement } from "./SuiviTerrain";
 import "./SuiviTerrain.css";
 
 const STATUT_LABEL = {
@@ -134,11 +134,11 @@ const AdminSuiviPreparationScreen = () => {
       </p>
 
       <div className="st-kpis">
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-warn">
           <span className="st-kpi-lbl">À préparer</span>
           <span className="st-kpi-val">{fmtInt(totaux?.a_faire ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-info">
           <span className="st-kpi-lbl">En cours</span>
           <span className="st-kpi-val">{fmtInt(totaux?.en_cours ?? 0)}</span>
         </div>
@@ -146,19 +146,19 @@ const AdminSuiviPreparationScreen = () => {
           <span className="st-kpi-lbl">Préparées</span>
           <span className="st-kpi-val">{fmtInt(totaux?.prepare ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Au collecteur</span>
           <span className="st-kpi-val">{fmtInt(totaux?.scannee ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Fiches papier</span>
           <span className="st-kpi-val">{fmtInt(totaux?.manuelle ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Unités préparées</span>
           <span className="st-kpi-val">{fmtQte(totaux?.unites ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Colis / palettes</span>
           <span className="st-kpi-val">{fmtInt(totaux?.colis ?? 0)}</span>
         </div>
@@ -233,18 +233,15 @@ const AdminSuiviPreparationScreen = () => {
               filtrees.map((l) => (
                 <tr key={`${l.origine}-${l.id}`}>
                   <td>
-                    <span
-                      className={`st-prio ${
-                        l.origine === "scannee"
-                          ? "st-prio-urgent"
-                          : "st-prio-a_faire"
-                      }`}
-                    >
+                    <Origine mobile={l.origine === "scannee"}>
                       {l.origine === "scannee" ? "Collecteur" : "Fiche papier"}
-                    </span>
+                    </Origine>
                   </td>
                   <td>
-                    <span className="st-libelle">
+                    <span
+                      className="st-libelle"
+                      title={`${l.numpro} · ${l.client || ""}`}
+                    >
                       {l.numpro} · {l.client || "—"}
                     </span>
                     <span className="st-comment">
@@ -254,40 +251,39 @@ const AdminSuiviPreparationScreen = () => {
                     </span>
                   </td>
                   <td>
-                    <span
-                      className={`st-statut st-statut-${
-                        l.statut === "prepare"
-                          ? "realisee"
-                          : l.statut === "en_cours"
-                            ? "en_cours"
-                            : "en_attente"
-                      }`}
-                    >
+                    {/* a_faire / en_cours / prepare : les trois états sont
+                        déclarés dans SuiviTerrain.css, plus de traduction. */}
+                    <span className={`st-statut st-statut-${l.statut}`}>
                       {STATUT_LABEL[l.statut] || l.statut}
                     </span>
                     {l.etape && <span className="st-comment">{l.etape}</span>}
                   </td>
                   <td>
-                    {l.operateur ? (
-                      <span className="st-agent">
-                        {l.origine === "scannee" && <HiDeviceMobile />}
-                        {l.operateur}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
+                    <Agent nom={l.operateur} mobile={l.origine === "scannee"} />
                   </td>
-                  <td>{fmtDate(l.debutAt)}</td>
-                  <td>{fmtDate(l.finAt)}</td>
+                  <td>
+                    <Val v={fmtDate(l.debutAt)} />
+                  </td>
+                  <td>
+                    <Val v={fmtDate(l.finAt)} />
+                  </td>
+                  {/* ⚠️ Rien n'est saisi ligne à ligne sur une fiche papier :
+                      le serveur renvoie null pour les quatre compteurs, et
+                      <Avancement> affiche « — ». Surtout pas un « 0 / 0 », qui
+                      se lirait comme « rien n'a été préparé ». */}
                   <td className="st-num">
-                    {l.nbLignes === null
-                      ? "—"
-                      : `${fmtInt(l.lignesFaites)} / ${fmtInt(l.nbLignes)}`}
+                    <Avancement
+                      fait={l.lignesFaites}
+                      total={l.nbLignes}
+                      format={fmtInt}
+                    />
                   </td>
                   <td className="st-num">
-                    {l.unitesPreparees === null
-                      ? "—"
-                      : `${fmtQte(l.unitesPreparees)} / ${fmtQte(l.unitesCommandees)}`}
+                    <Avancement
+                      fait={l.unitesPreparees}
+                      total={l.unitesCommandees}
+                      format={fmtQte}
+                    />
                   </td>
                   <td className="st-num">
                     {l.colisage
@@ -299,12 +295,14 @@ const AdminSuiviPreparationScreen = () => {
                             `${l.colisage.nbLongueurs} long.`,
                         ]
                           .filter(Boolean)
-                          .join(" · ") || "—"
+                          .join(" · ") || <Val v={null} />
                       : l.nbImpressions
                         ? `${fmtInt(l.nbImpressions)} impr.`
-                        : "—"}
+                        : <Val v={null} />}
                   </td>
-                  <td className="st-num">{fmtDuree(l.tempsMs)}</td>
+                  <td className="st-num">
+                    <Val v={fmtDuree(l.tempsMs)} />
+                  </td>
                   <td>
                     {l.rapportAt ? (
                       <span className="st-agent" title={fmtDate(l.rapportAt)}>
@@ -312,7 +310,7 @@ const AdminSuiviPreparationScreen = () => {
                         {l.emailAt && <HiMail title={fmtDate(l.emailAt)} />}
                       </span>
                     ) : (
-                      "—"
+                      <Val v={null} />
                     )}
                   </td>
                 </tr>
@@ -322,7 +320,7 @@ const AdminSuiviPreparationScreen = () => {
         </table>
       </div>
 
-      <p className="st-intro">
+      <p className="st-note">
         <b>Lignes</b> et <b>unités</b> ne sont comptées que pour les préparations
         faites au collecteur : rien n'est saisi ligne à ligne sur une fiche
         papier, l'écran affiche « — » plutôt qu'un faux zéro. Pour une fiche, la

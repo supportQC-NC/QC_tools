@@ -1099,7 +1099,7 @@ const contenu = (r) => {
       { t: "Comment elle est calculee", w: 78 },
     ],
     [
-      ["Temps effectif", "Le temps reellement passe a compter : la somme des intervalles entre scans, en excluant les silences de plus de 5 minutes (pause, appel, autre tache)."],
+      ["Temps effectif", "Le temps reellement passe a compter : la somme des intervalles entre scans, en excluant les silences de plus de 3 minutes (pause, appel, autre tache)."],
       ["Temps brut", "De l'entree dans la zone jusqu'au depot, pauses comprises. Une zone ouverte le matin et deposee le soir affiche une journee entiere."],
     ],
   );

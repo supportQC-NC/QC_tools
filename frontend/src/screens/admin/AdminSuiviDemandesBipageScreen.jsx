@@ -13,7 +13,6 @@ import {
   HiClipboardCheck,
   HiRefresh,
   HiSearch,
-  HiDeviceMobile,
   HiEye,
   HiX,
 } from "react-icons/hi";
@@ -23,7 +22,9 @@ import {
   useGetSuiviDemandesBipageQuery,
   useLazyGetLignesBipageQuery,
 } from "../../slices/demandeBipageApiSlice";
-// Feuille de style COMMUNE aux écrans de suivi terrain (bipage, réappro).
+// Briques d'affichage et feuille de style COMMUNES aux écrans de suivi
+// terrain (bipage, réappro, préparation).
+import { Val, Origine, Agent, Avancement } from "./SuiviTerrain";
 import "./SuiviTerrain.css";
 
 const STATUT_LABEL = {
@@ -60,7 +61,7 @@ const DetailBipageModal = ({ detail, chargement, onFermer }) => (
         <h2>
           {detail?.libelle || "Détail du bipage"}
           {detail?.type === "libre" && (
-            <span className="st-prio st-prio-urgent">Libre</span>
+            <Origine mobile>Libre</Origine>
           )}
         </h2>
         <button className="st-btn-icon" onClick={onFermer} title="Fermer">
@@ -111,10 +112,14 @@ const DetailBipageModal = ({ detail, chargement, onFermer }) => (
                           <span className="st-comment">hors liste</span>
                         )}
                       </td>
-                      <td>{l.design || "—"}</td>
-                      <td>{l.gencod || "—"}</td>
+                      <td>
+                        <Val v={l.design} />
+                      </td>
+                      <td>
+                        <Val v={l.gencod} />
+                      </td>
                       <td className="st-num">
-                        {l.quantite === null ? "—" : fmtQte(l.quantite)}
+                        <Val v={l.quantite === null ? null : fmtQte(l.quantite)} />
                       </td>
                       <td>
                         <span
@@ -126,7 +131,9 @@ const DetailBipageModal = ({ detail, chargement, onFermer }) => (
                         </span>
                       </td>
                       {detail.type === "libre" && (
-                        <td>{fmtDate(l.scannedAt)}</td>
+                        <td>
+                          <Val v={fmtDate(l.scannedAt)} />
+                        </td>
                       )}
                     </tr>
                   ))
@@ -265,11 +272,11 @@ const AdminSuiviDemandesBipageScreen = () => {
 
       {/* Compteurs de la fenêtre affichée */}
       <div className="st-kpis">
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-warn">
           <span className="st-kpi-lbl">En attente</span>
           <span className="st-kpi-val">{fmtInt(totaux?.en_attente ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-info">
           <span className="st-kpi-lbl">En cours</span>
           <span className="st-kpi-val">{fmtInt(totaux?.en_cours ?? 0)}</span>
         </div>
@@ -277,19 +284,19 @@ const AdminSuiviDemandesBipageScreen = () => {
           <span className="st-kpi-lbl">Réalisées</span>
           <span className="st-kpi-val">{fmtInt(totaux?.realisee ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Bipages libres</span>
           <span className="st-kpi-val">{fmtInt(totaux?.libre ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Articles demandés</span>
           <span className="st-kpi-val">{fmtInt(totaux?.articles ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Lignes bipées</span>
           <span className="st-kpi-val">{fmtInt(totaux?.lignesBipees ?? 0)}</span>
         </div>
-        <div className="st-kpi">
+        <div className="st-kpi st-kpi-soft">
           <span className="st-kpi-lbl">Unités comptées</span>
           <span className="st-kpi-val">{fmtInt(totaux?.unites ?? 0)}</span>
         </div>
@@ -356,7 +363,7 @@ const AdminSuiviDemandesBipageScreen = () => {
               <th className="st-num">Lignes bipées</th>
               <th className="st-num">Unités</th>
               <th className="st-num">Délai</th>
-              <th />
+              <th className="st-col-act" />
             </tr>
           </thead>
           <tbody>
@@ -372,21 +379,21 @@ const AdminSuiviDemandesBipageScreen = () => {
               filtrees.map((d) => (
                 <tr key={`${d.type || "demande"}-${d._id}`}>
                   <td>
-                    <span
-                      className={`st-prio ${
-                        d.type === "libre" ? "st-prio-urgent" : "st-prio-a_faire"
-                      }`}
-                    >
+                    <Origine mobile={d.type === "libre"}>
                       {d.type === "libre" ? "Libre" : "Demande"}
-                    </span>
+                    </Origine>
                   </td>
                   <td>
-                    <span className="st-libelle">{d.libelle || "—"}</span>
+                    <span className="st-libelle" title={d.libelle || ""}>
+                      <Val v={d.libelle} />
+                    </span>
                     {d.commentaire && (
                       <span className="st-comment">{d.commentaire}</span>
                     )}
                   </td>
-                  <td>{SOURCE_LABEL[d.source] || d.source}</td>
+                  <td>
+                    <Val v={SOURCE_LABEL[d.source] || d.source} />
+                  </td>
                   <td>
                     <span className={`st-prio st-prio-${d.priorite}`}>
                       {PRIORITE_LABEL[d.priorite] || d.priorite}
@@ -397,26 +404,41 @@ const AdminSuiviDemandesBipageScreen = () => {
                       {STATUT_LABEL[d.statut] || d.statut}
                     </span>
                   </td>
-                  <td>{d.createdByNom || "—"}</td>
-                  <td>{fmtDate(d.createdAt)}</td>
                   <td>
-                    {d.realisedByNom ? (
-                      <span className="st-agent">
-                        <HiDeviceMobile /> {d.realisedByNom}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
+                    {/* Créée depuis le web : pas d'icône collecteur ici. */}
+                    <Agent nom={d.createdByNom} mobile={false} />
                   </td>
-                  <td>{fmtDate(d.realisedAt)}</td>
-                  <td className="st-num">{fmtInt(d.nbArticles)}</td>
-                  <td className="st-num">{fmtInt(d.nbLignesBipees)}</td>
-                  <td className="st-num">{fmtInt(d.unitesBipees)}</td>
-                  <td className="st-num">{fmtDelai(d.delaiMinutes)}</td>
                   <td>
+                    <Val v={fmtDate(d.createdAt)} />
+                  </td>
+                  <td>
+                    <Agent nom={d.realisedByNom} />
+                  </td>
+                  <td>
+                    <Val v={fmtDate(d.realisedAt)} />
+                  </td>
+                  <td className="st-num">
+                    <Val v={fmtInt(d.nbArticles)} />
+                  </td>
+                  <td className="st-num">
+                    {/* Un bipage libre n'a pas de liste demandée : on compte
+                        les lignes bipées sans dénominateur inventé. */}
+                    <Avancement
+                      fait={d.nbLignesBipees}
+                      total={d.type === "libre" ? null : d.nbArticles}
+                      format={fmtInt}
+                    />
+                  </td>
+                  <td className="st-num">
+                    <Val v={fmtInt(d.unitesBipees)} />
+                  </td>
+                  <td className="st-num">
+                    <Val v={fmtDelai(d.delaiMinutes)} />
+                  </td>
+                  <td className="st-col-act">
                     {/* Voir les articles bipés, y compris pendant le travail. */}
                     <button
-                      className="st-btn-icon"
+                      className="st-btn-icon st-btn-sm"
                       onClick={() => ouvrirDetail(d)}
                       title="Voir les articles bipés"
                       aria-label="Voir les articles bipés"

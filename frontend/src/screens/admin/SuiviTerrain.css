@@ -1,11 +1,25 @@
-/* Feuille commune aux écrans de SUIVI TERRAIN (bipage, réappro) — mêmes codes visuels que les autres écrans admin
-   (variables --admin-* / --bg-* définies globalement dans index.css). */
+/* Feuille commune aux écrans de SUIVI TERRAIN (réappro, bipage, préparation) —
+   mêmes codes visuels que les autres écrans admin (variables --admin-* / --bg-*
+   définies globalement dans index.css).
+
+   ⚠️ Les fonds de ligne sont des couleurs OPAQUES (jetons --st-row*) et non des
+   rgba() empilés : les deux premières colonnes du tableau sont figées
+   (position: sticky) et doivent masquer les colonnes qui défilent dessous. Un
+   fond semi-transparent laisserait le texte transparaître. */
 
 .st-screen {
   padding: 20px 24px 40px;
   color: var(--text-primary);
+
+  /* Famille de fonds du tableau, dans la teinte des écrans admin. */
+  --st-row: #1a1a2e;
+  --st-row-alt: #1e1e33;
+  --st-row-hover: #26263f;
+  --st-head: #212137;
+  --st-line: #2c2c40;
 }
 
+/* ── En-tête d'écran ── */
 .st-header {
   display: flex;
   align-items: center;
@@ -17,7 +31,12 @@
   align-items: center;
   gap: 10px;
   font-size: 22px;
+  letter-spacing: -0.01em;
   margin: 0;
+}
+
+.st-header h1 svg {
+  color: var(--accent);
 }
 
 .st-btn-icon {
@@ -32,11 +51,38 @@
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
+  transition: var(--admin-transition);
 }
 
 .st-btn-icon:hover {
   color: var(--text-primary);
   border-color: var(--accent);
+  background: var(--admin-bg-hover);
+}
+
+/* Version de ligne : discrète tant qu'on ne survole pas la ligne — une colonne
+   de boutons pleine taille tire l'œil plus que les données elles-mêmes. */
+.st-btn-sm {
+  margin-left: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.st-table tbody tr:hover .st-btn-sm {
+  border-color: var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.st-btn-sm:hover,
+.st-btn-sm:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
 }
 
 .st-spin {
@@ -52,42 +98,98 @@
 .st-intro {
   color: var(--text-muted);
   font-size: 13px;
+  line-height: 1.5;
   margin: 6px 0 16px;
-  max-width: 780px;
+  max-width: 820px;
 }
 
-/* ── Compteurs ── */
+/* Note de bas de tableau : même gris que l'intro, mais rattachée visuellement
+   au tableau qu'elle explique. */
+.st-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+  max-width: 900px;
+}
+
+.st-note b {
+  color: var(--text-secondary);
+}
+
+/* ── Compteurs ──────────────────────────────────────────────────────────────
+   Deux familles dans la même grille : les ÉTATS (barre de couleur, chiffre
+   plein) et les VOLUMES (.st-kpi-soft, sans fond ni barre). Sans cette
+   hiérarchie, « 3 à faire » et « 504 unités » se lisent avec le même poids
+   alors qu'on ne les regarde pas pour la même raison. */
 .st-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(146px, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
 
 .st-kpi {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 12px;
+  gap: 3px;
+  padding: 11px 13px 11px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-secondary);
 }
 
-.st-kpi-ok {
-  border-color: rgba(34, 197, 94, 0.45);
+.st-kpi::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+}
+
+.st-kpi-warn::before {
+  background: var(--admin-warning);
+}
+
+.st-kpi-info::before {
+  background: var(--admin-info);
+}
+
+.st-kpi-ok::before {
+  background: #22c55e;
 }
 
 .st-kpi-lbl {
-  font-size: 11px;
+  font-size: 10.5px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
 }
 
 .st-kpi-val {
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-kpi-soft {
+  background: transparent;
+  border-style: dashed;
+  padding-left: 13px;
+}
+
+.st-kpi-soft .st-kpi-val {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-secondary);
 }
 
 /* ── Filtres ── */
@@ -97,17 +199,27 @@
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
 }
 
 .st-search {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
+  gap: 7px;
+  padding: 7px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-tertiary);
   color: var(--text-muted);
+  transition: var(--admin-transition);
+}
+
+.st-search:focus-within {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .st-search input {
@@ -122,13 +234,14 @@
 .st-field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .st-field > span {
-  font-size: 11px;
+  font-size: 10.5px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
 }
 
@@ -139,58 +252,149 @@
   background: var(--bg-tertiary);
   color: var(--text-primary);
   font-size: 13px;
+  cursor: pointer;
+  transition: var(--admin-transition);
 }
 
-/* ── Tableau ── */
+.st-field select:hover,
+.st-field select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ── Tableau ────────────────────────────────────────────────────────────────
+   ⚠️ La hauteur maximale n'est pas décorative : `overflow` fait du conteneur
+   un contexte de défilement, et c'est LUI qui doit défiler verticalement pour
+   que le `position: sticky` de l'en-tête serve à quelque chose. Sans hauteur,
+   le conteneur s'étire, la page défile à sa place et l'en-tête ne colle
+   jamais — c'était le cas avant. */
 .st-table-wrap {
-  overflow-x: auto;
+  position: relative;
+  overflow: auto;
+  max-height: calc(100vh - 300px);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-secondary);
+  box-shadow: var(--admin-shadow);
 }
 
+/* `separate` (et non `collapse`) : une cellule collée perd ses bordures
+   fusionnées au défilement. Les traits sont donc portés par les cellules. */
 .st-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
   min-width: 1100px;
 }
 
-.st-table th,
+.st-table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  background: var(--st-head);
+  box-shadow: inset 0 -1px 0 var(--st-line);
+}
+
 .st-table td {
   padding: 9px 12px;
   text-align: left;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--st-line);
+  background: var(--st-row);
 }
 
-.st-table th {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  background: var(--bg-tertiary);
+.st-table tbody tr:nth-child(even) td {
+  background: var(--st-row-alt);
+}
+
+.st-table tbody tr:hover td {
+  background: var(--st-row-hover);
+}
+
+.st-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Colonnes figées : l'origine et le libellé restent visibles quand on fait
+   défiler les quatorze colonnes du suivi bipage vers la droite. Réservé au
+   tableau principal — une modale n'a pas assez de colonnes pour que ça serve.
+   La largeur de la 1re colonne est fixe pour que le décalage de la 2e soit
+   exact. */
+.st-table-wrap .st-table th:nth-child(1),
+.st-table-wrap .st-table td:nth-child(1) {
   position: sticky;
-  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 124px;
+  min-width: 124px;
 }
 
-.st-table tbody tr:hover {
-  background: var(--bg-tertiary);
+/* Largeur FIXE, et pas seulement un minimum : en `table-layout: auto` la
+   colonne au contenu le plus long récupère tout l'espace libre de la table, et
+   le libellé s'étalait sur la moitié de l'écran en repoussant les colonnes de
+   dates hors de vue. Les titres trop longs sont coupés — leur texte complet
+   reste dans l'infobulle de la cellule. */
+.st-table-wrap .st-table th:nth-child(2),
+.st-table-wrap .st-table td:nth-child(2) {
+  position: sticky;
+  left: 124px;
+  z-index: 2;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  box-shadow: inset -1px 0 0 var(--st-line);
+}
+
+.st-table-wrap .st-table td:nth-child(2) .st-libelle,
+.st-table-wrap .st-table td:nth-child(2) .st-comment {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-table-wrap .st-table th:nth-child(1),
+.st-table-wrap .st-table th:nth-child(2) {
+  z-index: 5;
+}
+
+.st-table-wrap .st-table th:nth-child(2) {
+  box-shadow:
+    inset 0 -1px 0 var(--st-line),
+    inset -1px 0 0 var(--st-line);
 }
 
 .st-num {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-col-act {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .st-libelle {
   display: block;
-  font-weight: 600;
+  font-weight: 650;
+  font-size: 13.5px;
+  line-height: 1.25;
+  color: var(--text-primary);
 }
 
 .st-comment {
   display: block;
-  font-size: 11.5px;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -198,53 +402,165 @@
 .st-agent {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-}
-
-.st-statut,
-.st-prio {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11.5px;
-  font-weight: 700;
+  gap: 6px;
   white-space: nowrap;
 }
 
-.st-statut-en_attente {
-  background: rgba(245, 158, 11, 0.16);
-  color: #f59e0b;
+.st-agent svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Valeur absente. Une colonne pleine de « — » ne doit pas peser autant que les
+   colonnes renseignées. */
+.st-nil {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* ── Pastilles ──────────────────────────────────────────────────────────────
+   Trois familles distinctes, à ne pas confondre :
+     .st-statut  = où en est le travail (pastille pleine + point coloré) ;
+     .st-prio    = l'urgence demandée ;
+     .st-origine = d'où vient le travail (collecteur / web) — surtout PAS
+                   l'échelle de priorité : « Collecteur » affiché en rouge se
+                   lisait comme une alerte. */
+.st-statut,
+.st-prio,
+.st-origine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.st-statut::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Les libellés d'état diffèrent d'un module à l'autre pour le MÊME sens
+   (a_faire/en_attente, termine/realisee/prepare) : les trois écrans partagent
+   donc les trois couleurs, pas les trois vocabulaires. */
+.st-statut-en_attente,
+.st-statut-a_faire {
+  background: rgba(245, 158, 11, 0.13);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: #fbbf24;
 }
 
 .st-statut-en_cours {
-  background: rgba(59, 130, 246, 0.16);
-  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.13);
+  border-color: rgba(59, 130, 246, 0.34);
+  color: #7fb4ff;
 }
 
-.st-statut-realisee {
-  background: rgba(34, 197, 94, 0.16);
-  color: #22c55e;
+.st-statut-realisee,
+.st-statut-termine,
+.st-statut-prepare,
+.st-statut-prise {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+
+/* Article cherché au dock et pas trouvé : c'est un incident de préparation, pas
+   une étape normale du parcours — il ne doit pas porter la même couleur qu'un
+   « à faire » qui attend simplement son tour. */
+.st-statut-introuvable {
+  background: rgba(239, 68, 68, 0.13);
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #f87171;
 }
 
 .st-prio-urgent {
-  background: rgba(239, 68, 68, 0.16);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.13);
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #f87171;
 }
 
 .st-prio-a_faire {
-  background: rgba(148, 163, 184, 0.16);
+  background: rgba(148, 163, 184, 0.13);
+  border-color: rgba(148, 163, 184, 0.26);
   color: var(--text-secondary);
 }
 
 .st-prio-normal {
   background: transparent;
   color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Origine : travail fait AU COLLECTEUR (bleu, comme les icônes mobiles) vs
+   travail poussé depuis le WEB (contour neutre). */
+.st-origine-mobile {
+  background: rgba(77, 166, 255, 0.12);
+  border-color: rgba(77, 166, 255, 0.34);
+  color: #7fc0ff;
+}
+
+.st-origine-web {
+  background: transparent;
+  border-color: var(--st-line);
+  color: var(--text-secondary);
+}
+
+/* ── Avancement ─────────────────────────────────────────────────────────────
+   « 0 / 16 » en texte brut oblige à faire la division de tête sur chaque
+   ligne. La barre donne la proportion d'un coup d'œil, le texte garde le
+   compte exact. */
+.st-prog {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 88px;
+}
+
+.st-prog-txt {
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+
+.st-prog-tot {
+  color: var(--text-muted);
+}
+
+.st-prog-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.st-prog-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.st-prog-complet .st-prog-fill {
+  background: #22c55e;
 }
 
 .st-empty {
   text-align: center;
   color: var(--text-muted);
-  padding: 26px 12px;
+  padding: 34px 12px;
+  font-size: 13px;
 }
 
 .st-placeholder {
@@ -264,7 +580,8 @@
 .st-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -279,9 +596,9 @@
   flex-direction: column;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 16px 18px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--admin-shadow-lg);
 }
 
 .st-modal-head {
@@ -296,6 +613,7 @@
   gap: 10px;
   margin: 0;
   font-size: 17px;
+  letter-spacing: -0.01em;
 }
 
 .st-modal-head .st-btn-icon {
@@ -307,10 +625,24 @@
 .st-modal-body {
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   margin-top: 4px;
 }
 
 .st-modal-body .st-table {
   min-width: 720px;
+}
+
+@media (max-width: 900px) {
+  .st-screen {
+    padding: 16px 14px 32px;
+  }
+
+  .st-table-wrap {
+    max-height: calc(100vh - 240px);
+  }
+
+  .st-search input {
+    min-width: 150px;
+  }
 }

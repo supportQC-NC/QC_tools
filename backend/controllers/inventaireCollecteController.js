@@ -2006,8 +2006,10 @@ const getSessionActive = asyncHandler(async (req, res) => {
 
 // Au-delà de ce silence entre deux scans, on considère que l'agent a fait autre
 // chose (pause, appel, réappro) : l'intervalle n'entre pas dans le temps de
-// bipage EFFECTIF. Même seuil et même raisonnement que le module réappro.
-const PAUSE_BIPAGE_MS = 5 * 60 * 1000;
+// bipage EFFECTIF. Même seuil et même raisonnement que le module réappro
+// (`PAUSE_MS`), abaissé de 5 à 3 minutes le 11/09/2026 — les deux doivent
+// rester égaux, sinon les temps effectifs des deux suivis ne se comparent plus.
+const PAUSE_BIPAGE_MS = 3 * 60 * 1000;
 
 /**
  * Temps d'un bipage, reconstitué a posteriori depuis les horodatages.

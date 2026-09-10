@@ -420,7 +420,7 @@ déployées de l'app mobile s'en servaient).
 - Chaque ligne validée part immédiatement au serveur (`POST /mobile/:id/lignes`) :
   `quantitePrise`, `statutLigne`, `traiteAt`. Le **temps de réappro effectif** est
   le temps ACTIF : on cumule les intervalles entre lignes et on ignore les silences
-  de plus de 5 min (`PAUSE_MS`). Sans l'horodatage par ligne il serait incalculable
+  de plus de 3 min (`PAUSE_MS`). Sans l'horodatage par ligne il serait incalculable
   a posteriori — ne pas le retirer.
 - `POST /mobile/:id/scan` résout un code **dans la liste** (NART, gencode ou
   REFER), puis via le catalogue. Un article du catalogue **absent de la liste est
@@ -441,7 +441,7 @@ déployées de l'app mobile s'en servaient).
 **Statistiques préparateurs** : `GET /:dossier/stats?debut&fin` (onglet
 « Statistiques » de l'écran, export Excel côté client). Par opérateur : nombre de
 réappros, de lignes, prises/introuvables, unités, **temps effectif** (somme des
-intervalles entre lignes, pauses > 5 min exclues) et **temps brut** (ouverture →
+intervalles entre lignes, pauses > 3 min exclues) et **temps brut** (ouverture →
 validation), plus la moyenne par ligne. Les listes préparées avant l'horodatage par
 ligne sont comptées dans `listesSansTemps` au lieu d'être faussées à 0.
 
