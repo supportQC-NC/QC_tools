@@ -4,12 +4,19 @@ import asyncHandler from "./asyncHandler.js";
 import User from "../models/UserModel.js";
 import { masqueUtilisateur } from "../services/dbfChampsService.js";
 
+// ⚠️ Les messages des 401 sont lus TELS QUELS par les écrans web et par l'app
+// mobile (aucun des deux ne réécrit l'erreur) : ils doivent dire à l'utilisateur
+// ce qu'il a à faire. « Token non valide » ne veut rien dire pour un agent au
+// rayon — il faut lui demander de se déconnecter puis de se reconnecter.
+const MSG_SESSION =
+  "Session expirée : déconnectez-vous puis reconnectez-vous.";
+
 // Protect routes
 const protect = asyncHandler(async (req, res, next) => {
   const token = req.cookies.token;
   if (!token) {
     res.status(401);
-    throw new Error("Non autorisé, pas de token");
+    throw new Error(MSG_SESSION);
   }
 
   let decoded;
@@ -17,7 +24,9 @@ const protect = asyncHandler(async (req, res, next) => {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
   } catch {
     res.status(401);
-    throw new Error("Token non valide");
+    // Jeton illisible ou expiré : le cookie est encore là, mais il ne vaut
+    // plus rien. Se reconnecter en pose un neuf.
+    throw new Error(MSG_SESSION);
   }
 
   req.user = await User.findById(decoded.userId).select("-password");
@@ -30,7 +39,7 @@ const protect = asyncHandler(async (req, res, next) => {
   // redemander une connexion.
   if (!req.user) {
     res.status(401);
-    throw new Error("Session expirée, reconnectez-vous");
+    throw new Error(MSG_SESSION);
   }
 
   // Champs DBF interdits à cet utilisateur. Posé ici — seul endroit traversé

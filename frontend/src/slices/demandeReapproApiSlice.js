@@ -43,6 +43,18 @@ export const demandeReapproApiSlice = apiSlice.injectEndpoints({
       }),
     }),
     // Performances de préparation par opérateur, sur une période.
+    // Suivi des réappros EN COURS : listes poussées depuis le web ET réappros
+    // libres faits au collecteur — le serveur fusionne les deux collections.
+    getSuiviReappros: builder.query({
+      query: ({ nomDossierDBF, etat, jours }) => ({
+        url: `${URL}/${nomDossierDBF}/suivi`,
+        params: {
+          ...(etat ? { etat } : {}),
+          ...(jours !== undefined ? { jours } : {}),
+        },
+      }),
+      keepUnusedDataFor: 30,
+    }),
     getStatsPreparateurs: builder.query({
       query: ({ nomDossierDBF, debut, fin }) => ({
         url: `${URL}/${nomDossierDBF}/stats`,
@@ -84,6 +96,7 @@ export const demandeReapproApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetDemandesQuery,
+  useGetSuiviReapprosQuery,
   useGetDemandeDetailQuery,
   useLazyGetDemandeDetailQuery,
   useCreateDemandesMutation,

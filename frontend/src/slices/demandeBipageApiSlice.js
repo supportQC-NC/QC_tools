@@ -12,6 +12,19 @@ export const demandeBipageApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 30,
     }),
+    // Suivi : une ligne par demande + compteurs. Le serveur agrège, il ne
+    // renvoie jamais les tableaux d'articles (une demande « groupe » peut en
+    // porter plusieurs milliers).
+    getSuiviDemandesBipage: builder.query({
+      query: ({ nomDossierDBF, statut, jours }) => ({
+        url: `${URL}/${nomDossierDBF}/suivi`,
+        params: {
+          ...(statut ? { statut } : {}),
+          ...(jours !== undefined ? { jours } : {}),
+        },
+      }),
+      keepUnusedDataFor: 30,
+    }),
     createDemandeBipageProforma: builder.mutation({
       query: ({ nomDossierDBF, numpro, priorite, commentaire }) => ({
         url: `${URL}/${nomDossierDBF}/proforma`,
@@ -24,6 +37,19 @@ export const demandeBipageApiSlice = apiSlice.injectEndpoints({
         url: `${URL}/${nomDossierDBF}/gisement`,
         method: "POST",
         body: { gisements, priorite, commentaire },
+      }),
+    }),
+    createDemandeBipageGroupe: builder.mutation({
+      query: ({
+        nomDossierDBF,
+        groupes,
+        avecStockSeulement,
+        priorite,
+        commentaire,
+      }) => ({
+        url: `${URL}/${nomDossierDBF}/groupe`,
+        method: "POST",
+        body: { groupes, avecStockSeulement, priorite, commentaire },
       }),
     }),
     createDemandeBipagePanier: builder.mutation({
@@ -46,8 +72,10 @@ export const demandeBipageApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetDemandesBipageQuery,
+  useGetSuiviDemandesBipageQuery,
   useCreateDemandeBipageProformaMutation,
   useCreateDemandeBipageGisementMutation,
+  useCreateDemandeBipageGroupeMutation,
   useCreateDemandeBipagePanierMutation,
   useLazyGetArticleBipageQuery,
   useDeleteDemandeBipageMutation,

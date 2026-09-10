@@ -571,6 +571,25 @@ progression, récap, suivi bipage, agents de l'inventaire, fiches de contrôle),
 `ctrl_info_produit`, `releve`, `etiquettes`, `changement_prix`,
 `historique_pachat`, `edition_promo`.
 
+**Demandes de bipage vs suivi d'inventaire** — deux écrans de « suivi bipage »
+coexistent et ne doivent pas être confondus : `/admin/suivi-demandes-bipage`
+(module `bipage`) suit les **demandes envoyées aux collecteurs** depuis le web
+— qui a bipé quoi, combien de lignes, en combien de temps — et vit avec les
+documents `DemandeBipage` ; `/admin/suivi-bipage` (module `inventaire`) suit le
+**comptage d'inventaire par zone** et se vide à chaque réinitialisation
+d'inventaire. Le premier est dans le dossier Terrain ▸ Bipage, le second dans
+Inventaire Zones.
+
+Les demandes de bipage se créent depuis une **proforma**, un **gisement**, un
+**groupe** (famille d'articles) ou un panier manuel — une demande par gisement /
+par groupe, pour que deux agents puissent se partager le travail. ⚠️ La sélection
+par groupe passe par `bipageSelectionService.getArticlesParGroupes`, **pas** par
+`getMagasinArticlesByGisements` du réappro : celui-ci ne retient que les articles
+absents du rayon (S1 = 0 et stock > 0), ce qui est la question du réappro, pas
+celle du comptage. Elle écarte les articles techniques (NART < 100000) et, par
+défaut, ceux sans stock — chez QC le groupe `XXX` compte 13 000 références, dont
+4 693 en stock : sans ce garde-fou la demande est inexploitable sur un collecteur.
+
 **Communication** — `mailing` (campagnes clients par blocs, segments,
 automatisations, stats d'ouverture/clic, désinscription), `communication_client`
 (catalogue nouveautés), `assistant_ia` (chat OpenAI cadré sur les données société

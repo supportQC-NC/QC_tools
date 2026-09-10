@@ -1,6 +1,7 @@
 // src/screens/admin/AdminSuiviBipageScreen.jsx
 //
-// Suivi bipage — pour chaque zone bipée sur le collecteur : qui l'a bipée,
+// Suivi bipage INVENTAIRE — pour chaque zone bipée sur le collecteur : qui l'a
+// bipée,
 // quand ça a commencé, quand ça s'est terminé, combien de temps ça a pris, et
 // les observations (celle de l'agent, saisie au dépôt, et celle du suivi,
 // saisie ici).
@@ -176,7 +177,7 @@ const AdminSuiviBipageScreen = () => {
     <div className="suivi-bipage">
       <div className="suivi-bipage-header">
         <h1>
-          <HiClock /> Suivi bipage
+          <HiClock /> Suivi bipage inventaire
         </h1>
         <div className="suivi-bipage-actions">
           <button

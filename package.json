@@ -31,6 +31,8 @@
     "apikey:revoke": "node backend/scripts/apiKeys.js revoke",
     "apikey:activate": "node backend/scripts/apiKeys.js activate",
     "pachat:historiser": "node backend/historiserPachat.js",
+    "migrate:menu-ranger": "node backend/migrations/menuRangerOnglet.js",
+    "migrate:menu-bipage": "node backend/migrations/menuSuiviBipageTerrain.js",
     "migrate:groupes-prioritaires": "node backend/migrations/groupesPrioritairesParEntreprise.js"
   },
   "dependencies": {

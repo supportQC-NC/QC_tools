@@ -13,6 +13,7 @@ import { analyserProforma } from "../services/preparationService.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import { ecrireTransfertBipage } from "../services/demandeBipageTransfertService.js";
+import { getArticlesParGroupes } from "../services/bipageSelectionService.js";
 
 const ACTIF = ["en_attente", "en_cours"];
 
@@ -138,6 +139,91 @@ const createDemandeGisement = asyncHandler(async (req, res) => {
   res.status(201).json({ crees: crees.length, ignores, demandes: crees });
 });
 
+// @desc    Créer des demandes de bipage depuis un ou plusieurs GROUPES (1/groupe)
+// @route   POST /api/demande-bipage/:nomDossierDBF/groupe
+// @body    { groupes: string[], avecStockSeulement?, priorite?, commentaire? }
+//
+// ⚠️ Un groupe entier peut compter des milliers de références : par défaut on
+// ne retient que celles qui ont du stock (`avecStockSeulement`), sinon la
+// demande est inexploitable sur un collecteur. La case est décochable côté web
+// quand on veut vraiment tout passer.
+const createDemandeGroupe = asyncHandler(async (req, res) => {
+  const entreprise = entOf(req);
+  const key = entreprise.nomDossierDBF;
+  const groupes = (Array.isArray(req.body.groupes) ? req.body.groupes : [])
+    .map((g) => String(g || "").trim())
+    .filter(Boolean);
+  if (groupes.length === 0) {
+    res.status(400);
+    throw new Error("Aucun groupe sélectionné.");
+  }
+
+  // Anti-doublon : groupes déjà couverts par une demande active (même règle
+  // que pour les gisements).
+  const dejaActifs = await DemandeBipage.find({
+    entreprise: key,
+    source: "groupe",
+    sourceRef: { $in: groupes },
+    statut: { $in: ACTIF },
+  }).select("sourceRef");
+  const bloques = new Set(dejaActifs.map((d) => d.sourceRef));
+  const aTraiter = groupes.filter((g) => !bloques.has(g));
+  const ignores = [...bloques];
+
+  const crees = [];
+  const vides = [];
+  if (aTraiter.length > 0) {
+    const parGroupe = await getArticlesParGroupes(entreprise, aTraiter, {
+      avecStockSeulement: req.body.avecStockSeulement !== false,
+    });
+    for (const g of aTraiter) {
+      const arts = (parGroupe.get(g) || []).map((a) => ({
+        nart: a.nart,
+        design: a.design,
+        fourn: a.fourn,
+        fournNom: a.fournNom,
+        gencod: a.gencod,
+        stock: a.stock,
+        quantiteDemandee: 0,
+      }));
+      if (arts.length === 0) {
+        vides.push(g);
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const d = await DemandeBipage.create({
+        entreprise: key,
+        source: "groupe",
+        sourceRef: g,
+        libelle: `Groupe ${g}`,
+        priorite: normPriorite(req.body.priorite),
+        statut: "en_attente",
+        articles: arts,
+        nbArticles: arts.length,
+        commentaire: String(req.body.commentaire || "").slice(0, 500),
+        createdBy: req.user?._id,
+        createdByNom: nomUtilisateur(req.user),
+      });
+      crees.push(d);
+    }
+  }
+
+  // Réponse LÉGÈRE : renvoyer les documents complets ferait transiter des
+  // milliers de lignes d'articles pour un groupe un peu large.
+  res.status(201).json({
+    crees: crees.length,
+    ignores,
+    vides,
+    totalArticles: crees.reduce((s, d) => s + (d.nbArticles || 0), 0),
+    demandes: crees.map((d) => ({
+      _id: d._id,
+      sourceRef: d.sourceRef,
+      libelle: d.libelle,
+      nbArticles: d.nbArticles,
+    })),
+  });
+});
+
 // @desc    Résout un NART (saisie manuelle) -> article
 // @route   GET /api/demande-bipage/:nomDossierDBF/article/:nart
 const getArticleBipage = asyncHandler(async (req, res) => {
@@ -212,6 +298,90 @@ const getDemandes = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(300);
   res.json(demandes);
+});
+
+// @desc    SUIVI des demandes de bipage : une ligne par demande, avec ce qui a
+//          été réellement bipé au collecteur.
+// @route   GET /api/demande-bipage/:nomDossierDBF/suivi?statut=&jours=
+//
+// ⚠️ À ne pas confondre avec « Suivi bipage » (/admin/suivi-bipage), qui suit le
+// bipage d'INVENTAIRE par zone (LigneBipage, vidé à chaque réinitialisation
+// d'inventaire). Ici on suit les demandes envoyées aux collecteurs depuis le
+// web : deux cycles de vie différents, deux écrans.
+//
+// L'agrégation renvoie les COMPTEURS (nombre de lignes bipées, unités) sans
+// jamais faire transiter les tableaux `articles` / `lignesRealisees` : une
+// demande « groupe » peut porter plusieurs milliers de lignes.
+const getSuivi = asyncHandler(async (req, res) => {
+  const entreprise = entOf(req);
+  const match = { entreprise: entreprise.nomDossierDBF };
+  if (["en_attente", "en_cours", "realisee"].includes(req.query.statut)) {
+    match.statut = req.query.statut;
+  } else if (req.query.statut === "actif") {
+    match.statut = { $in: ACTIF };
+  }
+  // Fenêtre glissante : les demandes ne sont jamais purgées, l'écran ne doit
+  // pas remonter à la mise en service du module.
+  const jours = parseInt(req.query.jours, 10);
+  const fenetre = Number.isFinite(jours) ? jours : 30;
+  if (fenetre > 0) {
+    match.createdAt = { $gte: new Date(Date.now() - fenetre * 86400000) };
+  }
+
+  const lignes = await DemandeBipage.aggregate([
+    { $match: match },
+    { $sort: { createdAt: -1 } },
+    { $limit: 500 },
+    {
+      $project: {
+        libelle: 1,
+        source: 1,
+        sourceRef: 1,
+        priorite: 1,
+        statut: 1,
+        commentaire: 1,
+        nbArticles: 1,
+        createdAt: 1,
+        createdByNom: 1,
+        realisedAt: 1,
+        realisedByNom: 1,
+        transfertFichier: 1,
+        nbLignesBipees: { $size: { $ifNull: ["$lignesRealisees", []] } },
+        unitesBipees: { $sum: "$lignesRealisees.quantite" },
+        // Délai entre la création de la demande et sa réalisation, en minutes.
+        delaiMinutes: {
+          $cond: [
+            { $and: ["$realisedAt", "$createdAt"] },
+            {
+              $round: [
+                {
+                  $divide: [
+                    { $subtract: ["$realisedAt", "$createdAt"] },
+                    60000,
+                  ],
+                },
+                0,
+              ],
+            },
+            null,
+          ],
+        },
+      },
+    },
+  ]);
+
+  const totaux = lignes.reduce(
+    (acc, l) => {
+      acc[l.statut] = (acc[l.statut] || 0) + 1;
+      acc.articles += l.nbArticles || 0;
+      acc.lignesBipees += l.nbLignesBipees || 0;
+      acc.unites += l.unitesBipees || 0;
+      return acc;
+    },
+    { en_attente: 0, en_cours: 0, realisee: 0, articles: 0, lignesBipees: 0, unites: 0 },
+  );
+
+  res.json({ fenetreJours: fenetre, totaux, demandes: lignes });
 });
 
 // @desc    Détail d'une demande (avec ses articles)
@@ -307,9 +477,11 @@ const realiserDemande = asyncHandler(async (req, res) => {
 export {
   createDemandeProforma,
   createDemandeGisement,
+  createDemandeGroupe,
   createDemandePanier,
   getArticleBipage,
   getDemandes,
+  getSuivi,
   getDemandeById,
   deleteDemande,
   getMobileDemandes,

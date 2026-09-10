@@ -2,7 +2,8 @@
 //
 // Demande de BIPAGE créée depuis le web (admin) et destinée aux agents (app
 // mobile — module Bipage). Une demande = une LISTE d'articles à biper, sourcée
-// depuis une proforma, un gisement, ou saisie manuellement. À la réalisation,
+// depuis une proforma, un gisement, un groupe (famille d'articles), ou saisie
+// manuellement. À la réalisation,
 // l'agent bipe les articles et un fichier .dat de bipage est déposé.
 // (Calque de DemandeReapproModel.)
 import mongoose from "mongoose";
@@ -31,12 +32,12 @@ const demandeBipageSchema = new mongoose.Schema(
     entreprise: { type: String, index: true }, // nomDossierDBF
     source: {
       type: String,
-      enum: ["proforma", "gisement", "manuel"],
+      enum: ["proforma", "gisement", "groupe", "manuel"],
       default: "manuel",
       index: true,
     },
-    sourceRef: { type: String, default: "" }, // numpro (proforma) ou libellé gisement
-    libelle: { type: String, default: "" }, // libellé affiché (client proforma, gisement…)
+    sourceRef: { type: String, default: "" }, // numpro, code gisement ou code groupe
+    libelle: { type: String, default: "" }, // libellé affiché (client proforma, gisement, groupe…)
     priorite: {
       type: String,
       enum: ["urgent", "a_faire", "normal"],

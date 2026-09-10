@@ -8,6 +8,7 @@ import {
   getDemandeById,
   importerProformas,
   getStatsPreparateurs,
+  getSuiviReappros,
   updateDemande,
   updateUrgence,
   deleteDemande,
@@ -73,6 +74,13 @@ router.get(
 router.post(
   "/:nomDossierDBF/panier",
   protect, canWrite, checkEntrepriseAccess, createDemandePanier,
+);
+
+// Suivi des réappros EN COURS : listes poussées depuis le web + réappros
+// libres faits au collecteur. Deux collections, un seul écran.
+router.get(
+  "/:nomDossierDBF/suivi",
+  protect, canRead, checkEntrepriseAccess, getSuiviReappros,
 );
 
 // Statistiques de préparation (par opérateur, sur une période)

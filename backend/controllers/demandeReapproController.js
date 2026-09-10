@@ -1,6 +1,9 @@
 // backend/controllers/demandeReapproController.js
 import asyncHandler from "../middleware/asyncHandler.js";
 import DemandeReappro from "../models/DemandeReapproModel.js";
+// Réappro LIBRE (scan sans liste, depuis l'app mobile) : autre collection,
+// même écran de suivi.
+import Reappro from "../models/ReaproModel.js";
 import {
   getMagasinArticlesByGisements,
   resolveArticleForReappro,
@@ -163,6 +166,189 @@ const importerProformas = asyncHandler(async (req, res) => {
 });
 
 // @desc    Statistiques de préparation par opérateur (CDC §1)
+// ===========================================================================
+// SUIVI DES RÉAPPROS EN COURS
+// ===========================================================================
+//
+// Deux façons de faire un réappro au collecteur, donc deux collections :
+//   - sur une LISTE poussée depuis le web  -> DemandeReappro (verrou opérateur,
+//     avancement ligne à ligne) ;
+//   - en RÉAPPRO LIBRE, l'agent scanne ce qu'il veut -> Reappro (session de
+//     scan, exportée en .dat à la fin).
+// L'écran de suivi doit montrer LES DEUX : « ce qui est en train de se faire »
+// ne se lit pas dans une seule collection.
+//
+// ⚠️ On ne renvoie JAMAIS les tableaux de lignes : une liste de réappro peut en
+// porter plusieurs centaines. Les horodatages de scan sont la seule chose qu'on
+// remonte du réappro libre, et seulement pour calculer son temps actif.
+
+// Temps ACTIF : somme des intervalles entre deux gestes, silences de plus de
+// PAUSE_MS exclus. Même règle que les statistiques préparateurs — sans elle, une
+// pause déjeuner compterait comme du travail.
+const tempsActifDepuisHorodatages = (dates) => {
+  const t = (dates || [])
+    .filter(Boolean)
+    .map((d) => new Date(d).getTime())
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  let total = 0;
+  for (let i = 1; i < t.length; i += 1) {
+    const delta = t[i] - t[i - 1];
+    if (delta > 0 && delta <= PAUSE_MS) total += delta;
+  }
+  return total;
+};
+
+const msEntre = (debut, fin) => {
+  if (!debut || !fin) return null;
+  const d = new Date(debut).getTime();
+  const f = new Date(fin).getTime();
+  if (!Number.isFinite(d) || !Number.isFinite(f) || f < d) return null;
+  return f - d;
+};
+
+// @desc    Suivi unifié des réappros (listes + réappro libre)
+// @route   GET /api/demande-reappro/:nomDossierDBF/suivi?jours=&etat=
+// @access  Private (demande_reappro, read)
+const getSuiviReappros = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise || {
+    nomDossierDBF: req.params.nomDossierDBF,
+  };
+  const dossier = entreprise.nomDossierDBF;
+
+  // Fenêtre glissante : ces collections ne sont jamais purgées.
+  const jours = parseInt(req.query.jours, 10);
+  const fenetre = Number.isFinite(jours) ? jours : 15;
+  const depuis = fenetre > 0 ? new Date(Date.now() - fenetre * 86400000) : null;
+
+  const filtreDate = depuis ? { createdAt: { $gte: depuis } } : {};
+
+  const [listes, libres] = await Promise.all([
+    DemandeReappro.find({ entreprise: dossier, ...filtreDate })
+      .select(
+        "nom rayon gisement source sourceRef priorite statut nbArticles totalQuantite lignesTraitees tempsActifMs derniereActiviteAt operateur createdAt createdByNom realisedAt realisedByNom transfertFichier",
+      )
+      .sort({ createdAt: -1 })
+      .limit(300)
+      .lean(),
+    Reappro.aggregate([
+      { $match: { nomDossierDBF: dossier, ...filtreDate } },
+      { $sort: { createdAt: -1 } },
+      { $limit: 300 },
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "agent",
+        },
+      },
+      {
+        $project: {
+          nom: 1,
+          status: 1,
+          totalArticles: 1,
+          totalQuantite: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          exportedAt: 1,
+          fichierExport: 1,
+          horodatages: "$lignes.scannedAt",
+          agent: { $arrayElemAt: ["$agent", 0] },
+        },
+      },
+    ]),
+  ]);
+
+  const nomAgent = (u) =>
+    [u?.prenom, u?.nom].filter(Boolean).join(" ") || u?.email || "";
+
+  const lignesListes = listes.map((d) => {
+    const fin = d.realisedAt || null;
+    return {
+      id: String(d._id),
+      type: "liste",
+      libelle:
+        d.nom || d.rayon || d.gisement || d.sourceRef || "Liste de réappro",
+      detail: [d.gisement, d.rayon].filter(Boolean).join(" · "),
+      source: d.source,
+      priorite: d.priorite,
+      statut:
+        d.statut === "realisee"
+          ? "termine"
+          : d.statut === "en_cours"
+            ? "en_cours"
+            : "a_faire",
+      operateur: d.realisedByNom || d.operateur?.nom || "",
+      creePar: d.createdByNom || "",
+      creeLe: d.createdAt,
+      debutAt: d.operateur?.debutAt || null,
+      finAt: fin,
+      derniereActiviteAt: d.derniereActiviteAt || null,
+      nbArticles: d.nbArticles || 0,
+      lignesTraitees: d.lignesTraitees || 0,
+      unites: d.totalQuantite || 0,
+      tempsActifMs: d.tempsActifMs || 0,
+      tempsBrutMs: msEntre(d.operateur?.debutAt, fin || d.derniereActiviteAt),
+      transfertFichier: d.transfertFichier || "",
+    };
+  });
+
+  const lignesLibres = libres.map((r) => {
+    const fin = r.exportedAt || (r.status !== "en_cours" ? r.updatedAt : null);
+    const horod = r.horodatages || [];
+    return {
+      id: String(r._id),
+      type: "libre",
+      libelle: r.nom || "Réappro libre",
+      detail: "",
+      source: "libre",
+      priorite: "",
+      statut: r.status === "en_cours" ? "en_cours" : "termine",
+      operateur: nomAgent(r.agent),
+      creePar: nomAgent(r.agent),
+      creeLe: r.createdAt,
+      debutAt: r.createdAt,
+      finAt: fin,
+      // Le réappro libre n'a pas de compteur d'activité : le dernier scan fait
+      // foi.
+      derniereActiviteAt: horod.length
+        ? new Date(Math.max(...horod.map((d) => new Date(d).getTime())))
+        : null,
+      // Pas de liste préétablie : tout ce qui est scanné EST le travail fait.
+      nbArticles: r.totalArticles || 0,
+      lignesTraitees: r.totalArticles || 0,
+      unites: r.totalQuantite || 0,
+      tempsActifMs: tempsActifDepuisHorodatages(horod),
+      tempsBrutMs: msEntre(r.createdAt, fin),
+      transfertFichier: r.fichierExport || "",
+    };
+  });
+
+  let lignes = [...lignesListes, ...lignesLibres].sort(
+    (a, b) => new Date(b.creeLe) - new Date(a.creeLe),
+  );
+
+  const etat = String(req.query.etat || "").trim();
+  if (["a_faire", "en_cours", "termine"].includes(etat)) {
+    lignes = lignes.filter((l) => l.statut === etat);
+  } else if (etat === "actif") {
+    lignes = lignes.filter((l) => l.statut !== "termine");
+  }
+
+  const totaux = lignes.reduce(
+    (acc, l) => {
+      acc[l.statut] += 1;
+      acc[l.type] += 1;
+      acc.lignes += l.lignesTraitees;
+      acc.unites += l.unites;
+      return acc;
+    },
+    { a_faire: 0, en_cours: 0, termine: 0, liste: 0, libre: 0, lignes: 0, unites: 0 },
+  );
+
+  res.json({ fenetreJours: fenetre, seuilPauseMs: PAUSE_MS, totaux, lignes });
+});
 // @route   GET /api/demande-reappro/:nomDossierDBF/stats
 // @query   debut, fin (AAAA-MM-JJ) — défaut : 30 derniers jours
 // @access  Private — module demande_reappro (read) + accès entreprise
@@ -765,6 +951,7 @@ export {
   getDemandeById,
   importerProformas,
   getStatsPreparateurs,
+  getSuiviReappros,
   updateDemande,
   updateUrgence,
   deleteDemande,

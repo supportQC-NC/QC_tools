@@ -19,11 +19,15 @@ import {
   useGetDemandesBipageQuery,
   useCreateDemandeBipageProformaMutation,
   useCreateDemandeBipageGisementMutation,
+  useCreateDemandeBipageGroupeMutation,
   useCreateDemandeBipagePanierMutation,
   useLazyGetArticleBipageQuery,
   useDeleteDemandeBipageMutation,
 } from "../../slices/demandeBipageApiSlice";
 import { BASE_URL } from "../../constants";
+// Même sélecteur que le générateur d'étiquettes : chez QC il y a des centaines
+// de gisements et de groupes, une grille de puces est inutilisable.
+import SelecteurMultiple from "../../components/common/SelecteurMultiple/SelecteurMultiple";
 import "./AdminDemandesBipageScreen.css";
 
 const PRIORITE_LABEL = { urgent: "Urgent", a_faire: "À faire", normal: "Normal" };
@@ -32,7 +36,12 @@ const STATUT_LABEL = {
   en_cours: "En cours",
   realisee: "Réalisée",
 };
-const SOURCE_LABEL = { proforma: "Proforma", gisement: "Gisement", manuel: "Manuelle" };
+const SOURCE_LABEL = {
+  proforma: "Proforma",
+  gisement: "Gisement",
+  groupe: "Groupe",
+  manuel: "Manuelle",
+};
 
 const fmtDate = (d) =>
   d
@@ -45,7 +54,7 @@ const fmtDate = (d) =>
 const AdminDemandesBipageScreen = () => {
   const nomDossierDBF = useSelector(selectGlobalDossier) || "";
 
-  const [source, setSource] = useState("gisement"); // gisement | proforma | manuel
+  const [source, setSource] = useState("gisement"); // gisement | groupe | proforma | manuel
   const [priorite, setPriorite] = useState("a_faire");
   const [commentaire, setCommentaire] = useState("");
   const [feedback, setFeedback] = useState(null); // {tone, message}
@@ -55,6 +64,12 @@ const AdminDemandesBipageScreen = () => {
   // Sources
   const [gism1List, setGism1List] = useState([]);
   const [gisSel, setGisSel] = useState(new Set());
+  const [groupeList, setGroupeList] = useState([]);
+  const [grpSel, setGrpSel] = useState(new Set());
+  // Un groupe entier peut compter des milliers de références : par défaut on ne
+  // retient que celles qui ont du stock, sinon la demande est inexploitable sur
+  // un collecteur.
+  const [avecStock, setAvecStock] = useState(true);
   const [proformas, setProformas] = useState([]);
   const [numpro, setNumpro] = useState("");
   const [nartInput, setNartInput] = useState("");
@@ -71,10 +86,11 @@ const AdminDemandesBipageScreen = () => {
 
   const [creerProforma, { isLoading: cP }] = useCreateDemandeBipageProformaMutation();
   const [creerGisement, { isLoading: cG }] = useCreateDemandeBipageGisementMutation();
+  const [creerGroupe, { isLoading: cGr }] = useCreateDemandeBipageGroupeMutation();
   const [creerPanier, { isLoading: cM }] = useCreateDemandeBipagePanierMutation();
   const [resolveArticle] = useLazyGetArticleBipageQuery();
   const [deleteDemande] = useDeleteDemandeBipageMutation();
-  const creating = cP || cG || cM;
+  const creating = cP || cG || cGr || cM;
 
   const showMsg = (message, tone = "info") => {
     setFeedback({ message, tone });
@@ -84,19 +100,27 @@ const AdminDemandesBipageScreen = () => {
   // Réinitialise à chaque changement de société.
   useEffect(() => {
     setGisSel(new Set());
+    setGrpSel(new Set());
     setPanier([]);
     setNumpro("");
     setNartInput("");
     setProformas([]);
     setGism1List([]);
+    setGroupeList([]);
   }, [nomDossierDBF]);
 
   // Charge la liste des gisements (GISM1) et des proformas à préparer.
   const loadSources = useCallback(async () => {
     if (!nomDossierDBF) return;
     try {
-      const [g, p] = await Promise.all([
+      // Pas de `?vide=1` : une demande « Groupe VIDE » n'aurait pas de sens
+      // pour l'agent (ce sont les articles auxquels l'ERP n'a attribué aucun
+      // code, pas un rayon où aller).
+      const [g, gr, p] = await Promise.all([
         fetch(`${BASE_URL}/api/articles/${nomDossierDBF}/gism1`, {
+          credentials: "include",
+        }).then((r) => (r.ok ? r.json() : null)),
+        fetch(`${BASE_URL}/api/articles/${nomDossierDBF}/groupes`, {
           credentials: "include",
         }).then((r) => (r.ok ? r.json() : null)),
         fetch(`${BASE_URL}/api/preparations/a-preparer/${nomDossierDBF}`, {
@@ -104,6 +128,7 @@ const AdminDemandesBipageScreen = () => {
         }).then((r) => (r.ok ? r.json() : null)),
       ]);
       setGism1List(Array.isArray(g?.gism1) ? g.gism1 : []);
+      setGroupeList(Array.isArray(gr?.groupes) ? gr.groupes : []);
       const prof = p?.proformas || p?.items || p?.data || (Array.isArray(p) ? p : []);
       setProformas(Array.isArray(prof) ? prof : []);
     } catch {
@@ -134,12 +159,15 @@ const AdminDemandesBipageScreen = () => {
   }, [demandes, filtre, search]);
 
   // ── Actions création ────────────────────────────────────────────────────────
-  const toggleGis = (code) =>
-    setGisSel((prev) => {
+  const basculer = (setter) => (code) =>
+    setter((prev) => {
       const n = new Set(prev);
-      n.has(code) ? n.delete(code) : n.add(code);
+      if (n.has(code)) n.delete(code);
+      else n.add(code);
       return n;
     });
+  const toggleGis = basculer(setGisSel);
+  const toggleGrp = basculer(setGrpSel);
 
   const addNart = async () => {
     const nart = nartInput.trim();
@@ -167,6 +195,15 @@ const AdminDemandesBipageScreen = () => {
       } else if (source === "gisement") {
         if (gisSel.size === 0) return showMsg("Sélectionnez au moins un gisement.", "error");
         res = await creerGisement({ nomDossierDBF, gisements: [...gisSel], priorite, commentaire }).unwrap();
+      } else if (source === "groupe") {
+        if (grpSel.size === 0) return showMsg("Sélectionnez au moins un groupe.", "error");
+        res = await creerGroupe({
+          nomDossierDBF,
+          groupes: [...grpSel],
+          avecStockSeulement: avecStock,
+          priorite,
+          commentaire,
+        }).unwrap();
       } else {
         if (panier.length === 0) return showMsg("Ajoutez au moins un article.", "error");
         res = await creerPanier({
@@ -178,8 +215,20 @@ const AdminDemandesBipageScreen = () => {
       }
       const n = res?.crees ?? 0;
       const ign = res?.ignores?.length ? ` (${res.ignores.length} déjà en demande)` : "";
-      showMsg(`${n} demande(s) créée(s)${ign}.`, "success");
+      // Un groupe sans aucun article à biper ne crée rien : le dire, sinon
+      // « 0 demande créée » ressemble à une panne.
+      const vid = res?.vides?.length
+        ? ` (${res.vides.length} sans article à biper)`
+        : "";
+      // Le nombre d'ARTICLES compte autant que le nombre de demandes : un
+      // groupe large peut en produire des milliers, autant le voir tout de
+      // suite (la demande est supprimable d'un clic si c'est trop).
+      const arts = res?.totalArticles
+        ? ` — ${res.totalArticles.toLocaleString("fr-FR")} article(s) à biper`
+        : "";
+      showMsg(`${n} demande(s) créée(s)${ign}${vid}${arts}.`, "success");
       setGisSel(new Set());
+      setGrpSel(new Set());
       setPanier([]);
       setNumpro("");
       setCommentaire("");
@@ -230,7 +279,7 @@ const AdminDemandesBipageScreen = () => {
         <div className="db-card-head">
           <h2>Nouvelle demande de bipage</h2>
           <div className="db-source-tabs">
-            {["gisement", "proforma", "manuel"].map((s) => (
+            {["gisement", "groupe", "proforma", "manuel"].map((s) => (
               <button
                 key={s}
                 className={`db-tab ${source === s ? "on" : ""}`}
@@ -245,22 +294,62 @@ const AdminDemandesBipageScreen = () => {
         {/* Source : GISEMENT */}
         {source === "gisement" && (
           <div className="db-source-body">
-            <p className="db-hint">Sélectionnez un ou plusieurs gisements (une demande par gisement).</p>
-            <div className="db-gis-grid">
-              {gism1List.length === 0 ? (
-                <span className="db-muted">Aucun gisement chargé.</span>
-              ) : (
-                gism1List.map((g) => (
-                  <button
-                    key={g.code}
-                    className={`db-gis-chip ${gisSel.has(g.code) ? "on" : ""}`}
-                    onClick={() => toggleGis(g.code)}
-                  >
-                    {g.code} <span className="db-gis-count">{g.count}</span>
-                  </button>
-                ))
-              )}
-            </div>
+            <p className="db-hint">
+              Sélectionnez un ou plusieurs gisements — <b>une demande par
+              gisement</b>, pour que deux agents puissent se partager le travail.
+            </p>
+            <SelecteurMultiple
+              key={`gis-${nomDossierDBF}`}
+              items={gism1List}
+              selected={[...gisSel]}
+              onToggle={toggleGis}
+              onClear={() => setGisSel(new Set())}
+              placeholder="Rechercher et sélectionner un ou plusieurs gisements…"
+            />
+            {gisSel.size > 0 && (
+              <span className="db-hint">
+                {gisSel.size} gisement(s) sélectionné(s) → {gisSel.size} demande(s).
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Source : GROUPE (famille d'articles) */}
+        {source === "groupe" && (
+          <div className="db-source-body">
+            <p className="db-hint">
+              Sélectionnez un ou plusieurs groupes d'articles — <b>une demande par
+              groupe</b>, comme pour les gisements.
+            </p>
+            <SelecteurMultiple
+              key={`grp-${nomDossierDBF}`}
+              items={groupeList}
+              selected={[...grpSel]}
+              onToggle={toggleGrp}
+              onClear={() => setGrpSel(new Set())}
+              placeholder="Rechercher et sélectionner un ou plusieurs groupes…"
+            />
+            <label className="db-check">
+              <input
+                type="checkbox"
+                checked={avecStock}
+                onChange={(e) => setAvecStock(e.target.checked)}
+              />
+              <span>
+                Seulement les articles en stock
+                <em>
+                  {" "}
+                  — recommandé : un groupe entier compte souvent des milliers de
+                  références jamais entrées en stock.
+                </em>
+              </span>
+            </label>
+            {grpSel.size > 0 && (
+              <span className="db-hint">
+                {grpSel.size} groupe(s) sélectionné(s) → {grpSel.size} demande(s).
+                Le nombre d'articles réellement retenus est affiché après création.
+              </span>
+            )}
           </div>
         )}
 

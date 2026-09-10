@@ -130,19 +130,41 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  gap: 6px;
+  /* Plus un carré anonyme : le bouton porte son mot et se distingue des autres
+     icônes de la barre. Il garde une largeur minimale pour rester cliquable au
+     doigt quand le texte disparaît. */
+  min-width: 28px;
   height: 28px;
+  padding: 0 9px;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
   transition: all 0.2s;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .btn-logout svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Sous 900 px (tablette du magasin, écran du collecteur) le mot passe à la
+   trappe : l'icône seule reprend sa place, le `title` reste. */
+@media (max-width: 900px) {
+  .btn-logout {
+    padding: 0;
+    width: 28px;
+  }
+
+  .btn-logout-txt {
+    display: none;
+  }
 }
 
 .btn-logout:hover {

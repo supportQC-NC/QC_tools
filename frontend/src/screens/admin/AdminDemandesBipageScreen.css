@@ -205,3 +205,27 @@
   color: var(--danger); cursor: pointer; border-radius: 6px;
 }
 .db-del:hover { background: rgba(255,107,107,0.12); }
+
+/* Case « seulement les articles en stock » de la source Groupe. */
+.db-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.db-check input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.db-check em {
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+/* Les puces de gisement ont laissé place au sélecteur recherchable partagé
+   (components/common/SelecteurMultiple) : à plusieurs centaines de codes, une
+   grille de puces ne se parcourt pas. Les règles .db-gis-* restent pour le
+   tableau de suivi, qui affiche encore le code de la source. */

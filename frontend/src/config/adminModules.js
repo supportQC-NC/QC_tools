@@ -106,7 +106,9 @@ export const PATH_MODULE_MAP = [
   { path: "/historique-pachat", key: "historique_pachat" },
   { path: "/reception-manuelle", key: "reception_manuelle" },
   { path: "/preparation-manuelle", key: "prep_commande_manuelle" },
+  { path: "/admin/suivi-preparation", key: "prep_commande_manuelle" },
   { path: "/demandes-reappro", key: "demande_reappro" },
+  { path: "/admin/suivi-reappro", key: "demande_reappro" },
   { path: "/mailing", key: "mailing" },
   { path: "/communication-client", key: "communication_client" },
   { path: "/assistant-ia", key: "assistant_ia" },
@@ -127,6 +129,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/agents-inventaire", key: "inventaire" },
   { path: "/admin/bipages", key: "bipage" },
   { path: "/admin/demandes-bipage", key: "bipage" },
+  { path: "/admin/suivi-demandes-bipage", key: "bipage" },
   { path: "/admin/reappros", key: "reapro" },
   { path: "/admin/envoi-cde-fournisseur", key: "envoi_cde_fournisseur" },
   // Commerciaux (accès global unique)

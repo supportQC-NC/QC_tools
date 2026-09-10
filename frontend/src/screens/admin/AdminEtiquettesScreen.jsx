@@ -28,6 +28,9 @@ import {
   useDeleteEtiquetteTemplateMutation,
 } from "../../slices/etiquetteTemplateApiSlice";
 import { BASE_URL } from "../../constants";
+// Sélecteur multiple recherchable : mis au point ici, désormais PARTAGÉ
+// (les demandes de bipage s'en servent pour les mêmes listes gisement/groupe).
+import SelecteurMultiple from "../../components/common/SelecteurMultiple/SelecteurMultiple";
 import CustomEtiquetteDesigner from "../../components/Admin/CustomEtiquetteDesigner";
 import "./AdminEtiquettesScreen.css";
 
@@ -79,148 +82,6 @@ const LABEL_TYPES = [
     desc: "Vous choisissez la taille (cm/px), écrivez et placez votre texte. Plusieurs par feuille A4 si ça rentre.",
   },
 ];
-
-/**
- * Menu déroulant recherchable à sélection multiple ({ code, count }).
- * Réutilisé pour les gisements (GISM1) et les groupes/familles (GROUPE).
- */
-const SearchableMultiSelect = ({
-  items,
-  selected,
-  onToggle,
-  onClear,
-  loading,
-  placeholder,
-}) => {
-  const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (boxRef.current && !boxRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const q = search.trim().toLowerCase();
-  // La recherche porte sur le libelle affiche : taper « vide » doit trouver
-  // l'entree des articles sans groupe / sans gisement.
-  const filtered = (items || []).filter((g) =>
-    libelleCode(g.code).toLowerCase().includes(q),
-  );
-
-  return (
-    <div className="etiq-gism1" ref={boxRef}>
-      <div className="etiq-gism1-control" onClick={() => setOpen(true)}>
-        {selected.length === 0 && !search && (
-          <span className="etiq-gism1-placeholder">{placeholder}</span>
-        )}
-        {selected.map((code) => (
-          <span
-            key={code}
-            className={`etiq-gism1-chip ${code === CODE_VIDE ? "etiq-chip-vide" : ""}`}
-          >
-            {libelleCode(code)}
-            <button
-              type="button"
-              className="etiq-gism1-chip-x"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle(code);
-              }}
-              aria-label={`Retirer ${libelleCode(code)}`}
-            >
-              <HiX />
-            </button>
-          </span>
-        ))}
-        <input
-          className="etiq-gism1-search"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder={selected.length ? "Ajouter…" : ""}
-          onKeyDown={(e) => {
-            // Retour arrière sur une recherche vide : retire la dernière puce.
-            // Geste attendu d'un champ à puces, et une sortie de plus quand on
-            // s'est trompé d'un seul code.
-            if (e.key === "Backspace" && !search && selected.length) {
-              onToggle(selected[selected.length - 1]);
-            }
-          }}
-        />
-
-        {/* Vider la sélection d'un coup : à 30 gisements cochés, les retirer un
-            par un n'est pas une option. */}
-        {selected.length > 0 && (
-          <button
-            type="button"
-            className="etiq-gism1-clear"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSearch("");
-              onClear?.();
-            }}
-            title={`Tout effacer (${selected.length})`}
-            aria-label="Tout effacer"
-          >
-            <HiX /> Tout effacer
-          </button>
-        )}
-      </div>
-
-      {open && (
-        <div className="etiq-gism1-menu">
-          {loading ? (
-            <div className="etiq-gism1-empty">Chargement</div>
-          ) : filtered.length === 0 ? (
-            <div className="etiq-gism1-empty">
-              {search ? "Aucun résultat correspondant" : "Aucune valeur disponible"}
-            </div>
-          ) : (
-            filtered.map((g) => {
-              const checked = selected.includes(g.code);
-              return (
-                <button
-                  type="button"
-                  key={g.code}
-                  className={`etiq-gism1-option ${checked ? "checked" : ""} ${
-                    g.code === CODE_VIDE ? "etiq-option-vide" : ""
-                  }`}
-                  onClick={() => onToggle(g.code)}
-                  title={
-                    g.code === CODE_VIDE
-                      ? "Articles auxquels aucun code n'est attribue dans l'ERP"
-                      : undefined
-                  }
-                >
-                  <span className="etiq-gism1-check">{checked ? "✓" : ""}</span>
-                  <span className="etiq-gism1-code">{libelleCode(g.code)}</span>
-                  <span className="etiq-gism1-count">
-                    {g.count} article{g.count > 1 ? "s" : ""}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Code réservé renvoyé par l'API pour « les articles SANS groupe / SANS
-// gisement » (backend : articleService.CODE_VIDE). Il est affiche « VIDE »
-// partout : l'utilisateur ne doit jamais voir la valeur technique.
-const CODE_VIDE = "__VIDE__";
-const libelleCode = (code) => (code === CODE_VIDE ? "VIDE" : code);
 
 const AdminEtiquettesScreen = () => {
   const { data: entreprises, isLoading: loadingEntreprises } =
@@ -784,7 +645,7 @@ const AdminEtiquettesScreen = () => {
         {mode === "gism1" && (
           <div className="etiq-field">
             <label className="etiq-label">Gisement(s) GISM1</label>
-            <SearchableMultiSelect
+            <SelecteurMultiple
               key={`gism1-${nomDossierDBF || ""}`}
               items={gism1Data?.gism1}
               selected={selectedGism1}
@@ -804,7 +665,7 @@ const AdminEtiquettesScreen = () => {
         {mode === "groupe" && (
           <div className="etiq-field">
             <label className="etiq-label">Groupe(s) / Famille(s)</label>
-            <SearchableMultiSelect
+            <SelecteurMultiple
               key={`groupe-${nomDossierDBF || ""}`}
               items={groupeData?.groupes}
               selected={selectedGroupe}

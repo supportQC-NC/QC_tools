@@ -54,6 +54,9 @@ import AssistantIAScreen from "./screens/user/AssistantIAScreen";
 import VeilleScreen from "./screens/user/VeilleScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminSuiviBipageScreen from "./screens/admin/AdminSuiviBipageScreen";
+import AdminSuiviDemandesBipageScreen from "./screens/admin/AdminSuiviDemandesBipageScreen";
+import AdminSuiviReapproScreen from "./screens/admin/AdminSuiviReapproScreen";
+import AdminSuiviPreparationScreen from "./screens/admin/AdminSuiviPreparationScreen";
 import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
@@ -234,11 +237,19 @@ const router = createBrowserRouter(
           path="/preparation-manuelle"
           element={<PreparationManuelleScreen />}
         />
+        {/* Suivi unifié : préparations au collecteur + fiches papier marquées
+            « préparées ». Le module manuel suffit à l'ouvrir. */}
+        <Route
+          path="/admin/suivi-preparation"
+          element={<AdminSuiviPreparationScreen />}
+        />
       </Route>
 
       {/* Gestion · Listes de réappro -> module "demande_reappro" */}
       <Route element={<ModuleRoute module="demande_reappro" />}>
         <Route path="/demandes-reappro" element={<ListesReapproScreen />} />
+        {/* Suivi unifié : listes préparées au collecteur + réappros libres. */}
+        <Route path="/admin/suivi-reappro" element={<AdminSuiviReapproScreen />} />
       </Route>
 
       {/* Gestion · Historique prix d'achat -> module "historique_pachat" */}
@@ -441,6 +452,13 @@ const router = createBrowserRouter(
       {/* Données · Bipages (demandes) + Inventaire Zones · Détail des bipages -> module "bipage" */}
       <Route element={<ModuleRoute module="bipage" />}>
         <Route path="/admin/demandes-bipage" element={<AdminDemandesBipageScreen />} />
+        {/* Suivi du bipage TERRAIN (demandes envoyées aux collecteurs). Le
+            suivi du bipage d'INVENTAIRE est /admin/suivi-bipage, module
+            « inventaire » : deux cycles de vie différents. */}
+        <Route
+          path="/admin/suivi-demandes-bipage"
+          element={<AdminSuiviDemandesBipageScreen />}
+        />
         <Route path="/admin/bipages" element={<AdminBipagesScreen />} />
       </Route>
 

@@ -3,9 +3,11 @@ import express from "express";
 import {
   createDemandeProforma,
   createDemandeGisement,
+  createDemandeGroupe,
   createDemandePanier,
   getArticleBipage,
   getDemandes,
+  getSuivi,
   getDemandeById,
   deleteDemande,
   getMobileDemandes,
@@ -52,8 +54,19 @@ router.post(
   protect, canWrite, checkEntrepriseAccess, createDemandeGisement,
 );
 router.post(
+  "/:nomDossierDBF/groupe",
+  protect, canWrite, checkEntrepriseAccess, createDemandeGroupe,
+);
+router.post(
   "/:nomDossierDBF/panier",
   protect, canWrite, checkEntrepriseAccess, createDemandePanier,
+);
+
+// Suivi (scopé entreprise) — AVANT la route « liste », sinon « suivi » serait
+// lu comme un nomDossierDBF.
+router.get(
+  "/:nomDossierDBF/suivi",
+  protect, canRead, checkEntrepriseAccess, getSuivi,
 );
 
 // Liste (scopée entreprise)

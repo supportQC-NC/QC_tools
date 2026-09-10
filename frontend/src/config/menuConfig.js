@@ -74,6 +74,7 @@ export const adminMenuStructure = [
       // « Bipages » tout court se confondait avec « Détail des bipages » (les
       // lignes lues) : ici on CRÉE les demandes envoyées aux collecteurs.
       { label: "Demandes de bipage", path: "/admin/demandes-bipage", icon: HiClipboardList },
+      { label: "Suivi bipage terrain", path: "/admin/suivi-demandes-bipage", icon: HiClipboardCheck },
       { label: "Suivi Réceptions", path: "/admin/suivi-receptions", icon: HiClipboardCheck },
       { label: "Suivi des entrées", path: "/admin/suivi-entrees", icon: HiTruck },
       { label: "Entrées sur réservation", path: "/admin/resa-entrees", icon: HiClipboardCheck },
@@ -178,7 +179,10 @@ export const moduleMenuStructure = [
         icon: HiViewGrid,
       },
       {
-        label: "Suivi bipage",
+        // « Suivi bipage » tout court se confondait avec le bipage TERRAIN
+        // (demandes envoyées aux collecteurs) : celui-ci suit le comptage
+        // d'INVENTAIRE par zone et se vide à chaque réinitialisation.
+        label: "Suivi bipage inventaire",
         path: "/admin/suivi-bipage",
         icon: HiClock,
       },
@@ -234,6 +238,12 @@ export const moduleMenuStructure = [
         path: "/demandes-reappro",
         icon: HiClipboardList,
       },
+      {
+        moduleKey: "demande_reappro",
+        label: "Suivi des réappros",
+        path: "/admin/suivi-reappro",
+        icon: HiClock,
+      },
     ],
   },
   {
@@ -247,6 +257,12 @@ export const moduleMenuStructure = [
         label: "Préparation manuelle",
         path: "/preparation-manuelle",
         icon: HiClipboardList,
+      },
+      {
+        moduleKey: "prep_commande_manuelle",
+        label: "Suivi des préparations",
+        path: "/admin/suivi-preparation",
+        icon: HiClock,
       },
     ],
   },
@@ -687,6 +703,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
   "/reception-manuelle":
     "Imprimer les fiches de contrôle papier des commandes à réceptionner.",
+  "/admin/suivi-preparation":
+    "Préparations en cours et terminées : au collecteur ET fiches papier marquées « préparées ».",
   "/preparation-manuelle":
     "Imprimer les fiches de préparation papier des proformas à préparer (dock puis magasin).",
   "/admin/frequentation":
@@ -703,7 +721,9 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/inventaire-progression": "Progression de l'inventaire en cours.",
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
   "/admin/suivi-bipage":
-    "Qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
+    "INVENTAIRE : qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
+  "/admin/suivi-demandes-bipage":
+    "TERRAIN : ce que les collecteurs ont bipé sur les demandes envoyées depuis le web.",
   "/admin/agents-inventaire":
     "Toutes les personnes ayant travaillé sur l'inventaire : zones, coupons, temps.",
   "/admin/fiches-controle": "Fiches de contrôle d'inventaire.",
@@ -725,6 +745,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/analyse-reappro": "Analyse des réapprovisionnements.",
   "/demandes-reappro":
     "Listes de réappro à préparer : urgence, avancement et création manuelle.",
+  "/admin/suivi-reappro":
+    "Réappros en cours et terminés au collecteur : listes ET réappros libres.",
   "/admin/debit-comptant": "Répartition débit / comptant.",
   "/admin/gencod-doublons": "Détection des doublons de gencode.",
   "/admin/derniere-facturation":
@@ -876,14 +898,19 @@ const DOSSIER_TERRAIN = [
     parent: "terrain",
     // Listes de réappro = création des demandes (envoyées au collecteur) ET
     // suivi des listes en cours / terminées, avec les statistiques préparateurs.
-    items: ["/demandes-reappro", "/admin/analyse-reappro", "/admin/reappro-local"],
+    items: [
+      "/demandes-reappro",
+      "/admin/suivi-reappro",
+      "/admin/analyse-reappro",
+      "/admin/reappro-local",
+    ],
   },
   {
     key: "terrain_prepa",
     label: "Préparation de commande",
     icon: "cube",
     parent: "terrain",
-    items: ["/preparation-manuelle"],
+    items: ["/preparation-manuelle", "/admin/suivi-preparation"],
   },
   {
     key: "terrain_reception",
@@ -897,9 +924,13 @@ const DOSSIER_TERRAIN = [
     label: "Bipage",
     icon: "device",
     parent: "terrain",
-    // Demandes de bipage = ce qui part vers l'app mobile ; Suivi bipage = qui
-    // bipe quoi, en cours et terminé ; Détail des bipages = les lignes lues.
-    items: ["/admin/demandes-bipage", "/admin/suivi-bipage", "/admin/bipages"],
+    // UNIQUEMENT le bipage terrain (app mobile) : les demandes envoyées aux
+    // collecteurs, et le suivi de ce qu'ils ont rendu.
+    // ⚠️ Ni « /admin/suivi-bipage » ni « /admin/bipages » : ces deux-là suivent
+    // le comptage d'INVENTAIRE par zone et se vident à chaque réinitialisation
+    // d'inventaire. Ils appartiennent au chapitre « Inventaire Zones » et n'en
+    // bougent pas — c'est un autre module, un autre cycle de vie.
+    items: ["/admin/demandes-bipage", "/admin/suivi-demandes-bipage"],
   },
 ];
 

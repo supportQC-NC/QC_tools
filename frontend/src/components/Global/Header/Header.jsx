@@ -95,13 +95,18 @@ const Header = () => {
             </span>
           </div>
         </Link>
+        {/* Icône SEULE, l'ancien bouton se confondait avec les autres carrés
+            de la barre : on écrit le mot à côté (masqué sous 900 px, où la
+            place manque — le title reste). */}
         <button
           className="btn-logout"
           onClick={handleLogout}
           disabled={isLoading}
-          title="Déconnexion"
+          title="Se déconnecter"
+          aria-label="Se déconnecter"
         >
-           <HiLogout /> 
+          <HiLogout />
+          <span className="btn-logout-txt">Déconnexion</span>
         </button>
       </div>
     </header>
