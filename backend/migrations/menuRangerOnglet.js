@@ -7,6 +7,10 @@
 //
 //   node backend/migrations/menuRangerOnglet.js <path> <dossier> [--apres=<path>] [--dry]
 //
+// Mode retrait (écran supprimé de l'application) — le dossier n'est pas requis,
+// et un dossier laissé vide disparaît :
+//   node backend/migrations/menuRangerOnglet.js <path> --retirer [--dry]
+//
 // <dossier> est cherché sur le LIBELLÉ du dossier (insensible à la casse et aux
 // accents), puis sur sa clé. Sans effet si l'onglet est déjà rangé quelque part :
 // on ne déplace jamais ce que l'utilisateur a rangé lui-même.
@@ -19,9 +23,10 @@ const args = process.argv.slice(2);
 const DRY = args.includes("--dry");
 const apresArg = args.find((a) => a.startsWith("--apres="));
 const APRES = apresArg ? apresArg.split("=")[1] : "";
+const RETIRER = args.includes("--retirer");
 const [PATH, DOSSIER] = args.filter((a) => !a.startsWith("--"));
 
-if (!PATH || !DOSSIER) {
+if (!PATH || (!DOSSIER && !RETIRER)) {
   console.error(
     "Usage : node backend/migrations/menuRangerOnglet.js <path> <dossier> [--apres=<path>] [--dry]",
   );
@@ -36,7 +41,33 @@ const norm = (v) =>
     .toLowerCase()
     .trim();
 
+// Retrait d'un onglet : on le sort de tous les dossiers, et un dossier qui se
+// retrouve vide est supprimé — sinon le constructeur de menu affiche une carte
+// vide que personne ne comprend.
+const retirer = (chapitres) => {
+  const actions = [];
+  (chapitres || []).forEach((c) => {
+    if (!(c.items || []).includes(PATH)) return;
+    c.items = c.items.filter((p) => p !== PATH);
+    actions.push(`« ${c.label} » : retrait de ${PATH}`);
+  });
+  const vides = (chapitres || []).filter(
+    (c) =>
+      (c.items || []).length === 0 &&
+      !(chapitres || []).some((x) => x.parent === c.key),
+  );
+  vides.forEach((c) => {
+    const i = chapitres.indexOf(c);
+    if (i >= 0) {
+      chapitres.splice(i, 1);
+      actions.push(`« ${c.label} » : dossier vide supprimé`);
+    }
+  });
+  return actions.length ? actions.join(" · ") : null;
+};
+
 const corriger = (chapitres) => {
+  if (RETIRER) return retirer(chapitres);
   const dejaRange = (chapitres || []).some((c) => (c.items || []).includes(PATH));
   if (dejaRange) return null;
   const cible = (chapitres || []).find(
@@ -57,7 +88,7 @@ if (!global) {
   console.log("Menu global : aucun document (c'est le défaut du code qui sert).");
 } else {
   const action = corriger(global.chapitres);
-  if (!action) console.log("Menu global : onglet déjà rangé, rien à faire.");
+  if (!action) console.log("Menu global : rien à faire.");
   else {
     console.log("  Menu global →", action);
     if (!DRY && !action.startsWith("dossier")) {

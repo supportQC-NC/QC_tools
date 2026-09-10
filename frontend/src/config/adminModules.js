@@ -14,7 +14,10 @@ export const MODULE_GROUPS = {
 };
 
 export const PERMISSION_MODULES = [
-  { key: "stock", label: "Recherche Article", group: "gestion" },
+  // Le libellé ne dit plus « Recherche Article » : l'écran web du même nom a
+  // été retiré le 10/09/2026. Le module gouverne désormais Données ▸ Articles
+  // et ▸ Fournisseurs, ainsi que la recherche article de l'app mobile.
+  { key: "stock", label: "Articles & stock", group: "gestion" },
   { key: "inventaire", label: "Inventaire", group: "gestion" },
   { key: "reapro", label: "Reapro", group: "gestion" },
   { key: "demande_reappro", label: "Listes de réappro", group: "gestion" },

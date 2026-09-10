@@ -120,33 +120,15 @@ export const adminMenuStructure = [
 ];
 
 // Structure des menus MODULES avec sous-groupes
+// ⚠️ L'écran « Recherche Article » (/articles) a été RETIRÉ de l'application
+// web le 10/09/2026 (décision client), et avec lui le chapitre « Stock » qui ne
+// portait que lui. Ce qui reste, et qu'il ne faut pas supprimer :
+//   - Données ▸ Articles et Données ▸ Fournisseurs, qui dépendent du même
+//     module de permission `stock` ;
+//   - la recherche article de l'APP MOBILE, servie par les mêmes routes
+//     /api/articles et gardée par ce module.
+// Autrement dit : c'est l'écran web qui part, pas le module.
 export const moduleMenuStructure = [
-  {
-    type: "subgroup",
-    label: "Stock",
-    icon: HiCube,
-    collapsible: true,
-    items: [
-      {
-        moduleKey: "stock",
-        label: "Recherche Article",
-        path: "/articles",
-        icon: HiSearch,
-      },
-      // {
-      //   moduleKey: "proforma",
-      //   label: "Recherche Proforma",
-      //   path: "/proformas",
-      //   icon: HiSearch,
-      // },
-      // {
-      //   moduleKey: "reapro",
-      //   label: "Réappro",
-      //   path: "/reappro",
-      //   icon: HiRefresh,
-      // },
-    ],
-  },
   {
     type: "subgroup",
     label: "Inventaire Zones",
@@ -368,11 +350,6 @@ export const moduleMenuStructure = [
 
 // Ancienne structure plate pour compatibilité (moduleMenus)
 export const moduleMenus = {
-  stock: {
-    label: "Recherche Article",
-    path: "/articles",
-    icon: HiSearch,
-  },
   proformas: {
     label: "Proformas",
     path: "/proformas",
@@ -688,7 +665,6 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/concurrents": "Relevés et suivi des prix concurrents.",
   "/install": "Installer l'application mobile (QR code).",
   // Données
-  "/articles": "Rechercher un article (stock, prix, gencode).",
   "/admin/articles": "Rechercher et consulter les articles.",
   "/admin/fournisseurs": "Consulter les fournisseurs.",
   "/admin/clients": "Consulter les clients.",

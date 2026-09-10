@@ -67,7 +67,6 @@ import AdminTopVentesScreen from "./screens/admin/AdminTopVentesScreen";
 import AdminInfobullesScreen from "./screens/admin/AdminInfobullesScreen";
 import AdminSmtpScreen from "./screens/admin/AdminSmtpScreen";
 
-import ArticleSearch from "./screens/user/UserArticleSearch";
 import InventaireScreen from "./screens/user/UserInventaire";
 import UserReappro from "./screens/user/UserReappro";
 import ReleveScreen from "./screens/user/RelevesScreen";
@@ -138,7 +137,6 @@ const router = createBrowserRouter(
             est rattaché à un code vendeur (voir AccueilRoute). */}
         <Route path="/" element={<AccueilRoute />} />
         <Route path="/profile" element={<ProfileScreen />} />
-        <Route path="/articles" element={<ArticleSearch />} />
         <Route path="/inventaire" element={<InventaireScreen />} />
         <Route path="/proformas" element={<UserProformasScreen />} />
         <Route path="/reappro" element={<UserReappro />} />
