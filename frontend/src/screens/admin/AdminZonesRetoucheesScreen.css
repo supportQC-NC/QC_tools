@@ -1,4 +1,9 @@
-/* Classement des zones retouchées. S'appuie sur la feuille du tableau de bord
+/* Coque des écrans de LISTING de zones — partagée par « Zones les plus
+   retouchées » et « Écarts de stock par zone ». Le préfixe `zr-` est resté
+   celui du premier des deux ; les deux listings doivent se ressembler, d'où
+   une seule feuille plutôt qu'une copie.
+
+   S'appuie sur la feuille du tableau de bord
    (`.invd-*`) pour l'en-tête, les tableaux et les couleurs ; n'ajoute ici que
    ce qui lui est propre, sous le préfixe `zr-`.
 

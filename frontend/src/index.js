@@ -61,6 +61,7 @@ import AdminSuiviPreparationScreen from "./screens/admin/AdminSuiviPreparationSc
 import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
 import AdminInventaireDashboardScreen from "./screens/admin/AdminInventaireDashboardScreen";
 import AdminZonesRetoucheesScreen from "./screens/admin/AdminZonesRetoucheesScreen";
+import AdminEcartsZonesScreen from "./screens/admin/AdminEcartsZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
@@ -440,6 +441,12 @@ const router = createBrowserRouter(
         <Route
           path="/admin/zones-retouchees"
           element={<AdminZonesRetoucheesScreen />}
+        />
+        {/* Classement des écarts de stock. Pas au menu non plus : on y arrive
+            depuis le tableau de bord. */}
+        <Route
+          path="/admin/ecarts-zones"
+          element={<AdminEcartsZonesScreen />}
         />
         <Route path="/admin/recap-zones" element={<AdminRecapZonesScreen />} />
         <Route path="/admin/suivi-bipage" element={<AdminSuiviBipageScreen />} />

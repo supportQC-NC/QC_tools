@@ -650,9 +650,14 @@ const AdminInventaireDashboardScreen = () => {
             </>
           )}
 
-          <Link className="invd-lien" to="/admin/recap-zones">
-            Voir le récap détaillé par zone <HiArrowRight />
-          </Link>
+          <div className="invd-liens">
+            <Link className="invd-lien" to="/admin/ecarts-zones">
+              Classement de tous les écarts <HiArrowRight />
+            </Link>
+            <Link className="invd-lien" to="/admin/recap-zones">
+              Voir le récap détaillé par zone <HiArrowRight />
+            </Link>
+          </div>
         </section>
 
         {/* ── Agents de l'inventaire ────────────────────────────────────── */}
