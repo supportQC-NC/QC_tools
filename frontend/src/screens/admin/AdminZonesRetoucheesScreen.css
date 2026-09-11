@@ -158,3 +158,13 @@
   color: var(--admin-text-muted);
   padding: 30px 12px;
 }
+
+/* Seconde valeur sous un chiffre de cellule (unités sous les francs, ou
+   l'inverse) : présente sans concurrencer la valeur principale. */
+.ez-sous {
+  display: block;
+  margin-top: 1px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--admin-text-muted);
+}

@@ -1774,6 +1774,28 @@ const getRecapZones = asyncHandler(async (req, res) => {
     const totalEcart = z.lignes.reduce((s, l) => s + l.ecart, 0);
     const totalEcartXpf = z.lignes.reduce((s, l) => s + l.ecartXpf, 0);
     const nbEcarts = z.lignes.filter((l) => l.ecart !== 0).length;
+
+    // ── Manquants et excédents SÉPARÉS ──────────────────────────────────
+    // Le net seul induit en erreur : une zone peut afficher −325 unités et
+    // +46 460 F parce qu'un article cher en excédent écrase des articles bon
+    // marché manquants (cas réel : +12 masques à 4 365 F contre −117 gants à
+    // 58 F). Les deux sens séparés rendent la composition lisible.
+    // ⚠️ Le total en UNITÉS n'a de toute façon pas de sens physique : il
+    // additionne des masques et des gants. Seule la valorisation s'additionne
+    // légitimement d'un article à l'autre.
+    const ecartMoinsUnites = z.lignes
+      .filter((l) => l.ecart < 0)
+      .reduce((s, l) => s + l.ecart, 0);
+    const ecartPlusUnites = z.lignes
+      .filter((l) => l.ecart > 0)
+      .reduce((s, l) => s + l.ecart, 0);
+    const ecartMoinsXpf = z.lignes
+      .filter((l) => l.ecartXpf < 0)
+      .reduce((s, l) => s + l.ecartXpf, 0);
+    const ecartPlusXpf = z.lignes
+      .filter((l) => l.ecartXpf > 0)
+      .reduce((s, l) => s + l.ecartXpf, 0);
+
     return {
       ...z,
       totalArticles: z.lignes.length,
@@ -1782,6 +1804,15 @@ const getRecapZones = asyncHandler(async (req, res) => {
       totalEcart,
       totalEcartXpf,
       nbEcarts,
+      ecartMoinsUnites,
+      ecartPlusUnites,
+      ecartMoinsXpf,
+      ecartPlusXpf,
+      // Ampleur TOTALE du désordre = Σ|écart| par ligne. C'est elle qui dit
+      // « cette zone pose problème » : une zone à −100 000 F et +100 000 F a un
+      // net nul mais n'est pas saine pour autant.
+      ecartAbsUnites: Math.abs(ecartMoinsUnites) + ecartPlusUnites,
+      ecartAbsXpf: Math.abs(ecartMoinsXpf) + ecartPlusXpf,
     };
   });
 
@@ -1815,12 +1846,12 @@ const getRecapZones = asyncHandler(async (req, res) => {
       session: session
         ? { _id: session._id, nom: session.nom, statut: session.statut }
         : null,
-      // Classées par écart le plus COÛTEUX en valeur absolue : un manquant de
-      // 400 000 F et un excédent de 400 000 F posent autant question l'un que
-      // l'autre, c'est l'ampleur qui décide de l'ordre.
+      // Classées sur l'AMPLEUR du désordre (Σ|écart| par ligne), pas sur le
+      // net : une zone à −100 000 F et +100 000 F a un net nul et serait
+      // classée dernière alors que c'est l'une des plus problématiques.
       zones: zones
         .map(({ lignes, ...z }) => z)
-        .sort((a, b) => Math.abs(b.totalEcartXpf) - Math.abs(a.totalEcartXpf)),
+        .sort((a, b) => b.ecartAbsXpf - a.ecartAbsXpf),
       totaux: totauxResume,
     });
   }

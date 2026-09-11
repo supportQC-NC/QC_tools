@@ -68,19 +68,21 @@ const AdminEcartsZonesScreen = () => {
 
   const zones = useMemo(() => {
     const q = recherche.trim().toLowerCase();
-    // Le critère de classement décide aussi du critère de filtrage : filtrer
-    // les « manquants » sur la valeur alors qu'on classe sur les quantités
-    // donnerait une liste incohérente avec sa propre colonne de tri.
-    const cle = (z) =>
-      classerPar === "valeur" ? z.totalEcartXpf : z.totalEcart;
+    // Le NET sert à filtrer par sens (zone globalement manquante ou
+    // globalement excédentaire) ; l'AMPLEUR (Σ|écart|) sert à classer. Classer
+    // sur le net mettrait en dernier une zone à −100 000 F et +100 000 F, alors
+    // qu'elle est justement l'une des plus problématiques.
+    const net = (z) => (classerPar === "valeur" ? z.totalEcartXpf : z.totalEcart);
+    const ampleur = (z) =>
+      classerPar === "valeur" ? z.ecartAbsXpf : z.ecartAbsUnites;
 
     return toutes
       .filter((z) => !emplacement || z.zoneType === emplacement)
       .filter((z) => {
-        const v = cle(z);
+        const v = net(z);
         if (sens === "manquants") return v < 0;
         if (sens === "excedents") return v > 0;
-        return masquerNuls ? v !== 0 : true;
+        return masquerNuls ? ampleur(z) !== 0 : true;
       })
       .filter((z) => {
         if (!q) return true;
@@ -88,12 +90,10 @@ const AdminEcartsZonesScreen = () => {
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q));
       })
-      // Toujours du plus gros au plus petit EN VALEUR ABSOLUE : avec un filtre
-      // sur un seul sens, cela revient au tri naturel ; sans filtre, cela met
-      // en tête les écarts les plus lourds quel que soit leur signe.
+      // Du plus gros désordre au plus petit.
       .sort(
         (a, b) =>
-          Math.abs(cle(b)) - Math.abs(cle(a)) ||
+          ampleur(b) - ampleur(a) ||
           a.zoneCode.localeCompare(b.zoneCode, "fr", { numeric: true }),
       );
   }, [toutes, sens, emplacement, recherche, classerPar, masquerNuls]);
@@ -121,8 +121,12 @@ const AdminEcartsZonesScreen = () => {
       "Emplacement",
       "Articles",
       "Articles en ecart",
-      "Ecart unites",
-      "Ecart XPF",
+      "Manquants unites",
+      "Manquants XPF",
+      "Excedents unites",
+      "Excedents XPF",
+      "Ecart net unites",
+      "Ecart net XPF",
     ];
     const echapper = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const lignes = zones.map((z) =>
@@ -132,6 +136,10 @@ const AdminEcartsZonesScreen = () => {
         z.zoneType,
         z.totalArticles,
         z.nbEcarts,
+        z.ecartMoinsUnites,
+        Math.round(z.ecartMoinsXpf),
+        z.ecartPlusUnites,
+        Math.round(z.ecartPlusXpf),
         z.totalEcart,
         Math.round(z.totalEcartXpf),
       ]
@@ -187,10 +195,12 @@ const AdminEcartsZonesScreen = () => {
 
       <p className="invd-carte-aide zr-aide">
         <b>Écart</b> = quantité comptée − stock théorique, valorisé au prix
-        d'achat. Un <span className="invd-ec-moins">manquant</span> est négatif,
-        un <span className="invd-ec-plus">excédent</span> positif. Le classement
-        va du plus gros au plus petit, sans regarder le signe — sauf si vous
-        filtrez sur un sens.
+        d'achat. Manquants et excédents sont affichés <b>séparément</b> : c'est
+        ce qui explique qu'une zone puisse être négative en unités et positive
+        en francs — quelques articles chers en trop pèsent plus que beaucoup
+        d'articles bon marché manquants. Le classement va du plus gros désordre
+        au plus petit (manquants + excédents cumulés), et non sur le net, qui
+        masquerait une zone où les deux s'annulent.
       </p>
 
       <div className="zr-barre">
@@ -281,26 +291,27 @@ const AdminEcartsZonesScreen = () => {
               <th>Emplacement</th>
               <th className="invd-num">Articles</th>
               <th className="invd-num">En écart</th>
-              <th className="invd-num">Écart (unités)</th>
-              <th className="invd-num">Écart valorisé</th>
+              <th className="invd-num">Manquants</th>
+              <th className="invd-num">Excédents</th>
+              <th className="invd-num">Écart net</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="zr-vide">
+                <td colSpan={8} className="zr-vide">
                   Calcul des écarts… (chaque ligne bipée est comparée au stock)
                 </td>
               </tr>
             ) : !toutes.length ? (
               <tr>
-                <td colSpan={7} className="zr-vide">
+                <td colSpan={8} className="zr-vide">
                   Aucun comptage déposé : il n'y a pas encore d'écart à mesurer.
                 </td>
               </tr>
             ) : zones.length === 0 ? (
               <tr>
-                <td colSpan={7} className="zr-vide">
+                <td colSpan={8} className="zr-vide">
                   Aucune zone ne correspond à ce filtre.
                 </td>
               </tr>
@@ -320,16 +331,23 @@ const AdminEcartsZonesScreen = () => {
                   <td className="zr-empl">{z.zoneType || "—"}</td>
                   <td className="invd-num">{fmtInt(z.totalArticles)}</td>
                   <td className="invd-num">{fmtInt(z.nbEcarts)}</td>
-                  <td
-                    className={`invd-num ${
-                      z.totalEcart < 0
-                        ? "invd-ec-moins"
-                        : z.totalEcart > 0
-                          ? "invd-ec-plus"
-                          : ""
-                    }`}
-                  >
-                    {fmtEcart(z.totalEcart)}
+                  {/* Manquants et excédents SÉPARÉS : c'est leur composition
+                      qui explique un net à contre-sens, pas une erreur. */}
+                  <td className="invd-num invd-ec-moins">
+                    {z.ecartMoinsUnites
+                      ? `${fmtEcart(z.ecartMoinsUnites)} u`
+                      : "—"}
+                    <span className="ez-sous">
+                      {z.ecartMoinsXpf ? fmtXpf(z.ecartMoinsXpf) : ""}
+                    </span>
+                  </td>
+                  <td className="invd-num invd-ec-plus">
+                    {z.ecartPlusUnites
+                      ? `${fmtEcart(z.ecartPlusUnites)} u`
+                      : "—"}
+                    <span className="ez-sous">
+                      {z.ecartPlusXpf ? fmtXpf(z.ecartPlusXpf) : ""}
+                    </span>
                   </td>
                   <td
                     className={`invd-num invd-ec-val ${
@@ -341,6 +359,9 @@ const AdminEcartsZonesScreen = () => {
                     }`}
                   >
                     {fmtXpf(z.totalEcartXpf)}
+                    <span className="ez-sous">
+                      {fmtEcart(z.totalEcart)} u net
+                    </span>
                   </td>
                 </tr>
               ))
