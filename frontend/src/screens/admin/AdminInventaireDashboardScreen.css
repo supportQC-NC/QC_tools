@@ -430,3 +430,35 @@
   flex-wrap: wrap;
   gap: 18px;
 }
+
+/* ── Écarts de stock ──────────────────────────────────────────────────────
+   Le SIGNE est l'information : manquant en rouge, excédent en vert. Les deux
+   sont des anomalies — le vert ne veut pas dire « bon », seulement « en plus ».
+   D'où le même poids typographique pour les deux. */
+.invd-ec-moins {
+  color: #ef4444;
+}
+
+.invd-ec-plus {
+  color: #22c55e;
+}
+
+.invd-ec-totaux {
+  margin-bottom: 14px;
+}
+
+.invd-ec-table .invd-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.invd-ec-val {
+  font-weight: 700;
+}
+
+.invd-ec-empl {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--admin-primary);
+  white-space: nowrap;
+}

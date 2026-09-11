@@ -12,6 +12,16 @@ export const inventaireCollecteApiSlice = apiSlice.injectEndpoints({
       providesTags: ["InventaireZone"],
     }),
 
+    // Résumé des écarts PAR ZONE, sans le détail des lignes. Endpoint séparé
+    // plutôt qu'un paramètre sur getRecapZones : les deux réponses n'ont ni la
+    // même forme ni le même poids, les mélanger dans une même entrée de cache
+    // ferait servir l'une à la place de l'autre.
+    getRecapZonesResume: builder.query({
+      query: (entrepriseId) =>
+        `${BASE}/recap-zones/${entrepriseId}?resume=1`,
+      providesTags: ["InventaireZone"],
+    }),
+
     // ─── Suivi bipage ────────────────────────────────────────────────────
     // Qui a bipé quelle zone, quand, combien de temps, avec quelles
     // observations (agent sur le collecteur + suivi depuis le web).
@@ -51,6 +61,7 @@ export const inventaireCollecteApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetRecapZonesQuery,
+  useGetRecapZonesResumeQuery,
   useGetSuiviBipageQuery,
   useGetAgentsInventaireQuery,
   useUpdateObservationBipageMutation,

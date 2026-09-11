@@ -29,6 +29,7 @@ import {
   HiClock,
   HiArrowRight,
   HiPencilAlt,
+  HiScale,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
@@ -36,6 +37,7 @@ import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
 import {
   useGetAgentsInventaireQuery,
   useGetSuiviBipageQuery,
+  useGetRecapZonesResumeQuery,
 } from "../../slices/inventaireCollecteApiSlice";
 import { useGetStatsZonesRetoucheesQuery } from "../../slices/bipageApiSlice";
 import "./AdminInventaireDashboardScreen.css";
@@ -59,6 +61,25 @@ const fmtDuree = (ms) => {
   const reste = min % 60;
   if (h < 24) return reste ? `${h} h ${reste} min` : `${h} h`;
   return `${Math.floor(h / 24)} j ${h % 24} h`;
+};
+
+// Montant en francs. Pas de décimale : le XPF n'en a pas, et un écart
+// d'inventaire se lit en milliers, pas à la virgule près.
+const fmtXpf = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  const signe = n > 0 ? "+" : "";
+  return `${signe}${Math.round(n).toLocaleString("fr-FR")} F`;
+};
+
+// Écart en unités : le SIGNE porte l'information (manquant / excédent), il ne
+// doit pas disparaître.
+const fmtEcart = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  if (n === 0) return "0";
+  const signe = n > 0 ? "+" : "";
+  return `${signe}${n.toLocaleString("fr-FR", { maximumFractionDigits: 3 })}`;
 };
 
 const fmtDate = (d) =>
@@ -101,12 +122,16 @@ const AdminInventaireDashboardScreen = () => {
   // Agrégat à part : c'est un $group Mongo sur les lignes bipées, pas un
   // recoupement des autres réponses.
   const retouches = useGetStatsZonesRetoucheesQuery({ entrepriseId }, skip);
+  // La plus lourde des requêtes : chaque ligne bipée est comparée au stock du
+  // DBF. Elle a son propre état de chargement, le reste de la page n'attend pas.
+  const ecarts = useGetRecapZonesResumeQuery(entrepriseId, skip);
 
   const rafraichir = () => {
     session.refetch();
     agents.refetch();
     bipage.refetch();
     retouches.refetch();
+    ecarts.refetch();
   };
 
   // ⚠️ La réponse de /active est { active, progress } — PAS { session }.
@@ -201,11 +226,15 @@ const AdminInventaireDashboardScreen = () => {
   );
   const tRetouches = retouches.data?.totaux;
 
+  const zonesEcart = ecarts.data?.zones || [];
+  const tEcarts = ecarts.data?.totaux;
+
   const enCours =
     session.isFetching ||
     agents.isFetching ||
     bipage.isFetching ||
-    retouches.isFetching;
+    retouches.isFetching ||
+    ecarts.isFetching;
 
   return (
     <div className="invd-screen">
@@ -257,6 +286,13 @@ const AdminInventaireDashboardScreen = () => {
           label="Unités"
           valeur={fmtInt(tBipage?.totalQuantite)}
           icone={<HiCube />}
+        />
+        <Kpi
+          label="Écart valorisé"
+          valeur={fmtXpf(tEcarts?.totalEcartXpf)}
+          ton={tEcarts?.nbEcarts ? "warn" : ""}
+          icone={<HiScale />}
+          aide="Quantité comptée − stock théorique, valorisée au prix d'achat."
         />
         <Kpi
           label="Reprises manuelles"
@@ -495,6 +531,128 @@ const AdminInventaireDashboardScreen = () => {
               Voir le détail des bipages <HiArrowRight />
             </Link>
           </div>
+        </section>
+
+        {/* ── Écarts de stock par zone ──────────────────────────────────────
+            Écart = quantité bipée − stock théorique (ΣS1..S5 du DBF), valorisé
+            au prix d'achat. Classé par écart le plus COÛTEUX en valeur
+            absolue : un manquant de 400 000 F et un excédent de 400 000 F
+            posent autant question l'un que l'autre.
+            ⚠️ Ce calcul relit chaque ligne bipée contre le cache articles —
+            c'est la requête la plus lourde de la page. Elle a son propre état
+            de chargement et n'empêche pas le reste de s'afficher. */}
+        <section className="invd-carte invd-carte-large">
+          <h2>Écarts de stock par zone</h2>
+          <p className="invd-carte-aide">
+            <b>Écart</b> = quantité comptée − stock théorique, valorisé au prix
+            d'achat. Un <span className="invd-ec-moins">manquant</span> est
+            négatif, un <span className="invd-ec-plus">excédent</span> positif.
+            Les zones sont classées par montant d'écart, sans regarder le signe.
+          </p>
+
+          {ecarts.isLoading ? (
+            <p className="invd-attente">
+              Calcul des écarts… (chaque ligne bipée est comparée au stock)
+            </p>
+          ) : !zonesEcart.length ? (
+            <p className="invd-attente">
+              Aucun comptage déposé : il n'y a pas encore d'écart à mesurer.
+            </p>
+          ) : (
+            <>
+              <div className="invd-repartition invd-ec-totaux">
+                <div className="invd-rep">
+                  <span
+                    className={`invd-rep-val ${
+                      (tEcarts?.totalEcartXpf || 0) < 0
+                        ? "invd-ec-moins"
+                        : "invd-ec-plus"
+                    }`}
+                  >
+                    {fmtXpf(tEcarts?.totalEcartXpf)}
+                  </span>
+                  <span className="invd-rep-lbl">Écart net valorisé</span>
+                </div>
+                <div className="invd-rep">
+                  <span className="invd-rep-val">
+                    {fmtInt(tEcarts?.nbEcarts)}
+                  </span>
+                  <span className="invd-rep-lbl">Articles en écart</span>
+                </div>
+                <div className="invd-rep">
+                  <span className="invd-rep-val">
+                    {fmtInt(tEcarts?.totalArticles)}
+                  </span>
+                  <span className="invd-rep-lbl">Articles comptés</span>
+                </div>
+                <div className="invd-rep">
+                  <span className="invd-rep-val">
+                    {fmtInt(tEcarts?.totalZones)}
+                  </span>
+                  <span className="invd-rep-lbl">Zones déposées</span>
+                </div>
+              </div>
+
+              <table className="invd-table invd-ec-table">
+                <thead>
+                  <tr>
+                    <th>Zone</th>
+                    <th>Emplacement</th>
+                    <th className="invd-num">Articles</th>
+                    <th className="invd-num">En écart</th>
+                    <th className="invd-num">Écart (unités)</th>
+                    <th className="invd-num">Écart valorisé</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zonesEcart.slice(0, 10).map((z) => (
+                    <tr key={`${z.zoneCode}-${z.zoneType}`}>
+                      <td>
+                        <span className="invd-zone-code">{z.zoneCode}</span>
+                        {z.zoneLibelle && (
+                          <span className="invd-zone-lib">{z.zoneLibelle}</span>
+                        )}
+                      </td>
+                      <td className="invd-ec-empl">{z.zoneType || "—"}</td>
+                      <td className="invd-num">{fmtInt(z.totalArticles)}</td>
+                      <td className="invd-num">{fmtInt(z.nbEcarts)}</td>
+                      <td
+                        className={`invd-num ${
+                          z.totalEcart < 0 ? "invd-ec-moins" : ""
+                        }`}
+                      >
+                        {fmtEcart(z.totalEcart)}
+                      </td>
+                      <td
+                        className={`invd-num invd-ec-val ${
+                          z.totalEcartXpf < 0
+                            ? "invd-ec-moins"
+                            : z.totalEcartXpf > 0
+                              ? "invd-ec-plus"
+                              : ""
+                        }`}
+                      >
+                        {fmtXpf(z.totalEcartXpf)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {zonesEcart.length > 10 && (
+                <p className="invd-empl-reste">
+                  + {fmtInt(zonesEcart.length - 10)} autre
+                  {zonesEcart.length - 10 > 1 ? "s" : ""} zone
+                  {zonesEcart.length - 10 > 1 ? "s" : ""} déposée
+                  {zonesEcart.length - 10 > 1 ? "s" : ""}
+                </p>
+              )}
+            </>
+          )}
+
+          <Link className="invd-lien" to="/admin/recap-zones">
+            Voir le récap détaillé par zone <HiArrowRight />
+          </Link>
         </section>
 
         {/* ── Agents de l'inventaire ────────────────────────────────────── */}

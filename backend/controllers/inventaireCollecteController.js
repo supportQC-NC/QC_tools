@@ -1711,15 +1711,22 @@ const getRecapZones = asyncHandler(async (req, res) => {
 
   for (const collecte of collectes) {
     const code = collecte.zoneCode || "(sans zone)";
-    if (!zonesMap.has(code)) {
-      zonesMap.set(code, {
+    const type = String(collecte.zoneType || "").trim();
+    // ⚠️ Clé sur le COUPLE code + emplacement. Regrouper sur le seul code
+    // fusionnait les deux zones d'un même code — chez QC, 53 codes existent à
+    // la fois en MAGASIN et au DOCK — et les écarts des deux emplacements se
+    // retrouvaient additionnés sous une zone unique, étiquetée avec le premier
+    // emplacement rencontré.
+    const cle = `${code}|${type}`;
+    if (!zonesMap.has(cle)) {
+      zonesMap.set(cle, {
         zoneCode: code,
         zoneLibelle: collecte.zoneLibelle || "",
-        zoneType: collecte.zoneType || "",
+        zoneType: type,
         lignes: [],
       });
     }
-    const zoneEntry = zonesMap.get(code);
+    const zoneEntry = zonesMap.get(cle);
 
     for (const ligne of collecte.lignes) {
       const { stock, prixAchat, fourn, trouve } = await getInfosArticle(
@@ -1777,6 +1784,46 @@ const getRecapZones = asyncHandler(async (req, res) => {
       nbEcarts,
     };
   });
+
+  // `resume=1` : le tableau de bord ne veut que les totaux par zone. Le calcul
+  // est le MÊME (une seule vérité sur les écarts), on n'allège que la réponse —
+  // les lignes détaillées et le regroupement par fournisseur pèsent lourd et ne
+  // servent qu'à l'écran Récap par zone.
+  if (req.query.resume === "1") {
+    const totauxResume = zones.reduce(
+      (acc, z) => {
+        acc.totalArticles += z.totalArticles;
+        acc.totalQteBipee += z.totalQteBipee;
+        acc.totalStockTheorique += z.totalStockTheorique;
+        acc.totalEcart += z.totalEcart;
+        acc.totalEcartXpf += z.totalEcartXpf;
+        acc.nbEcarts += z.nbEcarts;
+        return acc;
+      },
+      {
+        totalZones: zones.length,
+        totalArticles: 0,
+        totalQteBipee: 0,
+        totalStockTheorique: 0,
+        totalEcart: 0,
+        totalEcartXpf: 0,
+        nbEcarts: 0,
+      },
+    );
+
+    return res.json({
+      session: session
+        ? { _id: session._id, nom: session.nom, statut: session.statut }
+        : null,
+      // Classées par écart le plus COÛTEUX en valeur absolue : un manquant de
+      // 400 000 F et un excédent de 400 000 F posent autant question l'un que
+      // l'autre, c'est l'ampleur qui décide de l'ordre.
+      zones: zones
+        .map(({ lignes, ...z }) => z)
+        .sort((a, b) => Math.abs(b.totalEcartXpf) - Math.abs(a.totalEcartXpf)),
+      totaux: totauxResume,
+    });
+  }
 
   // Regroupement alternatif PAR FOURNISSEUR (toutes zones confondues).
   // Chaque ligne garde une référence à sa zone d'origine.
