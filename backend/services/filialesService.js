@@ -16,9 +16,22 @@
 //   fournisseur.nom       -> fourniss.NOM   (jointure par FOURN)
 //   fournisseur.adresse_1 -> fourniss.AD1   (= trigramme de la mère pour le réseau)
 //
-// Règle réseau : une FILIALE ne garde que les articles dont le fournisseur a
-// AD1 == trigramme de la maison-mère. Matching filiale↔mère : clé = 1ʳᵉ partie de
-// DESIGN2 avant " - " (sinon REFER), comparée au NART de la mère.
+// RAPPROCHEMENT (revu le 11/09/2026) — voir docs/ANALYSE_FILIALES_matching.pdf
+//
+// Auparavant : une clé unique (1ʳᵉ partie de DESIGN2 avant " - ", sinon REFER),
+// comparée au NART de la mère ; et un filtre préalable écartant tout article de
+// filiale dont le fournisseur n'avait pas AD1 == trigramme de la mère.
+// Mesuré : ce filtre écartait ~70 % des articles (AD1 est un champ d'ADRESSE
+// détourné, vide ou rempli d'une vraie adresse dans 7 cas sur 10), et le repli
+// sur REFER n'était jamais atteint dès que DESIGN2 contenait quoi que ce soit.
+//
+// Désormais :
+//   · le filtre AD1 n'est plus un VERROU mais un simple INDICATEUR (`reseau`) ;
+//   · chaque article de filiale est indexé sous PLUSIEURS clés candidates,
+//     essayées par ordre de confiance (voir matchKeys) ;
+//   · les zéros de tête des codes sont neutralisés en repli ;
+//   · un article de filiale ne peut servir qu'UNE SEULE ligne mère, mais une
+//     ligne mère peut agréger plusieurs articles de filiale.
 //
 // Réseaux figés (comme le script) : DQ, QC, LD. Entités = entreprise.trigramme.
 // -----------------------------------------------------------------------------
@@ -26,6 +39,10 @@
 import Entreprise from "../models/EntrepriseModel.js";
 import articleService from "./articleService.js";
 import fournissCacheService from "./fournissCacheService.js";
+// Le code-barres est le SEUL identifiant réellement commun entre sociétés :
+// c'est le même produit physique. L'utilitaire gère les écritures multiples
+// d'un même code (UPC-A 12 chiffres / EAN-13 avec zéro de tête).
+import { canoniserCodeBarres, variantesCodeBarres } from "../utils/codeBarres.js";
 
 // Définition des 3 réseaux (mère + filiales) — codes = trigrammes
 const RESEAUX = {
@@ -110,11 +127,83 @@ class FilialesService {
     );
   }
 
-  // clé de matching filiale -> NART mère
-  matchKey(a) {
-    const desig2 = this.safeTrim(a.DESIGN2);
-    if (desig2) return desig2.split(/\s*-\s*/)[0].trim();
-    return this.safeTrim(a.REFER);
+  /**
+   * Normalise une clé de rapprochement : majuscules, espaces intérieurs
+   * réduits. Sans ça « 12345 » et « 12345 » (double espace, fréquent en DBF)
+   * ne se rejoignent pas.
+   */
+  normKey(v) {
+    return this.safeTrim(v).toUpperCase().replace(/\s+/g, " ");
+  }
+
+  /**
+   * Forme « sans zéros de tête » d'un code purement numérique.
+   * ⚠️ Le NART est un C(6) et l'ERP mélange « 12345 » et « 012345 » : sans ce
+   * repli, les deux ne se rejoignent jamais. N'est appliqué qu'aux codes
+   * NUMÉRIQUES — dépouiller « 0RING » de son zéro n'aurait aucun sens.
+   */
+  normNum(v) {
+    const k = this.normKey(v);
+    return /^\d+$/.test(k) ? k.replace(/^0+/, "") || "0" : null;
+  }
+
+  /**
+   * Clés candidates d'un article de filiale, par ordre de CONFIANCE
+   * décroissante. Le rang sert à départager quand plusieurs candidats
+   * rejoignent des articles mère différents.
+   *
+   *   1. DESIGN2 tronqué au premier séparateur — la règle historique ;
+   *   2. DESIGN2 entier — 3 520 valeurs sur 4 357 n'ont AUCUN séparateur,
+   *      la troncature n'y change rien mais le champ reste exploitable ;
+   *   3. REFER — le code fournisseur, souvent le vrai code à six chiffres ;
+   *      il était purement ignoré dès que DESIGN2 était rempli ;
+   *   4. NART de la filiale — les sociétés partagent le même ERP, le code est
+   *      fréquemment identique d'une société à l'autre.
+   *
+   * Le séparateur accepte le tiret, la barre oblique, le tiret bas et les
+   * tirets longs : le DBF n'est pas régulier sur ce point.
+   */
+  matchKeys(a) {
+    const out = [];
+    const vus = new Set();
+    // Le rang est SÉMANTIQUE (lié à la source du code), pas positionnel : la
+    // priorité doit vouloir dire la même chose d'une ligne à l'autre.
+    const pousse = (v, rang) => {
+      const k = this.normKey(v);
+      if (!k || vus.has(k)) return;
+      vus.add(k);
+      out.push({ k, rang });
+    };
+
+    // ⚠⚠ LE NART N'EST PAS UNE CLÉ DE RAPPROCHEMENT. C'est une référence
+    // INTERNE à chaque société : le même code désigne des produits différents
+    // d'une entité à l'autre. Mesuré le 11/09/2026 sur les bases réelles :
+    // QC et MQ partagent 16 569 NART, dont 3,7 % seulement désignent le même
+    // produit ; QC et KQ, 27 033 NART pour 2,8 %. Rapprocher là-dessus
+    // fabriquerait des dizaines de milliers de faux appariements.
+    //
+    // Ce qui est légitime, et pourquoi :
+    //   · REFER / DESIGN2 d'un article ACHETÉ À LA MÈRE : la mère étant le
+    //     fournisseur, la filiale y a enregistré le code article de la mère.
+    //     C'est tout le sens du marqueur réseau (AD1) — il désigne justement
+    //     ces articles-là ;
+    //   · le CODE-BARRES : seul identifiant universel, c'est le même produit
+    //     physique quelle que soit la société. Traité séparément (rang 3).
+    if (a.RESEAU) {
+      const d2 = this.safeTrim(a.DESIGN2);
+      if (d2) {
+        pousse(d2.split(/\s*[-–—/_]\s*/)[0], 0); // DESIGN2 tronqué
+        pousse(d2, 1);                             // DESIGN2 entier
+      }
+      pousse(a.REFER, 2);
+    }
+    // ⚠️ Hors réseau, REFER est la référence d'un AUTRE fournisseur : elle n'a
+    // aucune raison de valoir le NART de la mère. Essayée un temps en dernier
+    // recours, elle a été MESURÉE le 11/09/2026 sur qc→meare : 4 103
+    // rapprochements pour 1,5 % de justes — « PONCEUSE EXCENTRIQUE » rapprochée
+    // d'une « BÉTONNIÈRE ». Du bruit pur, écarté.
+    // Hors réseau, seul le code-barres fait foi (rang 3, ajouté à l'index).
+    return out;
   }
 
   label(code) {
@@ -187,14 +276,19 @@ class FilialesService {
           : null;
       const ad1 = fourn ? this.safeTrim(fourn.AD1).toUpperCase() : "";
 
-      // Filiale : ne garder que les articles du réseau (AD1 == trigramme mère)
-      if (!isMere && ad1 !== mereUpper) return;
+      // ⚠️ AD1 n'écarte PLUS l'article. Ce champ est l'adresse ligne 1 du
+      // fournisseur, détourné pour marquer l'appartenance réseau : il est vide
+      // ou contient une vraie adresse pour ~70 % des articles. L'utiliser comme
+      // verrou revenait à jeter les sept dixièmes du catalogue avant même de
+      // tenter le moindre rapprochement. Il devient un simple indicateur.
+      const estReseau = ad1 === mereUpper;
 
       const vteAn = this.venteAn(a);
       const pvte = this.num(a.PVTE);
 
       rows.push({
         NART: this.safeTrim(a.NART),
+        GENCOD: this.safeTrim(a.GENCOD),
         DESIGN: this.safeTrim(a.DESIGN),
         DESIGN2: this.safeTrim(a.DESIGN2),
         REFER: this.safeTrim(a.REFER),
@@ -204,6 +298,7 @@ class FilialesService {
         PVTE: pvte,
         VTE_AN: vteAn,
         CA_AN: pvte * vteAn,
+        RESEAU: estReseau,
       });
     });
 
@@ -308,29 +403,61 @@ class FilialesService {
     // Consolidation
     this.setProgress(key, "conso", 80, "Consolidation par article…");
 
-    // Index filiale : clé de matching -> agrégat (somme si plusieurs articles)
+    // Index filiale : clé candidate -> [{ i, rang }] où `i` pointe la ligne.
+    // On n'agrège PLUS à l'indexation : il faut pouvoir choisir, puis marquer
+    // l'article comme consommé, pour qu'il ne serve pas deux lignes mère.
     const filialeIndex = filialesData.map((fil) => {
-      const map = new Map();
-      fil.rows.forEach((r) => {
-        const k = this.matchKey(r);
+      const exact = new Map();
+      const numerique = new Map();
+      let sansCle = 0;
+
+      const ajouter = (map, k, i, rang) => {
         if (!k) return;
-        if (!map.has(k)) {
-          map.set(k, {
-            NART: r.NART,
-            STOCK: r.STOCK,
-            PVTE: r.PVTE,
-            VTE_AN: r.VTE_AN,
-            CA_AN: r.CA_AN,
-          });
-        } else {
-          const agg = map.get(k);
-          agg.STOCK += r.STOCK;
-          agg.VTE_AN += r.VTE_AN;
-          agg.CA_AN += r.CA_AN;
-          // PVTE / NART : on garde le premier
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push({ i, rang });
+      };
+
+      fil.rows.forEach((r, i) => {
+        const cles = this.matchKeys(r);
+        if (cles.length === 0) {
+          sansCle += 1;
+          return;
         }
+        cles.forEach(({ k, rang }) => {
+          ajouter(exact, k, i, rang);
+          const n = this.normNum(k);
+          // L'index « sans zéros » ne sert qu'en REPLI : on le range à part
+          // pour que la forme exacte reste toujours prioritaire.
+          if (n && n !== k) ajouter(numerique, n, i, rang);
+        });
       });
-      return { ...fil, index: map };
+
+      // Index CODE-BARRES : un même produit physique porte le même gencod d'une
+      // société à l'autre, même quand les codes internes divergent. C'est le
+      // rapprochement le plus fiable, mais il n'est tenté QU'EN DERNIER —
+      // les codes internes, quand ils concordent, sont plus spécifiques.
+      // Toutes les écritures équivalentes du code sont indexées (un UPC-A de
+      // 12 chiffres et son EAN-13 à zéro de tête sont le même code).
+      const gencod = new Map();
+      fil.rows.forEach((r, i) => {
+        if (!r.GENCOD) return;
+        variantesCodeBarres(r.GENCOD).forEach((v) => {
+          const c = canoniserCodeBarres(v);
+          if (!c) return;
+          if (!gencod.has(c)) gencod.set(c, []);
+          gencod.get(c).push({ i, rang: 3 });
+        });
+      });
+
+      return {
+        ...fil,
+        exact,
+        numerique,
+        gencod,
+        sansCle,
+        utilises: new Set(),
+        nbReseau: fil.rows.filter((r) => r.RESEAU).length,
+      };
     });
 
     const rows = mereRows.map((m) => {
@@ -338,21 +465,79 @@ class FilialesService {
       let vteFiliales = 0;
       let presentDansReseau = false;
 
+      const cleMere = this.normKey(m.NART);
+      const cleMereNum = this.normNum(m.NART);
+
       filialeIndex.forEach((fil) => {
-        const match = fil.index.get(m.NART);
-        if (match) {
-          presentDansReseau = true;
-          vteFiliales += match.VTE_AN;
-          filialesCells[fil.code] = {
-            NART: match.NART,
-            STOCK: match.STOCK,
-            PVTE: match.PVTE,
-            VTE_AN: match.VTE_AN,
-            CA_AN: match.CA_AN,
-          };
-        } else {
-          filialesCells[fil.code] = null;
+        // On RASSEMBLE toutes les pistes, puis le RANG tranche. Les essayer en
+        // cascade ferait gagner une piste faible (le REFER d'un fournisseur
+        // tiers, rang 8) sur une piste sûre (le code-barres, rang 3) au seul
+        // motif qu'elle est interrogée en premier.
+        const vues = new Set();
+        const cands = [];
+        const verser = (liste) => {
+          (liste || []).forEach((e) => {
+            if (vues.has(e.i)) return;
+            vues.add(e.i);
+            cands.push(e);
+          });
+        };
+
+        verser(fil.exact.get(cleMere));
+        // Forme exacte d'abord, repli « sans zéros de tête » ensuite : jamais
+        // l'inverse, sinon « 012345 » et « 12345 » deviendraient équivalents
+        // même quand les deux existent réellement côte à côte.
+        if (cleMereNum) verser(fil.numerique.get(cleMereNum));
+
+        if (m.GENCOD) {
+          variantesCodeBarres(m.GENCOD).forEach((v) => {
+            const c = canoniserCodeBarres(v);
+            if (c) verser(fil.gencod.get(c));
+          });
         }
+
+        // Un article de filiale ne sert qu'UNE ligne mère. Une ligne mère peut
+        // en revanche en agréger plusieurs : plusieurs références de filiale
+        // pour un même article de la mère, c'est le cas normal.
+        const retenus = cands.filter((c) => !fil.utilises.has(c.i));
+        if (retenus.length === 0) {
+          filialesCells[fil.code] = null;
+          return;
+        }
+        // Meilleur rang = candidat le plus fiable (DESIGN2 avant REFER, etc.).
+        const meilleurRang = Math.min(...retenus.map((c) => c.rang));
+        const groupe = retenus.filter((c) => c.rang === meilleurRang);
+
+        let STOCK = 0;
+        let VTE_AN = 0;
+        let CA_AN = 0;
+        let NART = "";
+        let PVTE = 0;
+        let reseau = false;
+        groupe.forEach((c, k) => {
+          const r = fil.rows[c.i];
+          fil.utilises.add(c.i);
+          STOCK += r.STOCK;
+          VTE_AN += r.VTE_AN;
+          CA_AN += r.CA_AN;
+          if (r.RESEAU) reseau = true;
+          if (k === 0) {
+            NART = r.NART;
+            PVTE = r.PVTE;
+          }
+        });
+
+        presentDansReseau = true;
+        vteFiliales += VTE_AN;
+        filialesCells[fil.code] = {
+          NART,
+          STOCK,
+          PVTE,
+          VTE_AN,
+          CA_AN,
+          reseau,
+          rang: meilleurRang,
+        };
       });
 
       const vteMere = m.VTE_AN;
@@ -377,6 +562,19 @@ class FilialesService {
 
     this.setProgress(key, "finalize", 95, "Finalisation…");
 
+    // Diagnostic par filiale : sans lui, un rapprochement qui échoue reste
+    // invisible et passe pour un oubli. On compte ce qui est entré, ce qui a
+    // servi, et ce qui n'a jamais trouvé preneur.
+    const diagnostic = filialeIndex.map((fil) => ({
+      code: fil.code,
+      label: fil.label,
+      articles: fil.rows.length,
+      marquesReseau: fil.nbReseau,
+      sansCle: fil.sansCle,
+      rapproches: fil.utilises.size,
+      orphelins: fil.rows.length - fil.utilises.size,
+    }));
+
     // Totaux
     const totaux = {
       nbArticles: rows.length,
@@ -400,6 +598,11 @@ class FilialesService {
       })),
       warnings,
       totaux,
+      // Diagnostic du rapprochement, par filiale : combien d'articles sont
+      // entrés, combien ont trouvé leur ligne mère, combien sont restés
+      // orphelins. C'est ce qui manquait pour comprendre les "articles non
+      // pris en compte".
+      diagnostic,
       generatedAt: new Date().toISOString(),
       rows,
     };

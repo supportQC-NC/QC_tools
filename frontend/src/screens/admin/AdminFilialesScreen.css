@@ -356,3 +356,229 @@
   font-size: 0.74rem;
   color: var(--admin-text-muted, #606070);
 }
+/* ── Onglets de vue : consolidation / diagnostic ──────────────────────────
+   Un second niveau sous les onglets de réseau. Le diagnostic répond à une
+   autre question que le tableau, il ne doit pas le encombrer. */
+.af-vues {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.af-vues button {
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--admin-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.af-vues button:hover {
+  color: var(--admin-text);
+}
+
+.af-vues button.active {
+  color: var(--admin-primary);
+  border-bottom-color: var(--admin-primary);
+}
+
+/* ── Panneau de diagnostic ───────────────────────────────────────────── */
+.af-diag {
+  max-width: 1100px;
+}
+
+.af-diag-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--admin-text-secondary);
+}
+
+.af-diag-regles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.af-diag-regle {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--admin-text-secondary);
+}
+
+.af-diag-regle b {
+  color: var(--admin-text);
+}
+
+.af-diag-regle code {
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-primary);
+}
+
+.af-diag-rang {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* La règle écartée porte un code couleur distinct : c'est un avertissement,
+   pas une étape du rapprochement. */
+.af-diag-exclu {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.af-diag-exclu .af-diag-rang {
+  background: var(--admin-danger);
+}
+
+.af-diag-titre {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-muted);
+}
+
+.af-diag-origines {
+  margin-bottom: 22px;
+}
+
+.af-diag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.af-diag-chip {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  font-size: 12.5px;
+  color: var(--admin-text-secondary);
+}
+
+.af-diag-chip b {
+  color: var(--admin-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.af-diag-chip.c-refer {
+  border-color: rgba(77, 166, 255, 0.4);
+}
+
+.af-diag-chip.c-gencod {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.af-diag-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  overflow: hidden;
+}
+
+.af-diag-table th {
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-secondary);
+  background: var(--admin-bg-tertiary);
+  white-space: nowrap;
+}
+
+.af-diag-table td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.af-diag-table .n {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.af-diag-table .ok {
+  color: var(--admin-success);
+  font-weight: 700;
+}
+
+.af-diag-table .dim {
+  color: var(--admin-text-muted);
+}
+
+.af-diag-fil {
+  font-weight: 700;
+  color: var(--admin-primary);
+}
+
+/* Jauge de taux : la proportion se lit sans comparer deux nombres. */
+.af-diag-taux {
+  display: inline-block;
+  width: 60px;
+  height: 5px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--admin-bg-tertiary);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.af-diag-taux i {
+  display: block;
+  height: 100%;
+  background: var(--admin-primary);
+}
+
+.af-diag-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--admin-border);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--admin-text-muted);
+}
+
+.af-diag-note b {
+  color: var(--admin-text-secondary);
+}
+
+.af-diag-note code {
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-primary);
+}

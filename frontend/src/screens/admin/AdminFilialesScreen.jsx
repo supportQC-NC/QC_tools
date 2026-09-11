@@ -31,6 +31,10 @@ const AdminFilialesScreen = () => {
   );
   const [search, setSearch] = useState("");
   const [filtreMode, setFiltreMode] = useState("TOUS"); // TOUS | O | N
+  // Vue affichée : le tableau de consolidation, ou le diagnostic du
+  // rapprochement. Un onglet séparé plutôt qu'un bloc de plus sous le tableau :
+  // les deux ne se lisent pas au même moment.
+  const [vue, setVue] = useState("conso"); // conso | diag
   const [hiddenEntities, setHiddenEntities] = useState(() => new Set());
   const gridApiRef = useRef(null);
 
@@ -63,6 +67,21 @@ const AdminFilialesScreen = () => {
 
   // Progression
   const [progress, setProgress] = useState(null);
+
+  // Répartition des rapprochements par ORIGINE de la clé. Le serveur ne
+  // l'agrège pas : l'information est portée par chaque cellule (`rang`), et les
+  // lignes sont déjà en mémoire — inutile de la redemander.
+  const origines = useMemo(() => {
+    const acc = {};
+    (data?.rows || []).forEach((r) => {
+      Object.values(r.filiales || {}).forEach((c) => {
+        if (!c) return;
+        const k = c.rang === 3 ? "gencod" : c.rang === 2 ? "refer" : "design2";
+        acc[k] = (acc[k] || 0) + 1;
+      });
+    });
+    return acc;
+  }, [data]);
   const pollRef = useRef(null);
   useEffect(() => {
     const active = Boolean(selectedReseau) && (isLoading || isFetching);
@@ -478,6 +497,23 @@ const AdminFilialesScreen = () => {
         ))}
       </div>
 
+      {selectedReseau && data ? (
+        <div className="af-vues">
+          <button
+            className={vue === "conso" ? "active" : ""}
+            onClick={() => setVue("conso")}
+          >
+            Consolidation
+          </button>
+          <button
+            className={vue === "diag" ? "active" : ""}
+            onClick={() => setVue("diag")}
+          >
+            Diagnostic du rapprochement
+          </button>
+        </div>
+      ) : null}
+
       {!selectedReseau ? (
         <div className="af-empty">Choisissez un réseau.</div>
       ) : isLoading ? (
@@ -544,6 +580,8 @@ const AdminFilialesScreen = () => {
             </div>
           )}
 
+          {vue === "conso" && (
+          <>
           <div className="af-filters">
             <div className="af-search">
               <HiSearch />
@@ -610,6 +648,121 @@ const AdminFilialesScreen = () => {
               tooltipShowDelay={300}
             />
           </div>
+          </>
+          )}
+
+          {/* ── Diagnostic du rapprochement ────────────────────────────────
+              Répond à « pourquoi cet article n'apparaît-il pas ? ». La
+              consolidation ne montre que ce qui a réussi : sans ce panneau,
+              les articles écartés sont invisibles et passent pour un oubli. */}
+          {vue === "diag" && (
+            <div className="af-diag">
+              <p className="af-diag-intro">
+                Le rapprochement part des articles de <b>{data.mere}</b> et
+                cherche leur équivalent dans chaque filiale. Deux clés
+                seulement sont retenues, parce que ce sont les seules fiables :
+              </p>
+
+              <div className="af-diag-regles">
+                <div className="af-diag-regle">
+                  <span className="af-diag-rang">1</span>
+                  <div>
+                    <b>Référence fournisseur</b> d'un article acheté à la
+                    maison-mère (<code>REFER</code> ou <code>DESIGN2</code>).
+                    La mère étant le fournisseur, la filiale y a enregistré le
+                    code article de la mère. Fiabilité mesurée : <b>96,7 %</b>.
+                  </div>
+                </div>
+                <div className="af-diag-regle">
+                  <span className="af-diag-rang">2</span>
+                  <div>
+                    <b>Code-barres</b> — le seul identifiant commun à toutes
+                    les sociétés, c'est le même produit physique. Fiabilité
+                    mesurée : <b>85,8 %</b>.
+                  </div>
+                </div>
+                <div className="af-diag-regle af-diag-exclu">
+                  <span className="af-diag-rang">✕</span>
+                  <div>
+                    <b>Le NART n'est PAS une clé.</b> C'est une référence
+                    interne à chaque société : sur 16 569 codes communs à QC et
+                    MQ, <b>3,7 %</b> seulement désignent le même produit.
+                    S'en servir fabriquerait des dizaines de milliers de faux
+                    rapprochements.
+                  </div>
+                </div>
+              </div>
+
+              {Object.keys(origines).length > 0 && (
+                <div className="af-diag-origines">
+                  <span className="af-diag-titre">
+                    Origine des rapprochements
+                  </span>
+                  <div className="af-diag-chips">
+                    <span className="af-diag-chip c-refer">
+                      Réf. fournisseur <b>{fmtQty(origines.refer || 0)}</b>
+                    </span>
+                    <span className="af-diag-chip c-gencod">
+                      Code-barres <b>{fmtQty(origines.gencod || 0)}</b>
+                    </span>
+                    {origines.design2 ? (
+                      <span className="af-diag-chip c-d2">
+                        DESIGN2 <b>{fmtQty(origines.design2)}</b>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              <span className="af-diag-titre">Par filiale</span>
+              <table className="af-diag-table">
+                <thead>
+                  <tr>
+                    <th>Filiale</th>
+                    <th className="n">Articles lus</th>
+                    <th className="n">Achetés à {data.mere}</th>
+                    <th className="n">Rapprochés</th>
+                    <th className="n">Orphelins</th>
+                    <th className="n">Taux</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.diagnostic || []).map((d) => {
+                    const taux = d.articles
+                      ? Math.round((d.rapproches / d.articles) * 1000) / 10
+                      : 0;
+                    return (
+                      <tr key={d.code}>
+                        <td className="af-diag-fil">{d.label}</td>
+                        <td className="n">{fmtQty(d.articles)}</td>
+                        <td className="n">{fmtQty(d.marquesReseau)}</td>
+                        <td className="n ok">{fmtQty(d.rapproches)}</td>
+                        <td className="n dim">{fmtQty(d.orphelins)}</td>
+                        <td className="n">
+                          <span className="af-diag-taux">
+                            <i style={{ width: `${taux}%` }} />
+                          </span>
+                          {taux} %
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <p className="af-diag-note">
+                <b>Achetés à {data.mere}</b> : articles dont le fournisseur
+                porte le trigramme de la mère dans son champ adresse
+                (<code>AD1</code>) — c'est ce marquage qui rend la référence
+                fournisseur exploitable. <b>Orphelins</b> : articles de la
+                filiale sans équivalent chez la mère. Une partie l'est
+                légitimement — chaque société a son propre assortiment — le
+                reste signale un marquage <code>AD1</code> manquant ou un
+                code-barres absent.
+              </p>
+
+            </div>
+          )}
         </>
       ) : null}
     </div>
