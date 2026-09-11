@@ -980,11 +980,15 @@ const AdminInventaireProgressionScreen = () => {
               </p>
             </div>
             <div className="modal-footer">
+              {/* ⚠️ Plus d'autoFocus ici : c'est le champ de bip, en tête de
+                  fenêtre, qui doit recevoir le focus. Deux autoFocus dans la
+                  même fenêtre, c'est le dernier monté qui gagne — le bouton
+                  volait le focus au champ, et la douchette n'écrivait nulle
+                  part. */}
               <button
                 className="btn-primary"
                 onClick={handleConfirmerDesignation}
                 disabled={biping}
-                autoFocus
               >
                 {biping ? "Validation…" : "Valider la phase"}
               </button>

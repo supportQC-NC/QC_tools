@@ -59,6 +59,7 @@ import AdminSuiviDemandesBipageScreen from "./screens/admin/AdminSuiviDemandesBi
 import AdminSuiviReapproScreen from "./screens/admin/AdminSuiviReapproScreen";
 import AdminSuiviPreparationScreen from "./screens/admin/AdminSuiviPreparationScreen";
 import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
+import AdminInventaireDashboardScreen from "./screens/admin/AdminInventaireDashboardScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
@@ -426,6 +427,12 @@ const router = createBrowserRouter(
         <Route
           path="/admin/inventaire-progression"
           element={<AdminInventaireProgressionScreen />}
+        />
+        {/* Tableau de bord de l'inventaire en cours : recoupe les stats
+            existantes, n'ajoute aucun agrégat serveur. */}
+        <Route
+          path="/admin/inventaire-dashboard"
+          element={<AdminInventaireDashboardScreen />}
         />
         <Route path="/admin/recap-zones" element={<AdminRecapZonesScreen />} />
         <Route path="/admin/suivi-bipage" element={<AdminSuiviBipageScreen />} />

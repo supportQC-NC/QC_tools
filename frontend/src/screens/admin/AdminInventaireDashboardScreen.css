@@ -1,0 +1,425 @@
+/* Tableau de bord de l'inventaire — mêmes codes visuels que les autres écrans
+   admin (variables --admin-* définies globalement dans index.css).
+
+   ⚠️ Toutes les classes sont préfixées `invd-` et les rares noms génériques
+   sont scopés sous `.invd-screen`. Le CSS de CRA est GLOBAL : une règle
+   `.spin` ou `.no-data` non préfixée fuit vers les autres écrans — c'est
+   déjà arrivé trois fois dans ce projet. */
+
+.invd-screen {
+  padding: 20px 24px 40px;
+  color: var(--admin-text);
+}
+
+.invd-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.invd-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  margin: 0;
+}
+
+.invd-head h1 svg {
+  color: var(--admin-primary);
+}
+
+.invd-icon-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.invd-icon-btn:hover {
+  color: var(--admin-text);
+  border-color: var(--admin-primary);
+}
+
+.invd-spin {
+  animation: invd-rot 0.9s linear infinite;
+}
+
+@keyframes invd-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.invd-sous {
+  margin: 6px 0 16px;
+  font-size: 13px;
+  color: var(--admin-text-muted);
+}
+
+.invd-sous b {
+  color: var(--admin-text);
+}
+
+/* ── Compteurs ───────────────────────────────────────────────────────────── */
+.invd-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.invd-kpi {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.invd-kpi::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+}
+
+.invd-kpi-accent::before {
+  background: var(--admin-primary);
+}
+
+.invd-kpi-ok::before {
+  background: #22c55e;
+}
+
+.invd-kpi-lbl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted);
+}
+
+.invd-kpi-val {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Cartes ──────────────────────────────────────────────────────────────── */
+.invd-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.invd-carte {
+  padding: 14px 16px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+  box-shadow: var(--admin-shadow);
+}
+
+/* Le bloc des agents porte un tableau : il lui faut toute la largeur. */
+.invd-carte-large {
+  grid-column: 1 / -1;
+}
+
+.invd-carte h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.invd-carte-aide {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--admin-text-muted);
+}
+
+.invd-carte-aide b {
+  color: var(--admin-text-secondary);
+}
+
+/* ── Phases ──────────────────────────────────────────────────────────────── */
+.invd-phases {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.invd-phase-tete {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+
+.invd-phase-nom {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.invd-phase-chiffre {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-text-secondary);
+}
+
+.invd-phase-pct {
+  color: var(--admin-text-muted);
+}
+
+.invd-bar {
+  display: flex;
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--admin-bg-tertiary);
+  overflow: hidden;
+}
+
+.invd-bar-fill {
+  display: block;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.invd-bar-empilee {
+  margin-top: 12px;
+}
+
+/* ── Répartitions ────────────────────────────────────────────────────────── */
+.invd-repartition {
+  display: flex;
+  gap: 10px;
+}
+
+.invd-rep {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+}
+
+.invd-rep-val {
+  font-size: 21px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-text);
+}
+
+.invd-rep-lbl {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+
+/* ── Tableau des agents ──────────────────────────────────────────────────── */
+.invd-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.invd-table th {
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.invd-table td {
+  padding: 9px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.invd-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.invd-table tbody tr:hover td {
+  background: var(--admin-bg-hover);
+}
+
+.invd-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.invd-agent {
+  display: block;
+  font-weight: 650;
+}
+
+.invd-agent-mail {
+  display: block;
+  font-size: 11px;
+  color: var(--admin-text-muted);
+  margin-top: 2px;
+}
+
+/* ── Liens de renvoi ─────────────────────────────────────────────────────── */
+.invd-lien {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--admin-primary);
+  text-decoration: none;
+}
+
+.invd-lien:hover {
+  text-decoration: underline;
+}
+
+.invd-attente {
+  margin: 0;
+  font-size: 13px;
+  color: var(--admin-text-muted);
+}
+
+/* ── États vides ─────────────────────────────────────────────────────────── */
+.invd-screen .invd-vide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 70px 20px;
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+
+.invd-screen .invd-vide svg {
+  font-size: 40px;
+}
+
+/* ── Zones les plus retouchées ────────────────────────────────────────────
+   Une colonne par emplacement (DOCK / MAGASIN) : la comparaison côte à côte
+   est tout l'intérêt — elle dit d'un coup d'œil de quel côté ça coince. */
+.invd-kpi-warn::before {
+  background: var(--admin-warning);
+}
+
+.invd-empl-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.invd-empl {
+  padding: 12px 13px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+}
+
+.invd-empl-tete {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invd-empl-nom {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--admin-primary);
+}
+
+.invd-empl-chiffre {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-text-secondary);
+}
+
+.invd-empl-detail {
+  color: var(--admin-text-muted);
+}
+
+.invd-empl-zones {
+  margin: 4px 0 10px;
+  font-size: 11.5px;
+  color: var(--admin-text-muted);
+}
+
+.invd-empl .invd-table th {
+  font-size: 10px;
+}
+
+.invd-zone-code {
+  display: block;
+  font-weight: 700;
+  color: #8b5cf6;
+}
+
+.invd-zone-lib {
+  display: block;
+  font-size: 11px;
+  color: var(--admin-text-muted);
+  margin-top: 1px;
+}
+
+.invd-part {
+  font-weight: 700;
+  color: var(--admin-text-secondary);
+}
+
+/* Au-delà d'un quart de la zone reprise à la main, le comptage mérite qu'on
+   aille voir : on le signale sans crier. */
+.invd-part-fort {
+  color: var(--admin-warning);
+}
+
+.invd-part-sur {
+  font-size: 11px;
+  color: var(--admin-text-muted);
+}
+
+.invd-empl-reste {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--admin-text-muted);
+}

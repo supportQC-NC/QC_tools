@@ -271,7 +271,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-.no-data {
+/* ⚠️ `.no-data` est défini SANS SCOPE dans une dizaine d'écrans, et celui de
+   AdminEntreprisesScreen le passe en `display: flex` — prévu pour une carte de
+   grille, pas pour une cellule de tableau. Le CSS de CRA étant global, cette
+   règle atteignait le <td> d'ici : la cellule cessait d'être une cellule, son
+   `colSpan` était donc IGNORÉ et le message s'affichait dans une colonne
+   étroite. On rétablit le comportement de cellule avec un sélecteur plus
+   spécifique, sans toucher à l'écran Entreprises qui a besoin du sien. */
+.admin-table td.no-data {
+  display: table-cell;
   text-align: center;
   color: var(--text-muted);
   padding: 30px 14px !important;

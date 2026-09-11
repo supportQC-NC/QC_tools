@@ -493,6 +493,23 @@ const updateBipage = asyncHandler(async (req, res) => {
     }
   }
 
+  // ── Rattrapage du GENCOD (lignes antérieures à ce champ) ────────────────
+  // Ces lignes n'ont PAS de gencod en base : la lecture le résout en mémoire
+  // (`completerGencod`) sans l'écrire, parce qu'une lecture ne doit pas écrire.
+  // Conséquence côté écran : modifier une quantité renvoyait un document au
+  // gencod vide et la colonne se VIDAIT, alors qu'elle était remplie juste
+  // avant — elle ne revenait qu'au rechargement.
+  // Ici on est dans une écriture : on peut le fixer pour de bon, et la ligne
+  // cesse définitivement de dépendre du rattrapage de lecture.
+  if (!ligne.gencod && ligne.nart) {
+    try {
+      const rec = await articleCacheService.findByNart(entreprise, ligne.nart);
+      if (rec) ligne.gencod = String(rec.GENCOD || "").trim();
+    } catch {
+      /* article introuvable dans le catalogue : le gencod reste vide */
+    }
+  }
+
   // ── Marquage de la correction ───────────────────────────────────────────
   // Seuls la QUANTITÉ et le NART comptent : une observation ajoutée n'altère
   // pas le comptage et ne doit pas faire passer la ligne pour corrigée.
@@ -1002,8 +1019,134 @@ const importExcelBipage = asyncHandler(async (req, res) => {
   });
 });
 
+
+/**
+ * @desc    Classement des zones par nombre de lignes RETOUCHÉES À LA MAIN
+ *          (ajoutées depuis l'écran ou dont le NART / la quantité a été
+ *          corrigé), groupées par emplacement. Sert à repérer les zones et les
+ *          emplacements qui posent problème : beaucoup de reprises manuelles
+ *          sur une zone, c'est un comptage à refaire ou un rayon mal tenu.
+ * @route   GET /api/bipages/:entrepriseId/stats-zones
+ * @access  Private (module bipage, read)
+ */
+const getStatsZonesRetouchees = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    return res.json({ active: false, emplacements: [], totaux: null });
+  }
+
+  // Les anciennes lignes n'ont pas de `zoneType` : sans ce rattrapage elles
+  // tomberaient toutes dans un emplacement vide et fausseraient le classement.
+  await backfillZoneType(session);
+
+  const lignes = await LigneBipage.aggregate([
+    { $match: { session: session._id } },
+    {
+      $group: {
+        _id: { type: "$zoneType", code: "$zoneCode" },
+        lignes: { $sum: 1 },
+        ajoutees: {
+          $sum: { $cond: [{ $eq: ["$source", "manuel"] }, 1, 0] },
+        },
+        modifiees: {
+          $sum: { $cond: [{ $eq: ["$modifie", true] }, 1, 0] },
+        },
+        // ⚠️ Compté à part, et NON comme ajoutees + modifiees : une ligne
+        // ajoutée puis corrigée serait sinon comptée deux fois et la zone
+        // remonterait artificiellement dans le classement.
+        touchees: {
+          $sum: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ["$source", "manuel"] },
+                  { $eq: ["$modifie", true] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  // Libellé de zone : pris dans le snapshot de session, sur le couple
+  // code + emplacement — un même code existe en MAGASIN ET en DOCK.
+  const libelles = new Map(
+    (session.zones || []).map((z) => [
+      `${z.code}|${String(z.type || "").trim()}`,
+      z.libelle || "",
+    ]),
+  );
+
+  const parEmplacement = new Map();
+  for (const l of lignes) {
+    const code = l._id.code || "";
+    if (!code) continue;
+    const type = String(l._id.type || "").trim() || "Sans emplacement";
+    if (!parEmplacement.has(type)) {
+      parEmplacement.set(type, {
+        emplacement: type,
+        zones: [],
+        lignes: 0,
+        ajoutees: 0,
+        modifiees: 0,
+        touchees: 0,
+      });
+    }
+    const bloc = parEmplacement.get(type);
+    bloc.zones.push({
+      code,
+      libelle: libelles.get(`${code}|${l._id.type || ""}`) || "",
+      lignes: l.lignes,
+      ajoutees: l.ajoutees,
+      modifiees: l.modifiees,
+      touchees: l.touchees,
+      // La PART compte autant que le nombre : 3 reprises sur 5 lignes est plus
+      // inquiétant que 3 sur 500.
+      pct: l.lignes ? Math.round((l.touchees / l.lignes) * 100) : 0,
+    });
+    bloc.lignes += l.lignes;
+    bloc.ajoutees += l.ajoutees;
+    bloc.modifiees += l.modifiees;
+    bloc.touchees += l.touchees;
+  }
+
+  // Les zones SANS aucune reprise ne sont pas du bruit utile ici : l'écran
+  // cherche les zones à problème. On les compte, on ne les liste pas.
+  const emplacements = [...parEmplacement.values()]
+    .map((b) => ({
+      ...b,
+      nbZones: b.zones.length,
+      nbZonesTouchees: b.zones.filter((z) => z.touchees > 0).length,
+      zones: b.zones
+        .filter((z) => z.touchees > 0)
+        .sort((a, c) => c.touchees - a.touchees || c.pct - a.pct),
+    }))
+    .sort((a, b) => b.touchees - a.touchees);
+
+  res.json({
+    active: true,
+    session: { _id: session._id, nom: session.nom },
+    emplacements,
+    totaux: {
+      lignes: emplacements.reduce((t, e) => t + e.lignes, 0),
+      ajoutees: emplacements.reduce((t, e) => t + e.ajoutees, 0),
+      modifiees: emplacements.reduce((t, e) => t + e.modifiees, 0),
+      touchees: emplacements.reduce((t, e) => t + e.touchees, 0),
+    },
+  });
+});
+
 export {
   getBipages,
+  getStatsZonesRetouchees,
   exportEcartsBipage,
   updateBipage,
   ajouterLigneBipage,

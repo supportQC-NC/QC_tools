@@ -44,7 +44,14 @@
   border-color: var(--admin-primary);
 }
 
-.spin {
+/* ⚠️ SCOPÉ sous .badges-screen, comme sur tous les autres écrans
+   (.ac-btn .spin, .dc-btn .spin…). Le CSS de CRA est GLOBAL : une règle
+   `.spin { animation: … infinite }` non scopée s'appliquait à toute icône
+   portant cette classe dans l'application entière, y compris là où l'écran
+   concerné ne l'avait jamais prévu — et une icône en rotation perpétuelle voit
+   sa boîte englobante changer à chaque image. C'est la collision de classe
+   globale déjà rencontrée avec `.info-card`. */
+.badges-screen .spin {
   animation: badges-rot 0.9s linear infinite;
 }
 

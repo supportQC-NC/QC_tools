@@ -3,6 +3,7 @@ import {
   HiIdentification,
   HiOfficeBuilding,
   HiChartBar,
+  HiChartPie,
   HiCube,
   HiViewGrid,
   HiClipboardList,
@@ -137,6 +138,12 @@ export const moduleMenuStructure = [
     collapsible: true,
     items: [
       {
+        // En tête : c'est la vue d'ensemble, on l'ouvre en premier.
+        label: "Tableau de bord",
+        path: "/admin/inventaire-dashboard",
+        icon: HiChartPie,
+      },
+      {
         label: "Fiches inventaires",
         path: "/admin/zones",
         icon: HiTemplate,
@@ -169,11 +176,11 @@ export const moduleMenuStructure = [
         path: "/admin/suivi-bipage",
         icon: HiClock,
       },
-      {
-        label: "Agents de l'inventaire",
-        path: "/admin/agents-inventaire",
-        icon: HiUserGroup,
-      },
+      // « Agents de l'inventaire » ne figure PLUS au menu (décision du
+      // 11/09/2026) : on y accède depuis le tableau de bord de l'inventaire,
+      // qui en porte déjà la synthèse. La ROUTE et son entrée dans
+      // PATH_MODULE_MAP restent — sans elles, le lien du tableau de bord
+      // tomberait sur une page inconnue.
     ],
   },
   {
@@ -696,6 +703,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/dictionnaire-rayons": "Dictionnaire des rayons (libellés, métrage).",
   "/admin/executables": "Téléchargements et exécutables.",
   // Inventaire
+  "/admin/inventaire-dashboard":
+    "Vue d'ensemble de l'inventaire en cours : avancement, zones, agents.",
   "/admin/zones": "Fiches d'inventaire par zone.",
   "/admin/inventaire-progression": "Progression de l'inventaire en cours.",
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
@@ -703,8 +712,6 @@ export const DEFAULT_MENU_HINTS = {
     "INVENTAIRE : qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
   "/admin/suivi-demandes-bipage":
     "TERRAIN : ce que les collecteurs ont bipé sur les demandes envoyées depuis le web.",
-  "/admin/agents-inventaire":
-    "Toutes les personnes ayant travaillé sur l'inventaire : zones, coupons, temps.",
   "/admin/fiches-controle": "Fiches de contrôle d'inventaire.",
   "/admin/inventaire-proforma": "Inventaire à partir d'une proforma.",
   // Commerciaux

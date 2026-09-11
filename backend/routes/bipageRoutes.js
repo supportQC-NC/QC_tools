@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import {
   getBipages,
+  getStatsZonesRetouchees,
   exportEcartsBipage,
   updateBipage,
   ajouterLigneBipage,
@@ -39,6 +40,11 @@ const uploadExcel = multer({
 }).single("file");
 
 // Routes littérales / spécifiques d'abord, puis paramétrées.
+// Classement des zones les plus retouchees a la main, par emplacement.
+// AVANT "/:entrepriseId" n'est pas necessaire (chemin plus long), mais on la
+// garde avec les autres routes nommees pour la lisibilite.
+router.get("/:entrepriseId/stats-zones", protect, canRead, checkEntrepriseAccess, getStatsZonesRetouchees);
+
 router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exportCsv);
 
 // Feuille d'écarts (PDF / Excel) — MÊME document que l'inventaire proforma.

@@ -34,6 +34,12 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Bipage"],
     }),
 
+    // Classement des zones les plus retouchées à la main, par emplacement.
+    getStatsZonesRetouchees: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/stats-zones`,
+      providesTags: ["Bipage"],
+    }),
+
     updateBipage: builder.mutation({
       query: ({ entrepriseId, id, body }) => ({
         url: `${BASE}/${entrepriseId}/${id}`,
@@ -133,6 +139,7 @@ export const getModeleExcelBipageUrl = (entrepriseId) =>
 
 export const {
   useGetBipagesQuery,
+  useGetStatsZonesRetoucheesQuery,
   useUpdateBipageMutation,
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
