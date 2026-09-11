@@ -560,6 +560,64 @@ sans décision explicite — le code correspondant (`ecrirePDFColisage`,
 `listerUnitesColisage`, `construireLignesColisage`) a été supprimé, pas mis en
 commentaire.
 
+## Analyse Filiales
+
+`backend/services/filialesService.js` est un **portage fidèle** du script Python
+de référence `C:\Users\Support\Desktop\analyse_filiale\main.py` (algorithme
+détaillé dans son `ALGORITHME.md`, journal d'exécution dans
+`output/generate_analyse.log`, snapshots SQLite sous `~/Desktop/DATABASES/`). Les
+classeurs produits par ce script **font foi** : une divergence est un bug, pas une
+amélioration. Relire `main.py` avant de toucher `consolidate()`.
+
+La consolidation part de **tous** les articles de la mère et cherche l'équivalent
+dans chaque filiale, en **trois passes** dont chacune ne comble que ce que la
+précédente a laissé vide (un rapprochement acquis n'est jamais écrasé) :
+
+1. **NART** — le numéro de la MÈRE lu dans la fiche de la FILIALE, champ
+   **`DESIFRN`**, partie avant le premier « - ». Repli **EXCLUSIF** sur `REFER` :
+   uniquement si `DESIFRN` est vide. Périmètre réseau seul.
+2. **GENCODE** — EAN-13 strict, périmètre réseau.
+3. **GENCODE-HORS** — EAN-13 strict, assortiment complet de la filiale. C'est la
+   passe la plus productive (chez QC elle rattrape ~8 900 articles).
+
+Le **périmètre réseau** d'une filiale = les articles dont le fournisseur porte le
+trigramme de la mère dans `fourniss.AD1` (jointure interne : sans fournisseur,
+pas de périmètre).
+
+⚠️ **Le champ est `DESIFRN`, pas `DESIGN2`.** `DESIGN2` n'existe pas dans les
+bases MQ, KQ et SITEC, et il est vide chez WELDOM et DQ : le lire désactive la
+règle et force toujours le repli sur `REFER`, ce qui accroche les mauvaises
+fiches (SITEC 400045 porte `DESIFRN` « PISTOLET TYPE SQUELETTE PRO » et `REFER`
+« 111499 » — le libellé fournisseur fait foi).
+
+⚠️ **Le NART n'est JAMAIS une clé de rapprochement.** C'est une référence interne
+à chaque société : QC et MQ partagent 16 569 numéros dont **3,7 %** seulement
+désignent le même produit. La passe nommée « NART » rapproche le numéro de la
+mère retrouvé chez la filiale, pas une égalité de numéros.
+
+⚠️ **Ne pas relâcher le filtre EAN-13 strict** (treize chiffres, rien d'autre) :
+le champ contient aussi « xxx », « * », « SLN » et de la notation scientifique.
+
+Les fiches renvoyées (`GENDOUBL`) sont résolues vers leur fiche active avant
+croisement, et une fiche mère renvoyée est **exclue** des passes gencode — sa
+fiche active porte déjà le rapprochement.
+
+**Export** — `GET /api/filiales/:reseau/export` (`filialesExcelService.js`)
+reproduit `generate_excel()` : 12 colonnes fixes + 6 par filiale, bandeaux
+fusionnés en ligne 1 (⚠️ le bandeau porte le **code** `HD`/`SIT`, l'en-tête le
+**libellé** `WELDOM`/`SITEC`), couleurs ARGB sur 8 chiffres préfixées `00` comme
+openpyxl, `freeze_panes = C3`, autofiltre `A2:…2`. Écriture **en flux** : 101 000
+lignes × 36 colonnes, un classeur monté en mémoire n'y tient pas.
+
+⚠️ Côté front, les cellules d'une ligne sont indexées par **libellé**
+(`r.filiales["WELDOM"]`), pas par code, et le gisement est `r.GISEMENT`.
+
+**Vérifier une modification** : comparer article par article contre
+`analyse_filiale/output/Analyse_Filiales_QC_*.xlsx`, et les compteurs de passe
+contre le log du script. Le service expose `rattrapages` (par passe et par
+filiale) exactement pour ça. État au 11/09/2026 : 0 article mère perdu,
+≥ 99,98 % de concordance par filiale.
+
 ## Carte des domaines fonctionnels
 
 Repères pour situer un écran / un routeur. Les préfixes API sont sous `/api/`.

@@ -133,7 +133,8 @@ const AdminFilialesScreen = () => {
     if (!data) return [];
     return data.rows.map((r) => {
       const o = {
-        gisement: r.gisement,
+        // ⚠️ Le service renvoie GISEMENT en majuscules (nom du champ DBF).
+        gisement: r.GISEMENT,
         nart: r.nart,
         design: r.design,
         nomFour: r.nomFour,
@@ -144,14 +145,18 @@ const AdminFilialesScreen = () => {
         vteHorsReseau: r.vteHorsReseau,
         pctReseau: r.pctReseau === null ? null : Math.round(r.pctReseau * 100),
         filtre: r.filtre,
+        origine: r.origine,
       };
       data.filiales.forEach((f) => {
-        const c = r.filiales[f.code];
+        // ⚠️ Les cellules sont indexées par LIBELLÉ (WELDOM, SITEC), pas par
+        // code : chercher par code laissait ces deux filiales vides.
+        const c = r.filiales[f.label];
         o[`${f.code}_nart`] = c ? c.NART : null;
         o[`${f.code}_stock`] = c ? c.STOCK : null;
         o[`${f.code}_pvte`] = c ? c.PVTE : null;
         o[`${f.code}_vteAn`] = c ? c.VTE_AN : null;
         o[`${f.code}_caAn`] = c ? c.CA_AN : null;
+        o[`${f.code}_enCde`] = c ? c.EN_COMMANDE : null;
       });
       return o;
     });
@@ -171,6 +176,9 @@ const AdminFilialesScreen = () => {
         headerName: `${data.mere} (maison-mère)`,
         headerClass: "grp grp-mere",
         children: [
+          // Ordre repris du classeur de référence, pour que l'écran et le
+          // fichier Excel se lisent de la même façon.
+          { field: "gisement", headerName: "Gisement", minWidth: 90 },
           {
             field: "nart",
             headerName: "NART",
@@ -185,7 +193,6 @@ const AdminFilialesScreen = () => {
             tooltipField: "design",
           },
           { field: "nomFour", headerName: "Fournisseur", minWidth: 160 },
-          { field: "gisement", headerName: "Gisement", minWidth: 90 },
           {
             field: "stock",
             headerName: "Stock",
@@ -245,6 +252,21 @@ const AdminFilialesScreen = () => {
             },
             cellStyle: { textAlign: "center", fontWeight: 700 },
           },
+          {
+            // Par quelle passe le rapprochement a abouti. C'est la colonne que
+            // l'on vient lire quand on doute d'une ligne.
+            field: "origine",
+            headerName: "Origine",
+            minWidth: 150,
+            cellClass: (p) =>
+              !p.value
+                ? ""
+                : p.value.includes("GENCODE-HORS")
+                  ? "orig-hors"
+                  : p.value.includes("GENCODE")
+                    ? "orig-gencode"
+                    : "orig-nart",
+          },
         ],
       },
     ];
@@ -296,6 +318,14 @@ const AdminFilialesScreen = () => {
             valueFormatter: moneyFmt,
             columnGroupShow: "open",
           },
+          {
+            field: `${f.code}_enCde`,
+            headerName: "En cde",
+            ...num,
+            filter: "agNumberColumnFilter",
+            valueFormatter: qtyFmt,
+            columnGroupShow: "open",
+          },
         ],
       });
     });
@@ -337,6 +367,17 @@ const AdminFilialesScreen = () => {
       }
       return next;
     });
+  };
+
+  // --- Export Excel « de référence » -------------------------------------
+  // Le classeur produit par le serveur est le portage fidèle du script Python
+  // qui fait foi : même feuille, mêmes colonnes, mêmes couleurs. Il exporte
+  // TOUT le réseau, sans tenir compte des filtres de l'écran — c'est le
+  // document que l'on s'échange entre sociétés.
+  const handleExportReference = () => {
+    if (!selectedReseau) return;
+    // Requête de navigation : le fichier est écrit en flux par le serveur.
+    window.open(`/api/filiales/${selectedReseau}/export`, "_blank");
   };
 
   // --- Export Excel : EXACTEMENT ce qui est affiché à l'écran ---
@@ -404,6 +445,7 @@ const AdminFilialesScreen = () => {
         "VTE HORS RESEAU",
         "% RESEAU",
         "FILTRE RESEAU",
+        "ORIGINE",
       ];
       data.filiales.forEach((f) => {
         headers.push(
@@ -412,6 +454,7 @@ const AdminFilialesScreen = () => {
           `PVTE ${f.label}`,
           `VTE AN ${f.label}`,
           `CA AN ${f.label}`,
+          `EN COMMANDE ${f.label}`,
         );
       });
       aoa = [headers];
@@ -428,6 +471,7 @@ const AdminFilialesScreen = () => {
           roundInt(r.vteHorsReseau),
           r.pctReseau === null ? "" : r.pctReseau,
           r.filtre,
+          r.origine,
         ];
         data.filiales.forEach((f) => {
           const nartV = r[`${f.code}_nart`];
@@ -438,9 +482,10 @@ const AdminFilialesScreen = () => {
               roundInt(r[`${f.code}_pvte`]),
               roundInt(r[`${f.code}_vteAn`]),
               roundInt(r[`${f.code}_caAn`]),
+              roundInt(r[`${f.code}_enCde`]),
             );
           } else {
-            line.push("", "", "", "", "");
+            line.push("", "", "", "", "", "");
           }
         });
         aoa.push(line);
@@ -471,11 +516,20 @@ const AdminFilialesScreen = () => {
             <HiRefresh className={refreshing ? "spin" : ""} /> Rafraîchir
           </button>
           <button
-            className="af-btn primary"
+            className="af-btn"
             onClick={handleExport}
             disabled={!data || !rowData.length}
+            title="Le tableau tel qu'il est affiché : filtres, tri et colonnes masquées compris."
           >
-            <HiDownload /> Excel
+            <HiDownload /> Excel (vue écran)
+          </button>
+          <button
+            className="af-btn primary"
+            onClick={handleExportReference}
+            disabled={!selectedReseau || isFetching}
+            title="Le classeur complet du réseau, mis en forme comme le rapport de référence."
+          >
+            <HiDownload /> Classeur de référence
           </button>
         </div>
       </div>

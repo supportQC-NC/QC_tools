@@ -300,6 +300,22 @@
   background: rgba(239, 68, 68, 0.12);
 }
 
+/* Colonne Origine — mêmes teintes que le classeur de référence, transposées
+   sur fond sombre : ce sont les rattrapages par code-barres que l'on vient
+   repérer dans le tableau. */
+.af-grid .orig-nart {
+  color: #b8bcc4;
+}
+.af-grid .orig-gencode {
+  color: #f0a868;
+  background: rgba(252, 228, 214, 0.1);
+}
+.af-grid .orig-hors {
+  color: #f8cbad;
+  background: rgba(248, 203, 173, 0.16);
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .admin-filiales {
     padding: 12px;

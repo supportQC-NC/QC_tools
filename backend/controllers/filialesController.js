@@ -6,6 +6,10 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import filialesService from "../services/filialesService.js";
 import { hasFilialeReseauAccess } from "../middleware/accessControl.js";
+import {
+  ecrireClasseur,
+  nomFichier,
+} from "../services/filialesExcelService.js";
 
 // GET /api/filiales — liste des réseaux AUTORISÉS pour l'utilisateur (DQ, QC, LD)
 const getReseaux = asyncHandler(async (req, res) => {
@@ -34,4 +38,20 @@ const getReseau = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
-export { getReseaux, getReseauProgress, refreshReseau, getReseau };
+// GET /api/filiales/:reseau/export — le classeur du script de référence.
+// Le fichier est écrit DIRECTEMENT dans la réponse (writer en flux d'ExcelJS) :
+// le réseau QC fait 101 000 lignes × 36 colonnes, le monter en mémoire avant de
+// l'envoyer coûterait plus d'un Go.
+const exportReseau = asyncHandler(async (req, res) => {
+  const data = await filialesService.getReseau(req.params.reseau);
+  const nom = nomFichier(data.mere);
+
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="${nom}"`);
+  await ecrireClasseur(data, res);
+});
+
+export { getReseaux, getReseauProgress, refreshReseau, getReseau, exportReseau };
