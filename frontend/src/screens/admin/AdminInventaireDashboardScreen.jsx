@@ -100,7 +100,7 @@ const AdminInventaireDashboardScreen = () => {
   const bipage = useGetSuiviBipageQuery({ entrepriseId }, skip);
   // Agrégat à part : c'est un $group Mongo sur les lignes bipées, pas un
   // recoupement des autres réponses.
-  const retouches = useGetStatsZonesRetoucheesQuery(entrepriseId, skip);
+  const retouches = useGetStatsZonesRetoucheesQuery({ entrepriseId }, skip);
 
   const rafraichir = () => {
     session.refetch();
@@ -193,7 +193,12 @@ const AdminInventaireDashboardScreen = () => {
     );
   }
 
-  const emplacements = retouches.data?.emplacements || [];
+  // ⚠️ Le serveur renvoie un bloc par emplacement même quand aucune zone n'y
+  // a été retouchée (il porte les totaux) : on ne garde ici que ceux qui ont
+  // quelque chose à montrer, sinon la carte affiche des colonnes vides.
+  const emplacements = (retouches.data?.emplacements || []).filter(
+    (e) => e.zones.length > 0,
+  );
   const tRetouches = retouches.data?.totaux;
 
   const enCours =
@@ -424,7 +429,9 @@ const AdminInventaireDashboardScreen = () => {
                   <p className="invd-empl-zones">
                     {fmtInt(e.nbZonesTouchees)} zone
                     {e.nbZonesTouchees > 1 ? "s" : ""} concernée
-                    {e.nbZonesTouchees > 1 ? "s" : ""} sur {fmtInt(e.nbZones)}
+                    {e.nbZonesTouchees > 1 ? "s" : ""} sur{" "}
+                    {fmtInt(e.nbZonesComptees)} comptée
+                    {e.nbZonesComptees > 1 ? "s" : ""}
                   </p>
 
                   <table className="invd-table">
@@ -480,9 +487,14 @@ const AdminInventaireDashboardScreen = () => {
             </div>
           )}
 
-          <Link className="invd-lien" to="/admin/bipages">
-            Voir le détail des bipages <HiArrowRight />
-          </Link>
+          <div className="invd-liens">
+            <Link className="invd-lien" to="/admin/zones-retouchees">
+              Classement de toutes les zones <HiArrowRight />
+            </Link>
+            <Link className="invd-lien" to="/admin/bipages">
+              Voir le détail des bipages <HiArrowRight />
+            </Link>
+          </div>
         </section>
 
         {/* ── Agents de l'inventaire ────────────────────────────────────── */}

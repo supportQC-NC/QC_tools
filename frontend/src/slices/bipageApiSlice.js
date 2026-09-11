@@ -35,8 +35,12 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
     }),
 
     // Classement des zones les plus retouchées à la main, par emplacement.
+    // `tout` : renvoie TOUTES les zones (listing complet) au lieu des seules
+    // zones à problème. Le tableau de bord n'en a pas besoin — lui envoyer les
+    // 622 zones à chaque chargement serait du gâchis.
     getStatsZonesRetouchees: builder.query({
-      query: (entrepriseId) => `${BASE}/${entrepriseId}/stats-zones`,
+      query: ({ entrepriseId, tout = false }) =>
+        `${BASE}/${entrepriseId}/stats-zones${tout ? "?tout=1" : ""}`,
       providesTags: ["Bipage"],
     }),
 

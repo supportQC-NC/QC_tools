@@ -1,0 +1,155 @@
+/* Classement des zones retouchées. S'appuie sur la feuille du tableau de bord
+   (`.invd-*`) pour l'en-tête, les tableaux et les couleurs ; n'ajoute ici que
+   ce qui lui est propre, sous le préfixe `zr-`.
+
+   ⚠️ Aucun nom générique : le CSS de CRA est global. */
+
+.zr-retour {
+  margin-top: 0;
+}
+
+.zr-aide {
+  margin-bottom: 14px;
+  max-width: 900px;
+}
+
+.zr-barre {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.zr-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+}
+
+.zr-search:focus-within {
+  border-color: var(--admin-primary);
+}
+
+.zr-search input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--admin-text);
+  font-size: 13px;
+  min-width: 220px;
+}
+
+.zr-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted);
+}
+
+.zr-champ select {
+  padding: 7px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.zr-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+}
+
+.zr-compte {
+  font-size: 12px;
+  color: var(--admin-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.zr-export {
+  margin-left: auto;
+}
+
+/* La liste peut faire 600 lignes : elle défile sous un en-tête qui reste. */
+.zr-table-wrap {
+  max-height: calc(100vh - 340px);
+  overflow: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+  box-shadow: var(--admin-shadow);
+}
+
+.zr-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--admin-bg-tertiary);
+  /* `border-bottom` disparaît sous une cellule collée : c'est l'ombre interne
+     qui tient le trait au défilement. */
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--admin-border);
+}
+
+.zr-table td,
+.zr-table th {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.zr-rang {
+  width: 44px;
+  text-align: right;
+  color: var(--admin-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.zr-empl {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--admin-primary);
+  white-space: nowrap;
+}
+
+.zr-fort {
+  font-weight: 800;
+}
+
+/* Zone sans aucune reprise : présente, mais elle ne doit pas retenir l'œil —
+   le classement se lit du haut. */
+.zr-ligne-zero td {
+  opacity: 0.45;
+}
+
+.zr-nil {
+  color: var(--admin-text-muted);
+}
+
+.zr-vide {
+  text-align: center;
+  color: var(--admin-text-muted);
+  padding: 30px 12px;
+}

@@ -1076,20 +1076,20 @@ const getStatsZonesRetouchees = asyncHandler(async (req, res) => {
     },
   ]);
 
-  // Libellé de zone : pris dans le snapshot de session, sur le couple
-  // code + emplacement — un même code existe en MAGASIN ET en DOCK.
-  const libelles = new Map(
-    (session.zones || []).map((z) => [
-      `${z.code}|${String(z.type || "").trim()}`,
-      z.libelle || "",
-    ]),
-  );
+  // `tout=1` : le LISTING complet, toutes zones comprises, y compris celles
+  // qui n'ont aucune reprise et celles qui n'ont même pas de ligne bipée.
+  // Par défaut on ne renvoie que les zones à problème — c'est ce dont la carte
+  // du tableau de bord a besoin, et lui envoyer les 622 zones à chaque
+  // chargement serait du gâchis.
+  const tout = req.query.tout === "1";
 
+  // Ossature : TOUTES les zones du snapshot de session. On part de là plutôt
+  // que du seul résultat d'agrégation, sinon une zone sans aucune ligne bipée
+  // n'existerait pas dans le listing — or c'est justement une information.
   const parEmplacement = new Map();
-  for (const l of lignes) {
-    const code = l._id.code || "";
-    if (!code) continue;
-    const type = String(l._id.type || "").trim() || "Sans emplacement";
+  const zoneParCle = new Map();
+
+  const bloc = (type) => {
     if (!parEmplacement.has(type)) {
       parEmplacement.set(type, {
         emplacement: type,
@@ -1100,34 +1100,85 @@ const getStatsZonesRetouchees = asyncHandler(async (req, res) => {
         touchees: 0,
       });
     }
-    const bloc = parEmplacement.get(type);
-    bloc.zones.push({
+    return parEmplacement.get(type);
+  };
+
+  for (const z of session.zones || []) {
+    const code = z.code || "";
+    if (!code) continue;
+    const brut = String(z.type || "").trim();
+    const type = brut || "Sans emplacement";
+    const entree = {
       code,
-      libelle: libelles.get(`${code}|${l._id.type || ""}`) || "",
-      lignes: l.lignes,
-      ajoutees: l.ajoutees,
-      modifiees: l.modifiees,
-      touchees: l.touchees,
-      // La PART compte autant que le nombre : 3 reprises sur 5 lignes est plus
-      // inquiétant que 3 sur 500.
-      pct: l.lignes ? Math.round((l.touchees / l.lignes) * 100) : 0,
-    });
-    bloc.lignes += l.lignes;
-    bloc.ajoutees += l.ajoutees;
-    bloc.modifiees += l.modifiees;
-    bloc.touchees += l.touchees;
+      libelle: z.libelle || "",
+      emplacement: type,
+      lignes: 0,
+      ajoutees: 0,
+      modifiees: 0,
+      touchees: 0,
+      pct: 0,
+    };
+    bloc(type).zones.push(entree);
+    // Clé sur le couple code + emplacement : un même code existe en MAGASIN
+    // ET en DOCK, les confondre mélangerait deux comptages.
+    zoneParCle.set(`${code}|${brut}`, entree);
   }
 
-  // Les zones SANS aucune reprise ne sont pas du bruit utile ici : l'écran
-  // cherche les zones à problème. On les compte, on ne les liste pas.
+  for (const l of lignes) {
+    const code = l._id.code || "";
+    if (!code) continue;
+    const brut = String(l._id.type || "").trim();
+    const type = brut || "Sans emplacement";
+    // Une ligne peut porter une zone absente du snapshot (zone supprimée des
+    // fiches après coup) : on la rattache quand même, elle compte.
+    let entree = zoneParCle.get(`${code}|${brut}`);
+    if (!entree) {
+      entree = {
+        code,
+        libelle: "",
+        emplacement: type,
+        lignes: 0,
+        ajoutees: 0,
+        modifiees: 0,
+        touchees: 0,
+        pct: 0,
+      };
+      bloc(type).zones.push(entree);
+      zoneParCle.set(`${code}|${brut}`, entree);
+    }
+    entree.lignes = l.lignes;
+    entree.ajoutees = l.ajoutees;
+    entree.modifiees = l.modifiees;
+    entree.touchees = l.touchees;
+    // La PART compte autant que le nombre : 3 reprises sur 5 lignes est plus
+    // inquiétant que 3 sur 500.
+    entree.pct = l.lignes ? Math.round((l.touchees / l.lignes) * 100) : 0;
+
+    const b2 = bloc(type);
+    b2.lignes += l.lignes;
+    b2.ajoutees += l.ajoutees;
+    b2.modifiees += l.modifiees;
+    b2.touchees += l.touchees;
+  }
+
+  // Tri : la plus retouchée d'abord, puis la part, puis le code — sans ce
+  // dernier critère l'ordre des zones à égalité (toutes celles à zéro) serait
+  // arbitraire et changerait d'un appel à l'autre.
+  const parRetouches = (a, c) =>
+    c.touchees - a.touchees ||
+    c.pct - a.pct ||
+    c.lignes - a.lignes ||
+    a.code.localeCompare(c.code, "fr", { numeric: true });
+
   const emplacements = [...parEmplacement.values()]
     .map((b) => ({
       ...b,
       nbZones: b.zones.length,
+      nbZonesComptees: b.zones.filter((z) => z.lignes > 0).length,
       nbZonesTouchees: b.zones.filter((z) => z.touchees > 0).length,
-      zones: b.zones
-        .filter((z) => z.touchees > 0)
-        .sort((a, c) => c.touchees - a.touchees || c.pct - a.pct),
+      zones: (tout ? b.zones : b.zones.filter((z) => z.touchees > 0)).sort(
+        parRetouches,
+      ),
     }))
     .sort((a, b) => b.touchees - a.touchees);
 
