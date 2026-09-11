@@ -1,4 +1,5 @@
 // backend/controllers/userControlleur.js
+import mongoose from "mongoose";
 import asyncHandler from "../middleware/asyncHandler.js";
 import jwt from "jsonwebtoken";
 import User from "../models/UserModel.js";
@@ -22,6 +23,11 @@ import {
   canAssignRole,
   isSuperAdmin,
 } from "../middleware/accessControl.js";
+import {
+  genererListePDF,
+  genererCartesPDF,
+  nomAffiche as nomBadge,
+} from "../services/badgeUtilisateurService.js";
 
 // Périmètre EFFECTIF de l'acteur pour l'atténuation des permissions accordées.
 // Un admin (rôle) possède TOUS les modules (cohérent avec checkModuleAccess) ;
@@ -1079,8 +1085,194 @@ const generateResetEmail = ({ prenom, nom, resetUrl }) => `
 </html>
 `;
 
+
+// ===========================================================================
+// BADGES UTILISATEURS (code-barres EAN-13)
+// ===========================================================================
+
+/**
+ * @desc    Attribue un code-barres aux comptes qui n'en ont pas encore.
+ *          Opération de RATTRAPAGE, à passer une fois : les comptes créés
+ *          depuis reçoivent le leur automatiquement (hook du modèle).
+ *          Idempotente — relancée, elle ne touche à rien.
+ *          ⚠️ On enregistre via `save()` et non `updateOne()` : c'est le hook
+ *          du modèle qui génère le code, et un update direct le contournerait.
+ * @route   POST /api/users/badges/generer
+ * @access  Private/Admin (module users_admin, write)
+ */
+const genererBadgesManquants = asyncHandler(async (req, res) => {
+  // Périmètre hiérarchique : on ne régularise que les comptes qu'on gère.
+  const scope = await getManageableUserScope(req.user);
+  const filtre = scope.all ? {} : { _id: { $in: scope.userIds } };
+
+  const sansCode = await User.find({
+    ...filtre,
+    $or: [{ codeBarre: { $exists: false } }, { codeBarre: "" }, { codeBarre: null }],
+  });
+
+  let generes = 0;
+  const echecs = [];
+  for (const u of sansCode) {
+    try {
+      await u.save(); // le hook pre-save pose le code-barres
+      generes += 1;
+    } catch (err) {
+      // Collision d'index (astronomiquement improbable) ou compte invalide :
+      // on ne bloque pas le lot pour un compte, on le signale.
+      echecs.push({ id: String(u._id), email: u.email, motif: err.message });
+    }
+  }
+
+  res.json({
+    examines: sansCode.length,
+    generes,
+    echecs,
+    message: generes
+      ? `${generes} badge(s) attribué(s).`
+      : "Tous les comptes gérés ont déjà un badge.",
+  });
+});
+
+/**
+ * @desc    Retrouve un utilisateur par son code-barres de badge.
+ *          Sert au scan : le poste bipe le badge au lieu de chercher la
+ *          personne dans une liste.
+ * @route   GET /api/users/badges/:code
+ * @access  Private (tout compte connecté : la réponse ne porte que l'identité)
+ */
+const getUserParBadge = asyncHandler(async (req, res) => {
+  const code = String(req.params.code || "").trim();
+  if (!code) {
+    res.status(400);
+    throw new Error("Code-barres requis");
+  }
+
+  const user = await User.findOne({ codeBarre: code }).select(
+    "nom prenom email isActive",
+  );
+  if (!user) {
+    res.status(404);
+    throw new Error("Badge inconnu");
+  }
+  if (!user.isActive) {
+    res.status(400);
+    throw new Error(`${nomBadge(user)} : compte désactivé.`);
+  }
+
+  res.json({
+    _id: user._id,
+    nom: user.nom,
+    prenom: user.prenom,
+    email: user.email,
+    nomComplet: nomBadge(user),
+  });
+});
+
+/**
+ * @desc    PDF des badges.
+ *          `format=liste`  : feuille de poste, un agent par ligne ;
+ *          `format=cartes` : badges à découper (format carte bancaire).
+ *          `tri=nom|entreprise` ; `ids=a,b,c` pour n'imprimer qu'une sélection.
+ * @route   GET /api/users/badges/pdf
+ * @access  Private/Admin (module users_admin, read)
+ */
+const exporterBadgesPdf = asyncHandler(async (req, res) => {
+  const format = req.query.format === "cartes" ? "cartes" : "liste";
+  const tri = req.query.tri === "entreprise" ? "entreprise" : "nom";
+
+  const scope = await getManageableUserScope(req.user);
+  const filtre = scope.all ? {} : { _id: { $in: scope.userIds } };
+
+  // Sélection explicite : on RESTREINT le périmètre géré, on ne l'élargit pas.
+  const ids = String(req.query.ids || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => mongoose.isValidObjectId(v));
+  if (ids.length) filtre._id = { $in: ids.map((v) => new mongoose.Types.ObjectId(v)) };
+
+  // Un compte désactivé n'a rien à faire sur une feuille d'inventaire.
+  if (req.query.inactifs !== "1") filtre.isActive = true;
+
+  const users = await User.find(filtre).select("nom prenom email codeBarre").lean();
+
+  // ⚠️ Sans code-barres, une carte sort vide et devient indétectable une fois
+  // découpée : on écarte ces comptes du document plutôt que d'imprimer du vide.
+  const prets = users.filter((u) => String(u.codeBarre || "").trim());
+  if (prets.length === 0) {
+    res.status(400);
+    throw new Error(
+      "Aucun compte avec badge dans cette sélection. Lancez d'abord « Attribuer les badges manquants ».",
+    );
+  }
+
+  const parNom = (a, b) =>
+    nomBadge(a).localeCompare(nomBadge(b), "fr", { sensitivity: "base" });
+
+  const nomFichier =
+    format === "cartes" ? "badges_utilisateurs.pdf" : "liste_badges.pdf";
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${nomFichier}"`);
+
+  if (format === "cartes") {
+    // Les cartes sont toujours triées par nom : on les découpe et on les
+    // distribue, le regroupement par société n'y apporte rien.
+    const doc = genererCartesPDF({ utilisateurs: prets.sort(parNom) });
+    doc.pipe(res);
+    return;
+  }
+
+  let groupes;
+  if (tri === "entreprise") {
+    // La société vient des permissions : un même compte peut en avoir
+    // plusieurs, il apparaît alors dans chaque groupe — c'est voulu, la feuille
+    // de poste d'un magasin doit porter tous ceux qui peuvent y travailler.
+    const perms = await Permission.find({
+      user: { $in: prets.map((u) => u._id) },
+    })
+      .populate("entreprises", "trigramme nomComplet")
+      .lean();
+    const parUser = new Map(perms.map((p) => [String(p.user), p]));
+
+    const buckets = new Map();
+    const ajouter = (cle, libelle, u) => {
+      if (!buckets.has(cle)) buckets.set(cle, { titre: libelle, utilisateurs: [] });
+      buckets.get(cle).utilisateurs.push(u);
+    };
+    for (const u of prets) {
+      const perm = parUser.get(String(u._id));
+      const ents = perm?.entreprises || [];
+      if (perm?.allEntreprises) ajouter("~toutes", "Toutes sociétés", u);
+      else if (ents.length === 0) ajouter("~sans", "Sans société", u);
+      else
+        for (const e of ents) {
+          ajouter(
+            String(e._id),
+            `${e.trigramme || ""} — ${e.nomComplet || ""}`.trim(),
+            u,
+          );
+        }
+    }
+    groupes = [...buckets.values()]
+      .map((g) => ({ ...g, utilisateurs: g.utilisateurs.sort(parNom) }))
+      .sort((a, b) => a.titre.localeCompare(b.titre, "fr"));
+  } else {
+    groupes = [{ titre: "", utilisateurs: prets.sort(parNom) }];
+  }
+
+  const doc = genererListePDF({
+    titre: "Badges utilisateurs",
+    sousTitre:
+      "Bipez le badge de l'agent pour le désigner (coupon d'inventaire, etc.).",
+    groupes,
+  });
+  doc.pipe(res);
+});
+
 export {
   authUser,
+  genererBadgesManquants,
+  getUserParBadge,
+  exporterBadgesPdf,
   logoutUser,
   getUserProfile,
   getSocketToken,

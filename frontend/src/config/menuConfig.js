@@ -1,5 +1,6 @@
 import {
   HiUsers,
+  HiIdentification,
   HiOfficeBuilding,
   HiChartBar,
   HiCube,
@@ -47,6 +48,7 @@ export const adminMenuStructure = [
     collapsible: true,
     items: [
       { label: "Utilisateurs", path: "/admin/users", icon: HiUsers },
+      { label: "Badges utilisateurs", path: "/admin/badges", icon: HiIdentification },
       { label: "Équipes", path: "/admin/equipes", icon: HiUserGroup },
       { label: "Tâches", path: "/admin/taches", icon: HiClipboardCheck },
       { label: "Entreprises", path: "/admin/entreprises", icon: HiOfficeBuilding },
@@ -656,6 +658,8 @@ export const DEFAULT_MENU_HINTS = {
   "/espace-equipe": "Messagerie et espace de travail de vos équipes.",
   // Gestion
   "/admin/users": "Gérer les comptes utilisateurs et leurs accès.",
+  "/admin/badges":
+    "Code-barres des comptes : feuille de poste à biper et cartes à découper.",
   "/admin/equipes": "Créer et gérer les équipes.",
   "/admin/taches": "Suivre et assigner les tâches.",
   "/admin/entreprises": "Configurer les sociétés et leurs chemins de données.",

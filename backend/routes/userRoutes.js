@@ -11,6 +11,9 @@ import {
   forgotPassword,
   resetPassword,
   createUser,
+  genererBadgesManquants,
+  getUserParBadge,
+  exporterBadgesPdf,
   getUsers,
   getAssignableUsers,
   getDirectoryUsers,
@@ -69,6 +72,16 @@ router.get("/", protect, canRead, getUsers);
 router.get("/assignable", protect, canRead, getAssignableUsers);
 // Annuaire société pour créer une discussion — tout user connecté. AVANT /:id.
 router.get("/directory", protect, getDirectoryUsers);
+// ── Badges (code-barres EAN-13 des utilisateurs) ────────────────────────────
+// TOUTES avant /:id, sinon "badges" serait pris pour un identifiant.
+// Le PDF et le rattrapage sont réservés à la gestion des utilisateurs ; la
+// résolution d'un badge scanné reste ouverte à tout compte connecté : elle ne
+// renvoie qu'une identité (nom, e-mail), et c'est le poste d'inventaire —
+// pas forcément un admin — qui bipe le badge de l'agent.
+router.get("/badges/pdf", protect, canRead, exporterBadgesPdf);
+router.post("/badges/generer", protect, canWrite, genererBadgesManquants);
+router.get("/badges/:code", protect, getUserParBadge);
+
 // Photo d'un user (image) — accessible à tout utilisateur connecté.
 router.get("/:id/photo", protect, getUserPhoto);
 router.get("/:id", protect, canRead, getUserById);

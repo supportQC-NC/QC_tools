@@ -25,6 +25,7 @@ import NotFound from "./screens/NotFoundScreen/NotFoundScreen";
 import InstallAppScreen from "./screens/InstallAppScreen";
 import ProfileScreen from "./screens/ProfileScreen/ProfileScreen";
 import AdminUsers from "./screens/admin/AdminUsersScreen";
+import AdminBadgesScreen from "./screens/admin/AdminBadgesScreen";
 import AdminEntreprises from "./screens/admin/AdminEntreprisesScreen";
 import AdminEntrepriseConfigScreen from "./screens/admin/AdminEntrepriseConfigScreen";
 import AdminUserConfigScreen from "./screens/admin/AdminUserConfigScreen";
@@ -284,6 +285,9 @@ const router = createBrowserRouter(
           données scopées à son équipe côté API) */}
       <Route element={<ModuleRoute module="users_admin" roles={["responsable"]} />}>
         <Route path="/admin/users" element={<AdminUsers />} />
+        {/* Badges (code-barres des comptes) : même périmètre que la gestion
+            des utilisateurs — c'est la liste des mêmes personnes. */}
+        <Route path="/admin/badges" element={<AdminBadgesScreen />} />
         {/* Création : page plein écran (le formulaire ne tient plus en modale). */}
         <Route path="/admin/users/nouveau" element={<AdminUserCreateScreen />} />
         <Route

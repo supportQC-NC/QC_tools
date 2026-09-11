@@ -28,6 +28,7 @@ import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import ImportComptageZone from "../../components/Admin/ImportComptageZone";
 import UserPicker from "../../components/ui/UserPicker/UserPicker";
+import { useLazyGetUserParBadgeQuery } from "../../slices/userApiSlice";
 import "./AdminProgressionScreen.css";
 
 const POLL = 4000;
@@ -111,6 +112,14 @@ const AdminInventaireProgressionScreen = () => {
   // { source: 'bip'|'manuel', code?, zone, phase }
   const [designation, setDesignation] = useState(null);
   const [agentUserId, setAgentUserId] = useState("");
+  // Badge scanné : le poste bipe la carte de l'agent plutôt que de le chercher
+  // dans la liste. Le scan ne fait que REMPLIR le sélecteur — la validation
+  // reste la même, et la liste reste utilisable quand quelqu'un a oublié sa
+  // carte.
+  const [badgeSaisi, setBadgeSaisi] = useState("");
+  const [badgeMsg, setBadgeMsg] = useState(null);
+  const [resoudreBadge, { isFetching: badgeEnCours }] =
+    useLazyGetUserParBadgeQuery();
   // Dernier agent désigné : re-proposé au coupon suivant, un agent en rapporte
   // en général plusieurs d'affilée.
   const [dernierAgentId, setDernierAgentId] = useState("");
@@ -327,6 +336,31 @@ const AdminInventaireProgressionScreen = () => {
 
   // ÉTAPE 2 — validation de la désignation : c'est ICI que la phase est marquée,
   // que l'on soit venu du scan d'un coupon ou d'une coche manuelle.
+  /**
+   * Un badge vient d'être bipé (ou saisi). On résout la personne et on
+   * pré-remplit le sélecteur.
+   * ⚠️ Déclenché sur la LONGUEUR (13 chiffres), pas sur « Entrée » : beaucoup
+   * de douchettes n'envoient aucun suffixe — même règle que sur le collecteur.
+   */
+  const traiterBadge = async (valeur) => {
+    const code = String(valeur || "").replace(/\D/g, "");
+    setBadgeSaisi(valeur);
+    setBadgeMsg(null);
+    if (code.length !== 13) return;
+    try {
+      const u = await resoudreBadge(code).unwrap();
+      setAgentUserId(u._id);
+      setBadgeMsg({ type: "ok", texte: `Badge reconnu : ${u.nomComplet}` });
+      setBadgeSaisi("");
+    } catch (err) {
+      setBadgeMsg({
+        type: "err",
+        texte: err?.data?.message || "Badge inconnu.",
+      });
+      setBadgeSaisi("");
+    }
+  };
+
   const handleConfirmerDesignation = async () => {
     if (!designation || biping) return;
     try {
@@ -909,6 +943,27 @@ const AdminInventaireProgressionScreen = () => {
                   </span>
                 )}
               </div>
+              {/* Bip du badge : posé AVANT la liste, c'est le geste normal.
+                  La liste reste dessous pour les cas sans carte. */}
+              <div className="designation-badge">
+                <input
+                  type="text"
+                  className="designation-badge-input"
+                  value={badgeSaisi}
+                  onChange={(e) => traiterBadge(e.target.value)}
+                  placeholder="Bipez le badge de l'agent…"
+                  autoFocus
+                />
+                {badgeEnCours && (
+                  <span className="designation-badge-etat">Recherche…</span>
+                )}
+              </div>
+              {badgeMsg && (
+                <p className={`designation-badge-msg ${badgeMsg.type}`}>
+                  {badgeMsg.texte}
+                </p>
+              )}
+
               <UserPicker
                 users={agentsPossibles || []}
                 value={agentUserId}
@@ -917,10 +972,11 @@ const AdminInventaireProgressionScreen = () => {
                 emptyLabel="Moi (par défaut)"
               />
               <p className="designation-hint">
-                Cherchez la personne par son nom ou son e-mail. Tous les comptes
-                de l'application sont proposés, pas seulement ceux de la
-                société : un renfort venu d'une autre société doit pouvoir être
-                crédité. Sans choix, la phase est mise à votre nom.
+                Bipez le badge de l'agent, ou cherchez-le par son nom ou son
+                e-mail. Tous les comptes de l'application sont proposés, pas
+                seulement ceux de la société : un renfort venu d'une autre
+                société doit pouvoir être crédité. Sans choix, la phase est mise
+                à votre nom.
               </p>
             </div>
             <div className="modal-footer">

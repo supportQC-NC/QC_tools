@@ -1,0 +1,324 @@
+/* Badges utilisateurs — mêmes codes visuels que les autres écrans admin
+   (variables --admin-* définies globalement dans index.css). */
+
+.badges-screen {
+  padding: 20px 24px 40px;
+  color: var(--admin-text);
+}
+
+.badges-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.badges-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  margin: 0;
+}
+
+.badges-head h1 svg {
+  color: var(--admin-primary);
+}
+
+.badges-icon-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.badges-icon-btn:hover {
+  color: var(--admin-text);
+  border-color: var(--admin-primary);
+}
+
+.spin {
+  animation: badges-rot 0.9s linear infinite;
+}
+
+@keyframes badges-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.badges-intro,
+.badges-note {
+  color: var(--admin-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 880px;
+}
+
+.badges-intro {
+  margin: 6px 0 16px;
+}
+
+.badges-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--admin-border);
+  font-size: 12.5px;
+}
+
+.badges-note b,
+.badges-intro b {
+  color: var(--admin-text-secondary);
+}
+
+/* Rattrapage des comptes antérieurs : ambre, c'est une action ponctuelle. */
+.badges-rattrapage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--admin-radius);
+  background: rgba(245, 158, 11, 0.07);
+  font-size: 13px;
+}
+
+.badges-rattrapage > svg {
+  color: var(--admin-warning);
+  flex-shrink: 0;
+}
+
+.badges-rattrapage .btn-primary {
+  margin-left: auto;
+}
+
+.badges-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border-radius: var(--admin-radius-sm);
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+
+.badges-msg.ok {
+  color: var(--admin-success);
+  background: var(--admin-success-light);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.badges-msg.err {
+  color: var(--admin-danger);
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.badges-barre {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.badges-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-muted);
+}
+
+.badges-search:focus-within {
+  border-color: var(--admin-primary);
+}
+
+.badges-search input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--admin-text);
+  font-size: 13px;
+  min-width: 220px;
+}
+
+.badges-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted);
+}
+
+.badges-champ select {
+  padding: 7px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.badges-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+}
+
+.badges-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.badges-portee {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--admin-text-muted);
+}
+
+.badges-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+  box-shadow: var(--admin-shadow);
+}
+
+.badges-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  min-width: 760px;
+}
+
+.badges-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-secondary);
+  background: var(--admin-bg-tertiary);
+  box-shadow: inset 0 -1px 0 var(--admin-border);
+}
+
+.badges-table td {
+  padding: 9px 12px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.badges-table tbody tr:hover td {
+  background: var(--admin-bg-hover);
+}
+
+.badges-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.col-check {
+  width: 34px;
+  text-align: center;
+}
+
+.badges-nom {
+  display: block;
+  font-weight: 650;
+  color: var(--admin-text);
+}
+
+.badges-mail {
+  display: block;
+  font-size: 11px;
+  color: var(--admin-text-muted);
+  margin-top: 2px;
+}
+
+.badges-soc {
+  color: var(--admin-text-secondary);
+}
+
+.badges-role {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+}
+
+.badges-role.r-admin {
+  color: var(--admin-danger);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.badges-role.r-responsable {
+  color: var(--admin-warning);
+  background: var(--admin-warning-light);
+}
+
+/* Le code est fait pour être relu chiffre à chiffre : chasse fixe. */
+.badges-code {
+  font-family: "Courier New", monospace;
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  color: var(--admin-text);
+  white-space: nowrap;
+}
+
+.badges-absent {
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: normal;
+  color: var(--admin-warning);
+}
+
+.ligne-inactive td {
+  opacity: 0.5;
+}
+
+.ligne-sans-badge td {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.badges-vide {
+  text-align: center;
+  color: var(--admin-text-muted);
+  padding: 30px 12px;
+}

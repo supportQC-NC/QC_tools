@@ -5,6 +5,19 @@ import { USERS_URL } from "../constants";
 export const userPhotoUrl = (id, v) =>
   `${USERS_URL}/${id}/photo${v ? `?v=${encodeURIComponent(v)}` : ""}`;
 
+/**
+ * URL du PDF des badges. Hors RTK Query : c'est un flux binaire qu'on ouvre
+ * dans un onglet, pas une donnée à mettre en cache.
+ *   format : "liste" (feuille de poste) | "cartes" (à découper)
+ *   tri    : "nom" | "entreprise"  (sans effet sur les cartes)
+ *   ids    : sélection ; vide = tout le périmètre géré
+ */
+export const badgesPdfUrl = ({ format = "liste", tri = "nom", ids = [] } = {}) => {
+  const params = new URLSearchParams({ format, tri });
+  if (ids.length) params.set("ids", ids.join(","));
+  return `${USERS_URL}/badges/pdf?${params.toString()}`;
+};
+
 export const userApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Auth
@@ -74,6 +87,21 @@ export const userApiSlice = apiSlice.injectEndpoints({
       providesTags: ["User"],
       keepUnusedDataFor: 5,
     }),
+    // ── Badges (code-barres utilisateurs) ────────────────────────────────
+    // Rattrapage des comptes créés avant la fonctionnalité. Invalide "User" :
+    // la liste doit réafficher les codes fraîchement attribués.
+    genererBadgesManquants: builder.mutation({
+      query: () => ({
+        url: `${USERS_URL}/badges/generer`,
+        method: "POST",
+      }),
+      invalidatesTags: ["User"],
+    }),
+    // Résolution d'un badge scanné → identité de la personne.
+    getUserParBadge: builder.query({
+      query: (code) => ({ url: `${USERS_URL}/badges/${encodeURIComponent(code)}` }),
+    }),
+
     // Liste allégée des utilisateurs assignables à une équipe (périmètre société).
     getAssignableUsers: builder.query({
       query: () => ({
@@ -140,6 +168,8 @@ export const {
   useUploadProfilePhotoMutation,
   useDeleteProfilePhotoMutation,
   useGetUsersQuery,
+  useGenererBadgesManquantsMutation,
+  useLazyGetUserParBadgeQuery,
   useGetAssignableUsersQuery,
   useGetDirectoryUsersQuery,
   useGetUserByIdQuery,

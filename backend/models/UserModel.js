@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { genererEanInterne } from "../utils/ean13.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -72,6 +73,20 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // ── Badge de l'utilisateur ────────────────────────────────────────────
+    // EAN-13 interne (préfixe « 2 »), déterministe, dérivé de l'_id : il ne
+    // change jamais et se régénère à l'identique si besoin. Sert à DÉSIGNER la
+    // personne par un bip — au coupon d'inventaire, on bipe son badge au lieu
+    // de la chercher dans une liste déroulante.
+    // `sparse` : les comptes créés avant cette fonctionnalité n'ont pas encore
+    // de code ; sans lui, l'index unique les ferait tous entrer en collision
+    // sur la valeur absente.
+    codeBarre: {
+      type: String,
+      trim: true,
+      index: { unique: true, sparse: true },
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -96,6 +111,18 @@ userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Badge : généré à la création, jamais réécrit ensuite.
+// ⚠️ Hook SÉPARÉ de celui du mot de passe : celui-ci sort tôt
+// (`isModified("password")`), et y greffer la génération la sauterait à chaque
+// enregistrement qui ne touche pas au mot de passe — c'est-à-dire presque tous.
+// `_id` est disponible ici : Mongoose l'attribue avant le pre-save.
+userSchema.pre("save", function (next) {
+  if (!this.codeBarre) {
+    this.codeBarre = genererEanInterne(`user|${this._id}`);
+  }
   next();
 });
 

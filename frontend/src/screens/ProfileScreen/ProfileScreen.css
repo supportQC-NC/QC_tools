@@ -627,3 +627,22 @@
   margin-top: 6px;
   text-decoration: underline;
 }
+
+/* ── Mon badge ────────────────────────────────────────────────────────────
+   Le code est fait pour être relu chiffre à chiffre, voire dicté : chasse
+   fixe, gros, espacé. */
+.profile-badge-code {
+  margin: 4px 0 8px;
+  font-family: "Courier New", monospace;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--admin-primary, #4da6ff);
+}
+
+.profile-badge-aide {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--admin-text-muted, #8b8b9e);
+}

@@ -87,6 +87,8 @@ export const PERMISSION_MODULE_BY_KEY = PERMISSION_MODULES.reduce((acc, m) => {
 export const PATH_MODULE_MAP = [
   // Administration
   { path: "/admin/users", key: "users_admin" },
+  // Badges : même module que la gestion des utilisateurs.
+  { path: "/admin/badges", key: "users_admin" },
   { path: "/admin/entreprises", key: "entreprises_admin" },
   { path: "/admin/infobulles", key: "infobulles_admin" },
   { path: "/admin/smtp", key: "smtp_admin" },

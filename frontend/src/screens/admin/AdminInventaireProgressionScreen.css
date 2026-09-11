@@ -533,3 +533,49 @@
 .proforma-group.excluded .proforma-numfact {
   text-decoration: line-through;
 }
+/* ── Bip du badge agent (fenêtre de désignation) ───────────────────────────
+   Le champ est en tête de fenêtre et prend le focus : le geste normal est de
+   biper, pas de chercher dans la liste. */
+.designation-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.designation-badge-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-primary);
+  border-radius: var(--admin-radius-sm);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 15px;
+  font-family: "Courier New", monospace;
+  letter-spacing: 0.06em;
+}
+
+.designation-badge-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.25);
+}
+
+.designation-badge-etat {
+  font-size: 12px;
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+}
+
+.designation-badge-msg {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.designation-badge-msg.ok {
+  color: var(--admin-success);
+}
+
+.designation-badge-msg.err {
+  color: var(--admin-danger);
+}

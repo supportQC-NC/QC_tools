@@ -96,6 +96,16 @@ const IconDevice = () => (
   </svg>
 );
 
+// Badge : un code-barres stylisé, pas une vraie lecture — l'icône ne sert qu'à
+// identifier la carte dans la page.
+const IconBadge = () => (
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M6 9v6M9 9v6M12 9v6M16 9v6M19 9v6" />
+  </svg>
+);
+
 const STATUT_LABELS = {
   stock: "En stock",
   service: "En service",
@@ -432,6 +442,29 @@ const ProfileScreen = () => {
             </button>
           </form>
         </section>
+
+        {/* ─── Carte : mon badge ───────────────────────────────────────────
+            Le code-barres qui permet de me désigner d'un bip (coupon
+            d'inventaire). Affiché en clair pour qu'il puisse être dicté ou
+            ressaisi quand le badge papier n'est pas sous la main. En lecture
+            seule : il est dérivé de l'identifiant du compte et ne se modifie
+            pas. */}
+        {profile?.codeBarre ? (
+          <section className="profile-card profile-area-badge">
+            <div className="card-head">
+              <span className="card-head-icon">
+                <IconBadge />
+              </span>
+              <h2>Mon badge</h2>
+            </div>
+            <p className="profile-badge-code">{profile.codeBarre}</p>
+            <p className="profile-badge-aide">
+              Ce code-barres vous identifie lors d'un bip — par exemple au
+              scan d'un coupon d'inventaire, pour créditer votre travail. Votre
+              carte plastifiée est imprimée par un administrateur.
+            </p>
+          </section>
+        ) : null}
 
         {/* ─── Carte : mes collecteurs ─── */}
         <section className="profile-card profile-area-collecteurs">
