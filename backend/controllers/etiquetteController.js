@@ -25,12 +25,31 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// Nombre d'étiquettes à tirer pour une ligne de proforma (décision client du
+// 15/09/2026 : une étiquette PAR UNITÉ commandée, la proforma sert à étiqueter
+// un arrivage avant mise en rayon).
+//
+// ⚠️ `prodet.QTE` est un N(x.3) : beaucoup d'articles se vendent au mètre. On
+// arrondit ICI, et ICI SEULEMENT, parce qu'on compte des étiquettes (un objet
+// physique, forcément entier) — jamais la quantité affichée ou exportée.
+// Une ligne à 0 (ou négative : retour, ligne de commentaire chiffrée) donne
+// quand même UNE étiquette : l'article figure au document.
+const nbEtiquettesLigne = (qte) => {
+  const n = Math.round(toNum(qte));
+  return n > 1 ? n : 1;
+};
+
+// Garde-fou anti-PDF géant : 20 étiquettes par feuille A4, donc 2 000 =
+// 100 feuilles. Au-delà on refuse explicitement plutôt que de tronquer en
+// silence (l'utilisateur croirait avoir tout imprimé).
+const MAX_ETIQUETTES_PROFORMA = 2000;
+
 // Résout une liste ORDONNÉE de NART selon le mode, puis charge les articles.
 // Partagé par les types classiques ET le type « custom » avec données.
 // Lève des erreurs HTTP via res.status (comportement identique à l'ancien code).
 const resolveArticles = async (req, res, entreprise, mode) => {
   let nartList = [];
-  // Renseigne uniquement par les modes gisement / groupe : [{ titre, narts }].
+  // Renseigné par les modes gisement / groupe / proforma : [{ titre, code, narts }].
   let sections = null;
   if (mode === "proforma") {
     const numfact = safeTrim(req.body.numfact);
@@ -41,10 +60,52 @@ const resolveArticles = async (req, res, entreprise, mode) => {
     const cache = await proformaCacheService.getProformas(entreprise);
     const rows = (cache.prodetByNumfact.get(numfact) || []).slice();
     rows.sort((a, b) => toNum(a.NL) - toNum(b.NL));
-    nartList = rows.map((r) => safeTrim(r.NART)).filter(Boolean);
+
+    // Autant d'étiquettes par référence que la QTE de la proforma : la même
+    // NART est répétée, elle ne sera résolue qu'une seule fois plus bas.
+    nartList = [];
+    for (const r of rows) {
+      const nart = safeTrim(r.NART);
+      // Lignes de commentaire de la proforma (NART vide ou contenant « ! »,
+      // même règle que proformaCacheService.isCommentLine) : rien à étiqueter.
+      if (!nart || nart.includes("!")) continue;
+      const n = nbEtiquettesLigne(r.QTE);
+      for (let i = 0; i < n; i++) nartList.push(nart);
+    }
     if (nartList.length === 0) {
       res.status(404);
       throw new Error(`Aucun article pour la proforma ${numfact}`);
+    }
+    if (nartList.length > MAX_ETIQUETTES_PROFORMA) {
+      res.status(400);
+      throw new Error(
+        `La proforma ${numfact} demande ${nartList.length} étiquettes ` +
+          `(limite : ${MAX_ETIQUETTES_PROFORMA}). Imprimez-la en plusieurs fois ` +
+          `ou passez par la liste de NART.`,
+      );
+    }
+
+    // L'observation de la proforma joue le rôle du code de gisement / groupe :
+    // titre en haut à droite de chaque feuille ET marque verticale en marge de
+    // chaque rangée, pour que les bandes découpées restent identifiables.
+    //
+    // ⚠️ L'observation est `proforma.TEXTE` : **il n'existe aucun champ OBSERV
+    // dans proforma.dbf** (NUMFACT, DATFACT, TIERS, NOM, TEXTE, REPRES,
+    // MONTANT, DATCHANT, MAILING1-5, ETAT — vérifié sur le DBF de QC). C'est
+    // déjà TEXTE que lisent l'import des proformas « reappro » et le bloc
+    // « Texte / Objet » de l'écran Proformas.
+    //
+    // Observation vide ⇒ AUCUN titre (comportement d'avant) : on n'écrit pas
+    // le numéro de proforma à la place, l'utilisateur veut son observation ou
+    // rien.
+    const idxEntete = cache.indexByNumfact.get(numfact);
+    const entete =
+      idxEntete === undefined ? null : cache.proformaRecords[idxEntete];
+    const observation = safeTrim(entete && entete.TEXTE);
+    if (observation) {
+      sections = [
+        { titre: observation, code: observation, narts: nartList.slice() },
+      ];
     }
   } else if (mode === "commande") {
     const numcde = safeTrim(req.body.numcde);
@@ -116,15 +177,23 @@ const resolveArticles = async (req, res, entreprise, mode) => {
 
   const articles = [];
   const introuvables = [];
+  // Un NART peut revenir plusieurs fois (quantités d'une proforma, liste saisie
+  // avec doublons) : on ne le résout qu'UNE fois, et on ne le compte qu'une
+  // fois dans les introuvables.
+  const resolus = new Map();
   for (const nart of nartList) {
-    let art = null;
-    try {
-      art = await articleCacheService.findByNart(entreprise, nart);
-    } catch {
-      art = null;
+    if (!resolus.has(nart)) {
+      let art = null;
+      try {
+        art = await articleCacheService.findByNart(entreprise, nart);
+      } catch {
+        art = null;
+      }
+      resolus.set(nart, art);
+      if (!art) introuvables.push(nart);
     }
+    const art = resolus.get(nart);
     if (art) articles.push(art);
-    else introuvables.push(nart);
   }
   if (articles.length === 0) {
     res.status(404);

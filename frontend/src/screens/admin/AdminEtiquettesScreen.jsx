@@ -582,6 +582,10 @@ const AdminEtiquettesScreen = () => {
             />
             <span className="etiq-hint">
               Les articles sont récupérés et triés par numéro de ligne (NL).
+              Chaque référence est tirée <strong>autant de fois que sa quantité</strong>{" "}
+              sur la proforma, et l&apos;<strong>observation</strong> du document (champ
+              « Texte / Objet ») est rappelée en haut de feuille et en marge de
+              chaque rangée — rien n&apos;est écrit si elle est vide.
             </span>
           </div>
         )}

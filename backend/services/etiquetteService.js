@@ -445,8 +445,8 @@ const drawMarqueLigne = (rl, code, xGauche, largeur, yCentre, hauteurRangee) => 
  * sur la même feuille obligent à découper puis trier. Le titre rappelle en haut
  * à droite de quel gisement ou groupe il s'agit.
  *
- * Une section sans titre (impression par NART, par proforma, par commande…) se
- * comporte exactement comme avant : remplissage continu, aucun en-tête.
+ * Une section sans titre (impression par NART, par commande…) se comporte
+ * exactement comme avant : remplissage continu, aucun en-tête.
  */
 const drawStandard = (rl, sections, opts = {}) => {
   const W = rl.W;
@@ -1045,8 +1045,8 @@ export const genererEtiquettesCustomPDF = async ({
  * @param {object} p
  * @param {Array}  p.articles  liste à plat (compat : tous les modes hors
  *                             gisement/groupe)
- * @param {Array}  [p.sections] [{ titre, articles }] — une section par gisement
- *                             ou par groupe. Chacune démarre une NOUVELLE
+ * @param {Array}  [p.sections] [{ titre, articles }] — une section par gisement,
+ *                             par groupe, ou la proforma (observation en titre). Chacune démarre une NOUVELLE
  *                             feuille, porte son titre en haut à droite et
  *                             le répète en marge de chaque rangée (découpage
  *                             en bandes).
@@ -1080,8 +1080,8 @@ export const genererEtiquettesPDF = async ({
   // Logo entreprise (optionnel) — résolu + tracé dans les logs si ignoré
   const logoBuf = resolveLogoBuffer(entreprise);
 
-  // Sans sections (impression par NART, proforma, commande…) : une seule
-  // section sans titre, donc remplissage continu, exactement comme avant.
+  // Sans sections (impression par NART, par commande…) : une seule section
+  // sans titre, donc remplissage continu, exactement comme avant.
   const paquets =
     Array.isArray(sections) && sections.length
       ? sections
