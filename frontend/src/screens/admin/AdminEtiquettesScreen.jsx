@@ -105,6 +105,12 @@ const AdminEtiquettesScreen = () => {
   const [csvCount, setCsvCount] = useState(0);
   const fileInputRef = useRef(null);
 
+  // Contrôle « articles sans code-barres » : renseigné juste avant la
+  // génération quand au moins un article sélectionné n'a pas de GENCOD
+  // exploitable. Porte la réponse du serveur ET le corps de requête déjà
+  // construit, pour relancer la génération telle quelle après le choix.
+  const [controleGencod, setControleGencod] = useState(null);
+
   // Import « en masse » (type custom) : fichier Excel/CSV SANS en-tête. Chaque
   // ligne = une étiquette ; les colonnes deviennent des champs plaçables (imp0…N).
   const [importRows, setImportRows] = useState([]); // tableau de lignes (tableaux de cellules)
@@ -363,9 +369,35 @@ const AdminEtiquettesScreen = () => {
     return { ok: false, error: "Choisissez une source d'articles." };
   };
 
+  // Demande au serveur quels articles de la sélection n'ont pas de code-barres
+  // imprimable. Best effort : si le contrôle échoue (source invalide, réseau),
+  // on renvoie null et la génération suit son cours — c'est elle qui portera
+  // le vrai message d'erreur.
+  const controlerArticlesSansGencod = async (body) => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/etiquettes/${nomDossierDBF}/controle-gencod`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const genererEtiquettes = async () => {
     setError("");
     setInfo(null);
+    setControleGencod(null);
 
     if (!nomDossierDBF) {
       setError("Sélectionnez une entreprise.");
@@ -409,6 +441,31 @@ const AdminEtiquettesScreen = () => {
         body = { type, mode, ...src.fields, format };
       }
     }
+
+    // Seule la grille « Standard » (avec prix) laisse la zone code-barres VIDE
+    // quand l'article n'a pas de GENCOD. On ne pose donc la question que là :
+    // « Standard sans prix » affiche déjà le NART en gros au centre, les
+    // formats pleine page l'écrivent sous le code-barres, et le type custom
+    // n'a aucune zone imposée.
+    if (type === "standard" && mode !== "aucun" && mode !== "import") {
+      const controle = await controlerArticlesSansGencod(body);
+      if (controle && controle.nbSansGencod > 0) {
+        // On ne génère rien tant que l'utilisateur n'a pas tranché.
+        setControleGencod({ ...controle, body });
+        return;
+      }
+    }
+
+    await lancerGeneration(body);
+  };
+
+  // Génération réelle. `sansGencod` = choix de la fenêtre de contrôle
+  // (« nart » / « vide »), absent quand la question ne s'est pas posée.
+  const lancerGeneration = async (bodyBase, sansGencod) => {
+    setError("");
+    setInfo(null);
+    setControleGencod(null);
+    const body = sansGencod ? { ...bodyBase, sansGencod } : bodyBase;
 
     setLoading(true);
     try {
@@ -915,6 +972,77 @@ const AdminEtiquettesScreen = () => {
           {loading ? "Génération…" : "🏷️ Générer les étiquettes"}
         </button>
       </div>
+
+      {/* Articles sans code-barres : la question n'est posée QUE s'il y en a,
+          et une seule fois, juste avant la génération. */}
+      {controleGencod && (
+        <div
+          className="etiq-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="etiq-modal-titre"
+        >
+          <div className="etiq-modal">
+            <div className="etiq-modal-head">
+              <h3 id="etiq-modal-titre">
+                {controleGencod.nbSansGencod} article
+                {controleGencod.nbSansGencod > 1 ? "s" : ""} sans code-barres
+              </h3>
+              <button
+                type="button"
+                className="etiq-modal-close"
+                onClick={() => setControleGencod(null)}
+                title="Annuler"
+              >
+                <HiX />
+              </button>
+            </div>
+
+            <p className="etiq-modal-text">
+              Ces articles n&apos;ont pas de GENCOD exploitable en base : leur
+              étiquette ne portera aucun code-barres. Que voulez-vous mettre à la
+              place&nbsp;? «&nbsp;Laisser vide&nbsp;» retire aussi le petit NART
+              du coin : l&apos;étiquette ne garde que la désignation et le prix.
+            </p>
+
+            <div className="etiq-modal-liste">
+              {(controleGencod.articles || []).slice(0, 12).map((art) => (
+                <div key={art.NART} className="etiq-modal-ligne">
+                  <span className="etiq-modal-nart">{art.NART}</span>
+                  <span className="etiq-modal-design">{art.DESIGN}</span>
+                </div>
+              ))}
+              {controleGencod.nbSansGencod > 12 && (
+                <div className="etiq-modal-more">
+                  … et {controleGencod.nbSansGencod - 12} autre
+                  {controleGencod.nbSansGencod - 12 > 1 ? "s" : ""}
+                </div>
+              )}
+            </div>
+
+            <div className="etiq-modal-actions">
+              <button
+                type="button"
+                className="etiq-modal-btn etiq-modal-btn--primary"
+                onClick={() => lancerGeneration(controleGencod.body, "nart")}
+              >
+                Afficher le NART à la place
+              </button>
+              <button
+                type="button"
+                className="etiq-modal-btn"
+                onClick={() => lancerGeneration(controleGencod.body, "vide")}
+              >
+                Laisser vide (aucun NART)
+              </button>
+            </div>
+            <div className="etiq-modal-hint">
+              Les {controleGencod.total} étiquette(s) sont générées dans les deux
+              cas ; seuls les articles ci-dessus changent.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

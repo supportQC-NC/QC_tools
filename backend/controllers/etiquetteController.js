@@ -9,6 +9,7 @@ import articleCacheService, { CODE_VIDE } from "../services/articleService.js";
 import {
   genererEtiquettesPDF,
   genererEtiquettesCustomPDF,
+  codeBarresImprimable,
   TYPES_ETIQUETTES,
 } from "../services/etiquetteService.js";
 
@@ -317,6 +318,15 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
     sections,
     entreprise,
     outPath: tmp,
+    // Choix fait par l'utilisateur dans la fenêtre de contrôle (voir
+    // controlerGencod), pour les articles sans GENCOD exploitable : « nart »
+    // imprime le NART en gros dans la zone code-barres, « vide » n'imprime
+    // AUCUN NART (petit NART du coin compris). Sans choix : comportement
+    // historique.
+    sansGencod:
+      req.body.sansGencod === "nart" || req.body.sansGencod === "vide"
+        ? req.body.sansGencod
+        : "defaut",
   });
 
   return streamAndCleanup(res, tmp, `etiquettes_${type}.pdf`, {
@@ -326,4 +336,53 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
   });
 });
 
-export { genererEtiquettes };
+/**
+ * @desc    Contrôle AVANT génération : quels articles de la sélection n'ont pas
+ *          de code-barres imprimable ? L'écran s'en sert pour demander à
+ *          l'utilisateur, une seule fois et seulement si nécessaire, s'il veut
+ *          voir le NART à la place ou laisser la zone vide.
+ *
+ *          Même corps de requête que /generer (mode + source) : la résolution
+ *          des articles passe par le MÊME `resolveArticles`, sinon le contrôle
+ *          et le PDF pourraient porter sur deux listes différentes.
+ * @route   POST /api/etiquettes/:nomDossierDBF/controle-gencod
+ * @access  Private (module etiquettes, read) — entreprise via :nomDossierDBF
+ */
+const controlerGencod = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const { mode } = req.body;
+
+  // Le type « custom » avec données libres importées n'a pas d'article à
+  // contrôler, et les modes sans source non plus.
+  if (!mode || mode === "aucun" || mode === "import") {
+    return res.json({ total: 0, nbSansGencod: 0, articles: [] });
+  }
+
+  const { articles } = await resolveArticles(req, res, entreprise, mode);
+
+  // Dédoublonné par NART : une proforma répète la même référence autant de
+  // fois que sa quantité, l'utilisateur n'a pas besoin de la lire 12 fois.
+  const vus = new Set();
+  const sans = [];
+  for (const art of articles) {
+    const nart = safeTrim(art.NART);
+    if (vus.has(nart)) continue;
+    vus.add(nart);
+    if (!codeBarresImprimable(art)) {
+      sans.push({
+        NART: nart,
+        DESIGN: safeTrim(art.DESIGN),
+        GENCOD: safeTrim(art.GENCOD),
+      });
+    }
+  }
+
+  return res.json({
+    total: articles.length,
+    nbSansGencod: sans.length,
+    // Liste bornée : au-delà l'écran affiche « … et N autres ».
+    articles: sans.slice(0, 200),
+  });
+});
+
+export { genererEtiquettes, controlerGencod };

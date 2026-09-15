@@ -1,6 +1,9 @@
 // backend/routes/etiquetteRoutes.js
 import express from "express";
-import { genererEtiquettes } from "../controllers/etiquetteController.js";
+import {
+  genererEtiquettes,
+  controlerGencod,
+} from "../controllers/etiquetteController.js";
 import {
   getTemplates,
   createTemplate,
@@ -25,6 +28,16 @@ router.post(
   checkEntrepriseAccess,
   canRead,
   genererEtiquettes,
+);
+
+// Contrôle préalable : articles de la sélection sans code-barres imprimable.
+// Même corps de requête et mêmes gardes que /generer — c'est la même lecture.
+router.post(
+  "/:nomDossierDBF/controle-gencod",
+  protect,
+  checkEntrepriseAccess,
+  canRead,
+  controlerGencod,
 );
 
 // Templates d'étiquettes personnalisées (SCOPÉS SOCIÉTÉ, partagés entre users).

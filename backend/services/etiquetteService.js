@@ -99,6 +99,25 @@ const drawEAN13 = (rl, code, x, y, w, h) => {
   rl.drawCentredString(x + w / 2, y + 1, res.full);
 };
 
+/**
+ * Code-barres EAN-13 imprimable d'un article, ou `null` quand sa fiche n'en
+ * porte pas d'exploitable (GENCOD vide, « xxx », « * », « SLN », notation
+ * scientifique, longueur autre que 12 ou 13…).
+ *
+ * ⚠️ UN CODE À 12 CHIFFRES EST VALIDE (UPC-A) : `ean13Bits` sait le compléter.
+ * Le test « longueur === 13 » qui gardait la grille standard écartait donc des
+ * articles parfaitement étiquetables — ils sortaient sans code-barres.
+ *
+ * ⚠️ C'est la SEULE définition de « article sans code-barres » : le contrôle
+ * préalable de l'écran (etiquetteController.controlerGencod) s'appuie dessus,
+ * sinon on annoncerait à l'utilisateur des articles que le PDF code-barre
+ * quand même (ou l'inverse).
+ */
+export const codeBarresImprimable = (record) => {
+  const res = ean13Bits(record && record.GENCOD);
+  return res ? res.full : null;
+};
+
 // ----------------------------------------------------------------------------
 // Formatage (équivalents du script Python)
 // ----------------------------------------------------------------------------
@@ -302,14 +321,32 @@ const resolveLogoBuffer = (entreprise) => {
 // pour éviter tout rognage en haut / sur les bords par l'imprimante.
 // ----------------------------------------------------------------------------
 const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
-  const { showPrice = true } = opts;
+  // `sansGencod` — ce qu'on fait des articles DONT LA FICHE N'A PAS de
+  // code-barres exploitable. Trois états, et le défaut n'est PAS « vide » :
+  //
+  //   « defaut » (aucun choix) : zone code-barres blanche, petit NART en haut
+  //                              à gauche — comportement historique, celui de
+  //                              tout appelant qui ne pose pas la question ;
+  //   « nart »              : le NART en GROS dans la zone code-barres ;
+  //   « vide »              : rien du tout — ni code-barres, ni NART, pas
+  //                              même le petit en haut à gauche (décision
+  //                              client : « laisser vide » veut dire vide).
+  //
+  // Seule la grille « standard » (avec prix) pose la question à l'utilisateur :
+  // « standard sans prix » affiche déjà le NART en gros au centre.
+  const { showPrice = true, sansGencod = "defaut" } = opts;
+
+  // Calculé AVANT le premier tracé : il conditionne aussi le petit NART.
+  const code = codeBarresImprimable(record);
+  const masquerNart = !code && sansGencod === "vide";
+
   rl.setStrokeColorRGB(0, 0, 0);
   rl.setLineWidth(1);
   rl.rect(x, y, labelW, labelH);
 
   rl.setFillColorRGB(0, 0, 0);
   rl.setFont("Helvetica", 6);
-  rl.drawString(x + 2, y + labelH - 8, safe(record.NART));
+  if (!masquerNart) rl.drawString(x + 2, y + labelH - 8, safe(record.NART));
 
   rl.setFont("Helvetica-Bold", 7);
   const product = safe(record.DESIGN || "Désignation non spécifié").slice(0, 80);
@@ -339,13 +376,35 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
     if (klText) { rl.setFont("Helvetica-Bold", 8); rl.drawCentredString(x + labelW / 2, yp - 10, klText); }
   }
 
-  const gencod = String(record.GENCOD || "").replace(/\D/g, "");
-  if (gencod.length === 13) {
-    const bw = labelW - 10;
-    const bh = 46;
-    const bx = x + (labelW - bw) / 2;
-    const by = y + 1;
-    drawEAN13(rl, gencod, bx, by, bw, bh);
+  const bw = labelW - 10;
+  const bh = 46;
+  const bx = x + (labelW - bw) / 2;
+  const by = y + 1;
+  if (code) {
+    drawEAN13(rl, code, bx, by, bw, bh);
+  } else if (sansGencod === "nart") {
+    // Pas de code-barres en base : le NART prend sa place, en gros, pour que
+    // l'article reste identifiable en rayon.
+    //
+    // ⚠️ LE NART SEUL, sans le mot « NART » (décision client) : l'étiquette
+    // n'a que 5 cm de large, le mot mange la place et n'apprend rien à qui
+    // travaille en rayon. Taille réduite jusqu'à tenir dans la largeur (un
+    // NART est un C(6), 22 pt passent toujours — la boucle est une sécurité).
+    const texte = safe(record.NART);
+    if (texte) {
+      let taille = 22;
+      const dispo = bw - 6;
+      while (
+        taille > 8 &&
+        rl.doc.font("Helvetica-Bold").fontSize(taille).widthOfString(texte) >
+          dispo
+      ) {
+        taille -= 1;
+      }
+      rl.setFillColorRGB(0, 0, 0);
+      rl.setFont("Helvetica-Bold", taille);
+      rl.drawCentredString(x + labelW / 2, by + (bh - taille) / 2, texte);
+    }
   }
 };
 
@@ -1045,6 +1104,12 @@ export const genererEtiquettesCustomPDF = async ({
  * @param {object} p
  * @param {Array}  p.articles  liste à plat (compat : tous les modes hors
  *                             gisement/groupe)
+ * @param {string} [p.sansGencod] sort des articles dont la fiche n'a pas de
+ *                             GENCOD exploitable : « defaut » (zone blanche,
+ *                             petit NART conservé), « nart » (le NART en gros
+ *                             dans la zone code-barres) ou « vide » (aucun
+ *                             NART sur l'étiquette). N'agit que sur la grille
+ *                             standard.
  * @param {Array}  [p.sections] [{ titre, articles }] — une section par gisement,
  *                             par groupe, ou la proforma (observation en titre). Chacune démarre une NOUVELLE
  *                             feuille, porte son titre en haut à droite et
@@ -1062,6 +1127,7 @@ export const genererEtiquettesPDF = async ({
   sections,
   entreprise,
   outPath,
+  sansGencod = "defaut",
 }) => {
   const isStandard = type === "standard" || type === "standard_sans_prix";
   if (!isStandard && !ONE_DRAWERS[type]) {
@@ -1089,7 +1155,10 @@ export const genererEtiquettesPDF = async ({
 
   const rl = new RL(doc);
   if (isStandard) {
-    drawStandard(rl, paquets, { showPrice: type === "standard" });
+    drawStandard(rl, paquets, {
+      showPrice: type === "standard",
+      sansGencod,
+    });
   } else if (isDemi) {
     drawDemi(rl, doc, paquets, logoBuf, ONE_DRAWERS[type]);
   } else {

@@ -440,3 +440,145 @@
   color: var(--text-muted);
   border-top: 1px solid var(--border);
 }
+
+/* ---------------------------------------------------------------------------
+   Fenêtre « articles sans code-barres »
+   Posée juste avant la génération, uniquement quand au moins un article
+   sélectionné n'a pas de GENCOD exploitable : NART dans la zone code-barres,
+   ou zone laissée vide.
+   --------------------------------------------------------------------------- */
+.etiq-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.etiq-modal {
+  width: 100%;
+  max-width: 560px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+
+.etiq-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.etiq-modal-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.etiq-modal-close {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 18px;
+  padding: 4px;
+}
+
+.etiq-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.etiq-modal-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.etiq-modal-liste {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  margin-bottom: 14px;
+}
+
+.etiq-modal-ligne {
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.etiq-modal-ligne:last-child {
+  border-bottom: none;
+}
+
+.etiq-modal-nart {
+  flex: 0 0 62px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.etiq-modal-design {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.etiq-modal-more {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.etiq-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.etiq-modal-btn {
+  flex: 1 1 200px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.etiq-modal-btn:hover {
+  border-color: var(--accent);
+}
+
+.etiq-modal-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.etiq-modal-btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+.etiq-modal-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
