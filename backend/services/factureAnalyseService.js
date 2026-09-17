@@ -92,11 +92,26 @@ class FactureAnalyseService {
     return out;
   }
 
-  // Convertit une Map key->{nbFactures,montant} en tableau aligné sur moisList
+  // Convertit une Map key->{nbFactures,nbFacturesZero,montant} en tableau aligné
+  // sur moisList.
+  //
+  // ⚠️ `nbFactures` reste le compte TOTAL : c'est le dénominateur du « % de
+  // factures à 0 », et le diviseur de toutes les moyennes. `nbFacturesHorsZero`
+  // est le compte AFFICHÉ (décision client du 18/09/2026) — les factures à 0
+  // ayant leur propre compteur, les additionner au reste gonflait le volume
+  // d'activité. Garder les deux évite d'avoir à choisir entre un affichage juste
+  // et un pourcentage juste.
   moisMapToArray(moisList, map) {
     return moisList.map((m) => {
-      const e = map.get(m.key) || { nbFactures: 0, montant: 0 };
-      return { mois: m.label, nbFactures: e.nbFactures, montant: e.montant };
+      const e = map.get(m.key) || { nbFactures: 0, nbFacturesZero: 0, montant: 0 };
+      const zero = e.nbFacturesZero || 0;
+      return {
+        mois: m.label,
+        nbFactures: e.nbFactures,
+        nbFacturesZero: zero,
+        nbFacturesHorsZero: e.nbFactures - zero,
+        montant: e.montant,
+      };
     });
   }
 
@@ -176,9 +191,12 @@ class FactureAnalyseService {
       totalLignesArticle += nbLignesFacture;
 
       const mk = this.moisKey(d);
-      if (!globalMoisMap.has(mk)) globalMoisMap.set(mk, { nbFactures: 0, montant: 0 });
+      if (!globalMoisMap.has(mk)) {
+        globalMoisMap.set(mk, { nbFactures: 0, nbFacturesZero: 0, montant: 0 });
+      }
       const gm = globalMoisMap.get(mk);
       gm.nbFactures += 1;
+      if (montant === 0) gm.nbFacturesZero += 1;
       gm.montant += montant;
 
       // Par code vendeur (tous types)
@@ -190,9 +208,12 @@ class FactureAnalyseService {
         if (montant === 0) v.nbFacturesZero += 1;
         v.totalArticles += qteFacture;
         v.totalLignesArticle += nbLignesFacture;
-        if (!v.moisMap.has(mk)) v.moisMap.set(mk, { nbFactures: 0, montant: 0 });
+        if (!v.moisMap.has(mk)) {
+          v.moisMap.set(mk, { nbFactures: 0, nbFacturesZero: 0, montant: 0 });
+        }
         const vm = v.moisMap.get(mk);
         vm.nbFactures += 1;
+        if (montant === 0) vm.nbFacturesZero += 1;
         vm.montant += montant;
       }
     }
@@ -203,9 +224,14 @@ class FactureAnalyseService {
         code: v.code,
         nom: v.nom,
         type: v.type,
+        // Total (dénominateur du pourcentage et des moyennes).
         nbFactures: v.nbFactures,
+        // Compte affiché : les factures à 0 sont comptées à part.
+        nbFacturesHorsZero: v.nbFactures - v.nbFacturesZero,
         montant: v.montant,
         nbFacturesZero: v.nbFacturesZero,
+        // ⚠️ Toujours rapporté au TOTAL de ses factures, jamais au hors-zéro :
+        // sinon une part dépasserait 100 % dès que les factures à 0 dominent.
         pctFacturesZero:
           v.nbFactures !== 0 ? (v.nbFacturesZero / v.nbFactures) * 100 : 0,
         totalArticles: v.totalArticles,
@@ -219,7 +245,9 @@ class FactureAnalyseService {
         partMontant: montantTotal !== 0 ? (v.montant / montantTotal) * 100 : 0,
         parMois: this.moisMapToArray(moisList, v.moisMap),
       }))
-      .sort((a, b) => b.nbFactures - a.nbFactures);
+      // Trié sur le compte AFFICHÉ, sinon l'ordre du tableau contredirait sa
+      // propre colonne.
+      .sort((a, b) => b.nbFacturesHorsZero - a.nbFacturesHorsZero);
 
     return {
       nomDossierDBF: entreprise.nomDossierDBF,
@@ -227,7 +255,12 @@ class FactureAnalyseService {
       dateFin,
       generatedAt: new Date().toISOString(),
       totaux: {
+        // Total des factures de type F sur la période : dénominateur du
+        // « % de factures à 0 » et de toutes les moyennes ci-dessous.
         nbFactures,
+        // Compte AFFICHÉ dans le récap : hors factures à 0, qui ont leur propre
+        // compteur (décision client du 18/09/2026).
+        nbFacturesHorsZero: nbFactures - nbFacturesZero,
         montantTotal,
         montantMoyenParFacture: nbFactures !== 0 ? montantTotal / nbFactures : 0,
         // Moyenne d'ARTICLES / facture = Σ QTE / nb factures
@@ -238,6 +271,8 @@ class FactureAnalyseService {
         totalArticles,
         totalLignesArticle,
         nbFacturesZero,
+        // ⚠️ Rapporté au TOTAL, pas au hors-zéro : c'est bien « quelle part de
+        // ce qui a été facturé est à 0 » que la question pose.
         pctFacturesZero: nbFactures !== 0 ? (nbFacturesZero / nbFactures) * 100 : 0,
       },
       parMois: this.moisMapToArray(moisList, globalMoisMap),

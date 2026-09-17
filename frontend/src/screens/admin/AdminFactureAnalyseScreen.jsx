@@ -141,7 +141,11 @@ const AdminFactureAnalyseScreen = () => {
         valueFormatter: (p) => LIBELLE_TYPE[p.value] || p.value || "",
       },
       {
-        field: "nbFactures", headerName: "Nb factures", ...num, minWidth: 120,
+        // ⚠️ `nbFacturesHorsZero` et non `nbFactures` : les factures à 0 ont
+        // leur propre colonne, les compter ici aussi gonflerait le volume
+        // d'activité du vendeur (décision client du 18/09/2026).
+        field: "nbFacturesHorsZero", headerName: "Nb factures (hors 0)",
+        ...num, minWidth: 150,
         filter: "agNumberColumnFilter", sort: "desc",
         valueFormatter: (p) => fNum(p.value), cellClass: "col-strong",
       },
@@ -173,6 +177,18 @@ const AdminFactureAnalyseScreen = () => {
         filter: "agNumberColumnFilter", valueFormatter: (p) => fNum(p.value),
         cellClass: (p) => (p.value > 0 ? "col-warn" : ""),
       },
+      {
+        // Part rapportée au TOTAL de ses factures (hors 0 + à 0), jamais au
+        // seul hors-zéro — sinon la part dépasserait 100 %.
+        field: "pctFacturesZero", headerName: "% à 0 (sur total)", ...num,
+        minWidth: 140, filter: "agNumberColumnFilter",
+        valueFormatter: (p) => fPct(p.value),
+        cellClass: (p) => (p.value > 0 ? "col-warn" : ""),
+      },
+      {
+        field: "nbFactures", headerName: "Total factures", ...num, minWidth: 130,
+        filter: "agNumberColumnFilter", valueFormatter: (p) => fNum(p.value),
+      },
     ],
     [],
   );
@@ -197,36 +213,41 @@ const AdminFactureAnalyseScreen = () => {
       ["Du", data.dateDebut, "au", data.dateFin],
       ["Type de vendeur", libelleType],
       [],
-      ["Nombre de factures", totaux.nbFactures],
+      ["Nombre de factures (hors factures à 0)", totaux.nbFacturesHorsZero],
       ["Montant total facturé (XPF)", roundInt(totaux.montantTotal)],
       ["Montant moyen / facture (XPF)", roundInt(totaux.montantMoyenParFacture)],
       ["Moyenne d'articles / facture (Σ QTE)", Number(totaux.moyenneArticlesParFacture.toFixed(2))],
       ["Articles vendus (Σ QTE)", roundInt(totaux.totalArticles)],
       ["Moyenne de lignes / facture", Number((totaux.moyenneLignesParFacture ?? 0).toFixed(2))],
       ["Factures à 0", totaux.nbFacturesZero],
-      ["% factures à 0", Number((totaux.pctFacturesZero ?? 0).toFixed(1))],
+      ["Total des factures (hors 0 + à 0)", totaux.nbFactures],
+      ["% factures à 0 (sur le total)", Number((totaux.pctFacturesZero ?? 0).toFixed(1))],
       [],
-      ["Mois", "Nb factures", "Montant (XPF)"],
-      ...parMois.map((m) => [m.mois, m.nbFactures, roundInt(m.montant)]),
+      ["Mois", "Nb factures (hors 0)", "Factures à 0", "Total factures", "Montant (XPF)"],
+      ...parMois.map((m) => [
+        m.mois, m.nbFacturesHorsZero, m.nbFacturesZero, m.nbFactures,
+        roundInt(m.montant),
+      ]),
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsK), "Synthèse");
 
     const wsV = [[
-      "Code", "Vendeur", "Type", "Nb factures", "Montant facturé (XPF)", "Part (%)",
-      "Montant moy./facture (XPF)", "Articles/facture (moy. QTE)",
+      "Code", "Vendeur", "Type", "Nb factures (hors 0)", "Montant facturé (XPF)",
+      "Part (%)", "Montant moy./facture (XPF)", "Articles/facture (moy. QTE)",
       "Articles vendus (Σ QTE)", "Lignes/facture (moy.)", "Factures à 0",
-      "% factures à 0",
+      "Total factures", "% factures à 0 (sur total)",
     ]];
     vendeurs.forEach((v) =>
       wsV.push([
         v.code, v.nom, LIBELLE_TYPE[v.type] || v.type || "",
-        v.nbFactures, roundInt(v.montant),
+        v.nbFacturesHorsZero, roundInt(v.montant),
         Number(v.partMontant.toFixed(1)),
         roundInt(v.montantMoyenParFacture),
         Number(v.moyenneArticlesParFacture.toFixed(2)),
         roundInt(v.totalArticles),
         Number((v.moyenneLignesParFacture ?? 0).toFixed(2)),
         v.nbFacturesZero,
+        v.nbFactures,
         Number((v.pctFacturesZero ?? 0).toFixed(1)),
       ]),
     );
@@ -310,8 +331,16 @@ const AdminFactureAnalyseScreen = () => {
             <div className="fa-kpi">
               <div className="fa-kpi-icon"><HiDocumentText /></div>
               <div>
-                <span className="fa-kpi-value">{fNum(totaux.nbFactures)}</span>
-                <span className="fa-kpi-label">Factures (type F)</span>
+                {/* Compte HORS factures à 0 : elles ont leur propre carte, les
+                    additionner ici gonflait le volume d'activité. Le total reste
+                    affiché en dessous, c'est lui qui sert de base au « % à 0 ». */}
+                <span className="fa-kpi-value">
+                  {fNum(totaux.nbFacturesHorsZero)}
+                </span>
+                <span className="fa-kpi-label">Factures (type F), hors 0</span>
+                <span className="fa-kpi-mini">
+                  {fNum(totaux.nbFactures)} au total avec les factures à 0
+                </span>
               </div>
             </div>
             <div className="fa-kpi">
@@ -354,7 +383,8 @@ const AdminFactureAnalyseScreen = () => {
                 <span className="fa-kpi-value">{fNum(totaux.nbFacturesZero)}</span>
                 <span className="fa-kpi-label">Factures à 0</span>
                 <span className="fa-kpi-mini">
-                  {fPct(totaux.pctFacturesZero)} des factures
+                  {fPct(totaux.pctFacturesZero)} du total ({fNum(totaux.nbFactures)}{" "}
+                  factures)
                 </span>
               </div>
             </div>
@@ -401,9 +431,9 @@ const AdminFactureAnalyseScreen = () => {
                   />
                   <Line
                     yAxisId="n"
-                    name="Nb factures"
+                    name="Nb factures (hors 0)"
                     type="monotone"
-                    dataKey="nbFactures"
+                    dataKey="nbFacturesHorsZero"
                     stroke="#22c55e"
                     strokeWidth={2.5}
                     dot={false}
@@ -449,7 +479,12 @@ const AdminFactureAnalyseScreen = () => {
               </h3>
               <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart
-                  data={vendeurs.filter((v) => v.nbFactures > 0)}
+                  data={
+                    // Filtré sur le compte AFFICHÉ : un vendeur qui n'a que des
+                    // factures à 0 donnerait une barre vide. Il reste visible
+                    // dans le tableau récapitulatif, qui, lui, est exhaustif.
+                    vendeurs.filter((v) => v.nbFacturesHorsZero > 0)
+                  }
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                   <XAxis
@@ -479,8 +514,8 @@ const AdminFactureAnalyseScreen = () => {
                   <Legend />
                   <Bar
                     yAxisId="n"
-                    name="Nb factures"
-                    dataKey="nbFactures"
+                    name="Nb factures (hors 0)"
+                    dataKey="nbFacturesHorsZero"
                     fill="#6366f1"
                     radius={[4, 4, 0, 0]}
                   />
@@ -515,7 +550,7 @@ const AdminFactureAnalyseScreen = () => {
                 )}
                 {vendeurs.map((v) => (
                   <option key={v.code} value={v.code}>
-                    {v.nom} ({v.code}) — {fNum(v.nbFactures)} factures
+                    {v.nom} ({v.code}) — {fNum(v.nbFacturesHorsZero)} factures
                   </option>
                 ))}
               </select>
@@ -527,10 +562,13 @@ const AdminFactureAnalyseScreen = () => {
                   <div className="fa-kpi">
                     <div className="fa-kpi-icon"><HiDocumentText /></div>
                     <div>
-                      <span className="fa-kpi-value">{fNum(vendeur.nbFactures)}</span>
-                      <span className="fa-kpi-label">Factures</span>
+                      <span className="fa-kpi-value">
+                        {fNum(vendeur.nbFacturesHorsZero)}
+                      </span>
+                      <span className="fa-kpi-label">Factures, hors 0</span>
                       <span className="fa-kpi-mini">
-                        {fPct(vendeur.partMontant)} du montant total
+                        {fNum(vendeur.nbFactures)} au total ·{" "}
+                        {fPct(vendeur.partMontant)} du montant
                       </span>
                     </div>
                   </div>
@@ -566,7 +604,7 @@ const AdminFactureAnalyseScreen = () => {
                       </span>
                       <span className="fa-kpi-label">Factures à 0</span>
                       <span className="fa-kpi-mini">
-                        {fPct(vendeur.pctFacturesZero)} de ses factures
+                        {fPct(vendeur.pctFacturesZero)} du total de ses factures
                       </span>
                     </div>
                   </div>
@@ -603,9 +641,9 @@ const AdminFactureAnalyseScreen = () => {
                       />
                       <Line
                         yAxisId="n"
-                        name="Nb factures"
+                        name="Nb factures (hors 0)"
                         type="monotone"
-                        dataKey="nbFactures"
+                        dataKey="nbFacturesHorsZero"
                         stroke="#6366f1"
                         strokeWidth={2.5}
                         dot={false}
