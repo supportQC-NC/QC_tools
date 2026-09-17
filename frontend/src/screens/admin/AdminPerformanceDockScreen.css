@@ -300,3 +300,227 @@
     padding: 12px;
   }
 }
+/* ── Panneau de critères ───────────────────────────────────────────────────
+   Les critères vivent au-dessus des KPI : ce qu'ils changent (la moyenne, le
+   périmètre) se lit juste en dessous, sans avoir à faire défiler. */
+.pd-filtres {
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.pd-filtres-titre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-muted, #8b949e);
+  margin-bottom: 12px;
+}
+.pd-filtres-titre svg {
+  color: var(--admin-primary, #6366f1);
+}
+.pd-reset {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 7px;
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.72rem;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.pd-reset:hover {
+  color: var(--admin-text, #f0f0f5);
+  border-color: var(--admin-text-muted, #8b949e);
+}
+
+.pd-filtres-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.pd-filtre > label {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-muted, #8b949e);
+  margin-bottom: 7px;
+}
+.pd-filtre small {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--admin-text-muted, #8b949e);
+}
+
+.pd-dates,
+.pd-seuils {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pd-dates span,
+.pd-seuils span {
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.85rem;
+}
+.pd-filtres input[type="date"],
+.pd-filtres input[type="number"] {
+  flex: 1;
+  min-width: 0;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 8px;
+  color: var(--admin-text, #f0f0f5);
+  font-size: 0.83rem;
+  padding: 7px 9px;
+}
+.pd-filtres input:focus {
+  outline: none;
+  border-color: var(--admin-primary, #6366f1);
+}
+
+.pd-raccourcis {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+}
+.pd-raccourcis button {
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 7px;
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.74rem;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.pd-raccourcis button:hover {
+  color: var(--admin-text, #f0f0f5);
+  background: var(--admin-bg-hover, #22222e);
+}
+
+.pd-jours {
+  display: flex;
+  gap: 4px;
+}
+.pd-jours button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pd-jours button.actif {
+  background: rgba(57, 135, 229, 0.18);
+  border-color: #3987e5;
+  color: #9ec7f5;
+}
+
+.pd-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary, #a0a0b0);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+.pd-check input {
+  accent-color: var(--admin-primary, #6366f1);
+}
+
+.pd-base {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 9px;
+  padding: 3px;
+}
+.pd-base button {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.78rem;
+  padding: 6px 11px;
+  cursor: pointer;
+}
+.pd-base button.actif {
+  background: rgba(201, 162, 39, 0.16);
+  color: #e0c158;
+  font-weight: 600;
+}
+
+.pd-filtres-resume {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--admin-border, #2a2a3a);
+  font-size: 0.76rem;
+  color: var(--admin-text-muted, #8b949e);
+}
+
+/* Erreur d'export : bandeau court, pas une page d'erreur */
+.pd-error.compact {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.83rem;
+  margin-bottom: 12px;
+}
+
+/* Journées écartées — aucun filtrage silencieux */
+.pd-ecartees {
+  margin-top: 14px;
+  background: var(--admin-bg-secondary, #12121a);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.pd-ecartees summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--admin-text-muted, #8b949e);
+}
+.pd-ecartees ul {
+  list-style: none;
+  margin: 10px 0 2px;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+.pd-ecartees li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--admin-border, #2a2a3a);
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.pd-ecartees li b {
+  color: var(--admin-text, #f0f0f5);
+  font-variant-numeric: tabular-nums;
+}
+.pd-ecartees li em {
+  margin-left: auto;
+  font-style: normal;
+  color: var(--admin-text-muted, #8b949e);
+}

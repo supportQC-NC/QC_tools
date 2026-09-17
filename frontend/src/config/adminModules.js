@@ -62,7 +62,7 @@ export const PERMISSION_MODULES = [
   { key: "gencod_doublons_admin", label: "Doublons GENCODE", group: "analyse" },
   { key: "derniere_facturation_admin", label: "Dernière facturation", group: "analyse" },
   { key: "analyse_ca_admin", label: "Analyse CA", group: "analyse" },
-  { key: "performance_dock_admin", label: "Performance Dock", group: "analyse" },
+  { key: "performance_dock_admin", label: "Performance réappro magasin", group: "analyse" },
   { key: "collecteurs_admin", label: "Collecteurs", group: "analyse" },
   { key: "rapport_tgc", label: "Rapports TGC", group: "analyse" },
   { key: "balances_clients", label: "Balances / clients à bloquer", group: "analyse" },

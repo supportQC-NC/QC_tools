@@ -2,6 +2,7 @@
 import express from "express";
 import {
   getReport,
+  exportExcel,
   refreshReport,
 } from "../controllers/performanceDockController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -13,6 +14,7 @@ const canRead = checkModuleAccess("performance_dock_admin", "read");
 
 // QC uniquement, dossier serveur fixe -> pas de checkEntrepriseAccess
 router.get("/", protect, canRead, getReport);
+router.get("/excel", protect, canRead, exportExcel);
 router.post("/refresh", protect, canRead, refreshReport);
 
 export default router;

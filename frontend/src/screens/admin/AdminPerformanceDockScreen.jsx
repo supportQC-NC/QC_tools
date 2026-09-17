@@ -1,6 +1,14 @@
 // src/screens/admin/AdminPerformanceDockScreen.jsx
-import React, { useMemo, useState } from "react";
-import * as XLSX from "xlsx";
+//
+// Performance du RÉAPPRO MAGASIN : combien d'ARTICLES le dock a
+// réapprovisionnés chaque jour (une ligne de l'onglet DONNEES du fichier
+// reapro_mag = un article). On ne parle jamais de « lignes » ici : l'unité
+// que l'équipe compte, et sur laquelle elle est mesurée, est l'article.
+//
+// ⚠️ Tout le calcul (filtrage + moyenne) est fait par le serveur, pas ici :
+// l'export Excel passe par le même service, les deux ne peuvent donc pas
+// diverger. L'écran n'envoie que les critères.
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -15,11 +23,18 @@ import {
   ReferenceLine,
   ReferenceDot,
 } from "recharts";
-import { HiRefresh, HiDownload, HiChartBar } from "react-icons/hi";
+import {
+  HiRefresh,
+  HiDownload,
+  HiChartBar,
+  HiOutlineFilter,
+  HiX,
+} from "react-icons/hi";
 import {
   useGetPerformanceDockQuery,
   useRefreshPerformanceDockMutation,
 } from "../../slices/performanceDockApiSlice";
+import { BASE_URL } from "../../constants";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminPerformanceDockScreen.css";
 
@@ -44,12 +59,38 @@ const MOIS_COURT = [
 ];
 const JOURS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
 
+// Ordre d'affichage du filtre : la semaine commence le lundi, pas le dimanche
+// (Date#getDay() renvoie 0 pour dimanche — on garde ses indices en valeur).
+const JOURS_FILTRE = [
+  { jour: 1, court: "L", long: "lundi" },
+  { jour: 2, court: "M", long: "mardi" },
+  { jour: 3, court: "M", long: "mercredi" },
+  { jour: 4, court: "J", long: "jeudi" },
+  { jour: 5, court: "V", long: "vendredi" },
+  { jour: 6, court: "S", long: "samedi" },
+  { jour: 0, court: "D", long: "dimanche" },
+];
+
+const CRITERES_PAR_DEFAUT = {
+  debut: "",
+  fin: "",
+  jours: [], // vide = tous
+  exclureZero: false,
+  min: "",
+  max: "",
+  baseMoyenne: "globale", // la moyenne historique reste l'étalon par défaut
+};
+
 // Les dates viennent du nom de fichier (yyyy-mm-dd) ; si le nom ne suit pas la
 // convention le service renvoie le nom brut — on l'affiche alors tel quel.
 const enDate = (s) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
   return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
 };
+const enIso = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
 const fmtJour = (s) => {
   const d = enDate(s);
   return d ? `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}` : s;
@@ -99,12 +140,12 @@ const BarreEcart = ({ x, y, width, height, fill }) => {
 const InfoBulle = ({ active, payload, label, moyenne }) => {
   if (!active || !payload || !payload.length) return null;
   const p = payload[0].payload;
-  const ecart = Math.round(p.count - moyenne);
+  const ecart = Math.round(p.articles - moyenne);
   const pct = moyenne ? (ecart / moyenne) * 100 : 0;
   return (
     <div className="pd-tooltip">
       <div className="pd-tt-date">{fmtJourLong(label)}</div>
-      <div className="pd-tt-val">{fNum(p.count)} lignes</div>
+      <div className="pd-tt-val">{fNum(p.articles)} articles</div>
       <div className={`pd-tt-diff ${ecart >= 0 ? "pos" : "neg"}`}>
         {fSigne(ecart)} vs moyenne ({pct >= 0 ? "+" : ""}
         {pct.toFixed(1)} %)
@@ -113,70 +154,188 @@ const InfoBulle = ({ active, payload, label, moyenne }) => {
   );
 };
 
+const InfoBulleJour = ({ active, payload }) => {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="pd-tooltip">
+      <div className="pd-tt-date">
+        {p.label.charAt(0).toUpperCase() + p.label.slice(1)} · {fNum(p.nbJours)}{" "}
+        journée{p.nbJours > 1 ? "s" : ""}
+      </div>
+      <div className="pd-tt-val">{fNum(p.moyenneArrondie)} articles / jour</div>
+      <div className={`pd-tt-diff ${p.ecart >= 0 ? "pos" : "neg"}`}>
+        {fSigne(p.ecart)} vs moyenne
+      </div>
+    </div>
+  );
+};
+
 const VUES = [
   { cle: "volume", libelle: "Volume" },
   { cle: "ecart", libelle: "Écart vs moyenne" },
+  { cle: "semaine", libelle: "Jours de semaine" },
   { cle: "table", libelle: "Tableau" },
 ];
 
 const AdminPerformanceDockScreen = () => {
-  const { data, isLoading, isFetching, error } = useGetPerformanceDockQuery();
+  const [criteres, setCriteres] = useState(CRITERES_PAR_DEFAUT);
+  const [vue, setVue] = useState("volume");
+  const [erreurExport, setErreurExport] = useState("");
+  const [exportEnCours, setExportEnCours] = useState(false);
+
+  // Query string envoyée au serveur : on n'y met que ce qui s'écarte du défaut,
+  // pour que la requête « sans critère » reste une seule entrée de cache.
+  const params = useMemo(() => {
+    const p = {};
+    if (criteres.debut) p.debut = criteres.debut;
+    if (criteres.fin) p.fin = criteres.fin;
+    if (criteres.jours.length && criteres.jours.length < 7) {
+      p.jours = [...criteres.jours].sort((a, b) => a - b).join(",");
+    }
+    if (criteres.exclureZero) p.exclureZero = "1";
+    if (String(criteres.min).trim() !== "") p.min = criteres.min;
+    if (String(criteres.max).trim() !== "") p.max = criteres.max;
+    if (criteres.baseMoyenne === "selection") p.baseMoyenne = "selection";
+    return p;
+  }, [criteres]);
+
+  // Les seuils se saisissent au clavier : sans ce délai, chaque frappe partait
+  // en requête.
+  const [paramsEnvoyes, setParamsEnvoyes] = useState(params);
+  useEffect(() => {
+    const t = setTimeout(() => setParamsEnvoyes(params), 300);
+    return () => clearTimeout(t);
+  }, [params]);
+
+  const { data, isLoading, isFetching, error, refetch } =
+    useGetPerformanceDockQuery(paramsEnvoyes);
   const [refreshPerformanceDock, { isLoading: refreshing }] =
     useRefreshPerformanceDockMutation();
 
-  const [vue, setVue] = useState("volume");
+  // Un changement de critère change la clé de cache : `data` repasse à undefined
+  // le temps de la réponse et l'écran clignoterait. On garde le dernier rapport
+  // affiché pendant le recalcul.
+  const dernier = useRef(null);
+  if (data) dernier.current = data;
+  const rapport = data || dernier.current;
 
-  const rows = useMemo(() => data?.rows || [], [data]);
-  const stats = data?.stats;
-  const moyenne = stats?.moyenne || 0;
+  const rows = useMemo(() => rapport?.rows || [], [rapport]);
+  const stats = rapport?.stats;
+  const globales = rapport?.statsGlobales;
+  const moyenne = rapport?.moyenne || 0;
+  const bornes = rapport?.bornes || { premiere: "", derniere: "" };
+  const ecartees = rapport?.ecartees || [];
+  const surSelection = criteres.baseMoyenne === "selection";
+
+  const filtreActif =
+    Boolean(criteres.debut) ||
+    Boolean(criteres.fin) ||
+    (criteres.jours.length > 0 && criteres.jours.length < 7) ||
+    criteres.exclureZero ||
+    String(criteres.min).trim() !== "" ||
+    String(criteres.max).trim() !== "" ||
+    surSelection;
+
+  const majCritere = (patch) => setCriteres((c) => ({ ...c, ...patch }));
+
+  const basculerJour = (jour) =>
+    setCriteres((c) => ({
+      ...c,
+      jours: c.jours.includes(jour)
+        ? c.jours.filter((j) => j !== jour)
+        : [...c.jours, jour],
+    }));
+
+  // Raccourcis de période : calés sur la DERNIÈRE journée disponible et non sur
+  // aujourd'hui — les fichiers reapro_mag peuvent avoir plusieurs jours de
+  // retard, « 30 derniers jours » sortirait sinon à moitié vide.
+  const periodeRapide = (nbJours) => {
+    const fin = enDate(bornes.derniere);
+    if (!fin) return;
+    if (!nbJours) {
+      majCritere({ debut: "", fin: "" });
+      return;
+    }
+    const debut = new Date(fin);
+    debut.setDate(debut.getDate() - (nbJours - 1));
+    const premiere = enDate(bornes.premiere);
+    majCritere({
+      debut: enIso(premiere && debut < premiere ? premiere : debut),
+      fin: enIso(fin),
+    });
+  };
 
   const handleRefresh = async () => {
     try {
       await refreshPerformanceDock().unwrap();
+      refetch();
     } catch (e) {
       /* ignore */
     }
   };
 
-  const handleExport = () => {
-    if (!rows.length) return;
-    const aoa = [["DATE", "LIGNES VALIDES", "ECART VS MOYENNE"]];
-    rows.forEach((r) =>
-      aoa.push([r.date, r.count, Math.round(r.count - moyenne)]),
-    );
-    aoa.push([]);
-    aoa.push(["MOYENNE", stats.moyenneArrondie]);
-    aoa.push(["MAXIMUM", stats.max]);
-    aoa.push(["MINIMUM", stats.min]);
-    aoa.push(["FICHIERS", stats.nbFichiers]);
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Performance Dock");
-    const today = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `performance_dock_${today}.xlsx`);
+  // Export serveur (ExcelJS) : mise en forme complète, mêmes critères que
+  // l'écran. L'ancien export navigateur (SheetJS) ne savait pas styler.
+  const handleExport = async () => {
+    setErreurExport("");
+    setExportEnCours(true);
+    try {
+      const qs = new URLSearchParams(paramsEnvoyes).toString();
+      const res = await fetch(
+        `${BASE_URL}/api/performance-dock/excel${qs ? `?${qs}` : ""}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        let msg = `Échec de l'export (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = j.message;
+        } catch {
+          /* non-JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        criteres.debut || criteres.fin
+          ? `performance_reappro_magasin_${criteres.debut || bornes.premiere}_${
+              criteres.fin || bornes.derniere
+            }.xlsx`
+          : "performance_reappro_magasin.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setErreurExport(e.message || "Erreur lors de l'export.");
+    } finally {
+      setExportEnCours(false);
+    }
   };
 
-  // Données dérivées : écart par jour + repères max / min / dernier jour.
-  const { chartData, domaine, reperes, dernier } = useMemo(() => {
-    const d = rows.map((r) => ({ ...r, ecart: Math.round(r.count - moyenne) }));
-    const valeurs = d.map((r) => r.count);
+  // Repères max / min / dernier jour de la sélection.
+  const { domaine, reperes, dernierJour } = useMemo(() => {
+    const valeurs = rows.map((r) => r.articles);
     let iMax = -1;
     let iMin = -1;
-    d.forEach((r, i) => {
-      if (iMax < 0 || r.count > d[iMax].count) iMax = i;
-      if (iMin < 0 || r.count < d[iMin].count) iMin = i;
+    rows.forEach((r, i) => {
+      if (iMax < 0 || r.articles > rows[iMax].articles) iMax = i;
+      if (iMin < 0 || r.articles < rows[iMin].articles) iMin = i;
     });
     return {
-      chartData: d,
       domaine: domaineZoome(valeurs),
-      reperes: { max: d[iMax] || null, min: d[iMin] || null },
-      dernier: d.length ? d[d.length - 1] : null,
+      reperes: { max: rows[iMax] || null, min: rows[iMin] || null },
+      dernierJour: rows.length ? rows[rows.length - 1] : null,
     };
-  }, [rows, moyenne]);
+  }, [rows]);
 
   // Au-delà d'un mois de données, une étiquette sur deux suffit.
-  const pasEtiquettes = chartData.length > 31 ? Math.ceil(chartData.length / 20) : 0;
-  const loading = isLoading || (isFetching && !data);
+  const pasEtiquettes = rows.length > 31 ? Math.ceil(rows.length / 20) : 0;
+  const loading = isLoading || (isFetching && !rapport);
 
   const axeX = (
     <XAxis
@@ -191,25 +350,166 @@ const AdminPerformanceDockScreen = () => {
     />
   );
 
+  const panneauFiltres = (
+    <div className="pd-filtres">
+      <div className="pd-filtres-titre">
+        <HiOutlineFilter /> Critères
+        {filtreActif && (
+          <button
+            type="button"
+            className="pd-reset"
+            onClick={() => setCriteres(CRITERES_PAR_DEFAUT)}
+          >
+            <HiX /> Réinitialiser
+          </button>
+        )}
+      </div>
+
+      <div className="pd-filtres-grille">
+        <div className="pd-filtre">
+          <label>Période</label>
+          <div className="pd-dates">
+            <input
+              type="date"
+              value={criteres.debut}
+              min={bornes.premiere || undefined}
+              max={bornes.derniere || undefined}
+              onChange={(e) => majCritere({ debut: e.target.value })}
+            />
+            <span>→</span>
+            <input
+              type="date"
+              value={criteres.fin}
+              min={bornes.premiere || undefined}
+              max={bornes.derniere || undefined}
+              onChange={(e) => majCritere({ fin: e.target.value })}
+            />
+          </div>
+          <div className="pd-raccourcis">
+            {[
+              { l: "7 j", n: 7 },
+              { l: "30 j", n: 30 },
+              { l: "90 j", n: 90 },
+              { l: "Tout", n: 0 },
+            ].map((r) => (
+              <button key={r.l} type="button" onClick={() => periodeRapide(r.n)}>
+                {r.l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="pd-filtre">
+          <label>Jours de la semaine</label>
+          <div className="pd-jours">
+            {JOURS_FILTRE.map((j) => {
+              const actif = !criteres.jours.length || criteres.jours.includes(j.jour);
+              return (
+                <button
+                  key={j.long}
+                  type="button"
+                  title={j.long}
+                  aria-pressed={actif}
+                  className={actif ? "actif" : ""}
+                  onClick={() => basculerJour(j.jour)}
+                >
+                  {j.court}
+                </button>
+              );
+            })}
+          </div>
+          <small>Aucun jour coché = tous les jours.</small>
+        </div>
+
+        <div className="pd-filtre">
+          <label>Volume retenu (articles / jour)</label>
+          <div className="pd-seuils">
+            <input
+              type="number"
+              min="0"
+              placeholder="min"
+              value={criteres.min}
+              onChange={(e) => majCritere({ min: e.target.value })}
+            />
+            <span>→</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="max"
+              value={criteres.max}
+              onChange={(e) => majCritere({ max: e.target.value })}
+            />
+          </div>
+          <label className="pd-check">
+            <input
+              type="checkbox"
+              checked={criteres.exclureZero}
+              onChange={(e) => majCritere({ exclureZero: e.target.checked })}
+            />
+            Ignorer les journées sans activité (0 article)
+          </label>
+        </div>
+
+        <div className="pd-filtre">
+          <label>Base de la moyenne</label>
+          <div className="pd-base">
+            <button
+              type="button"
+              className={!surSelection ? "actif" : ""}
+              onClick={() => majCritere({ baseMoyenne: "globale" })}
+            >
+              Toutes les journées
+            </button>
+            <button
+              type="button"
+              className={surSelection ? "actif" : ""}
+              onClick={() => majCritere({ baseMoyenne: "selection" })}
+            >
+              Journées filtrées
+            </button>
+          </div>
+          <small>
+            {surSelection
+              ? `Moyenne recalculée sur les ${fNum(stats?.nbJours || 0)} journées retenues (référence : ${fNum(globales?.moyenne || 0)}).`
+              : "Moyenne de référence, calculée sur tout l'historique disponible."}
+          </small>
+        </div>
+      </div>
+
+      {filtreActif && (
+        <div className="pd-filtres-resume">
+          {fNum(stats?.nbJours || 0)} journée(s) retenue(s) sur{" "}
+          {fNum(globales?.nbJours || 0)}
+          {ecartees.length > 0 && <> · {fNum(ecartees.length)} écartée(s)</>}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="admin-performance-dock">
       <div className="pd-header">
         <h1>
-          <HiChartBar /> Performance Dock
+          <HiChartBar /> Performance réappro magasin
         </h1>
         <div className="pd-actions">
           <button className="pd-btn" onClick={handleRefresh} disabled={refreshing || isFetching}>
             <HiRefresh className={refreshing ? "spin" : ""} /> Rafraîchir
           </button>
-          <button className="pd-btn primary" onClick={handleExport} disabled={!rows.length}>
-            <HiDownload /> Excel
+          <button
+            className="pd-btn primary"
+            onClick={handleExport}
+            disabled={!rows.length || exportEnCours}
+          >
+            <HiDownload /> {exportEnCours ? "Génération…" : "Excel"}
           </button>
         </div>
       </div>
 
       <p className="pd-subtitle">
-        Lignes réappro préparées par jour · onglet <strong>DONNEES</strong> · filtre
-        GISEMENT ≠ vide / STOP · société QC
+        Nombre d'<strong>articles réapprovisionnés</strong> par jour · fichiers
+        reapro_mag, onglet <strong>DONNEES</strong> · un article = une ligne dont
+        le GISEMENT n'est ni vide ni STOP · société QC
       </p>
 
       {loading ? (
@@ -221,15 +521,15 @@ const AdminPerformanceDockScreen = () => {
         <div className="pd-error">
           {error?.data?.message || "Erreur de chargement."}
         </div>
-      ) : data && !data.dossierExiste ? (
+      ) : rapport && !rapport.dossierExiste ? (
         <div className="pd-error">
-          <p>{data.message}</p>
+          <p>{rapport.message}</p>
           {/* Détail des chemins tentés : sans lui, « dossier introuvable »
               laisse croire à un bug alors que le dossier est simplement sur
               une AUTRE machine que le serveur. */}
-          {Array.isArray(data.candidats) && data.candidats.length > 0 && (
+          {Array.isArray(rapport.candidats) && rapport.candidats.length > 0 && (
             <ul className="pd-candidats">
-              {data.candidats.map((c) => (
+              {rapport.candidats.map((c) => (
                 <li key={c.chemin}>
                   <code>{c.chemin}</code> <em>({c.origine})</em> → {c.etat}
                 </li>
@@ -238,9 +538,9 @@ const AdminPerformanceDockScreen = () => {
           )}
           {/* Ce que le serveur voit autour : dit si c'est le montage qui manque
               ou seulement le dernier dossier. */}
-          {Array.isArray(data.sondages) && data.sondages.length > 0 && (
+          {Array.isArray(rapport.sondages) && rapport.sondages.length > 0 && (
             <ul className="pd-candidats">
-              {data.sondages.map((s) => (
+              {rapport.sondages.map((s) => (
                 <li key={s.ancetre}>
                   <code>{s.ancetre}</code> contient :{" "}
                   {s.erreur
@@ -251,249 +551,349 @@ const AdminPerformanceDockScreen = () => {
             </ul>
           )}
         </div>
-      ) : rows.length === 0 ? (
-        <div className="pd-empty">{data?.message || "Aucune donnée."}</div>
       ) : (
         <>
-          {isFetching && <div className="pd-refreshing">Actualisation…</div>}
+          {panneauFiltres}
+          {erreurExport && <div className="pd-error compact">{erreurExport}</div>}
+          {isFetching && <div className="pd-refreshing">Recalcul…</div>}
 
-          <div className="pd-kpis">
-            <div className="pd-kpi avg">
-              <span className="v">{fNum(stats.moyenneArrondie)}</span>
-              <span className="l">Moyenne / jour</span>
+          {rows.length === 0 ? (
+            <div className="pd-empty">
+              {globales?.nbJours
+                ? "Aucune journée ne correspond aux critères."
+                : rapport?.message || "Aucune donnée."}
             </div>
-            {dernier && (
-              <div className="pd-kpi">
-                <span className="v">{fNum(dernier.count)}</span>
-                <span className="l">
-                  Dernier jour ({fmtJour(dernier.date)}){" "}
-                  <b className={dernier.ecart >= 0 ? "pos" : "neg"}>
-                    {fSigne(dernier.ecart)}
-                  </b>
-                </span>
-              </div>
-            )}
-            <div className="pd-kpi best">
-              <span className="v">{fNum(stats.max)}</span>
-              <span className="l">
-                Maximum {reperes.max ? `(${fmtJour(reperes.max.date)})` : ""}
-              </span>
-            </div>
-            <div className="pd-kpi low">
-              <span className="v">{fNum(stats.min)}</span>
-              <span className="l">
-                Minimum {reperes.min ? `(${fmtJour(reperes.min.date)})` : ""}
-              </span>
-            </div>
-            <div className="pd-kpi">
-              <span className="v">{fNum(stats.nbFichiers)}</span>
-              <span className="l">Jours analysés</span>
-            </div>
-          </div>
-
-          <div className="pd-vues" role="tablist" aria-label="Affichage">
-            {VUES.map((v) => (
-              <button
-                key={v.cle}
-                role="tab"
-                aria-selected={vue === v.cle}
-                className={`pd-vue ${vue === v.cle ? "active" : ""}`}
-                onClick={() => setVue(v.cle)}
-              >
-                {v.libelle}
-              </button>
-            ))}
-          </div>
-
-          <div className="pd-chart-wrap">
-            {vue === "volume" && (
-              <>
-                <ResponsiveContainer width="100%" height={420}>
-                  <ComposedChart
-                    data={chartData}
-                    margin={{ top: 24, right: 28, left: 0, bottom: 4 }}
-                    accessibilityLayer
-                  >
-                    <defs>
-                      <linearGradient id="pdAire" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={SERIE} stopOpacity={0.45} />
-                        <stop offset="100%" stopColor={SERIE} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke={GRILLE} vertical={false} />
-                    {axeX}
-                    <YAxis
-                      domain={domaine}
-                      tick={{ fill: AXE, fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => v.toLocaleString("fr-FR")}
-                      width={58}
-                    />
-                    <Tooltip
-                      cursor={{ stroke: AXE, strokeWidth: 1 }}
-                      content={<InfoBulle moyenne={moyenne} />}
-                    />
-                    <ReferenceLine
-                      y={moyenne}
-                      stroke={MOYENNE}
-                      strokeWidth={1.5}
-                      strokeDasharray="6 4"
-                      label={{
-                        value: `Moyenne ${fNum(moyenne)}`,
-                        position: "insideTopRight",
-                        fill: MOYENNE,
-                        fontSize: 11,
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="count"
-                      stroke={SERIE}
-                      strokeWidth={2}
-                      fill="url(#pdAire)"
-                      dot={{ r: 3, fill: SERIE, stroke: "none" }}
-                      activeDot={{ r: 5, stroke: "#12121a", strokeWidth: 2 }}
-                    />
-                    {/* Étiquettes directes sur les deux journées qui comptent,
-                        plutôt qu'un nombre sur chaque point. */}
-                    {reperes.max && (
-                      <ReferenceDot
-                        x={reperes.max.date}
-                        y={reperes.max.count}
-                        r={5}
-                        fill={AU_DESSUS}
-                        stroke="#12121a"
-                        strokeWidth={2}
-                        label={{
-                          value: `▲ ${fNum(reperes.max.count)}`,
-                          position: "top",
-                          fill: AU_DESSUS,
-                          fontSize: 11,
-                        }}
-                      />
-                    )}
-                    {reperes.min && (
-                      <ReferenceDot
-                        x={reperes.min.date}
-                        y={reperes.min.count}
-                        r={5}
-                        fill={EN_DESSOUS}
-                        stroke="#12121a"
-                        strokeWidth={2}
-                        label={{
-                          value: `▼ ${fNum(reperes.min.count)}`,
-                          position: "bottom",
-                          fill: EN_DESSOUS,
-                          fontSize: 11,
-                        }}
-                      />
-                    )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-                <p className="pd-note">
-                  Échelle resserrée autour des valeurs pour rendre les écarts
-                  lisibles — l'axe ne part pas de zéro. Pour comparer en valeur
-                  absolue, voir l'onglet « Écart vs moyenne ».
-                </p>
-              </>
-            )}
-
-            {vue === "ecart" && (
-              <>
-                <ResponsiveContainer width="100%" height={420}>
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 24, right: 28, left: 0, bottom: 4 }}
-                    barCategoryGap="22%"
-                    accessibilityLayer
-                  >
-                    <CartesianGrid stroke={GRILLE} vertical={false} />
-                    {axeX}
-                    <YAxis
-                      tick={{ fill: AXE, fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => fSigne(v)}
-                      width={58}
-                    />
-                    <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                      content={<InfoBulle moyenne={moyenne} />}
-                    />
-                    <ReferenceLine
-                      y={0}
-                      stroke={MOYENNE}
-                      strokeWidth={1.5}
-                      label={{
-                        value: `Moyenne ${fNum(moyenne)}`,
-                        position: "insideTopRight",
-                        fill: MOYENNE,
-                        fontSize: 11,
-                      }}
-                    />
-                    <Bar dataKey="ecart" shape={<BarreEcart />} maxBarSize={44}>
-                      {chartData.map((r) => (
-                        <Cell
-                          key={r.date}
-                          fill={r.ecart >= 0 ? AU_DESSUS : EN_DESSOUS}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="pd-legend">
-                  <span>
-                    <i className="dot" style={{ background: AU_DESSUS }} /> Au‑dessus de
-                    la moyenne
-                  </span>
-                  <span>
-                    <i className="dot" style={{ background: EN_DESSOUS }} /> En‑dessous
-                    de la moyenne
+          ) : (
+            <>
+              <div className="pd-kpis">
+                <div className="pd-kpi avg">
+                  <span className="v">{fNum(moyenne)}</span>
+                  <span className="l">
+                    Moyenne / jour{" "}
+                    <b>{surSelection ? "(sélection)" : "(référence)"}</b>
                   </span>
                 </div>
-              </>
-            )}
-
-            {vue === "table" && (
-              <div className="pd-table-wrap">
-                <table className="pd-table">
-                  <thead>
-                    <tr>
-                      <th>Jour</th>
-                      <th className="num">Lignes valides</th>
-                      <th className="num">Écart vs moyenne</th>
-                      <th className="num">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chartData.map((r) => (
-                      <tr key={r.date}>
-                        <td>{fmtJourLong(r.date)}</td>
-                        <td className="num">{fNum(r.count)}</td>
-                        <td className={`num ${r.ecart >= 0 ? "pos" : "neg"}`}>
-                          {fSigne(r.ecart)}
-                        </td>
-                        <td className={`num ${r.ecart >= 0 ? "pos" : "neg"}`}>
-                          {moyenne
-                            ? `${r.ecart >= 0 ? "+" : ""}${((r.ecart / moyenne) * 100).toFixed(1)} %`
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td>Moyenne · {fNum(stats.nbFichiers)} jours</td>
-                      <td className="num">{fNum(stats.moyenneArrondie)}</td>
-                      <td className="num">—</td>
-                      <td className="num">—</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                <div className="pd-kpi">
+                  <span className="v">{fNum(stats.mediane)}</span>
+                  <span className="l">Médiane / jour</span>
+                </div>
+                {dernierJour && (
+                  <div className="pd-kpi">
+                    <span className="v">{fNum(dernierJour.articles)}</span>
+                    <span className="l">
+                      Dernier jour ({fmtJour(dernierJour.date)}){" "}
+                      <b className={dernierJour.ecart >= 0 ? "pos" : "neg"}>
+                        {fSigne(dernierJour.ecart)}
+                      </b>
+                    </span>
+                  </div>
+                )}
+                <div className="pd-kpi best">
+                  <span className="v">{fNum(stats.max)}</span>
+                  <span className="l">
+                    Maximum {reperes.max ? `(${fmtJour(reperes.max.date)})` : ""}
+                  </span>
+                </div>
+                <div className="pd-kpi low">
+                  <span className="v">{fNum(stats.min)}</span>
+                  <span className="l">
+                    Minimum {reperes.min ? `(${fmtJour(reperes.min.date)})` : ""}
+                  </span>
+                </div>
+                <div className="pd-kpi">
+                  <span className="v">{fNum(stats.total)}</span>
+                  <span className="l">Articles sur la période</span>
+                </div>
+                <div className="pd-kpi">
+                  <span className="v">{fNum(stats.nbJours)}</span>
+                  <span className="l">Journées retenues</span>
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="pd-vues" role="tablist" aria-label="Affichage">
+                {VUES.map((v) => (
+                  <button
+                    key={v.cle}
+                    role="tab"
+                    aria-selected={vue === v.cle}
+                    className={`pd-vue ${vue === v.cle ? "active" : ""}`}
+                    onClick={() => setVue(v.cle)}
+                  >
+                    {v.libelle}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pd-chart-wrap">
+                {vue === "volume" && (
+                  <>
+                    <ResponsiveContainer width="100%" height={420}>
+                      <ComposedChart
+                        data={rows}
+                        margin={{ top: 24, right: 28, left: 0, bottom: 4 }}
+                        accessibilityLayer
+                      >
+                        <defs>
+                          <linearGradient id="pdAire" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={SERIE} stopOpacity={0.45} />
+                            <stop offset="100%" stopColor={SERIE} stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke={GRILLE} vertical={false} />
+                        {axeX}
+                        <YAxis
+                          domain={domaine}
+                          tick={{ fill: AXE, fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => v.toLocaleString("fr-FR")}
+                          width={58}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: AXE, strokeWidth: 1 }}
+                          content={<InfoBulle moyenne={moyenne} />}
+                        />
+                        <ReferenceLine
+                          y={moyenne}
+                          stroke={MOYENNE}
+                          strokeWidth={1.5}
+                          strokeDasharray="6 4"
+                          label={{
+                            value: `Moyenne ${fNum(moyenne)} art./j`,
+                            position: "insideTopRight",
+                            fill: MOYENNE,
+                            fontSize: 11,
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="articles"
+                          stroke={SERIE}
+                          strokeWidth={2}
+                          fill="url(#pdAire)"
+                          dot={{ r: 3, fill: SERIE, stroke: "none" }}
+                          activeDot={{ r: 5, stroke: "#12121a", strokeWidth: 2 }}
+                        />
+                        {/* Étiquettes directes sur les deux journées qui comptent,
+                            plutôt qu'un nombre sur chaque point. */}
+                        {reperes.max && (
+                          <ReferenceDot
+                            x={reperes.max.date}
+                            y={reperes.max.articles}
+                            r={5}
+                            fill={AU_DESSUS}
+                            stroke="#12121a"
+                            strokeWidth={2}
+                            label={{
+                              value: `▲ ${fNum(reperes.max.articles)}`,
+                              position: "top",
+                              fill: AU_DESSUS,
+                              fontSize: 11,
+                            }}
+                          />
+                        )}
+                        {reperes.min && (
+                          <ReferenceDot
+                            x={reperes.min.date}
+                            y={reperes.min.articles}
+                            r={5}
+                            fill={EN_DESSOUS}
+                            stroke="#12121a"
+                            strokeWidth={2}
+                            label={{
+                              value: `▼ ${fNum(reperes.min.articles)}`,
+                              position: "bottom",
+                              fill: EN_DESSOUS,
+                              fontSize: 11,
+                            }}
+                          />
+                        )}
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                    <p className="pd-note">
+                      Échelle resserrée autour des valeurs pour rendre les écarts
+                      lisibles — l'axe ne part pas de zéro. Pour comparer en valeur
+                      absolue, voir l'onglet « Écart vs moyenne ».
+                    </p>
+                  </>
+                )}
+
+                {vue === "ecart" && (
+                  <>
+                    <ResponsiveContainer width="100%" height={420}>
+                      <BarChart
+                        data={rows}
+                        margin={{ top: 24, right: 28, left: 0, bottom: 4 }}
+                        barCategoryGap="22%"
+                        accessibilityLayer
+                      >
+                        <CartesianGrid stroke={GRILLE} vertical={false} />
+                        {axeX}
+                        <YAxis
+                          tick={{ fill: AXE, fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => fSigne(v)}
+                          width={58}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                          content={<InfoBulle moyenne={moyenne} />}
+                        />
+                        <ReferenceLine
+                          y={0}
+                          stroke={MOYENNE}
+                          strokeWidth={1.5}
+                          label={{
+                            value: `Moyenne ${fNum(moyenne)} art./j`,
+                            position: "insideTopRight",
+                            fill: MOYENNE,
+                            fontSize: 11,
+                          }}
+                        />
+                        <Bar dataKey="ecart" shape={<BarreEcart />} maxBarSize={44}>
+                          {rows.map((r) => (
+                            <Cell
+                              key={r.date}
+                              fill={r.ecart >= 0 ? AU_DESSUS : EN_DESSOUS}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="pd-legend">
+                      <span>
+                        <i className="dot" style={{ background: AU_DESSUS }} /> Au‑dessus de
+                        la moyenne
+                      </span>
+                      <span>
+                        <i className="dot" style={{ background: EN_DESSOUS }} /> En‑dessous
+                        de la moyenne
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {vue === "semaine" && (
+                  <>
+                    <ResponsiveContainer width="100%" height={380}>
+                      <BarChart
+                        data={rapport.parJourSemaine || []}
+                        margin={{ top: 24, right: 28, left: 0, bottom: 4 }}
+                        barCategoryGap="28%"
+                        accessibilityLayer
+                      >
+                        <CartesianGrid stroke={GRILLE} vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fill: AXE, fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={{ stroke: GRILLE }}
+                          height={28}
+                        />
+                        <YAxis
+                          tick={{ fill: AXE, fontSize: 11 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => v.toLocaleString("fr-FR")}
+                          width={58}
+                        />
+                        <Tooltip
+                          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                          content={<InfoBulleJour />}
+                        />
+                        <ReferenceLine
+                          y={moyenne}
+                          stroke={MOYENNE}
+                          strokeWidth={1.5}
+                          strokeDasharray="6 4"
+                          label={{
+                            value: `Moyenne ${fNum(moyenne)} art./j`,
+                            position: "insideTopRight",
+                            fill: MOYENNE,
+                            fontSize: 11,
+                          }}
+                        />
+                        <Bar dataKey="moyenneArrondie" radius={[4, 4, 0, 0]} maxBarSize={64}>
+                          {(rapport.parJourSemaine || []).map((j) => (
+                            <Cell
+                              key={j.jour}
+                              fill={j.ecart >= 0 ? AU_DESSUS : EN_DESSOUS}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <p className="pd-note">
+                      Moyenne d'articles réapprovisionnés par jour de la semaine,
+                      sur les journées retenues — dit quel jour porte réellement la
+                      charge du dock.
+                    </p>
+                  </>
+                )}
+
+                {vue === "table" && (
+                  <div className="pd-table-wrap">
+                    <table className="pd-table">
+                      <thead>
+                        <tr>
+                          <th>Jour</th>
+                          <th className="num">Articles réappro.</th>
+                          <th className="num">Écart vs moyenne</th>
+                          <th className="num">%</th>
+                          <th className="num">Cumul</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.date}>
+                            <td>{fmtJourLong(r.date)}</td>
+                            <td className="num">{fNum(r.articles)}</td>
+                            <td className={`num ${r.ecart >= 0 ? "pos" : "neg"}`}>
+                              {fSigne(r.ecart)}
+                            </td>
+                            <td className={`num ${r.ecart >= 0 ? "pos" : "neg"}`}>
+                              {moyenne
+                                ? `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)} %`
+                                : "—"}
+                            </td>
+                            <td className="num">{fNum(r.cumul)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td>Moyenne · {fNum(stats.nbJours)} journées</td>
+                          <td className="num">{fNum(moyenne)}</td>
+                          <td className="num">—</td>
+                          <td className="num">—</td>
+                          <td className="num">{fNum(stats.total)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Aucun filtrage silencieux : ce qui a été écarté est dit. */}
+              {ecartees.length > 0 && (
+                <details className="pd-ecartees">
+                  <summary>
+                    {fNum(ecartees.length)} journée(s) écartée(s) par les critères
+                  </summary>
+                  <ul>
+                    {ecartees.map((e) => (
+                      <li key={e.date}>
+                        <span>{fmtJourLong(e.date)}</span>
+                        <b>{fNum(e.articles)} articles</b>
+                        <em>{e.motif}</em>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )}
         </>
       )}
     </div>

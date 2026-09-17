@@ -114,7 +114,7 @@ export const adminMenuStructure = [
       { label: "Analyse Réappro", path: "/admin/analyse-reappro", icon: HiRefresh },
       { label: "Débit / Comptant", path: "/admin/debit-comptant", icon: HiCurrencyDollar },
       { label: "Doublons GENCODE", path: "/admin/gencod-doublons", icon: HiDatabase },
-      { label: "Performance Dock", path: "/admin/performance-dock", icon: HiClipboardCheck },
+      { label: "Performance réappro magasin", path: "/admin/performance-dock", icon: HiClipboardCheck },
       { label: "Collecteurs", path: "/admin/collecteurs", icon: HiDeviceMobile },
       { label: "Carte des collecteurs", path: "/admin/collecteurs-carte", icon: HiDeviceMobile },
     ],
@@ -737,7 +737,7 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/gencod-doublons": "Détection des doublons de gencode.",
   "/admin/derniere-facturation":
     "Clients de la société et date de leur dernière facture, du plus ancien au plus récent.",
-  "/admin/performance-dock": "Performance du dock (réceptions).",
+  "/admin/performance-dock": "Articles réapprovisionnés par jour au magasin : volume, moyenne et écarts.",
   "/admin/collecteurs": "Collecteurs (terminaux de scan).",
   "/admin/collecteurs-carte": "Carte de localisation des collecteurs.",
   // Modules (gestion utilisateur)
