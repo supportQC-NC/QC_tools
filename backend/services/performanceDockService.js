@@ -4,15 +4,31 @@
 // reapro_mag_qc_yyyy-mm-dd.xlsx (onglet DONNEES, colonne GISEMENT ≠ vide / STOP).
 // Port de moyenne_reapro.py (version simple : barres/jour + moyenne).
 //
-// Dossier source (Ubuntu) : /home/supportserv/Bureau/doc_temp/reapro_mag
-// Surchargable via la variable d'env REAPRO_MAG_DIR.
+// Dossier source : le dossier `doc_temp/reapro_mag` du partage Rcommun.
+// ⚠️ Il N'EST PAS au même endroit selon la machine qui exécute le backend :
+//   - poste Ubuntu local  : /home/supportserv/Bureau/doc_temp/reapro_mag
+//   - poste Windows (dev) : \\192.168.0.250\Rcommun\doc_temp\reapro_mag
+//   - VPS de production   : <racine du montage Rcommun>/doc_temp/reapro_mag,
+//                           soit /mnt/rcommun/doc_temp/reapro_mag quand
+//                           RCOMMON_STOCK_ROOT=/mnt/rcommun/STOCK.
+// Coder le chemin Ubuntu en dur faisait échouer le module en production
+// (« Dossier introuvable ») alors que le dossier existait bien… sur une autre
+// machine. On essaie donc les candidats dans l'ordre et on renvoie le détail de
+// ce qui a été tenté, pour que l'écran dise POURQUOI (introuvable vs droits).
+// Surcharge explicite : REAPRO_MAG_DIR dans le .env du serveur.
 // -----------------------------------------------------------------------------
 
 import fs from "fs";
 import path from "path";
-import ExcelJS from "exceljs";
+// ⚠️ SheetJS et pas ExcelJS : ces classeurs contiennent un onglet « Graphique »
+// avec un graphe incorporé, sur lequel le lecteur d'ExcelJS 4.4 plante
+// (« Cannot read properties of undefined (reading 'anchors') »). Le service
+// avalait l'erreur et ne gardait qu'un fichier sur douze — courbe muette.
+import XLSX from "xlsx";
 
 const DEFAULT_DIR = "/home/supportserv/Bureau/doc_temp/reapro_mag";
+const DEFAULT_DIR_UNC = "\\\\192.168.0.250\\Rcommun\\doc_temp\\reapro_mag";
+const SOUS_DOSSIER = ["doc_temp", "reapro_mag"];
 const FILE_RE = /^reapro_mag_qc_\d{4}-\d{2}-\d{2}\.xlsx$/i;
 const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
 const ONGLET = "DONNEES";
@@ -26,23 +42,68 @@ class PerformanceDockService {
     this.lock = null;
   }
 
-  getDir() {
-    return process.env.REAPRO_MAG_DIR || DEFAULT_DIR;
+  /** Chemins à essayer, dans l'ordre : le premier lisible gagne. */
+  candidats() {
+    const liste = [];
+    const ajouter = (chemin, origine) => {
+      const v = String(chemin || "").trim();
+      if (v && !liste.some((c) => c.chemin === v)) liste.push({ chemin: v, origine });
+    };
+
+    ajouter(process.env.REAPRO_MAG_DIR, "REAPRO_MAG_DIR");
+
+    // Prod VPS : RCOMMON_STOCK_ROOT pointe sur .../STOCK, doc_temp en est le
+    // frère — on remonte d'un cran sous la racine du partage monté.
+    const stockRoot = String(process.env.RCOMMON_STOCK_ROOT || "").replace(
+      /[\\/]+$/,
+      "",
+    );
+    if (stockRoot) {
+      ajouter(
+        path.posix.join(path.posix.dirname(stockRoot), ...SOUS_DOSSIER),
+        "RCOMMON_STOCK_ROOT (partage monté)",
+      );
+    }
+
+    ajouter(DEFAULT_DIR, "poste Ubuntu local");
+    ajouter(DEFAULT_DIR_UNC, "partage UNC (dev Windows)");
+    return liste;
   }
 
-  cellText(cell) {
-    if (!cell) return "";
-    // ExcelJS : .text donne la valeur formatée ; fallback sur .value
-    let v = cell.text != null ? cell.text : cell.value;
-    if (v == null) return "";
-    if (typeof v === "object") {
-      if (v.result != null) v = v.result; // formule
-      else if (v.text != null) v = v.text; // hyperlink
-      else if (Array.isArray(v.richText))
-        v = v.richText.map((t) => t.text).join("");
-      else v = String(v);
+  /** Dossier lisible ? Distingue ENOENT (absent) de EACCES (droits). */
+  verifierDossier(chemin) {
+    try {
+      if (!fs.statSync(chemin).isDirectory()) {
+        return { ok: false, etat: "existe mais n'est pas un dossier" };
+      }
+      fs.accessSync(chemin, fs.constants.R_OK | fs.constants.X_OK);
+      return { ok: true, etat: "lisible" };
+    } catch (e) {
+      const code = e.code || "";
+      if (code === "ENOENT") return { ok: false, etat: "introuvable" };
+      if (code === "EACCES" || code === "EPERM") {
+        return { ok: false, etat: `droits insuffisants (${code})` };
+      }
+      return { ok: false, etat: code || e.message };
     }
-    return String(v).trim();
+  }
+
+  /** Résout le dossier source : { dir, candidats: [{chemin, origine, etat}] }. */
+  resoudreDossier() {
+    const candidats = this.candidats().map((c) => ({
+      ...c,
+      ...this.verifierDossier(c.chemin),
+    }));
+    const retenu = candidats.find((c) => c.ok);
+    return { dir: retenu ? retenu.chemin : null, candidats };
+  }
+
+  getDir() {
+    return this.resoudreDossier().dir || process.env.REAPRO_MAG_DIR || DEFAULT_DIR;
+  }
+
+  cellText(v) {
+    return v == null ? "" : String(v).trim();
   }
 
   extraireDate(nom) {
@@ -52,35 +113,37 @@ class PerformanceDockService {
 
   /** Compte les lignes valides (GISEMENT ≠ vide et ≠ STOP) d'un fichier. */
   async compterLignesValides(cheminFichier) {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.readFile(cheminFichier);
+    // Styles/formules/HTML désactivés : on ne veut que des valeurs texte.
+    const wb = XLSX.readFile(cheminFichier, {
+      cellFormula: false,
+      cellHTML: false,
+      cellStyles: false,
+    });
 
-    // Onglet DONNEES (insensible à la casse)
-    let ws = wb.getWorksheet(ONGLET);
-    if (!ws) {
-      ws = wb.worksheets.find(
-        (s) => String(s.name || "").trim().toUpperCase() === ONGLET,
-      );
-    }
+    // Onglet DONNEES (insensible à la casse : « Donnees » dans certains fichiers)
+    const nomOnglet = (wb.SheetNames || []).find(
+      (n) => String(n || "").trim().toUpperCase() === ONGLET,
+    );
+    const ws = nomOnglet ? wb.Sheets[nomOnglet] : null;
     if (!ws) return -1;
 
-    // Localiser la colonne GISEMENT dans la 1ʳᵉ ligne (en-têtes)
-    const headerRow = ws.getRow(1);
-    let gisCol = null;
-    headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-      if (
-        gisCol == null &&
-        this.cellText(cell).toUpperCase() === COLONNE.toUpperCase()
-      ) {
-        gisCol = colNumber;
-      }
+    const lignes = XLSX.utils.sheet_to_json(ws, {
+      header: 1,
+      raw: false,
+      defval: "",
     });
-    if (gisCol == null) return -1;
+    if (!lignes.length) return -1;
+
+    // Localiser la colonne GISEMENT dans la 1ʳᵉ ligne (en-têtes)
+    const entetes = lignes[0] || [];
+    const gisCol = entetes.findIndex(
+      (c) => this.cellText(c).toUpperCase() === COLONNE.toUpperCase(),
+    );
+    if (gisCol < 0) return -1;
 
     let compteur = 0;
-    const last = ws.rowCount;
-    for (let r = 2; r <= last; r += 1) {
-      const val = this.cellText(ws.getRow(r).getCell(gisCol));
+    for (let r = 1; r < lignes.length; r += 1) {
+      const val = this.cellText((lignes[r] || [])[gisCol]);
       if (!val) continue;
       if (val.toUpperCase() === VALEUR_EXCLUE.toUpperCase()) continue;
       compteur += 1;
@@ -89,12 +152,20 @@ class PerformanceDockService {
   }
 
   async build() {
-    const dir = this.getDir();
-    if (!fs.existsSync(dir)) {
+    const { dir, candidats } = this.resoudreDossier();
+    if (!dir) {
+      const detail = candidats
+        .map((c) => `${c.chemin} (${c.origine}) → ${c.etat}`)
+        .join(" ; ");
       return {
-        dossier: dir,
+        dossier: candidats[0]?.chemin || DEFAULT_DIR,
         dossierExiste: false,
-        message: `Dossier introuvable sur le serveur : ${dir}`,
+        candidats,
+        message:
+          "Dossier reapro_mag inaccessible depuis le serveur. Chemins essayés : " +
+          detail +
+          ". Définir REAPRO_MAG_DIR dans le .env du serveur (en production : le " +
+          "dossier doc_temp/reapro_mag du partage Rcommun monté) puis redémarrer.",
         generatedAt: new Date().toISOString(),
         rows: [],
         stats: { nbFichiers: 0, total: 0, moyenne: 0, moyenneArrondie: 0, max: 0, min: 0 },
@@ -107,14 +178,24 @@ class PerformanceDockService {
       .sort();
 
     const rows = [];
+    const ignores = []; // fichiers écartés + POURQUOI (sinon la courbe ment en silence)
     for (const nom of fichiers) {
       let count = -1;
+      let raison = "onglet DONNEES ou colonne GISEMENT absent";
       try {
         count = await this.compterLignesValides(path.join(dir, nom));
       } catch (e) {
-        count = -1; // fichier illisible : on l'ignore
+        count = -1;
+        raison = e.message;
       }
       if (count >= 0) rows.push({ date: this.extraireDate(nom), count });
+      else ignores.push({ fichier: nom, raison });
+    }
+    if (ignores.length) {
+      console.warn(
+        `[performance-dock] ${ignores.length} fichier(s) ignoré(s) :`,
+        ignores.map((i) => `${i.fichier} (${i.raison})`).join(", "),
+      );
     }
 
     const valeurs = rows.map((r) => r.count);
@@ -125,9 +206,11 @@ class PerformanceDockService {
     return {
       dossier: dir,
       dossierExiste: true,
+      candidats,
+      ignores,
       message: nbFichiers
         ? ""
-        : "Aucun fichier reapro_mag_qc_*.xlsx trouvé dans le dossier.",
+        : `Aucun fichier reapro_mag_qc_*.xlsx trouvé dans ${dir}.`,
       generatedAt: new Date().toISOString(),
       rows,
       stats: {

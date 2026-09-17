@@ -113,7 +113,21 @@ const AdminPerformanceDockScreen = () => {
           {error?.data?.message || "Erreur de chargement."}
         </div>
       ) : data && !data.dossierExiste ? (
-        <div className="pd-error">{data.message}</div>
+        <div className="pd-error">
+          <p>{data.message}</p>
+          {/* Détail des chemins tentés : sans lui, « dossier introuvable »
+              laisse croire à un bug alors que le dossier est simplement sur
+              une AUTRE machine que le serveur. */}
+          {Array.isArray(data.candidats) && data.candidats.length > 0 && (
+            <ul className="pd-candidats">
+              {data.candidats.map((c) => (
+                <li key={c.chemin}>
+                  <code>{c.chemin}</code> <em>({c.origine})</em> → {c.etat}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       ) : rows.length === 0 ? (
         <div className="pd-empty">{data?.message || "Aucune donnée."}</div>
       ) : (

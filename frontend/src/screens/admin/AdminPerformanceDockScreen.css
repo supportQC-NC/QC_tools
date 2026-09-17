@@ -79,6 +79,20 @@
   border-color: var(--admin-danger, #ef4444);
   color: #fca5a5;
 }
+.pd-candidats {
+  list-style: none;
+  margin: 16px auto 0;
+  padding: 0;
+  text-align: left;
+  display: inline-block;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  color: var(--admin-text-secondary, #a0a0b0);
+}
+.pd-candidats code {
+  color: var(--admin-text, #e6e6f0);
+  word-break: break-all;
+}
 .pd-loading {
   display: flex;
   flex-direction: column;
