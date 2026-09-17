@@ -127,10 +127,11 @@
   gap: 3px;
 }
 .pd-kpi .v {
+  /* Chiffres proportionnels : les valeurs ne s'alignent pas verticalement ici. */
   font-size: 1.7rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
-  color: #58a6ff;
+  color: var(--admin-text, #f0f0f5);
 }
 .pd-kpi .l {
   font-size: 0.7rem;
@@ -138,14 +139,52 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+.pd-kpi .l b {
+  font-weight: 700;
+}
 .pd-kpi.avg .v {
-  color: #e05252;
+  color: #c9a227;
 }
 .pd-kpi.best .v {
-  color: #3fb950;
+  color: #0ca30c;
 }
 .pd-kpi.low .v {
-  color: #f0883e;
+  color: #e66767;
+}
+/* Scopé : .pos / .neg sont des noms trop courants pour être posés globalement. */
+.admin-performance-dock .pos {
+  color: #0ca30c;
+}
+.admin-performance-dock .neg {
+  color: #e66767;
+}
+
+/* Sélecteur de vue */
+.pd-vues {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 12px;
+}
+.pd-vue {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.84rem;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.pd-vue:hover {
+  color: var(--admin-text, #f0f0f5);
+}
+.pd-vue.active {
+  background: var(--admin-bg-hover, #22222e);
+  color: var(--admin-text, #f0f0f5);
+  font-weight: 600;
 }
 
 /* Chart */
@@ -154,6 +193,51 @@
   border: 1px solid var(--admin-border, #2a2a3a);
   border-radius: 14px;
   padding: 18px 18px 12px;
+}
+.pd-note {
+  margin: 10px 2px 4px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--admin-text-muted, #8b949e);
+}
+
+/* Vue tableau — l'équivalent lisible sans couleur du graphique */
+.pd-table-wrap {
+  max-height: 460px;
+  overflow: auto;
+}
+.pd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.pd-table th,
+.pd-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--admin-border, #2a2a3a);
+  text-align: left;
+}
+.pd-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--admin-bg-secondary, #12121a);
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.pd-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pd-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.pd-table tfoot td {
+  font-weight: 700;
+  border-bottom: 0;
+  color: var(--admin-text, #f0f0f5);
 }
 
 .pd-legend {
@@ -179,7 +263,7 @@
 .pd-legend .line-dot {
   width: 22px;
   height: 0;
-  border-top: 2.5px dashed #e05252;
+  border-top: 2px dashed #c9a227;
   display: inline-block;
 }
 
@@ -191,6 +275,7 @@
   padding: 8px 12px;
   font-size: 0.82rem;
   color: #e6edf3;
+  font-variant-numeric: tabular-nums;
 }
 .pd-tt-date {
   color: #8b949e;
@@ -200,11 +285,14 @@
 .pd-tt-val {
   font-weight: 700;
 }
+.pd-tt-diff {
+  margin-top: 2px;
+}
 .pd-tt-diff.pos {
-  color: #3fb950;
+  color: #0ca30c;
 }
 .pd-tt-diff.neg {
-  color: #f85149;
+  color: #e66767;
 }
 
 @media (max-width: 640px) {
