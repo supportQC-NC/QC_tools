@@ -30,10 +30,13 @@ import {
   HiOutlineFilter,
   HiX,
 } from "react-icons/hi";
+import { useSelector } from "react-redux";
 import {
   useGetPerformanceDockQuery,
-  useRefreshPerformanceDockMutation,
+  usePrendrePhotoReapproMutation,
+  useRattraperHistoriqueReapproMutation,
 } from "../../slices/performanceDockApiSlice";
+import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
 import Loader from "../../components/Shared/Loader/Loader";
 import "./AdminPerformanceDockScreen.css";
@@ -53,6 +56,33 @@ const EN_DESSOUS = "#0ca30c"; // vert, écart négatif = moins de charge
 const MOYENNE = "#c9a227"; // repère moyenne, distinct des deux pôles
 const GRILLE = "#24242e";
 const AXE = "#8b949e";
+
+// Tranches de ventes : série ORDONNÉE (aucune < faible < moyenne < forte), donc
+// une rampe SÉQUENTIELLE d'une seule teinte — pas quatre couleurs catégorielles,
+// qui suggéreraient des familles sans ordre. Rampe monotone en clarté, chaque
+// palier au-dessus de 3:1 sur le fond admin (#12121a) ; l'identité est portée
+// par le libellé écrit sur chaque tuile, jamais par la couleur seule.
+const TRANCHE_COULEURS = {
+  aucune: "#7fb2f0",
+  faible: "#5a9bea",
+  moyenne: "#3987e5",
+  forte: "#2a6cbd",
+};
+// Du plus vendeur au moins vendeur : c'est l'ordre dans lequel on veut lire la
+// charge — ce qui part toutes les semaines d'abord.
+const ORDRE_TRANCHES = ["forte", "moyenne", "faible", "aucune"];
+const LIB_TRANCHES = {
+  forte: "≥ 1 vente / semaine",
+  moyenne: "1 / mois à 1 / semaine",
+  faible: "< 1 vente / mois",
+  aucune: "aucune vente sur 12 mois",
+};
+const LIB_TRANCHES_COURT = {
+  forte: "≥ 1 / sem.",
+  moyenne: "1 / mois → 1 / sem.",
+  faible: "< 1 / mois",
+  aucune: "aucune vente",
+};
 
 const fNum = (n) => Math.round(Number(n) || 0).toLocaleString("fr-FR");
 const fSigne = (n) => (n >= 0 ? `+${fNum(n)}` : fNum(n));
@@ -75,13 +105,18 @@ const JOURS_FILTRE = [
   { jour: 0, court: "D", long: "dimanche" },
 ];
 
+// ⚠️ Plus de seuils min/max sur le volume : filtrer les journées d'après la
+// valeur qu'on mesure, puis les comparer à une moyenne calculée sur les
+// survivantes, était circulaire — plus on serrait les seuils, plus tout
+// paraissait « dans la moyenne ». Les filtres qui restent portent sur le CONTENU
+// de la journée (rythme de vente, fournisseur), une question métier.
 const CRITERES_PAR_DEFAUT = {
   debut: "",
   fin: "",
   jours: [], // vide = tous
   exclureZero: false,
-  min: "",
-  max: "",
+  tranches: [], // vide = toutes
+  fourn: "", // "" = tous
   baseMoyenne: "globale", // la moyenne historique reste l'étalon par défaut
 };
 
@@ -175,14 +210,35 @@ const InfoBulleJour = ({ active, payload }) => {
   );
 };
 
+const InfoBulleFournisseur = ({ active, payload }) => {
+  if (!active || !payload || !payload.length) return null;
+  const f = payload[0].payload;
+  return (
+    <div className="pd-tooltip">
+      <div className="pd-tt-date">{f.nom || `(code ${f.code || "—"})`}</div>
+      <div className="pd-tt-val">
+        {fNum(f.moyenneArrondie)} articles / jour en moyenne
+      </div>
+      <div className="pd-tt-diff">
+        {fNum(f.ventesMoyennes)} ventes 12 mois cumulées · présent{" "}
+        {fNum(f.jours)} jour(s)
+      </div>
+    </div>
+  );
+};
+
 const VUES = [
   { cle: "volume", libelle: "Volume" },
   { cle: "ecart", libelle: "Écart vs moyenne" },
+  { cle: "fournisseurs", libelle: "Fournisseurs" },
   { cle: "semaine", libelle: "Jours de semaine" },
   { cle: "table", libelle: "Tableau" },
 ];
 
 const AdminPerformanceDockScreen = () => {
+  // Société du sélecteur GLOBAL du header : la mesure se lit dans la fiche
+  // article (S1..S5), elle n'a plus rien de propre à QC.
+  const societe = useSelector(selectGlobalDossier);
   const [criteres, setCriteres] = useState(CRITERES_PAR_DEFAUT);
   const [vue, setVue] = useState("volume");
   const [erreurExport, setErreurExport] = useState("");
@@ -198,8 +254,10 @@ const AdminPerformanceDockScreen = () => {
       p.jours = [...criteres.jours].sort((a, b) => a - b).join(",");
     }
     if (criteres.exclureZero) p.exclureZero = "1";
-    if (String(criteres.min).trim() !== "") p.min = criteres.min;
-    if (String(criteres.max).trim() !== "") p.max = criteres.max;
+    if (criteres.tranches.length && criteres.tranches.length < 4) {
+      p.tranches = criteres.tranches.join(",");
+    }
+    if (criteres.fourn) p.fourn = criteres.fourn;
     if (criteres.baseMoyenne === "selection") p.baseMoyenne = "selection";
     return p;
   }, [criteres]);
@@ -212,15 +270,27 @@ const AdminPerformanceDockScreen = () => {
     return () => clearTimeout(t);
   }, [params]);
 
-  const { data, isLoading, isFetching, error, refetch } =
-    useGetPerformanceDockQuery(paramsEnvoyes);
-  const [refreshPerformanceDock, { isLoading: refreshing }] =
-    useRefreshPerformanceDockMutation();
+  const { data, isLoading, isFetching, error } = useGetPerformanceDockQuery(
+    { societe, ...paramsEnvoyes },
+    { skip: !societe },
+  );
+  const [prendrePhoto, { isLoading: photoEnCours }] =
+    usePrendrePhotoReapproMutation();
+  const [rattraper, { isLoading: rattrapageEnCours }] =
+    useRattraperHistoriqueReapproMutation();
+  const [infoAction, setInfoAction] = useState("");
 
   // Un changement de critère change la clé de cache : `data` repasse à undefined
   // le temps de la réponse et l'écran clignoterait. On garde le dernier rapport
   // affiché pendant le recalcul.
   const dernier = useRef(null);
+  const derniereSociete = useRef(societe);
+  if (derniereSociete.current !== societe) {
+    // Changer de société ne doit pas laisser le rapport de la précédente à
+    // l'écran : ce sont des chiffres, on les croirait.
+    dernier.current = null;
+    derniereSociete.current = societe;
+  }
   if (data) dernier.current = data;
   const rapport = data || dernier.current;
 
@@ -230,6 +300,12 @@ const AdminPerformanceDockScreen = () => {
   const moyenne = rapport?.moyenne || 0;
   const bornes = rapport?.bornes || { premiere: "", derniere: "" };
   const ecartees = rapport?.ecartees || [];
+  const fournisseurs = useMemo(
+    () => rapport?.parFournisseur || [],
+    [rapport],
+  );
+  const tranchesMoy = rapport?.tranchesMoyennes || null;
+  const contexte = rapport?.dernier || null;
   const surSelection = criteres.baseMoyenne === "selection";
 
   const filtreActif =
@@ -237,8 +313,8 @@ const AdminPerformanceDockScreen = () => {
     Boolean(criteres.fin) ||
     (criteres.jours.length > 0 && criteres.jours.length < 7) ||
     criteres.exclureZero ||
-    String(criteres.min).trim() !== "" ||
-    String(criteres.max).trim() !== "" ||
+    (criteres.tranches.length > 0 && criteres.tranches.length < 4) ||
+    Boolean(criteres.fourn) ||
     surSelection;
 
   const majCritere = (patch) => setCriteres((c) => ({ ...c, ...patch }));
@@ -270,12 +346,38 @@ const AdminPerformanceDockScreen = () => {
     });
   };
 
-  const handleRefresh = async () => {
+  const basculerTranche = (cle) =>
+    setCriteres((c) => ({
+      ...c,
+      tranches: c.tranches.includes(cle)
+        ? c.tranches.filter((t) => t !== cle)
+        : [...c.tranches, cle],
+    }));
+
+  // Relevé du jour à la demande : le planificateur le prend à 18:00, ce bouton
+  // sert à amorcer une société ou à revoir le chiffre après une correction.
+  const handlePhoto = async () => {
+    setInfoAction("");
+    setErreurExport("");
     try {
-      await refreshPerformanceDock().unwrap();
-      refetch();
+      const r = await prendrePhoto(societe).unwrap();
+      setInfoAction(r.message || "Photo enregistrée.");
     } catch (e) {
-      /* ignore */
+      setErreurExport(e?.data?.message || "Échec de la photo du jour.");
+    }
+  };
+
+  // Rattrapage : rejoue les journées déjà archivées dans reapro_mag avec la
+  // MÊME règle, pour que la série ne démarre pas vide.
+  const handleRattrapage = async () => {
+    setInfoAction("");
+    setErreurExport("");
+    try {
+      const r = await rattraper({ societe }).unwrap();
+      setInfoAction(r.message || "Rattrapage terminé.");
+      if (!r.ok) setErreurExport(r.message || "");
+    } catch (e) {
+      setErreurExport(e?.data?.message || "Échec du rattrapage.");
     }
   };
 
@@ -287,7 +389,7 @@ const AdminPerformanceDockScreen = () => {
     try {
       const qs = new URLSearchParams(paramsEnvoyes).toString();
       const res = await fetch(
-        `${BASE_URL}/api/performance-dock/excel${qs ? `?${qs}` : ""}`,
+        `${BASE_URL}/api/performance-dock/${societe}/excel${qs ? `?${qs}` : ""}`,
         { credentials: "include" },
       );
       if (!res.ok) {
@@ -306,10 +408,10 @@ const AdminPerformanceDockScreen = () => {
       a.href = url;
       a.download =
         criteres.debut || criteres.fin
-          ? `performance_reappro_magasin_${criteres.debut || bornes.premiere}_${
+          ? `reappro_magasin_${societe}_${criteres.debut || bornes.premiere}_${
               criteres.fin || bornes.derniere
             }.xlsx`
-          : "performance_reappro_magasin.xlsx";
+          : `reappro_magasin_${societe}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -426,24 +528,29 @@ const AdminPerformanceDockScreen = () => {
         </div>
 
         <div className="pd-filtre">
-          <label>Volume retenu (articles / jour)</label>
-          <div className="pd-seuils">
-            <input
-              type="number"
-              min="0"
-              placeholder="min"
-              value={criteres.min}
-              onChange={(e) => majCritere({ min: e.target.value })}
-            />
-            <span>→</span>
-            <input
-              type="number"
-              min="0"
-              placeholder="max"
-              value={criteres.max}
-              onChange={(e) => majCritere({ max: e.target.value })}
-            />
+          <label>Rythme de vente des articles</label>
+          <div className="pd-tranches-filtre">
+            {ORDRE_TRANCHES.map((cle) => {
+              const actif =
+                !criteres.tranches.length || criteres.tranches.includes(cle);
+              return (
+                <button
+                  key={cle}
+                  type="button"
+                  aria-pressed={actif}
+                  className={actif ? "actif" : ""}
+                  onClick={() => basculerTranche(cle)}
+                >
+                  <i style={{ background: TRANCHE_COULEURS[cle] }} />
+                  {LIB_TRANCHES[cle]}
+                </button>
+              );
+            })}
           </div>
+          <small>
+            Aucune coche = tous les articles. Un article à réapprovisionner qui
+            ne se vend pas n'a pas le poids d'un article qui part chaque semaine.
+          </small>
           <label className="pd-check">
             <input
               type="checkbox"
@@ -452,6 +559,27 @@ const AdminPerformanceDockScreen = () => {
             />
             Ignorer les journées sans activité (0 article)
           </label>
+        </div>
+
+        <div className="pd-filtre">
+          <label>Fournisseur</label>
+          <select
+            value={criteres.fourn}
+            onChange={(e) => majCritere({ fourn: e.target.value })}
+          >
+            <option value="">Tous les fournisseurs</option>
+            {fournisseurs.map((f) => (
+              <option key={f.code} value={f.code}>
+                {f.nom || `(code ${f.code || "—"})`} · {fNum(f.moyenneArrondie)}{" "}
+                art./jour
+              </option>
+            ))}
+          </select>
+          <small>
+            {criteres.fourn
+              ? "La courbe ne compte plus que les articles de ce fournisseur ; le filtre par rythme de vente est alors ignoré."
+              : "Restreindre la courbe à un seul fournisseur."}
+          </small>
         </div>
 
         <div className="pd-filtre">
@@ -497,8 +625,22 @@ const AdminPerformanceDockScreen = () => {
           <HiChartBar /> Performance réappro magasin
         </h1>
         <div className="pd-actions">
-          <button className="pd-btn" onClick={handleRefresh} disabled={refreshing || isFetching}>
-            <HiRefresh className={refreshing ? "spin" : ""} /> Rafraîchir
+          <button
+            className="pd-btn"
+            onClick={handlePhoto}
+            disabled={!societe || photoEnCours || isFetching}
+            title="Relit les fiches articles maintenant et met à jour le relevé d'aujourd'hui. Le relevé est pris tout seul chaque soir à 18:00."
+          >
+            <HiRefresh className={photoEnCours ? "spin" : ""} /> Recompter
+            aujourd'hui
+          </button>
+          <button
+            className="pd-btn"
+            onClick={handleRattrapage}
+            disabled={!societe || rattrapageEnCours}
+            title="Recalcule les journées d'avant la mise en service, à partir des rapports reapro_mag déjà archivés, avec la même règle de comptage."
+          >
+            {rattrapageEnCours ? "Calcul…" : "Récupérer les jours passés"}
           </button>
           <button
             className="pd-btn primary"
@@ -511,49 +653,46 @@ const AdminPerformanceDockScreen = () => {
       </div>
 
       <p className="pd-subtitle">
-        Nombre d'<strong>articles réapprovisionnés</strong> par jour · fichiers
-        reapro_mag, onglet <strong>DONNEES</strong> · un article = une ligne dont
-        le GISEMENT n'est ni vide ni STOP · société QC
+        Nombre d'<strong>articles à réapprovisionner</strong> par jour — rien en
+        rayon (<strong>S1 = 0</strong>) alors qu'il reste du stock dans un autre
+        dépôt (<strong>S2 à S5 &gt; 0</strong>). Même règle que la liste
+        « rayon vide » de l'écran Listes de réappro.
+        {rapport?.societeNom ? ` · ${rapport.societeNom}` : ""}
       </p>
 
-      {loading ? (
+      {/* Sans cette phrase, personne ne peut deviner que le graphique est une
+          suite de relevés quotidiens et non un calcul refait à chaque
+          ouverture — ni pourquoi il existe un bouton pour en refaire un. */}
+      {societe && (
+        <p className="pd-explication">
+          Le stock ne garde aucune trace du passé : la fiche article ne dit que
+          l'état d'aujourd'hui. Pour construire une courbe, l'application
+          <strong> compte les articles concernés automatiquement chaque soir à
+          18 h, après la fermeture</strong>, et conserve le résultat. Chaque
+          point du graphique est donc l'état de fin de journée : ce qui restait
+          à descendre le soir même.
+          {contexte
+            ? ` Dernier relevé : ${fmtJourLong(contexte.date)} — ${fNum(
+                contexte.total,
+              )} articles.`
+            : " Aucun relevé pour l'instant."}
+        </p>
+      )}
+
+      {infoAction && <div className="pd-info">{infoAction}</div>}
+
+      {!societe ? (
+        <div className="pd-empty">
+          Choisissez une société dans le sélecteur du bandeau.
+        </div>
+      ) : loading ? (
         <div className="pd-loading">
           <Loader />
-          <p>Lecture des fichiers reapro_mag…</p>
+          <p>Lecture des photos quotidiennes…</p>
         </div>
       ) : error ? (
         <div className="pd-error">
           {error?.data?.message || "Erreur de chargement."}
-        </div>
-      ) : rapport && !rapport.dossierExiste ? (
-        <div className="pd-error">
-          <p>{rapport.message}</p>
-          {/* Détail des chemins tentés : sans lui, « dossier introuvable »
-              laisse croire à un bug alors que le dossier est simplement sur
-              une AUTRE machine que le serveur. */}
-          {Array.isArray(rapport.candidats) && rapport.candidats.length > 0 && (
-            <ul className="pd-candidats">
-              {rapport.candidats.map((c) => (
-                <li key={c.chemin}>
-                  <code>{c.chemin}</code> <em>({c.origine})</em> → {c.etat}
-                </li>
-              ))}
-            </ul>
-          )}
-          {/* Ce que le serveur voit autour : dit si c'est le montage qui manque
-              ou seulement le dernier dossier. */}
-          {Array.isArray(rapport.sondages) && rapport.sondages.length > 0 && (
-            <ul className="pd-candidats">
-              {rapport.sondages.map((s) => (
-                <li key={s.ancetre}>
-                  <code>{s.ancetre}</code> contient :{" "}
-                  {s.erreur
-                    ? `lecture refusée (${s.erreur})`
-                    : s.entrees.join(", ") || "(vide)"}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       ) : (
         <>
@@ -604,15 +743,75 @@ const AdminPerformanceDockScreen = () => {
                     Minimum {reperes.min ? `(${fmtJour(reperes.min.date)})` : ""}
                   </span>
                 </div>
-                <div className="pd-kpi">
-                  <span className="v">{fNum(stats.total)}</span>
-                  <span className="l">Articles sur la période</span>
-                </div>
+                {/* ⚠️ Plus de « total d'articles sur la période » : additionner
+                    des photos compterait dix fois le même article resté dix
+                    jours en rayon vide (chez QC, 96 % de la liste est identique
+                    d'un jour sur l'autre). Ce qui a du sens, c'est le contexte
+                    du dernier jour connu. */}
+                {contexte && (
+                  <div className="pd-kpi">
+                    <span className="v">{fNum(contexte.sansGisement)}</span>
+                    <span className="l">
+                      Sans emplacement <b>({fmtJour(contexte.date)})</b>
+                    </span>
+                  </div>
+                )}
+                {contexte && (
+                  <div className="pd-kpi">
+                    <span className="v">{fNum(contexte.sansStock)}</span>
+                    <span className="l">
+                      Rayon vide <b>sans stock nulle part</b>
+                    </span>
+                  </div>
+                )}
                 <div className="pd-kpi">
                   <span className="v">{fNum(stats.nbJours)}</span>
                   <span className="l">Journées retenues</span>
                 </div>
               </div>
+
+              {/* Qualité de la charge. Des tuiles et non un empilement : la
+                  série est ordonnée, chaque palier porte son libellé écrit, et
+                  l'identité ne repose donc jamais sur la couleur seule. */}
+              {tranchesMoy && !criteres.fourn && (
+                <div className="pd-tranches">
+                  <div className="pd-tranches-titre">
+                    Sur une journée type, ces articles se vendent :
+                  </div>
+                  <div className="pd-tranches-tuiles">
+                    {ORDRE_TRANCHES.map((cle) => {
+                      const n = tranchesMoy[cle] || 0;
+                      const tot = ORDRE_TRANCHES.reduce(
+                        (t, k) => t + (tranchesMoy[k] || 0),
+                        0,
+                      );
+                      return (
+                        <div
+                          key={cle}
+                          className="pd-tranche"
+                          style={{ borderTopColor: TRANCHE_COULEURS[cle] }}
+                        >
+                          <span
+                            className="v"
+                            style={{ color: TRANCHE_COULEURS[cle] }}
+                          >
+                            {fNum(n)}
+                          </span>
+                          <span className="l">{LIB_TRANCHES_COURT[cle]}</span>
+                          <span className="p">
+                            {tot ? ((n / tot) * 100).toFixed(0) : 0} %
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="pd-note">
+                    Moyennes par jour. Un article à réapprovisionner qui ne se
+                    vend pas est du stock qui dort ; un article qui part chaque
+                    semaine et qui manque en rayon est une vente perdue.
+                  </p>
+                </div>
+              )}
 
               <div className="pd-vues" role="tablist" aria-label="Affichage">
                 {VUES.map((v) => (
@@ -778,6 +977,79 @@ const AdminPerformanceDockScreen = () => {
                   </>
                 )}
 
+                {vue === "fournisseurs" && (
+                  <>
+                    {fournisseurs.length === 0 ? (
+                      <div className="pd-empty">
+                        Aucun fournisseur sur la période retenue.
+                      </div>
+                    ) : (
+                      <>
+                        <ResponsiveContainer
+                          width="100%"
+                          height={Math.max(
+                            260,
+                            40 * Math.min(fournisseurs.length, 15) + 40,
+                          )}
+                        >
+                          <BarChart
+                            data={fournisseurs.slice(0, 15)}
+                            layout="vertical"
+                            margin={{ top: 8, right: 56, left: 8, bottom: 8 }}
+                            accessibilityLayer
+                          >
+                            <CartesianGrid stroke={GRILLE} horizontal={false} />
+                            <XAxis
+                              type="number"
+                              tick={{ fill: AXE, fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="nom"
+                              tick={{ fill: AXE, fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                              width={190}
+                              tickFormatter={(v) =>
+                                v && v.length > 26 ? `${v.slice(0, 25)}…` : v || "(inconnu)"
+                              }
+                            />
+                            <Tooltip
+                              cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                              content={<InfoBulleFournisseur />}
+                            />
+                            {/* Série UNIQUE : une seule teinte, pas de légende
+                                — le titre de la vue la nomme déjà. */}
+                            <Bar
+                              dataKey="moyenneArrondie"
+                              fill={SERIE}
+                              radius={[0, 4, 4, 0]}
+                              maxBarSize={22}
+                              label={{
+                                position: "right",
+                                fill: AXE,
+                                fontSize: 11,
+                                formatter: (v) => fNum(v),
+                              }}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <p className="pd-note">
+                          Articles à réapprovisionner par <strong>journée
+                          type</strong> — une moyenne, pas un cumul : le même
+                          article resté dix jours en rayon vide serait sinon
+                          compté dix fois. 15 premiers fournisseurs sur{" "}
+                          {fNum(fournisseurs.length)} ; l'export Excel les porte
+                          tous. Cliquer un fournisseur dans le filtre restreint
+                          toute la courbe à ses articles.
+                        </p>
+                      </>
+                    )}
+                  </>
+                )}
+
                 {vue === "semaine" && (
                   <>
                     <ResponsiveContainer width="100%" height={380}>
@@ -845,7 +1117,11 @@ const AdminPerformanceDockScreen = () => {
                           <th className="num">Articles réappro.</th>
                           <th className="num">Écart vs moyenne</th>
                           <th className="num">%</th>
-                          <th className="num">Cumul</th>
+                          {/* ⚠️ Plus de colonne « Cumul » : additionner des
+                              photos successives compterait plusieurs fois le
+                              même article. On montre à la place ce qui manque
+                              pour agir. */}
+                          <th className="num">Sans emplacement</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -861,7 +1137,7 @@ const AdminPerformanceDockScreen = () => {
                                 ? `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)} %`
                                 : "—"}
                             </td>
-                            <td className="num">{fNum(r.cumul)}</td>
+                            <td className="num">{fNum(r.sansGisement)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -871,7 +1147,7 @@ const AdminPerformanceDockScreen = () => {
                           <td className="num">{fNum(moyenne)}</td>
                           <td className="num">—</td>
                           <td className="num">—</td>
-                          <td className="num">{fNum(stats.total)}</td>
+                          <td className="num">—</td>
                         </tr>
                       </tfoot>
                     </table>

@@ -78,6 +78,7 @@ import commerciauxRoutes from "./routes/commerciauxRoutes.js";
 import commercialRoutes from "./routes/commercialRoutes.js";
 import { startCommercialIndexWarmer } from "./services/commercialService.js";
 import { startReapproProformaScheduler } from "./services/reapproProformaScheduler.js";
+import { startReapproSnapshotScheduler } from "./services/performanceReapproService.js";
 import { startVeilleScheduler } from "./services/veilleScheduler.js";
 import topVentesRoutes from "./routes/topVentesRoutes.js";
 import menuHintRoutes from "./routes/menuHintRoutes.js";
@@ -374,4 +375,8 @@ server.listen(PORT, () => {
   startReapproProformaScheduler();
   // Veille : génération hebdomadaire des rapports IA (par utilisateur).
   startVeilleScheduler();
+  // Réappro magasin : photo quotidienne du nombre d'articles à rayon vide mais
+  // avec du stock ailleurs. Sans elle, aucun historique n'existe — S1..S5 sont
+  // écrasés à chaque mouvement de stock.
+  startReapproSnapshotScheduler();
 });

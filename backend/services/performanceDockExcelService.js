@@ -9,7 +9,7 @@
 // données dans la colonne des volumes, mise en page prête à imprimer.
 //
 // ⚠️ Le calcul n'est PAS refait ici : le service reçoit le rapport déjà filtré
-// par `performanceDockService.getReport()`. Écran et classeur affichent donc
+// par `performanceReapproService.getRapport()`. Écran et classeur affichent donc
 // exactement les mêmes chiffres, y compris quand l'utilisateur a redéfini la
 // base de la moyenne.
 //
@@ -62,6 +62,17 @@ const jourDe = (iso) => {
 };
 
 const cap = (s) => (s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : "");
+
+// Tranches de ventes (Σ|V1..V12|) — mêmes bornes que performanceReapproService.
+// Un article à réapprovisionner qui ne se vend pas n'a pas le poids d'un article
+// qui part toutes les semaines : c'est cette lecture que le classeur doit porter.
+const LIB_TRANCHES = {
+  forte: "≥ 1 vente / semaine",
+  moyenne: "1 / mois à 1 / semaine",
+  faible: "< 1 vente / mois",
+  aucune: "aucune vente sur 12 mois",
+};
+const ORDRE_TRANCHES = ["forte", "moyenne", "faible", "aucune"];
 
 const col = (n) => String.fromCharCode(64 + n); // 1 -> A
 const bordureBasse = { bottom: { style: "thin", color: { argb: BORDURE } } };
@@ -163,16 +174,14 @@ const libellesCriteres = (rapport) => {
       c.exclureZero ? "exclues du calcul" : "conservées",
     ],
     [
-      "Seuil bas",
-      c.min === null || c.min === undefined
-        ? "aucun"
-        : `journées sous ${c.min} articles exclues`,
+      "Tranches de ventes retenues",
+      c.tranches && c.tranches.length
+        ? c.tranches.map((t) => LIB_TRANCHES[t] || t).join(", ")
+        : "toutes",
     ],
     [
-      "Seuil haut",
-      c.max === null || c.max === undefined
-        ? "aucun"
-        : `journées au-dessus de ${c.max} articles exclues`,
+      "Fournisseur",
+      c.fourn ? `code ${c.fourn} uniquement` : "tous",
     ],
     [
       "Base de la moyenne",
@@ -221,13 +230,22 @@ const feuilleSynthese = (wb, rapport, periodeLabel) => {
     OR,
   );
   carte(ws, 3, l1, stats.mediane || 0, "Médiane / jour", BLEU_FONCE);
-  carte(ws, 5, l1, stats.total || 0, "Total d'articles réapprovisionnés", BLEU_FONCE);
+  // ⚠️ Pas de « total d'articles » : la somme des photos compterait plusieurs
+  // fois le même article resté en rayon vide plusieurs jours de suite.
+  carte(ws, 5, l1, stats.nbJours || 0, "Journées mesurées", BLEU_FONCE);
 
   ws.getRow(l1 + 2).height = 6; // espaceur
   const l2 = l1 + 3;
   carte(ws, 1, l2, stats.max || 0, "Journée la plus chargée", ROUGE);
   carte(ws, 3, l2, stats.min || 0, "Journée la plus légère", VERT);
-  carte(ws, 5, l2, stats.nbJours || 0, "Journées retenues", BLEU_FONCE);
+  carte(
+    ws,
+    5,
+    l2,
+    rapport.dernier?.sansStock || 0,
+    "Rayon vide SANS stock ailleurs (dernier jour) — achat, pas réappro",
+    GRIS,
+  );
 
   // Rappel de l'autre moyenne : sans lui, on ne sait plus à quoi la sélection
   // est comparée.
@@ -246,8 +264,43 @@ const feuilleSynthese = (wb, rapport, periodeLabel) => {
   remplir(rappel, OR_PALE);
   ws.getRow(lRappel).height = 20;
 
+  // ── Qualité de la charge : combien de ces articles se vendent vraiment ──
+  // Sans cette ventilation, « 1 600 articles à réappro » ne dit pas si le
+  // magasin perd des ventes ou traîne du stock mort. Moyennes par jour.
+  const lTr = lRappel + 2;
+  sectionAt(ws, lTr, "Qualité de la charge — par rythme de vente (moyenne / jour)", "F");
+  entetesAt(ws, lTr + 1, [
+    "Rythme de vente",
+    "Articles / jour",
+    "Part",
+    "",
+    "",
+    "",
+  ]);
+  const tr = rapport.tranchesMoyennes || {};
+  const totalTr = ORDRE_TRANCHES.reduce((t, k) => t + (tr[k] || 0), 0);
+  ORDRE_TRANCHES.forEach((k, i) => {
+    const row = ws.getRow(lTr + 2 + i);
+    row.values = [
+      LIB_TRANCHES[k],
+      tr[k] || 0,
+      totalTr ? ((tr[k] || 0) / totalTr) * 100 : 0,
+    ];
+    row.getCell(2).numFmt = ENTIER;
+    row.getCell(2).font = { bold: true };
+    row.getCell(3).numFmt = '0.0" %"';
+    // Le haut de tableau est celui qui coûte des ventes : on le souligne.
+    if (k === "forte") row.getCell(1).font = { bold: true, color: { argb: ROUGE } };
+    if (k === "aucune") row.getCell(1).font = { color: { argb: GRIS } };
+    row.eachCell((c) => {
+      c.border = bordureBasse;
+      if (i % 2) remplir(c, ZEBRE);
+    });
+    row.commit();
+  });
+
   // ── Rythme par jour de la semaine ──
-  const lSection = lRappel + 2;
+  const lSection = lTr + 2 + ORDRE_TRANCHES.length + 1;
   sectionAt(ws, lSection, "Rythme par jour de la semaine", "F");
   entetesAt(ws, lSection + 1, [
     "Jour",
@@ -358,7 +411,9 @@ const feuilleDetail = (wb, rapport, periodeLabel) => {
     "Écart vs moyenne",
     "% vs moyenne",
     "Rang",
-    "Cumul articles",
+    // ⚠️ Pas de cumul : additionner des photos successives compterait plusieurs
+    // fois le même article resté en rayon vide plusieurs jours.
+    "Sans emplacement",
   ]);
 
   const premiere = 4;
@@ -372,7 +427,7 @@ const feuilleDetail = (wb, rapport, periodeLabel) => {
       r.ecart,
       r.pct,
       r.rang,
-      r.cumul,
+      r.sansGisement,
     ];
     row.getCell(3).numFmt = ENTIER;
     row.getCell(4).numFmt = SIGNE;
@@ -409,9 +464,9 @@ const feuilleDetail = (wb, rapport, periodeLabel) => {
     const lTotal = derniere + 1;
     const total = ws.getRow(lTotal);
     total.values = [
-      "Total",
+      "Moyenne",
       `${rapport.stats?.nbJours || 0} journées`,
-      rapport.stats?.total || 0,
+      rapport.stats?.moyenneArrondie || 0,
     ];
     total.eachCell((c) => {
       c.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -448,7 +503,83 @@ const feuilleDetail = (wb, rapport, periodeLabel) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Feuille 3 — Journées écartées (transparence : aucun filtrage silencieux)
+// Feuille 3 — Fournisseurs
+//
+// ⚠️ Des MOYENNES par jour, pas des cumuls. Additionner les photos compterait
+// dix fois le même article resté dix jours en rayon vide : chez QC, 96 % de la
+// liste est identique d'un jour sur l'autre. La question à laquelle cette
+// feuille répond est « quel fournisseur pèse combien sur une journée type ».
+// ─────────────────────────────────────────────────────────────────────────────
+const feuilleFournisseurs = (wb, rapport, periodeLabel) => {
+  const ws = wb.addWorksheet("Fournisseurs", {
+    properties: { tabColor: { argb: OR } },
+    views: [{ state: "frozen", ySplit: 3, showGridLines: false }],
+  });
+  ws.columns = [
+    { width: 12 },
+    { width: 42 },
+    { width: 20 },
+    { width: 16 },
+    { width: 22 },
+    { width: 18 },
+  ];
+
+  bandeau(
+    ws,
+    "Où se concentre le réappro — ventilation par fournisseur",
+    periodeLabel,
+    "F",
+  );
+  entetesAt(ws, 3, [
+    "Code",
+    "Fournisseur",
+    "Articles / jour (moy.)",
+    "Part",
+    "Ventes 12 mois / jour (moy.)",
+    "Journées concernées",
+  ]);
+
+  const lignes = rapport.parFournisseur || [];
+  const totalMoy = lignes.reduce((t, f) => t + (f.moyenne || 0), 0);
+
+  if (!lignes.length) {
+    ws.mergeCells("A4:F4");
+    const c = ws.getCell("A4");
+    c.value = "Aucun fournisseur sur la période retenue.";
+    c.font = { italic: true, color: { argb: GRIS } };
+    return ws;
+  }
+
+  lignes.forEach((f, i) => {
+    const row = ws.getRow(4 + i);
+    row.values = [
+      f.code || "—",
+      f.nom || "(fournisseur inconnu)",
+      f.moyenneArrondie || 0,
+      totalMoy ? (f.moyenne || 0) / totalMoy : 0,
+      f.ventesMoyennes || 0,
+      f.jours || 0,
+    ];
+    row.getCell(3).numFmt = ENTIER;
+    row.getCell(3).font = { bold: true };
+    row.getCell(4).numFmt = '0.0" %"';
+    // ExcelJS écrit un pourcentage brut : on donne la valeur ×100 au format.
+    row.getCell(4).value = totalMoy ? ((f.moyenne || 0) / totalMoy) * 100 : 0;
+    row.getCell(5).numFmt = ENTIER;
+    row.getCell(6).numFmt = ENTIER;
+    row.eachCell((c) => {
+      c.border = bordureBasse;
+      if (i % 2) remplir(c, ZEBRE);
+    });
+    row.commit();
+  });
+
+  ws.autoFilter = { from: "A3", to: `F${3 + lignes.length}` };
+  return ws;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feuille 4 — Journées écartées (transparence : aucun filtrage silencieux)
 // ─────────────────────────────────────────────────────────────────────────────
 const feuilleEcartees = (wb, rapport, periodeLabel) => {
   const ws = wb.addWorksheet("Journées écartées", {
@@ -486,7 +617,7 @@ const feuilleEcartees = (wb, rapport, periodeLabel) => {
 
 /**
  * Construit le classeur à partir d'un rapport DÉJÀ filtré.
- * @param {object} rapport sortie de performanceDockService.getReport()
+ * @param {object} rapport sortie de performanceReapproService.getRapport()
  * @returns {Promise<Buffer>}
  */
 export const genererExcelPerformanceDock = async (rapport) => {
@@ -507,6 +638,7 @@ export const genererExcelPerformanceDock = async (rapport) => {
 
   feuilleSynthese(wb, rapport, periodeLabel);
   feuilleDetail(wb, rapport, periodeLabel);
+  feuilleFournisseurs(wb, rapport, periodeLabel);
   feuilleEcartees(wb, rapport, periodeLabel);
 
   return wb.xlsx.writeBuffer();

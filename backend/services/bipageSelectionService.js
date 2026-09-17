@@ -29,6 +29,31 @@ const stockTotal = (a) =>
 // Stock des RÉSERVES seules (S2 à S5) : le rayon, c'est S1.
 const stockReserves = (a) => num(a.S2) + num(a.S3) + num(a.S4) + num(a.S5);
 
+/**
+ * LA règle « article à réapprovisionner », partagée.
+ *
+ * Rien en rayon (S1 = 0) alors qu'il reste du stock dans un autre dépôt
+ * (S2..S5 > 0) : il y a quelque chose à descendre. Un article sans stock nulle
+ * part n'est pas un problème de réappro mais d'achat — il est compté à part,
+ * jamais ici.
+ *
+ * ⚠️ Source de vérité UNIQUE du critère : la liste « rayon vide » de l'écran
+ * Listes de réappro et l'indicateur quotidien de `performanceReapproService`
+ * s'en servent tous les deux. Les faire diverger, c'est afficher deux nombres
+ * contradictoires pour la même question.
+ *
+ * Déclarée ici plutôt que dans un utilitaire : les exclusions qu'elle applique
+ * (articles techniques, renvois GENDOUBL, emplacements hors rayon) sont déjà
+ * définies dans ce fichier et n'ont qu'un seul sens.
+ */
+const estAReapprovisionner = (a, isQC = false) => {
+  if (estTechnique(a)) return false;
+  if (estRenvoi(a)) return false;
+  if (num(a.S1) !== 0) return false;
+  if (stockReserves(a) <= 0) return false;
+  return !estHorsRayon(gisementArticle(a), isQC);
+};
+
 // Ventes des 12 derniers mois : Σ|V1..V12|, exactement la formule du réappro
 // local et de l'analyse réappro (`venteAnnuelle`). Valeur absolue : l'ERP écrit
 // des quantités négatives sur certains mois (retours).
@@ -68,9 +93,14 @@ const estTechnique = (a) => {
 
 // Emplacements qui NE SONT PAS un rayon : un article rangé là n'a par
 // définition rien en rayon, il ne doit pas être signalé comme « rayon vide ».
-// Propre à QC (SAV et DOCK), comme dans le service réappro.
+// Propre à QC (SAV, DOCK et STOP), comme dans le service réappro.
+// ⚠️ « STOP » = article arrêté : il n'a plus de place en rayon, envoyer
+// quelqu'un le remettre n'a pas de sens. Le rapport reapro_mag l'excluait déjà.
+// Un gisement VIDE, en revanche, reste retenu : c'est un article à descendre
+// dont on ignore l'emplacement — un travail réel doublé d'une fiche à corriger,
+// pas une raison de le faire disparaître du comptage.
 const estHorsRayon = (gis, isQC) =>
-  isQC && ["SAV", "DOCK"].includes(String(gis || "").toUpperCase());
+  isQC && ["SAV", "DOCK", "STOP"].includes(String(gis || "").toUpperCase());
 
 // Ligne telle que l'écran l'affiche. `prioritaire` = rayon vide alors qu'il
 // reste du stock en réserve : c'est CE cas qu'on veut voir en premier. La règle
@@ -280,12 +310,9 @@ export const getArticlesRayonVide = async (entreprise, options = {}) => {
   const parFourn = new Map();
   (artCache.records || []).forEach((a) => {
     const nart = safeTrim(a.NART);
-    if (!nart || estTechnique(a)) return;
-    // Un article renvoyé vers un autre code n'a pas à être compté.
-    if (estRenvoi(a)) return;
-    if (num(a.S1) !== 0) return;
-    if (stockReserves(a) <= 0) return;
-    if (estHorsRayon(gisementArticle(a), isQC)) return;
+    // Règle partagée : rien en rayon, du stock ailleurs. Elle écarte aussi les
+    // articles techniques, les renvois GENDOUBL et les emplacements hors rayon.
+    if (!nart || !estAReapprovisionner(a, isQC)) return;
 
     const ligne = ligneArticle(a, fournByCode, isQC, rayons);
     const code = ligne.fourn;
@@ -390,6 +417,16 @@ export const getArticlesParGroupes = async (
   });
 
   return parGroupe;
+};
+
+// Règle et helpers partagés — voir estAReapprovisionner.
+export {
+  estAReapprovisionner,
+  ventes12Mois,
+  stockReserves,
+  estTechnique,
+  estRenvoi,
+  estHorsRayon,
 };
 
 export default {

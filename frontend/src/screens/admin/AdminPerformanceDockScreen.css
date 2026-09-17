@@ -368,31 +368,59 @@
   color: var(--admin-text-muted, #8b949e);
 }
 
-.pd-dates,
-.pd-seuils {
+.pd-dates {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.pd-dates span,
-.pd-seuils span {
+.pd-dates span {
   color: var(--admin-text-muted, #8b949e);
   font-size: 0.85rem;
 }
 .pd-filtres input[type="date"],
-.pd-filtres input[type="number"] {
+.pd-filtres input[type="number"],
+.pd-filtres select {
   flex: 1;
   min-width: 0;
+  width: 100%;
   background: var(--admin-bg-tertiary, #1a1a25);
   border: 1px solid var(--admin-border, #2a2a3a);
   border-radius: 8px;
   color: var(--admin-text, #f0f0f5);
   font-size: 0.83rem;
   padding: 7px 9px;
+  font-family: inherit;
 }
-.pd-filtres input:focus {
+
+/* Le select natif n'hérite de rien : sans ces règles il sort en gris système,
+   à côté des champs date qui, eux, sont stylés. La flèche est dessinée en SVG
+   inline (data:) — aucune ressource externe, et elle suit la couleur du thème. */
+.pd-filtres select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238b949e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 14px;
+  text-overflow: ellipsis;
+}
+.pd-filtres select:hover {
+  border-color: var(--admin-text-muted, #8b949e);
+}
+/* La liste déroulée est rendue par l'OS : seuls fond et texte sont pilotables,
+   et il FAUT les poser — sinon options noires sur fond noir en thème sombre. */
+.pd-filtres select option {
+  background: var(--admin-bg-tertiary, #1a1a25);
+  color: var(--admin-text, #f0f0f5);
+}
+
+.pd-filtres input:focus,
+.pd-filtres select:focus {
   outline: none;
   border-color: var(--admin-primary, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
 .pd-raccourcis {
@@ -526,4 +554,108 @@
   margin-left: auto;
   font-style: normal;
   color: var(--admin-text-muted, #8b949e);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Qualité de la charge — tuiles par rythme de vente.
+   Des tuiles et non un empilement : la série est ORDONNÉE et chaque palier
+   porte son libellé écrit, l'identité ne repose donc jamais sur la couleur
+   seule (la rampe bleue est séquentielle, pas catégorielle).
+   ───────────────────────────────────────────────────────────────────────── */
+.pd-tranches {
+  margin: 14px 0 4px;
+}
+.pd-tranches-titre {
+  font-size: 12px;
+  color: var(--admin-text-muted, #8b949e);
+  margin-bottom: 8px;
+}
+.pd-tranches-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.pd-tranche {
+  background: var(--admin-bg-tertiary, #1a1a25);
+  border: 1px solid var(--admin-border, #2a2a3a);
+  border-top: 3px solid #3987e5; /* surchargé en ligne par la tranche */
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pd-tranche .v {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.pd-tranche .l {
+  font-size: 11px;
+  color: var(--admin-text-muted, #8b949e);
+}
+.pd-tranche .p {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-text-muted, #8b949e);
+}
+
+/* Filtre par rythme de vente : pastille + libellé, jamais la couleur seule. */
+.pd-tranches-filtre {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pd-tranches-filtre button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--admin-border, #2a2a3a);
+  background: transparent;
+  color: var(--admin-text-muted, #8b949e);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+.pd-tranches-filtre button.actif {
+  color: var(--admin-text, #f0f0f5);
+  border-color: #3987e5;
+  background: rgba(57, 135, 229, 0.08);
+}
+.pd-tranches-filtre button i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+/* Bandeau d'information des actions (photo du jour, rattrapage). */
+.pd-info {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #0ca30c;
+  background: rgba(12, 163, 12, 0.08);
+  border: 1px solid rgba(12, 163, 12, 0.25);
+}
+
+/* Phrase d'explication sous le titre : dit que le graphique est une suite de
+   relevés quotidiens. Sans elle, le bouton « Recompter aujourd'hui » est
+   incompréhensible. */
+.pd-explication {
+  margin: 0 0 14px;
+  padding: 10px 13px;
+  border-left: 3px solid var(--admin-primary, #6366f1);
+  border-radius: 0 8px 8px 0;
+  background: rgba(99, 102, 241, 0.07);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--admin-text-muted, #8b949e);
+}
+.pd-explication strong {
+  color: var(--admin-text, #f0f0f5);
+  font-weight: 600;
 }
