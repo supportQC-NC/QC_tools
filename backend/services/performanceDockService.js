@@ -61,13 +61,55 @@ class PerformanceDockService {
     if (stockRoot) {
       ajouter(
         path.posix.join(path.posix.dirname(stockRoot), ...SOUS_DOSSIER),
-        "RCOMMON_STOCK_ROOT (partage monté)",
+        "RCOMMON_STOCK_ROOT (racine du partage)",
+      );
+      // Si le montage ne porte QUE le dossier STOCK, doc_temp doit alors y être
+      // recopié : on essaie aussi les deux dispositions possibles sous STOCK.
+      ajouter(
+        path.posix.join(stockRoot, ...SOUS_DOSSIER),
+        "RCOMMON_STOCK_ROOT/doc_temp",
+      );
+      ajouter(
+        path.posix.join(stockRoot, SOUS_DOSSIER[1]),
+        "RCOMMON_STOCK_ROOT/reapro_mag",
       );
     }
 
     ajouter(DEFAULT_DIR, "poste Ubuntu local");
     ajouter(DEFAULT_DIR_UNC, "partage UNC (dev Windows)");
     return liste;
+  }
+
+  /**
+   * Remonte jusqu'au premier ancêtre existant d'un chemin et liste son contenu.
+   * Sans ça, « introuvable » ne dit pas OÙ ça casse : le montage est-il absent,
+   * ou est-ce seulement le dernier dossier qui manque ?
+   */
+  sonder(chemin) {
+    const p = chemin.includes("\\") ? path.win32 : path.posix;
+    let courant = chemin;
+    for (let i = 0; i < 8; i += 1) {
+      const parent = p.dirname(courant);
+      if (!parent || parent === courant) break;
+      // On ne remonte jamais jusqu'à la racine : lister « / » ou « C:\ » ne dit
+      // rien d'utile et déverse tout le système dans la réponse.
+      if (parent === p.parse(parent).root) break;
+      courant = parent;
+      try {
+        if (!fs.statSync(courant).isDirectory()) continue;
+        const entrees = fs
+          .readdirSync(courant, { withFileTypes: true })
+          .slice(0, 40)
+          .map((e) => (e.isDirectory() ? `${e.name}/` : e.name));
+        return { ancetre: courant, entrees };
+      } catch (e) {
+        if (e.code === "EACCES" || e.code === "EPERM") {
+          return { ancetre: courant, entrees: [], erreur: e.code };
+        }
+        // ENOENT : on continue de remonter
+      }
+    }
+    return null;
   }
 
   /** Dossier lisible ? Distingue ENOENT (absent) de EACCES (droits). */
@@ -157,10 +199,17 @@ class PerformanceDockService {
       const detail = candidats
         .map((c) => `${c.chemin} (${c.origine}) → ${c.etat}`)
         .join(" ; ");
+      // Sondage : ce que le serveur voit vraiment autour des chemins tentés.
+      const sondages = [];
+      for (const c of candidats) {
+        const s = this.sonder(c.chemin);
+        if (s && !sondages.some((x) => x.ancetre === s.ancetre)) sondages.push(s);
+      }
       return {
         dossier: candidats[0]?.chemin || DEFAULT_DIR,
         dossierExiste: false,
         candidats,
+        sondages,
         message:
           "Dossier reapro_mag inaccessible depuis le serveur. Chemins essayés : " +
           detail +

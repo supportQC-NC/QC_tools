@@ -127,6 +127,20 @@ const AdminPerformanceDockScreen = () => {
               ))}
             </ul>
           )}
+          {/* Ce que le serveur voit autour : dit si c'est le montage qui manque
+              ou seulement le dernier dossier. */}
+          {Array.isArray(data.sondages) && data.sondages.length > 0 && (
+            <ul className="pd-candidats">
+              {data.sondages.map((s) => (
+                <li key={s.ancetre}>
+                  <code>{s.ancetre}</code> contient :{" "}
+                  {s.erreur
+                    ? `lecture refusée (${s.erreur})`
+                    : s.entrees.join(", ") || "(vide)"}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : rows.length === 0 ? (
         <div className="pd-empty">{data?.message || "Aucune donnée."}</div>
