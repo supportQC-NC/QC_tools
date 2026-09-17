@@ -43,9 +43,13 @@ import "./AdminPerformanceDockScreen.css";
 //  - écart  = paire divergente vert/rouge, dont le SIGNE est porté par la
 //    position (au-dessus / en-dessous de zéro) et pas seulement par la couleur
 //    — vert et rouge sont proches en vision deutan (ΔE 7,1).
+// ⚠️ L'unité mesurée est une CHARGE : le nombre d'articles qu'il a fallu aller
+// réapprovisionner. Beaucoup d'articles = grosse journée à rattraper, donc
+// ROUGE au-dessus de la moyenne et VERT en-dessous — l'inverse d'un indicateur
+// de chiffre d'affaires (demande client du 18/09/2026).
 const SERIE = "#3987e5"; // bleu, volume
-const AU_DESSUS = "#0ca30c"; // vert, écart positif
-const EN_DESSOUS = "#e66767"; // rouge, écart négatif
+const AU_DESSUS = "#e66767"; // rouge, écart positif = plus de charge
+const EN_DESSOUS = "#0ca30c"; // vert, écart négatif = moins de charge
 const MOYENNE = "#c9a227"; // repère moyenne, distinct des deux pôles
 const GRILLE = "#24242e";
 const AXE = "#8b949e";
@@ -588,13 +592,13 @@ const AdminPerformanceDockScreen = () => {
                     </span>
                   </div>
                 )}
-                <div className="pd-kpi best">
+                <div className="pd-kpi haut">
                   <span className="v">{fNum(stats.max)}</span>
                   <span className="l">
                     Maximum {reperes.max ? `(${fmtJour(reperes.max.date)})` : ""}
                   </span>
                 </div>
-                <div className="pd-kpi low">
+                <div className="pd-kpi bas">
                   <span className="v">{fNum(stats.min)}</span>
                   <span className="l">
                     Minimum {reperes.min ? `(${fmtJour(reperes.min.date)})` : ""}

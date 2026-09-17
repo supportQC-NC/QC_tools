@@ -28,6 +28,8 @@ const PCT = '+0.0" %";-0.0" %";0" %"';
 
 // Palette : une teinte porteuse (le bleu du module) + le couple vert/rouge pour
 // le signe de l'écart. ARGB sur 8 chiffres, comme partout ailleurs.
+// ⚠️ On mesure une CHARGE (articles à réapprovisionner) : au-dessus de la
+// moyenne = ROUGE, en-dessous = VERT. Même convention que l'écran.
 const BLEU = "FF3987E5";
 const BLEU_FONCE = "FF1B4F91";
 const BLEU_PALE = "FFEAF2FC";
@@ -223,8 +225,8 @@ const feuilleSynthese = (wb, rapport, periodeLabel) => {
 
   ws.getRow(l1 + 2).height = 6; // espaceur
   const l2 = l1 + 3;
-  carte(ws, 1, l2, stats.max || 0, "Meilleure journée", VERT);
-  carte(ws, 3, l2, stats.min || 0, "Journée la plus basse", ROUGE);
+  carte(ws, 1, l2, stats.max || 0, "Journée la plus chargée", ROUGE);
+  carte(ws, 3, l2, stats.min || 0, "Journée la plus légère", VERT);
   carte(ws, 5, l2, stats.nbJours || 0, "Journées retenues", BLEU_FONCE);
 
   // Rappel de l'autre moyenne : sans lui, on ne sait plus à quoi la sélection
@@ -273,7 +275,7 @@ const feuilleSynthese = (wb, rapport, periodeLabel) => {
     row.getCell(4).numFmt = ENTIER;
     row.getCell(5).numFmt = SIGNE;
     row.getCell(6).numFmt = PCT;
-    const couleur = j.ecart >= 0 ? VERT : ROUGE;
+    const couleur = j.ecart >= 0 ? ROUGE : VERT;
     row.getCell(5).font = { bold: true, color: { argb: couleur } };
     row.getCell(6).font = { color: { argb: couleur } };
     row.eachCell((c) => {
@@ -377,7 +379,7 @@ const feuilleDetail = (wb, rapport, periodeLabel) => {
     row.getCell(5).numFmt = PCT;
     row.getCell(6).numFmt = ENTIER;
     row.getCell(7).numFmt = ENTIER;
-    const couleur = r.ecart >= 0 ? VERT : ROUGE;
+    const couleur = r.ecart >= 0 ? ROUGE : VERT;
     row.getCell(4).font = { bold: true, color: { argb: couleur } };
     row.getCell(5).font = { color: { argb: couleur } };
     row.eachCell((c) => {

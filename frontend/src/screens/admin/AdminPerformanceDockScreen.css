@@ -145,18 +145,21 @@
 .pd-kpi.avg .v {
   color: #c9a227;
 }
-.pd-kpi.best .v {
-  color: #0ca30c;
-}
-.pd-kpi.low .v {
+/* Charge, pas performance : la journée la plus haute est la plus lourde. */
+.pd-kpi.haut .v {
   color: #e66767;
 }
-/* Scopé : .pos / .neg sont des noms trop courants pour être posés globalement. */
-.admin-performance-dock .pos {
+.pd-kpi.bas .v {
   color: #0ca30c;
+}
+/* Scopé : .pos / .neg sont des noms trop courants pour être posés globalement.
+   .pos = écart POSITIF (au-dessus de la moyenne) = plus d'articles à aller
+   chercher, donc rouge ; .neg = journée plus légère, donc vert. */
+.admin-performance-dock .pos {
+  color: #e66767;
 }
 .admin-performance-dock .neg {
-  color: #e66767;
+  color: #0ca30c;
 }
 
 /* Sélecteur de vue */
@@ -289,10 +292,10 @@
   margin-top: 2px;
 }
 .pd-tt-diff.pos {
-  color: #0ca30c;
+  color: #e66767;
 }
 .pd-tt-diff.neg {
-  color: #e66767;
+  color: #0ca30c;
 }
 
 @media (max-width: 640px) {
