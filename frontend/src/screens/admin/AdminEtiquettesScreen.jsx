@@ -445,8 +445,9 @@ const AdminEtiquettesScreen = () => {
     // Seule la grille « Standard » (avec prix) laisse la zone code-barres VIDE
     // quand l'article n'a pas de GENCOD. On ne pose donc la question que là :
     // « Standard sans prix » affiche déjà le NART en gros au centre, les
-    // formats pleine page l'écrivent sous le code-barres, et le type custom
-    // n'a aucune zone imposée.
+    // formats pleine page (promo, solde, déstockage, sans prix, normal)
+    // impriment désormais le NART À LA PLACE du code-barres absent, et le type
+    // custom n'a aucune zone imposée.
     if (type === "standard" && mode !== "aucun" && mode !== "import") {
       const controle = await controlerArticlesSansGencod(body);
       if (controle && controle.nbSansGencod > 0) {

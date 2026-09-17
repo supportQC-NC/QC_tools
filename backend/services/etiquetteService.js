@@ -576,6 +576,61 @@ const drawStandard = (rl, sections, opts = {}) => {
 // ----------------------------------------------------------------------------
 // DESSINATEURS "UN ARTICLE" (pleine page logique A4 paysage, sans gestion de page)
 // ----------------------------------------------------------------------------
+
+/**
+ * Zone d'identification, en haut à droite des étiquettes pleine page (promo,
+ * solde, déstockage, sans prix, normal) : le code-barres EAN-13 et, dessous,
+ * le NART.
+ *
+ * ⚠️ Sans GENCOD exploitable en base, cette zone restait ENTIÈREMENT vide :
+ * pas de code-barres, et le NART disparaissait avec lui puisqu'il n'était
+ * imprimé qu'en légende. L'étiquette ne portait alors PLUS AUCUN identifiant —
+ * impossible de retrouver l'article en rayon. Le NART prend donc la place du
+ * code-barres, en gros, comme le fait déjà l'option « nart » de la grille
+ * standard. NART seul, sans le mot « NART » (décision client).
+ *
+ * ⚠️ La validité se teste avec `codeBarresImprimable`, la SEULE définition de
+ * « article sans code-barres » (voir son en-tête). L'ancien test `/^\d+$/`
+ * était plus permissif que `ean13Bits` : un GENCOD « 123 » le passait, puis
+ * `drawEAN13` refusait de tracer en silence — la légende NART s'imprimait
+ * alors sous un emplacement vide, et le contrôle de l'écran annonçait
+ * l'inverse de ce que faisait le PDF.
+ */
+const drawZoneIdentifiant = (rl, record, x, y, labelW) => {
+  // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
+  // Bord haut conservé (by + bh = y - 10), agrandissement vers le bas et la
+  // gauche ; la marge droite sert de zone de silence.
+  const bw = 175;
+  const bh = 72;
+  const bx = x + labelW - bw - 18;
+  const by = y - 82;
+
+  const code = codeBarresImprimable(record);
+  const nart = safe(record.NART) || "N/A";
+
+  if (code) {
+    drawEAN13(rl, code, bx, by, bw, bh);
+    rl.setFont("Helvetica-Bold", 14);
+    rl.setFillColorRGB(0, 0, 0);
+    rl.drawCentredString(bx + bw / 2, by - 15, nart);
+    return;
+  }
+
+  // Taille réduite jusqu'à tenir dans la largeur du bloc (un NART est un C(6),
+  // 34 pt passent toujours — la boucle n'est qu'une sécurité).
+  let taille = 34;
+  const dispo = bw - 6;
+  while (
+    taille > 10 &&
+    rl.doc.font("Helvetica-Bold").fontSize(taille).widthOfString(nart) > dispo
+  ) {
+    taille -= 1;
+  }
+  rl.setFillColorRGB(0, 0, 0);
+  rl.setFont("Helvetica-Bold", taille);
+  rl.drawCentredString(bx + bw / 2, by + (bh - taille) / 2, nart);
+};
+
 const drawBigOne = (rl, record, logoBuf, title, dateLineFn) => {
   const W = rl.W;
   const H = rl.H;
@@ -591,20 +646,7 @@ const drawBigOne = (rl, record, logoBuf, title, dateLineFn) => {
   rl.setFillColorRGB(1, 0, 0);
   rl.drawCentredString(x + labelW / 2, y - 60, title);
 
-  const gencod = String(record.GENCOD || "");
-  if (gencod && /^\d+$/.test(gencod)) {
-    // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
-    // On garde le bord haut à la même position (by + bh = y - 10) et on agrandit
-    // vers le bas et la gauche ; marge droite = zone de silence.
-    const bw = 175;
-    const bh = 72;
-    const bx = x + labelW - bw - 18;
-    const by = y - 82;
-    drawEAN13(rl, gencod, bx, by, bw, bh);
-    rl.setFont("Helvetica-Bold", 14);
-    rl.setFillColorRGB(0, 0, 0);
-    rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
-  }
+  drawZoneIdentifiant(rl, record, x, y, labelW);
 
   y -= 120;
 
@@ -660,20 +702,7 @@ const drawSansPrixOne = (rl, record, logoBuf) => {
   rl.rect(x, y - labelH, labelW, labelH);
   drawLogo(rl, logoBuf, x, y);
 
-  const gencod = String(record.GENCOD || "");
-  if (gencod && /^\d+$/.test(gencod)) {
-    // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
-    // On garde le bord haut à la même position (by + bh = y - 10) et on agrandit
-    // vers le bas et la gauche ; marge droite = zone de silence.
-    const bw = 175;
-    const bh = 72;
-    const bx = x + labelW - bw - 18;
-    const by = y - 82;
-    drawEAN13(rl, gencod, bx, by, bw, bh);
-    rl.setFont("Helvetica-Bold", 14);
-    rl.setFillColorRGB(0, 0, 0);
-    rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
-  }
+  drawZoneIdentifiant(rl, record, x, y, labelW);
 
   y -= 200;
 
@@ -702,20 +731,7 @@ const drawNormalOne = (rl, record, logoBuf) => {
   rl.rect(x, y - labelH, labelW, labelH);
   drawLogo(rl, logoBuf, x, y);
 
-  const gencod = String(record.GENCOD || "");
-  if (gencod && /^\d+$/.test(gencod)) {
-    // Code-barres agrandi pour être SCANNABLE (module ~0.6mm au lieu de ~0.37mm).
-    // On garde le bord haut à la même position (by + bh = y - 10) et on agrandit
-    // vers le bas et la gauche ; marge droite = zone de silence.
-    const bw = 175;
-    const bh = 72;
-    const bx = x + labelW - bw - 18;
-    const by = y - 82;
-    drawEAN13(rl, gencod, bx, by, bw, bh);
-    rl.setFont("Helvetica-Bold", 14);
-    rl.setFillColorRGB(0, 0, 0);
-    rl.drawCentredString(bx + bw / 2, by - 15, `${safe(record.NART) || "N/A"}`);
-  }
+  drawZoneIdentifiant(rl, record, x, y, labelW);
 
   y -= 120;
 
