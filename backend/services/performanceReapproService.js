@@ -847,6 +847,13 @@ const HEURE_RELEVE = "0 18 * * *"; // tous les jours à 18:00
 // pour toujours, il n'existe aucun moyen de le recalculer après coup. D'où un
 // second passage tardif qui ne traite QUE les sociétés encore sans relevé.
 const HEURE_RATTRAPAGE = "30 22 * * *";
+// Ingestion des rapports archivés. Tourne TOUTE SEULE : dès qu'un classeur
+// apparaît sur le partage pour une journée absente de la base, il est avalé.
+// Personne n'a à cliquer quoi que ce soit — le bouton de l'écran ne sert plus
+// qu'à forcer un tour immédiat.
+// Coût nul quand il n'y a rien de neuf : on liste les dossiers et on ne lit que
+// les classeurs dont la date manque en base.
+const HEURE_INGESTION = "20 5 * * *";
 
 /**
  * Un tour = une photo par société active. EN SÉRIE : le cache article est lourd
@@ -912,23 +919,95 @@ export const tourPhotos = async (options = {}) => {
   return { date, resultats };
 };
 
+let ingestionEnCours = false;
+
+/**
+ * Avale tous les rapports archivés encore absents de la base, pour toutes les
+ * sociétés actives. Idempotent : une journée déjà en base n'est jamais relue, et
+ * un relevé pris sur la fiche article n'est jamais écrasé.
+ *
+ * C'est ce qui rend les fichiers du partage définitivement accessoires : une
+ * fois avalés, tout vit en base et plus rien ne dépend de leur présence.
+ */
+export const tourIngestionArchives = async () => {
+  if (ingestionEnCours) return { ignore: true };
+  ingestionEnCours = true;
+  const debut = Date.now();
+  let total = 0;
+  try {
+    const entreprises = await Entreprise.find({ isActive: true });
+    for (const entreprise of entreprises) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await rejouerArchives(entreprise);
+        if (!r.ok) {
+          // Partage injoignable : ce n'est pas une panne du module, le relevé
+          // quotidien lit la fiche article. On le dit une fois, sans bruit.
+          console.log(`[reapproSnapshot] ingestion : ${r.message}`);
+          break;
+        }
+        if (r.rejouees) {
+          total += r.rejouees;
+          console.log(
+            `[reapproSnapshot] ingestion ${entreprise.nomDossierDBF} : ` +
+              `${r.rejouees} journée(s) ajoutée(s)`,
+          );
+        }
+        if (r.erreurs && r.erreurs.length) {
+          console.warn(
+            `[reapproSnapshot] ingestion ${entreprise.nomDossierDBF} : ` +
+              `${r.erreurs.length} rapport(s) refusé(s) — ${r.erreurs.slice(0, 2).join(" ; ")}`,
+          );
+        }
+      } catch (e) {
+        console.error(
+          `[reapproSnapshot] ingestion ${entreprise.nomDossierDBF}: ${e.message}`,
+        );
+      }
+    }
+    if (total) {
+      console.log(
+        `[reapproSnapshot] ingestion terminée en ${Date.now() - debut}ms — ` +
+          `${total} journée(s) ajoutée(s)`,
+      );
+    }
+  } catch (e) {
+    console.error("[reapproSnapshot] ingestion impossible:", e.message);
+  } finally {
+    ingestionEnCours = false;
+  }
+  return { total };
+};
+
 export const startReapproSnapshotScheduler = () => {
   cron.schedule(HEURE_RELEVE, () => tourPhotos(), { timezone: FUSEAU });
   cron.schedule(HEURE_RATTRAPAGE, () => tourPhotos({ seulementSiManquant: true }), {
     timezone: FUSEAU,
   });
 
-  // Dernier filet : si le backend était arrêté toute la soirée, les deux crons
-  // sont passés sans lui et la journée serait définitivement perdue. Au
-  // démarrage, après la fermeture, on complète ce qui manque encore. Le délai
-  // laisse la connexion Mongo et les caches s'établir.
+  cron.schedule(HEURE_INGESTION, () => tourIngestionArchives(), {
+    timezone: FUSEAU,
+  });
+
+  // Au démarrage, une fois Mongo et les caches établis :
+  //   - on avale les rapports archivés encore absents (coût nul s'il n'y a rien
+  //     de neuf), pour que personne n'ait jamais à lancer un rattrapage ;
+  //   - si le backend était arrêté toute la soirée, les deux crons du relevé
+  //     sont passés sans lui et la journée serait perdue pour toujours : on la
+  //     complète.
   setTimeout(() => {
-    if (heureLocale() >= 18) tourPhotos({ seulementSiManquant: true });
+    tourIngestionArchives()
+      .then(() => {
+        if (heureLocale() >= 18) return tourPhotos({ seulementSiManquant: true });
+        return null;
+      })
+      .catch((e) => console.error("[reapproSnapshot] démarrage:", e.message));
   }, 60 * 1000).unref?.();
 
   console.log(
-    "[reapproSnapshot] planificateur démarré (relevé quotidien à 18:00 " +
-      `heure de Nouméa, rattrapage des sociétés manquantes à 22:30)`,
+    "[reapproSnapshot] planificateur démarré — relevé quotidien 18:00 " +
+      "(heure de Nouméa), rattrapage des sociétés manquantes 22:30, " +
+      "ingestion des rapports archivés 05:20 et au démarrage",
   );
 };
 
@@ -936,6 +1015,7 @@ export default {
   calculerPhoto,
   prendrePhoto,
   rejouerArchives,
+  tourIngestionArchives,
   getRapport,
   normaliserCriteres,
   tourPhotos,

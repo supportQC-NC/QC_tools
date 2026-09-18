@@ -34,7 +34,6 @@ import { useSelector } from "react-redux";
 import {
   useGetPerformanceDockQuery,
   usePrendrePhotoReapproMutation,
-  useRattraperHistoriqueReapproMutation,
 } from "../../slices/performanceDockApiSlice";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
@@ -276,8 +275,6 @@ const AdminPerformanceDockScreen = () => {
   );
   const [prendrePhoto, { isLoading: photoEnCours }] =
     usePrendrePhotoReapproMutation();
-  const [rattraper, { isLoading: rattrapageEnCours }] =
-    useRattraperHistoriqueReapproMutation();
   const [infoAction, setInfoAction] = useState("");
 
   // Un changement de critère change la clé de cache : `data` repasse à undefined
@@ -367,19 +364,6 @@ const AdminPerformanceDockScreen = () => {
     }
   };
 
-  // Rattrapage : rejoue les journées déjà archivées dans reapro_mag avec la
-  // MÊME règle, pour que la série ne démarre pas vide.
-  const handleRattrapage = async () => {
-    setInfoAction("");
-    setErreurExport("");
-    try {
-      const r = await rattraper({ societe }).unwrap();
-      setInfoAction(r.message || "Rattrapage terminé.");
-      if (!r.ok) setErreurExport(r.message || "");
-    } catch (e) {
-      setErreurExport(e?.data?.message || "Échec du rattrapage.");
-    }
-  };
 
   // Export serveur (ExcelJS) : mise en forme complète, mêmes critères que
   // l'écran. L'ancien export navigateur (SheetJS) ne savait pas styler.
@@ -635,14 +619,6 @@ const AdminPerformanceDockScreen = () => {
             aujourd'hui
           </button>
           <button
-            className="pd-btn"
-            onClick={handleRattrapage}
-            disabled={!societe || rattrapageEnCours}
-            title="Recalcule les journées d'avant la mise en service, à partir des rapports reapro_mag déjà archivés, avec la même règle de comptage."
-          >
-            {rattrapageEnCours ? "Calcul…" : "Récupérer les jours passés"}
-          </button>
-          <button
             className="pd-btn primary"
             onClick={handleExport}
             disabled={!rows.length || exportEnCours}
@@ -668,9 +644,12 @@ const AdminPerformanceDockScreen = () => {
           Le stock ne garde aucune trace du passé : la fiche article ne dit que
           l'état d'aujourd'hui. Pour construire une courbe, l'application
           <strong> compte les articles concernés automatiquement chaque soir à
-          18 h, après la fermeture</strong>, et conserve le résultat. Chaque
-          point du graphique est donc l'état de fin de journée : ce qui restait
-          à descendre le soir même.
+          18 h, après la fermeture</strong>, et conserve le résultat en base.
+          Chaque point du graphique est donc l'état de fin de journée : ce qui
+          restait à descendre le soir même.{" "}
+          <strong>Rien n'est à lancer à la main</strong> — les anciens rapports
+          du partage ont été intégrés une fois pour toutes, et tout nouveau
+          rapport qui y apparaîtrait serait avalé tout seul.
           {contexte
             ? ` Dernier relevé : ${fmtJourLong(contexte.date)} — ${fNum(
                 contexte.total,

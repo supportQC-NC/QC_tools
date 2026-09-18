@@ -20,8 +20,10 @@ export const performanceDockApiSlice = apiSlice.injectEndpoints({
       query: (societe) => ({ url: `${URL}/${societe}/photo`, method: "POST" }),
       invalidatesTags: ["PerformanceReappro"],
     }),
-    // Rejoue les journées déjà archivées dans reapro_mag, même règle, pour que
-    // la série ne démarre pas vide.
+    // Rejoue les journées archivées dans reapro_mag, même règle de comptage.
+    // ⚠️ PLUS AUCUN BOUTON ne l'appelle : le serveur avale tout seul les
+    // rapports archivés (au démarrage et chaque matin à 05:20, voir
+    // `tourIngestionArchives`). L'endpoint reste comme échappatoire manuelle.
     rattraperHistoriqueReappro: builder.mutation({
       query: ({ societe, force = false }) => ({
         url: `${URL}/${societe}/rattrapage`,
