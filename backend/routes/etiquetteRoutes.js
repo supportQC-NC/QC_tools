@@ -3,6 +3,7 @@ import express from "express";
 import {
   genererEtiquettes,
   controlerGencod,
+  exporterComptageGisements,
 } from "../controllers/etiquetteController.js";
 import {
   getTemplates,
@@ -38,6 +39,16 @@ router.post(
   checkEntrepriseAccess,
   canRead,
   controlerGencod,
+);
+
+// Comptage des gisements au format Excel (gisement | nb d'articles | libellé),
+// option du bloc « QR gisement » : ?emplacement=MAGASIN|DOCK|TOUS
+router.get(
+  "/:nomDossierDBF/gisements-excel",
+  protect,
+  checkEntrepriseAccess,
+  canRead,
+  exporterComptageGisements,
 );
 
 // Templates d'étiquettes personnalisées (SCOPÉS SOCIÉTÉ, partagés entre users).

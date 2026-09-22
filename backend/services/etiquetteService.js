@@ -873,6 +873,11 @@ const drawDemi = (rl, doc, sections, logoBuf, drawOne) => {
 
 export const TYPES_ETIQUETTES = [
   "standard", "standard_sans_prix", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire", "custom",
+  // « qr_gisement » ne passe PAS par ce service : ce n'est pas une étiquette
+  // d'article (aucun NART, aucun prix, aucun code-barres EAN) mais un panneau
+  // de rayon, rendu par gisementLabelService.generateQrGondolePDF. Il figure
+  // ici parce que l'écran et le contrôleur partagent cette liste de types.
+  "qr_gisement",
 ];
 
 // ----------------------------------------------------------------------------

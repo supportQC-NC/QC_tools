@@ -46,12 +46,15 @@ router.get(
   exportGisements,
 );
 
-// Codes distincts d'un niveau de gisement (GISM1..GISM5) — pour le sélecteur
+// Codes distincts d'un niveau de gisement (GISM1..GISM5) — pour le sélecteur.
+// Partagé avec le générateur d'étiquettes, qui en a besoin pour les panneaux QR
+// de gisement (GISM1 = magasin, GISM2 = dock) : sans « etiquettes » dans la
+// liste, un utilisateur du générateur recevrait un 403 sur le sélecteur.
 router.get(
   "/:nomDossierDBF/gism/:niveau",
   protect,
   checkEntrepriseAccess,
-  checkModuleAccess("export_gisements_admin", "read"),
+  checkModuleAccess(["export_gisements_admin", "etiquettes"], "read"),
   getGismNiveau,
 );
 

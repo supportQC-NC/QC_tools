@@ -12,6 +12,16 @@ import {
   codeBarresImprimable,
   TYPES_ETIQUETTES,
 } from "../services/etiquetteService.js";
+import { generateQrGondolePDF } from "../services/gisementLabelService.js";
+import {
+  buildIndexRayons,
+  lookupRayon,
+} from "../services/dictionnaireRayonsService.js";
+import { getGisements, lookupGisement } from "../services/gisementsService.js";
+import { comparerCodeGisement } from "../services/preparationService.js";
+import { construireClasseurComptageGisements } from "../services/gisementsComptageExcelService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
+import { champMasque } from "../middleware/masquerChampsDbf.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 
@@ -219,6 +229,135 @@ const resolveArticles = async (req, res, entreprise, mode) => {
   return { nartList, articles, introuvables, sections: sectionsArticles };
 };
 
+// ── Panneaux QR de gisement (affichage en gondole) ──────────────────────────
+//
+// MAGASIN -> un panneau par GISM1 (le rayon) ; DOCK -> un panneau par GISM2
+// (la réserve). Ce sont bien DEUX jeux de codes distincts : chez QC, le même
+// article est rangé en « D_2d » au magasin et en « H_1 » au dock.
+//
+// Le libellé vient du DICTIONNAIRE DES RAYONS, interrogé sur le couple
+// « code + emplacement » — obligatoire : 53 codes existent aux deux
+// emplacements et 34 y portent un libellé DIFFÉRENT (« A_1 » = Ventilateurs
+// muraux au magasin, EPI GANTS au dock). Repli sur l'ancien fichier gisements
+// (indexé par code seul) pour les sociétés sans dictionnaire, comme partout
+// ailleurs dans l'application.
+const NIVEAU_PAR_EMPLACEMENT = { MAGASIN: 1, DOCK: 2 };
+const champDe = (emplacement) => `GISM${NIVEAU_PAR_EMPLACEMENT[emplacement]}`;
+
+// Emplacements visés. « TOUS » = les deux (magasin puis dock), et la sélection
+// de codes n'y a alors pas de sens : les deux niveaux n'ont pas les mêmes codes.
+const lireEmplacements = (valeur) => {
+  const demande = safeTrim(valeur).toUpperCase();
+  if (demande === "TOUS") return { emplacements: ["MAGASIN", "DOCK"], tous: true };
+  return {
+    emplacements: [demande === "DOCK" ? "DOCK" : "MAGASIN"],
+    tous: false,
+  };
+};
+
+const lireCodes = (brut) => {
+  let codes = [];
+  if (Array.isArray(brut)) codes = brut.map((c) => safeTrim(c)).filter(Boolean);
+  else if (typeof brut === "string")
+    codes = brut.split(SEPARATEUR_CODES).map((c) => c.trim()).filter(Boolean);
+  return [...new Set(codes)];
+};
+
+// Libellés des rayons : dictionnaire des rayons (couple code + emplacement),
+// repli sur l'ancien fichier gisements pour les sociétés sans dictionnaire. Ni
+// l'un ni l'autre n'est bloquant — un code sans libellé sort avec son code seul.
+const chargerLibellesRayons = async (entreprise) => {
+  const { index } = await buildIndexRayons(entreprise);
+  let anciens = null;
+  if (index.size === 0) {
+    try {
+      ({ map: anciens } = await getGisements(entreprise));
+    } catch {
+      anciens = null;
+    }
+  }
+  return { index, anciens };
+};
+
+// Gisements d'UN emplacement, triés dans l'ordre naturel des codes, avec le
+// libellé du rayon et le NOMBRE D'ARTICLES rangés dessus. `codesDemandes` vide
+// = tous les codes du niveau.
+//
+// Source unique du PDF de panneaux ET de l'export Excel : les deux doivent
+// toujours parler des mêmes gisements.
+const gisementsEmplacement = async (
+  entreprise,
+  emplacement,
+  codesDemandes,
+  index,
+  anciens,
+) => {
+  const tous = await articleCacheService.getGismLevel(
+    entreprise,
+    NIVEAU_PAR_EMPLACEMENT[emplacement],
+  );
+  const comptes = new Map(tous.map((g) => [g.code, g.count]));
+  const codes = codesDemandes.length ? codesDemandes : tous.map((g) => g.code);
+
+  return codes
+    .slice()
+    .sort(comparerCodeGisement)
+    .map((code) => {
+      const rayon = lookupRayon(index, code, emplacement);
+      const ancien = rayon ? null : lookupGisement(anciens, code);
+      return {
+        code,
+        libelle: (rayon && rayon.libelle) || (ancien && ancien.libelle) || "",
+        // 0 = code saisi à la main que ne porte aucune fiche article.
+        count: comptes.get(code) || 0,
+      };
+    });
+};
+
+// Résolution commune au PDF de panneaux et à l'export Excel.
+// `partieNom` est la partie variable du nom de fichier (« magasin_GISM1 »,
+// « dock_GISM2 », « tous_GISM1-GISM2 »).
+const resoudreGisements = async (req, res, source) => {
+  const entreprise = req.entreprise;
+  const { emplacements, tous } = lireEmplacements(source.emplacement);
+  const codes = tous ? [] : lireCodes(source.codes);
+  const { index, anciens } = await chargerLibellesRayons(entreprise);
+
+  const lots = [];
+  for (const emplacement of emplacements) {
+    // eslint-disable-next-line no-await-in-loop
+    const lignes = await gisementsEmplacement(
+      entreprise,
+      emplacement,
+      codes,
+      index,
+      anciens,
+    );
+    if (lignes.length === 0) continue; // niveau non renseigné dans ce catalogue
+    lots.push({ emplacement, champ: champDe(emplacement), lignes });
+  }
+
+  if (lots.length === 0) {
+    res.status(404);
+    throw new Error(
+      `Aucun gisement ${emplacements.map(champDe).join(" / ")} trouvé pour ` +
+        `${entreprise.nomComplet || entreprise.nomDossierDBF}.`,
+    );
+  }
+
+  return {
+    lots,
+    total: lots.reduce((n, l) => n + l.lignes.length, 0),
+    partieNom: tous
+      ? "tous_GISM1-GISM2"
+      : `${emplacements[0].toLowerCase()}_${champDe(emplacements[0])}`,
+    trig:
+      safeTrim(entreprise.trigramme) ||
+      safeTrim(entreprise.nomDossierDBF) ||
+      "societe",
+  };
+};
+
 // Stream un PDF déjà écrit sur disque puis le supprime.
 const streamAndCleanup = (res, tmp, filename, headers = {}) => {
   res.setHeader("Content-Type", "application/pdf");
@@ -249,6 +388,37 @@ const genererEtiquettes = asyncHandler(async (req, res) => {
     throw new Error(
       `Type d'étiquette invalide. Attendu : ${TYPES_ETIQUETTES.join(", ")}`,
     );
+  }
+
+  // ── Panneaux QR de GISEMENT : ni article, ni prix, ni code-barres. ────────
+  // Traité AVANT tout le reste : ce type n'a pas de source d'articles, donc
+  // ni `mode`, ni `format`, ni contrôle GENCOD ne s'y appliquent.
+  if (type === "qr_gisement") {
+    const { lots, total, partieNom, trig } = await resoudreGisements(
+      req,
+      res,
+      req.body,
+    );
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="qr_gisements_${partieNom}_${trig}.pdf"`,
+    );
+    res.setHeader("Access-Control-Expose-Headers", "X-Etiquettes");
+    res.setHeader("X-Etiquettes", String(total));
+
+    // Chaque section (emplacement) démarre sur une nouvelle feuille et porte
+    // son pied de page : une fois les panneaux découpés, rien ne distinguerait
+    // un code dock d'un code magasin (ils sont souvent identiques).
+    await generateQrGondolePDF({
+      sections: lots.map((lot) => ({
+        piedDePage: `QR gisement · ${lot.emplacement} (${lot.champ}) · ${trig}`,
+        items: lot.lignes,
+      })),
+      stream: res,
+    });
+    return;
   }
 
   // ── Étiquette PERSONNALISÉE : layout libre, avec ou sans données article. ──
@@ -385,4 +555,51 @@ const controlerGencod = asyncHandler(async (req, res) => {
   });
 });
 
-export { genererEtiquettes, controlerGencod };
+/**
+ * @desc    Export Excel « gisements et nombre d'articles » : une ligne par
+ *          gisement, le nombre d'articles rangés dessus, le libellé du rayon.
+ *          MAGASIN (GISM1) et DOCK (GISM2) sur deux feuilles séparées ;
+ *          `emplacement=TOUS` sort les deux.
+ *
+ *          Vit ici, et pas dans l'export gisements de l'admin, parce que c'est
+ *          l'option « télécharger le comptage » du bloc QR gisement du
+ *          générateur d'étiquettes : même résolution (`resoudreGisements`), donc
+ *          l'Excel et les panneaux imprimés portent toujours sur les mêmes
+ *          gisements.
+ * @route   GET /api/etiquettes/:nomDossierDBF/gisements-excel?emplacement=MAGASIN|DOCK|TOUS
+ * @access  Private (module etiquettes, read) — entreprise via :nomDossierDBF
+ */
+const exporterComptageGisements = asyncHandler(async (req, res) => {
+  // Le gisement EST la donnée demandée : si `champsDbf` interdit GISM1/GISM2 à
+  // cet utilisateur, envoyerClasseur retirerait la colonne et laisserait un
+  // classeur de comptages anonymes. Autant le dire.
+  const { emplacements } = lireEmplacements(req.query.emplacement);
+  const interdits = emplacements.map(champDe).filter((c) => champMasque(req, c));
+  if (interdits.length > 0) {
+    res.status(403);
+    throw new Error(
+      `Le champ ${interdits.join(" / ")} vous est masqué : cet export n'aurait aucun contenu.`,
+    );
+  }
+
+  const { lots, total, partieNom, trig } = await resoudreGisements(
+    req,
+    res,
+    req.query,
+  );
+
+  const workbook = construireClasseurComptageGisements({
+    trigramme: trig,
+    sections: lots,
+  });
+
+  await envoyerClasseur(
+    req,
+    res,
+    workbook,
+    `gisements_nb_articles_${partieNom}_${trig}.xlsx`,
+    { "X-Gisements": total },
+  );
+});
+
+export { genererEtiquettes, controlerGencod, exporterComptageGisements };

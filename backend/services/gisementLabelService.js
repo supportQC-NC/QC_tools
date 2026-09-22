@@ -236,4 +236,170 @@ export const generateGisementLabelsPDF = async ({
   });
 };
 
-export default { generateGisementLabelsPDF };
+// ─────────────────────────────────────────────────────────────────────────────
+// PANNEAUX QR « GONDOLE » (un par rayon, grand format)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Ce n'est pas une étiquette d'article : c'est le panneau affiché EN GONDOLE
+// pour identifier un rayon (GISM1, magasin) ou un emplacement de réserve
+// (GISM2, dock). Le QR encode le CODE du gisement — exactement ce qu'encode
+// déjà l'étiquette A8, pour que la douchette et l'app collecteur y lisent la
+// même chose ; le libellé et le code en clair sont là pour l'humain.
+//
+// Format (demande client) : QR d'environ 5 cm de côté, 1 à 2 cm de marge, et le
+// maximum de panneaux par feuille A4.
+//   pas de 65 × 70 mm  →  3 colonnes × 4 rangées = 12 panneaux par A4,
+//   avec 7,5 mm de marge latérale et 8,5 mm en haut/bas — le pied de page tient
+//   dans la marge basse SANS entrer dans la bande non imprimable (5 mm) des
+//   imprimantes du parc.
+// Le carré QR fait 58 mm zone de silence comprise, soit un symbole noir de
+// 42 à 45 mm selon la longueur du code : deux QR voisins sont donc séparés par
+// ~20 mm de blanc. Un pas plus large (le texte SOUS la marge au lieu de DANS)
+// ne tiendrait que 3 rangées, soit 9 panneaux par feuille au lieu de 12 — et
+// gagner 2 mm de QR obligerait à réduire le libellé sous 9 pt, illisible en
+// rayon. Toute retouche de ces trois constantes doit être revérifiée : le
+// libellé (12 pt) et le code (12,5 pt) occupent 10,3 mm, il ne reste rien :
+// 1,2 + 58 + 0,2 + 5,04 + 5,25 = 69,7 mm dans une cellule de 70 mm.
+const GONDOLE_CELL_W = 65 * MM;
+const GONDOLE_CELL_H = 70 * MM;
+const GONDOLE_QR = 58 * MM;
+
+// Dessine UN panneau dans la cellule (x, y, cw, ch) : QR en haut, libellé du
+// rayon en gras dessous, code en clair en bas.
+const drawQrGondole = (doc, QRCode, item, x, y, cw, ch) => {
+  const pad = 3 * MM;
+  const innerX = x + pad;
+  const innerW = cw - 2 * pad;
+  const code = safe(item.code);
+  const libelle = safe(item.libelle);
+
+  // Repère de découpe : trait fin et clair, il ne doit pas concurrencer le QR.
+  doc.save().lineWidth(0.5).strokeColor("#cccccc").rect(x, y, cw, ch).stroke().restore();
+
+  const qx = x + (cw - GONDOLE_QR) / 2;
+  const qy = y + 1.2 * MM;
+  drawQrCode(QRCode, doc, code, qx, qy, GONDOLE_QR);
+
+  // Libellé du rayon : une seule ligne, taille ajustée à la largeur.
+  // `lineBreak: false` + `ellipsis` : un libellé trop long est tronqué, il ne
+  // déborde jamais sur le panneau voisin.
+  let ty = qy + GONDOLE_QR + 0.2 * MM;
+  if (libelle) {
+    const libSize = fitBoldFontSize(doc, libelle, innerW, 12, 6);
+    doc.font("Helvetica-Bold").fontSize(libSize).fillColor("#000000");
+    doc.text(libelle, innerX, ty, {
+      width: innerW,
+      align: "center",
+      lineBreak: false,
+      ellipsis: true,
+    });
+    ty = doc.y;
+  }
+
+  // Code du gisement en clair (ce que lit l'agent sans douchette).
+  const codeSize = fitBoldFontSize(doc, code, innerW, 12.5, 8);
+  doc.font("Helvetica-Bold").fontSize(codeSize).fillColor("#000000");
+  doc.text(code, innerX, ty, {
+    width: innerW,
+    align: "center",
+    lineBreak: false,
+  });
+};
+
+/**
+ * Génère le PDF des panneaux QR de gisement (format gondole) dans `stream`.
+ *
+ * Les panneaux sont regroupés en SECTIONS, chacune démarrant sur une nouvelle
+ * feuille et portant son propre pied de page. C'est ce qui permet de sortir le
+ * magasin ET le dock en un seul PDF sans jamais mélanger les deux sur la même
+ * feuille : une feuille découpée doit rester identifiable, or chez QC 53 codes
+ * existent aux DEUX emplacements, 34 avec un libellé différent.
+ *
+ * @param {object} p
+ * @param {Array<{piedDePage?:string,items:Array<{code:string,libelle?:string}>}>} [p.sections]
+ *   sections dans l'ordre d'impression ; les sections vides sont ignorées.
+ * @param {Array<{code:string,libelle?:string}>} [p.items]  raccourci pour une
+ *   section unique (équivaut à `sections: [{ piedDePage, items }]`).
+ * @param {string} [p.piedDePage]  pied de page de la section unique.
+ * @param {WritableStream} p.stream  destination (res)
+ * @returns {Promise<number>} nombre total de panneaux générés
+ */
+export const generateQrGondolePDF = async ({
+  sections,
+  items,
+  piedDePage = "",
+  stream,
+}) => {
+  const PDFDocument = (await import("pdfkit")).default;
+  const QRCode = (await import("qrcode")).default;
+
+  const brut =
+    Array.isArray(sections) && sections.length
+      ? sections
+      : [{ piedDePage, items }];
+  const lots = brut
+    .map((sec) => ({
+      piedDePage: safe(sec && sec.piedDePage),
+      items: (Array.isArray(sec && sec.items) ? sec.items : [])
+        .map((it) => ({ code: safe(it.code), libelle: safe(it.libelle) }))
+        .filter((it) => it.code),
+    }))
+    .filter((sec) => sec.items.length > 0);
+
+  const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
+  doc.pipe(stream);
+
+  const cols = Math.max(1, Math.floor(A4_W / GONDOLE_CELL_W));
+  const rows = Math.max(1, Math.floor(A4_H / GONDOLE_CELL_H));
+  const startX = (A4_W - cols * GONDOLE_CELL_W) / 2;
+  const startY = (A4_H - rows * GONDOLE_CELL_H) / 2;
+  const perPage = cols * rows;
+
+  const ecrirePied = (texte) => {
+    if (!texte) return;
+    doc.font("Helvetica").fontSize(7).fillColor("#999999");
+    doc.text(texte, 0, A4_H - 7.5 * MM, {
+      width: A4_W,
+      align: "center",
+      lineBreak: false,
+    });
+  };
+
+  // pdfkit ouvre déjà la première feuille : on ne l'ajoute qu'à partir de la
+  // deuxième, sinon le PDF commence par une page blanche.
+  let pageOuverte = false;
+  let total = 0;
+
+  for (const lot of lots) {
+    lot.items.forEach((item, i) => {
+      const idxOnPage = i % perPage;
+      if (idxOnPage === 0) {
+        if (pageOuverte)
+          doc.addPage({ size: "A4", layout: "portrait", margin: 0 });
+        pageOuverte = true;
+        ecrirePied(lot.piedDePage);
+      }
+      const col = idxOnPage % cols;
+      const row = Math.floor(idxOnPage / cols);
+      drawQrGondole(
+        doc,
+        QRCode,
+        item,
+        startX + col * GONDOLE_CELL_W,
+        startY + row * GONDOLE_CELL_H,
+        GONDOLE_CELL_W,
+        GONDOLE_CELL_H,
+      );
+    });
+    total += lot.items.length;
+  }
+
+  return await new Promise((resolve, reject) => {
+    stream.on("finish", () => resolve(total));
+    stream.on("error", reject);
+    doc.on("error", reject);
+    doc.end();
+  });
+};
+
+export default { generateGisementLabelsPDF, generateQrGondolePDF };

@@ -14,12 +14,14 @@ import {
   HiBookmark,
   HiSave,
   HiTrash,
+  HiDownload,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetGism1Query,
+  useGetGismLevelQuery,
   useGetGroupesQuery,
 } from "../../slices/articleApiSlice";
 import {
@@ -77,6 +79,13 @@ const LABEL_TYPES = [
     desc: "NART et désignation en gros + grande case « Quantité » à remplir au stylo (A4 / demi A4).",
   },
   {
+    type: "qr_gisement",
+    title: "📍 QR gisement (gondole)",
+    desc:
+      "Panneau de rayon, pas étiquette d'article : un QR d'environ 5 cm par " +
+      "gisement (12 par feuille A4), à afficher en gondole.",
+  },
+  {
     type: "custom",
     title: "🎨 Personnalisée",
     desc: "Vous choisissez la taille (cm/px), écrivez et placez votre texte. Plusieurs par feuille A4 si ça rentre.",
@@ -96,6 +105,18 @@ const AdminEtiquettesScreen = () => {
   const [nartText, setNartText] = useState("");
   const [selectedGism1, setSelectedGism1] = useState([]); // liste de codes GISM1
   const [selectedGroupe, setSelectedGroupe] = useState([]); // liste de codes GROUPE
+  // Panneaux QR de gisement : l'emplacement choisit le NIVEAU lu sur la fiche
+  // article — MAGASIN = GISM1 (le rayon), DOCK = GISM2 (la réserve), TOUS = les
+  // deux planches dans un seul PDF. Ce sont deux jeux de codes différents : la
+  // sélection est remise à zéro quand l'emplacement change, et « TOUS » ne
+  // propose pas de sélection du tout (elle n'aurait pas de sens).
+  const [emplacementQr, setEmplacementQr] = useState("MAGASIN");
+  const [selectedGisQr, setSelectedGisQr] = useState([]);
+  // L'export Excel a SON PROPRE choix d'emplacement, indépendant de celui des
+  // panneaux : on imprime souvent les panneaux d'un seul emplacement alors
+  // qu'on veut le comptage des deux (ou l'inverse).
+  const [emplacementExcel, setEmplacementExcel] = useState("MAGASIN");
+  const [excelGisLoading, setExcelGisLoading] = useState(false);
   const [type, setType] = useState("standard");
   const [format, setFormat] = useState("a4"); // a4 | demi (types pleine page)
   const [customLayout, setCustomLayout] = useState(null); // layout du designer custom
@@ -249,6 +270,19 @@ const AdminEtiquettesScreen = () => {
     { skip: !nomDossierDBF || mode !== "groupe" },
   );
 
+  // Codes du niveau de gisement visé par les panneaux QR (1 = GISM1 magasin,
+  // 2 = GISM2 dock). Pas d'entrée « VIDE » ici : un gisement sans code n'a pas
+  // de panneau à afficher. En mode TOUS il n'y a rien à sélectionner, donc
+  // rien à charger.
+  const niveauQr = emplacementQr === "DOCK" ? 2 : 1;
+  const { data: gisQrData, isLoading: loadingGisQr } = useGetGismLevelQuery(
+    { nomDossierDBF, niveau: niveauQr },
+    {
+      skip:
+        !nomDossierDBF || type !== "qr_gisement" || emplacementQr === "TOUS",
+    },
+  );
+
   // Templates de la société (visibles/utilisables par tous les users y ayant accès).
   const { data: templates = [] } = useGetEtiquetteTemplatesQuery(nomDossierDBF, {
     skip: !nomDossierDBF,
@@ -316,10 +350,23 @@ const AdminEtiquettesScreen = () => {
   useEffect(() => {
     setSelectedGism1([]);
     setSelectedGroupe([]);
+    setSelectedGisQr([]);
   }, [nomDossierDBF]);
+
+  // Les codes GISM1 et GISM2 n'ont rien à voir : garder la sélection en
+  // changeant d'emplacement enverrait des codes qui n'existent pas au dock.
+  useEffect(() => {
+    setSelectedGisQr([]);
+  }, [emplacementQr]);
 
   const toggleGism1 = (code) => {
     setSelectedGism1((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+  };
+
+  const toggleGisQr = (code) => {
+    setSelectedGisQr((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
     );
   };
@@ -418,6 +465,18 @@ const AdminEtiquettesScreen = () => {
         : null;
 
     let body;
+    if (type === "qr_gisement") {
+      // Panneau de rayon : ni article, ni prix, ni code-barres — donc aucune
+      // source à valider et aucun contrôle GENCOD à poser. Une sélection vide
+      // vaut « tous les gisements du niveau » (le serveur les énumère).
+      body = {
+        type,
+        emplacement: emplacementQr,
+        codes: selectedGisQr,
+      };
+      await lancerGeneration(body);
+      return;
+    }
     if (type === "custom" && mode === "aucun") {
       if (!customLayout || !(customLayout.elements || []).length) {
         setError("Ajoutez au moins un élément à l'étiquette personnalisée.");
@@ -499,14 +558,28 @@ const AdminEtiquettesScreen = () => {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = `etiquettes_${type}.pdf`;
+      a.download =
+        type === "qr_gisement"
+          ? `qr_gisements_${emplacementQr.toLowerCase()}.pdf` // magasin | dock | tous
+          : `etiquettes_${type}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(href), 60000);
 
       let note;
-      if (type === "custom") {
+      if (type === "qr_gisement") {
+        // Ce type ne compte pas des articles mais des panneaux : l'entête est
+        // X-Etiquettes, pas X-Articles-Trouves.
+        const nb = res.headers.get("X-Etiquettes");
+        const ou =
+          emplacementQr === "TOUS"
+            ? "le magasin (GISM1) puis le dock (GISM2)"
+            : emplacementQr === "DOCK"
+              ? "le dock (GISM2)"
+              : "le magasin (GISM1)";
+        note = `${nb || "?"} panneau(x) QR généré(s) pour ${ou} — 12 par feuille A4.`;
+      } else if (type === "custom") {
         if (mode === "import") {
           note = `PDF généré (${trouves || importRows.length} étiquette(s) depuis le fichier importé).`;
         } else if (trouves && Number(trouves) > 0) {
@@ -525,6 +598,67 @@ const AdminEtiquettesScreen = () => {
       setError(e.message || "Impossible de générer les étiquettes");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // La sélection de codes ne s'applique au comptage que si l'export porte sur
+  // le MÊME emplacement que les panneaux : les codes cochés sont ceux d'un
+  // niveau précis (GISM1 ou GISM2), les transposer à l'autre n'aurait aucun sens.
+  const excelSuitSelection =
+    emplacementExcel !== "TOUS" &&
+    emplacementExcel === emplacementQr &&
+    selectedGisQr.length > 0;
+
+  // Comptage des gisements au format Excel (gisement | nb d'articles | libellé).
+  const telechargerExcelGisements = async () => {
+    setError("");
+    setInfo(null);
+    if (!nomDossierDBF) {
+      setError("Sélectionnez une entreprise.");
+      return;
+    }
+
+    const params = new URLSearchParams({ emplacement: emplacementExcel });
+    if (excelSuitSelection)
+      selectedGisQr.forEach((c) => params.append("codes", c));
+
+    setExcelGisLoading(true);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/etiquettes/${nomDossierDBF}/gisements-excel?${params}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        let msg = `Export échoué (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = j.message;
+        } catch {
+          /* réponse non-JSON */
+        }
+        throw new Error(msg);
+      }
+
+      const nb = res.headers.get("X-Gisements");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `gisements_nb_articles_${emplacementExcel.toLowerCase()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+      setInfo(
+        `Excel généré : ${nb || "?"} gisement(s)` +
+          (emplacementExcel === "TOUS"
+            ? " sur deux feuilles (GISM1 magasin, GISM2 dock)."
+            : "."),
+      );
+    } catch (e) {
+      setError(e.message || "Impossible de générer l'export Excel");
+    } finally {
+      setExcelGisLoading(false);
     }
   };
 
@@ -555,7 +689,8 @@ const AdminEtiquettesScreen = () => {
         <p>
           Générez vos étiquettes PDF (code-barres EAN-13) depuis une proforma,
           une commande, une liste de NART, un gisement (GISM1) ou un groupe
-          (GROUPE).
+          (GROUPE) — ou les panneaux <strong>QR de gisement</strong> à afficher
+          en gondole.
         </p>
       </div>
 
@@ -569,7 +704,136 @@ const AdminEtiquettesScreen = () => {
         </div>
       )}
 
+      {/* Panneaux QR de gisement : il n'y a pas de source d'articles à choisir,
+          ce bloc remplace celui des sources. */}
+      {type === "qr_gisement" && (
+        <div className="etiq-card">
+          <label className="etiq-label">Emplacement</label>
+          <div className="etiq-mode-tabs">
+            <button
+              type="button"
+              className={`etiq-mode-btn ${emplacementQr === "MAGASIN" ? "active" : ""}`}
+              onClick={() => setEmplacementQr("MAGASIN")}
+            >
+              <HiLocationMarker /> Magasin (GISM1)
+            </button>
+            <button
+              type="button"
+              className={`etiq-mode-btn ${emplacementQr === "DOCK" ? "active" : ""}`}
+              onClick={() => setEmplacementQr("DOCK")}
+            >
+              <HiTruck /> Dock / réserve (GISM2)
+            </button>
+            <button
+              type="button"
+              className={`etiq-mode-btn ${emplacementQr === "TOUS" ? "active" : ""}`}
+              onClick={() => setEmplacementQr("TOUS")}
+            >
+              <HiCollection /> Tout générer (les deux)
+            </button>
+          </div>
+          <span className="etiq-hint">
+            {emplacementQr === "MAGASIN"
+              ? "Un panneau par gisement GISM1 — le rayon où l'article est présenté."
+              : emplacementQr === "DOCK"
+                ? "Un panneau par gisement GISM2 — l'emplacement de réserve au dock."
+                : "Les deux planches dans un seul PDF : tous les GISM1 (magasin) puis tous les GISM2 (dock)."}{" "}
+            Le QR encode le <strong>code du gisement</strong> (ce que lit la
+            douchette et l&apos;app collecteur) ; le libellé imprimé vient du
+            dictionnaire des rayons, lu pour <strong>cet emplacement</strong> —
+            un même code peut porter deux noms différents au magasin et au dock.
+          </span>
+
+          {/* « Tout générer » ne propose aucune sélection : les deux niveaux
+              n'ont pas les mêmes codes, cocher des cases n'aurait pas de sens. */}
+          {emplacementQr === "TOUS" ? (
+            <span className="etiq-hint">
+              Chaque emplacement <strong>démarre sur une nouvelle feuille</strong>{" "}
+              et son pied de page rappelle lequel c&apos;est : une fois les
+              panneaux découpés, un code dock reste distinguable d&apos;un code
+              magasin. Pour ne tirer qu&apos;une partie des rayons, choisissez
+              un emplacement précis ci-dessus.
+            </span>
+          ) : (
+            <div className="etiq-field">
+              <label className="etiq-label">
+                Gisement(s) GISM{niveauQr}
+              </label>
+              <SelecteurMultiple
+                key={`qrgis-${nomDossierDBF || ""}-${emplacementQr}`}
+                items={gisQrData?.gisements}
+                selected={selectedGisQr}
+                onToggle={toggleGisQr}
+                onClear={() => setSelectedGisQr([])}
+                loading={loadingGisQr}
+                placeholder="Rechercher et sélectionner un ou plusieurs gisements…"
+              />
+              <span className="etiq-hint">
+                {selectedGisQr.length > 0
+                  ? `${selectedGisQr.length} panneau(x) seront générés, rangés dans l'ordre naturel des codes (A_1, A_2d, A_9, A_10…).`
+                  : `Aucune sélection : un panneau sera généré pour TOUS les gisements GISM${niveauQr} de la société${
+                      gisQrData?.total ? ` (${gisQrData.total} codes)` : ""
+                    }.`}
+              </span>
+            </div>
+          )}
+
+          {/* Comptage en Excel — choix d'emplacement INDÉPENDANT de celui des
+              panneaux (on veut souvent le comptage des deux niveaux même en
+              n'imprimant qu'une planche). */}
+          <div className="etiq-field">
+            <label className="etiq-label">
+              <HiDownload /> Excel : gisements et nombre d&apos;articles
+            </label>
+            <div className="etiq-mode-tabs">
+              <button
+                type="button"
+                className={`etiq-mode-btn ${emplacementExcel === "MAGASIN" ? "active" : ""}`}
+                onClick={() => setEmplacementExcel("MAGASIN")}
+              >
+                GISM1 — magasin
+              </button>
+              <button
+                type="button"
+                className={`etiq-mode-btn ${emplacementExcel === "DOCK" ? "active" : ""}`}
+                onClick={() => setEmplacementExcel("DOCK")}
+              >
+                GISM2 — dock
+              </button>
+              <button
+                type="button"
+                className={`etiq-mode-btn ${emplacementExcel === "TOUS" ? "active" : ""}`}
+                onClick={() => setEmplacementExcel("TOUS")}
+              >
+                Les deux (2 feuilles)
+              </button>
+            </div>
+            <button
+              type="button"
+              className="etiq-csv-btn"
+              onClick={telechargerExcelGisements}
+              disabled={excelGisLoading}
+            >
+              <HiDownload />{" "}
+              {excelGisLoading ? "Export…" : "Télécharger l'Excel"}
+            </button>
+            <span className="etiq-hint">
+              Une ligne par gisement : le <strong>code</strong>, le{" "}
+              <strong>nombre d&apos;articles</strong> qui y sont rangés, puis le
+              libellé du rayon.{" "}
+              {emplacementExcel === "TOUS"
+                ? "GISM1 (magasin) et GISM2 (dock) sur deux feuilles séparées."
+                : excelSuitSelection
+                  ? `Limité aux ${selectedGisQr.length} gisement(s) sélectionné(s) ci-dessus.`
+                  : `Tous les gisements ${emplacementExcel === "DOCK" ? "GISM2" : "GISM1"} de la société.`}{" "}
+              Les articles <strong>sans gisement</strong> n&apos;y figurent pas.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Source des articles (le type « custom » ajoute « Texte seul »). */}
+      {type !== "qr_gisement" && (
       <div className="etiq-card">
         <div className="etiq-mode-tabs">
           {type === "custom" && (
@@ -834,6 +1098,7 @@ const AdminEtiquettesScreen = () => {
           </span>
         )}
       </div>
+      )}
 
       {/* Type d'étiquette */}
       <div className="etiq-card">
@@ -860,7 +1125,8 @@ const AdminEtiquettesScreen = () => {
 
         {type !== "standard" &&
           type !== "standard_sans_prix" &&
-          type !== "custom" && (
+          type !== "custom" &&
+          type !== "qr_gisement" && (
           <div className="etiq-format">
             <span className="etiq-format-label">Format :</span>
             <button
@@ -970,7 +1236,11 @@ const AdminEtiquettesScreen = () => {
           onClick={genererEtiquettes}
           disabled={loading}
         >
-          {loading ? "Génération…" : "🏷️ Générer les étiquettes"}
+          {loading
+            ? "Génération…"
+            : type === "qr_gisement"
+              ? "📍 Générer les panneaux QR"
+              : "🏷️ Générer les étiquettes"}
         </button>
       </div>
 
