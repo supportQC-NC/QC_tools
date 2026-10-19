@@ -3,7 +3,7 @@
 // Routes de l'outil « Top Ventes » (groupe Commerciaux).
 // Chaîne : protect -> checkEntrepriseAccess -> checkModuleAccess("commerciaux_outils","read").
 import express from "express";
-import { synthese, detail } from "../controllers/topVentesController.js";
+import { synthese, detail, exportDetail } from "../controllers/topVentesController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
   checkEntrepriseAccess,
@@ -20,5 +20,6 @@ const read = [
 
 router.get("/:nomDossierDBF/synthese", ...read, synthese);
 router.get("/:nomDossierDBF/detail", ...read, detail);
+router.get("/:nomDossierDBF/export", ...read, exportDetail);
 
 export default router;

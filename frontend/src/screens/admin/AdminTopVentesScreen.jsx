@@ -10,6 +10,7 @@ import {
   HiChevronUp,
   HiChevronDown,
   HiSwitchHorizontal,
+  HiDownload,
 } from "react-icons/hi";
 import { selectGlobalDossier, selectGlobalEntreprise } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -17,6 +18,7 @@ import {
   useGetTopVenteDetailQuery,
 } from "../../slices/topVentesApiSlice";
 import { fmtQty, fmtFranc, fmtPct, fmtCoef } from "../../utils/format";
+import { BASE_URL, TOP_VENTES_URL } from "../../constants";
 import Modal from "../../components/ui/Modal/Modal";
 import "./AdminTopVentesScreen.css";
 
@@ -269,6 +271,52 @@ const DetailModal = ({ dossier, drill, onClose }) => {
   const [search, setSearch] = useState("");
   // "" = tous, "1" = uniquement les renvois, "0" = sans les renvois.
   const [renvoi, setRenvoi] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  // Export Excel du détail : mêmes filtres que l'affichage (recherche, renvois,
+  // tri), mais TOUTES les lignes — le serveur n'applique pas la borne d'écran.
+  const exporterExcel = async () => {
+    setExportError("");
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        type: drill.type,
+        code: String(drill.code),
+        sort,
+        dir,
+      });
+      if (renvoi !== "") params.set("renvoi", renvoi);
+      if (search.trim()) params.set("search", search.trim());
+      const res = await fetch(
+        `${BASE_URL}${TOP_VENTES_URL}/${dossier}/export?${params}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        let msg = `Export échoué (${res.status})`;
+        try {
+          const j = await res.json();
+          if (j?.message) msg = j.message;
+        } catch {
+          /* réponse non-JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `top_ventes_${drill.type}_${drill.code}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (e) {
+      setExportError(e.message || "Impossible d'exporter.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading, isFetching } = useGetTopVenteDetailQuery({
     nomDossierDBF: dossier,
@@ -329,8 +377,19 @@ const DetailModal = ({ dossier, drill, onClose }) => {
           <option value="1">Uniquement les renvois</option>
           <option value="0">Sans les renvois</option>
         </select>
+        <button
+          className="tv-btn"
+          onClick={exporterExcel}
+          disabled={exporting || isLoading || (data?.total ?? 0) === 0}
+          title="Exporter en Excel les articles affichés (mêmes filtres, toutes les lignes)"
+        >
+          <HiDownload /> {exporting ? "Export…" : "Exporter Excel"}
+        </button>
         <div className="tv-spacer" />
         <span className="tv-soc">
+          {exportError && (
+            <span style={{ color: "#f87171" }}>{exportError} · </span>
+          )}
           {data?.total ?? 0} article(s)
           {data?.nbRenvois > 0 && (
             <>

@@ -225,7 +225,10 @@ export const getDetail = async (entreprise, options = {}) => {
   const filtreRenvoi = trim(options.renvoi);
   const sort = SORT_FIELDS.has(options.sort) ? options.sort : "caAnnee";
   const dir = options.dir === "asc" ? 1 : -1;
-  const limit = Math.min(parseInt(options.limit) || 1000, 5000);
+  // limit=0 : TOUT (convention « 0 = pas de borne », comme fenetreMois) — c'est
+  // le cas de l'export Excel, qui ne doit pas tronquer en silence.
+  const limitBrut = parseInt(options.limit);
+  const limit = limitBrut === 0 ? Infinity : Math.min(limitBrut || 1000, 5000);
 
   if (code === undefined || code === null || code === "") {
     return { total: 0, articles: [] };
@@ -292,4 +295,19 @@ export const getDetail = async (entreprise, options = {}) => {
   return { total, nbRenvois, articles: rows.slice(0, limit) };
 };
 
-export default { getSynthese, getDetail };
+// Libellé d'un groupe (nom du fournisseur ou libellé du rayon), pour l'entête
+// de l'export Excel. Chaîne vide si inconnu.
+export const getLibelleGroupe = async (entreprise, type, code) => {
+  if (type === "rayon") {
+    const rayonMap = await buildRayonMap(entreprise);
+    return rayonMap.get(trim(code).toUpperCase()) || "";
+  }
+  try {
+    const frs = await fournissCacheService.findByFourn(entreprise, code);
+    return frs ? trim(frs.NOM) : "";
+  } catch {
+    return "";
+  }
+};
+
+export default { getSynthese, getDetail, getLibelleGroupe };
