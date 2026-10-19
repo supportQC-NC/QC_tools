@@ -1,8 +1,9 @@
 // backend/services/etiquetteService.js
 //
 // Générateur d'étiquettes PDF — portage fidèle du module Python (reportlab).
-// 6 types : standard (grille 5x4cm), promo / solde / destockage / sans_prix / normal
-// (pleine page A4 paysage). Option "demi A4" pour les types pleine page :
+// Types : standard / standard_sans_prix / standard_promo / standard_solde /
+// standard_destockage (grille 5x4cm), promo / solde / destockage / sans_prix /
+// normal (pleine page A4 paysage). Option "demi A4" pour les types pleine page :
 // 2 articles différents par feuille A4 portrait (chacun = demi-page A5 paysage).
 // Code-barres EAN-13 vectoriel (scannable). Polices Helvetica/Helvetica-Bold.
 //
@@ -334,7 +335,12 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   //
   // Seule la grille « standard » (avec prix) pose la question à l'utilisateur :
   // « standard sans prix » affiche déjà le NART en gros au centre.
-  const { showPrice = true, sansGencod = "defaut" } = opts;
+  //
+  // `variante` (voir VARIANTES_STANDARD) : grilles promo / solde / déstockage —
+  // même cellule 5x4 cm, mais bandeau rouge en haut à droite, PRIX PROMO au
+  // centre avec l'ancien prix barré dessous, et ligne de dates au-dessus du
+  // code-barres. Le code-barres est RÉDUIT en hauteur pour dégager cette place.
+  const { showPrice = true, sansGencod = "defaut", variante = null } = opts;
 
   // Calculé AVANT le premier tracé : il conditionne aussi le petit NART.
   const code = codeBarresImprimable(record);
@@ -348,6 +354,17 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   rl.setFont("Helvetica", 6);
   if (!masquerNart) rl.drawString(x + 2, y + labelH - 8, safe(record.NART));
 
+  if (variante) {
+    // Bandeau de l'opération en ROUGE, en haut à droite — l'équivalent, à
+    // l'échelle de la grille, du grand titre des étiquettes pleine page.
+    rl.doc.font("Helvetica-Bold").fontSize(11);
+    const wTitre = rl.doc.widthOfString(variante.titre);
+    rl.setFillColorRGB(1, 0, 0);
+    rl.setFont("Helvetica-Bold", 11);
+    rl.drawString(x + labelW - wTitre - 3, y + labelH - 12, variante.titre);
+    rl.setFillColorRGB(0, 0, 0);
+  }
+
   rl.setFont("Helvetica-Bold", 7);
   const product = safe(record.DESIGN || "Désignation non spécifié").slice(0, 80);
   let wrapped = wrapText(product, 28);
@@ -355,19 +372,57 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   let yp = y + labelH - 23;
   for (const line of wrapped) { rl.drawString(x + 5, yp, line); yp -= 8; }
 
-  // Bloc central : prix (Standard) ou NART (Standard sans prix), même emplacement.
+  // Bloc central : prix (Standard), PRIX PROMO (variantes promo/solde/
+  // déstockage) ou NART (Standard sans prix), même emplacement.
+  // Même calcul que les étiquettes pleine page : PVPROMO est HT, la TGC s'ajoute.
+  const promoTtc = Math.trunc(
+    (Number(record.PVPROMO) || 0) * (1 + (Number(record.ATVA) || 0) / 100),
+  );
   rl.setFillColorRGB(0.95, 0.95, 0.95);
   const pbh = 15;
   rl.rect(x + 5, yp - pbh, labelW - 10, pbh, { fill: true, stroke: false });
   rl.setFillColorRGB(0, 0, 0);
   rl.setFont("Helvetica-Bold", 12);
-  const centralText = showPrice
-    ? `${fmtInt(record.PVTETTC || 0)} XPF`
-    : safe(record.NART);
+  let centralText;
+  if (!showPrice) centralText = safe(record.NART);
+  else if (variante && promoTtc > 0) centralText = `${fmtInt(promoTtc)} XPF`;
+  // PVPROMO absent de la fiche : on retombe sur le prix normal plutôt que
+  // d'imprimer « 0 XPF » en rayon.
+  else centralText = `${fmtInt(record.PVTETTC || 0)} XPF`;
   rl.drawCentredString(x + labelW / 2, yp - pbh + 3, centralText);
   yp -= pbh;
 
-  if (showPrice) {
+  if (variante) {
+    // Ancien prix barré sous le prix promo — seulement quand les DEUX prix
+    // existent, sinon la ligne n'apprend rien.
+    const ancien = Number(record.PVTETTC) || 0;
+    if (promoTtc > 0 && ancien > 0) {
+      const txt = `au lieu de ${fmtInt(ancien)} XPF`;
+      rl.setFont("Helvetica", 6.5);
+      rl.drawCentredString(x + labelW / 2, yp - 9, txt);
+      const wTxt = rl.doc.font("Helvetica").fontSize(6.5).widthOfString(txt);
+      rl.setLineWidth(0.6);
+      rl.line(
+        x + labelW / 2 - wTxt / 2 - 1,
+        yp - 7,
+        x + labelW / 2 + wTxt / 2 + 1,
+        yp - 7,
+      );
+    }
+    // Dates de l'opération, juste au-dessus du code-barres. Taille réduite
+    // jusqu'à tenir dans la largeur (la ligne déstockage est la plus longue).
+    const texteDates = variante.dateLine(record);
+    let taille = 6.5;
+    while (
+      taille > 4.5 &&
+      rl.doc.font("Helvetica-Bold").fontSize(taille).widthOfString(texteDates) >
+        labelW - 8
+    ) {
+      taille -= 0.25;
+    }
+    rl.setFont("Helvetica-Bold", taille);
+    rl.drawCentredString(x + labelW / 2, y + 37, texteDates);
+  } else if (showPrice) {
     let klText = "";
     if (record.VOL && Number(record.VOL) !== 0) {
       const ppu = (Number(record.PVTETTC) || 0) / Number(record.VOL);
@@ -377,7 +432,10 @@ const drawStandardCell = (rl, record, x, y, labelW, labelH, opts = {}) => {
   }
 
   const bw = labelW - 10;
-  const bh = 46;
+  // Variantes : code-barres réduit en HAUTEUR (46 → 32 pt) pour laisser la
+  // place de la ligne de dates — la LARGEUR ne bouge pas, donc la taille de
+  // module (la scannabilité) non plus.
+  const bh = variante ? 32 : 46;
   const bx = x + (labelW - bw) / 2;
   const by = y + 1;
   if (code) {
@@ -871,8 +929,36 @@ const drawDemi = (rl, doc, sections, logoBuf, drawOne) => {
   });
 };
 
+// Variantes PROMO / SOLDE / DÉSTOCKAGE de la grille standard 5x4 cm : même
+// cellule que « standard » mais bandeau rouge, prix promo avec ancien prix
+// barré, et ligne de dates (DPROMOD / DPROMOF de la fiche article, comme les
+// étiquettes pleine page — y compris le « N/A » quand la fiche n'en porte pas).
+const VARIANTES_STANDARD = {
+  standard_promo: {
+    titre: "PROMO",
+    dateLine: (r) =>
+      `du ${fmtPromoDate(r.DPROMOD)} au ${fmtPromoDate(r.DPROMOF)}`,
+  },
+  standard_solde: {
+    titre: "SOLDE",
+    dateLine: (r) =>
+      `du ${fmtPromoDate(r.DPROMOD)} au ${fmtPromoDate(r.DPROMOF)}`,
+  },
+  standard_destockage: {
+    titre: "DESTOCKAGE",
+    // Pas de date de fin par nature ; sans date de début non plus, la mention
+    // seule suffit (pas de « Du N/A »).
+    dateLine: (r) =>
+      fmtPromoDate(r.DPROMOD) === "N/A"
+        ? "Jusqu'à épuisement du stock"
+        : `Du ${fmtPromoDate(r.DPROMOD)} - jusqu'à épuisement du stock`,
+  },
+};
+
 export const TYPES_ETIQUETTES = [
-  "standard", "standard_sans_prix", "promo", "solde", "destockage", "sans_prix", "normal", "inventaire", "custom",
+  "standard", "standard_sans_prix",
+  "standard_promo", "standard_solde", "standard_destockage",
+  "promo", "solde", "destockage", "sans_prix", "normal", "inventaire", "custom",
   // « qr_gisement » ne passe PAS par ce service : ce n'est pas une étiquette
   // d'article (aucun NART, aucun prix, aucun code-barres EAN) mais un panneau
   // de rayon, rendu par gisementLabelService.generateQrGondolePDF. Il figure
@@ -1115,7 +1201,9 @@ export const genererEtiquettesCustomPDF = async ({
 /**
  * Génère le PDF d'étiquettes dans outPath.
  * @param {Object} p
- * @param {string} p.type      - standard | promo | solde | destockage | sans_prix | normal
+ * @param {string} p.type      - standard | standard_sans_prix | standard_promo |
+ *                               standard_solde | standard_destockage | promo |
+ *                               solde | destockage | sans_prix | normal
  * @param {string} [p.format]  - "a4" (défaut) | "demi" (ignoré pour standard)
  * @param {Array}  p.articles  - enregistrements article.dbf (dans l'ordre voulu)
  * @param {Object} p.entreprise- doc entreprise (pour le chemin du logo)
@@ -1150,7 +1238,9 @@ export const genererEtiquettesPDF = async ({
   outPath,
   sansGencod = "defaut",
 }) => {
-  const isStandard = type === "standard" || type === "standard_sans_prix";
+  const variante = VARIANTES_STANDARD[type] || null;
+  const isStandard =
+    type === "standard" || type === "standard_sans_prix" || !!variante;
   if (!isStandard && !ONE_DRAWERS[type]) {
     throw new Error(`Type d'étiquette inconnu: ${type}`);
   }
@@ -1177,8 +1267,9 @@ export const genererEtiquettesPDF = async ({
   const rl = new RL(doc);
   if (isStandard) {
     drawStandard(rl, paquets, {
-      showPrice: type === "standard",
+      showPrice: type !== "standard_sans_prix",
       sansGencod,
+      variante,
     });
   } else if (isDemi) {
     drawDemi(rl, doc, paquets, logoBuf, ONE_DRAWERS[type]);

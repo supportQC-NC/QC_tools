@@ -49,6 +49,21 @@ const LABEL_TYPES = [
     desc: "Même format que Standard (5 × 4 cm, plusieurs par page), mais sans le prix.",
   },
   {
+    type: "standard_promo",
+    title: "🔥 Standard promo",
+    desc: "Grille 5 × 4 cm : bandeau PROMO, prix promo, ancien prix barré et dates de la promo.",
+  },
+  {
+    type: "standard_solde",
+    title: "💥 Standard solde",
+    desc: "Grille 5 × 4 cm : bandeau SOLDE, prix promo, ancien prix barré et dates.",
+  },
+  {
+    type: "standard_destockage",
+    title: "📦 Standard déstockage",
+    desc: "Grille 5 × 4 cm : bandeau DESTOCKAGE, prix promo et « jusqu'à épuisement du stock ».",
+  },
+  {
     type: "promo",
     title: "🔥 Promotion",
     desc: "Pleine page A4 avec prix barré, prix promo et dates.",
@@ -90,6 +105,16 @@ const LABEL_TYPES = [
     title: "🎨 Personnalisée",
     desc: "Vous choisissez la taille (cm/px), écrivez et placez votre texte. Plusieurs par feuille A4 si ça rentre.",
   },
+];
+
+// Grilles 5 × 4 cm AVEC prix : les seules à laisser la zone code-barres VIDE
+// quand l'article n'a pas de GENCOD exploitable — donc les seules pour
+// lesquelles on pose la question « NART à la place ou vide ? » avant de générer.
+const TYPES_GRILLE_AVEC_PRIX = [
+  "standard",
+  "standard_promo",
+  "standard_solde",
+  "standard_destockage",
 ];
 
 const AdminEtiquettesScreen = () => {
@@ -501,13 +526,13 @@ const AdminEtiquettesScreen = () => {
       }
     }
 
-    // Seule la grille « Standard » (avec prix) laisse la zone code-barres VIDE
-    // quand l'article n'a pas de GENCOD. On ne pose donc la question que là :
-    // « Standard sans prix » affiche déjà le NART en gros au centre, les
-    // formats pleine page (promo, solde, déstockage, sans prix, normal)
-    // impriment désormais le NART À LA PLACE du code-barres absent, et le type
-    // custom n'a aucune zone imposée.
-    if (type === "standard" && mode !== "aucun" && mode !== "import") {
+    // Seules les grilles AVEC prix (Standard et ses variantes promo / solde /
+    // déstockage) laissent la zone code-barres VIDE quand l'article n'a pas de
+    // GENCOD. On ne pose donc la question que là : « Standard sans prix »
+    // affiche déjà le NART en gros au centre, les formats pleine page (promo,
+    // solde, déstockage, sans prix, normal) impriment désormais le NART À LA
+    // PLACE du code-barres absent, et le type custom n'a aucune zone imposée.
+    if (TYPES_GRILLE_AVEC_PRIX.includes(type) && mode !== "aucun" && mode !== "import") {
       const controle = await controlerArticlesSansGencod(body);
       if (controle && controle.nbSansGencod > 0) {
         // On ne génère rien tant que l'utilisateur n'a pas tranché.
@@ -1123,8 +1148,9 @@ const AdminEtiquettesScreen = () => {
           ))}
         </div>
 
-        {type !== "standard" &&
-          type !== "standard_sans_prix" &&
+        {/* Le choix A4 / demi A4 ne concerne que les types pleine page : les
+            grilles « standard* » tuilent déjà 20 étiquettes par feuille. */}
+        {!type.startsWith("standard") &&
           type !== "custom" &&
           type !== "qr_gisement" && (
           <div className="etiq-format">
