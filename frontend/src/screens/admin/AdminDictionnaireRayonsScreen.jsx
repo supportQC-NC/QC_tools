@@ -67,6 +67,9 @@ const AdminDictionnaireRayonsScreen = () => {
   const [fichier, setFichier] = useState("");
   const [exists, setExists] = useState(true);
   const [codeType, setCodeType] = useState("barcode"); // "barcode" | "qr"
+  // Étiquettes : true = une par SOUS-ZONE (<GISM1>_A…), false = une par ZONE
+  // (code GISM1 seul, sans suffixe _A/_B).
+  const [avecSousZones, setAvecSousZones] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -230,7 +233,7 @@ const AdminDictionnaireRayonsScreen = () => {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ codeType }),
+          body: JSON.stringify({ codeType, sousZones: avecSousZones }),
         },
       );
       if (!res.ok) throw await erreurReponse(res, "Génération échouée");
@@ -240,7 +243,7 @@ const AdminDictionnaireRayonsScreen = () => {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = `etiquettes_rayons_${codeType}.pdf`;
+      a.download = `etiquettes_rayons_${codeType}${avecSousZones ? "" : "_zones"}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -706,7 +709,7 @@ const AdminDictionnaireRayonsScreen = () => {
 
           {/* ── Étiquettes ─────────────────────────────────────────── */}
           <div className="dicr-card">
-            <label className="dicr-label">Étiquettes (A8, par sous-zone)</label>
+            <label className="dicr-label">Étiquettes (A8)</label>
             <div className="dicr-types">
               <button
                 type="button"
@@ -723,9 +726,30 @@ const AdminDictionnaireRayonsScreen = () => {
                 ▣ QR code
               </button>
             </div>
+            <div className="dicr-types">
+              <button
+                type="button"
+                className={`dicr-type-btn ${avecSousZones ? "active" : ""}`}
+                onClick={() => setAvecSousZones(true)}
+                title="Une étiquette par sous-zone (codes avec suffixe _A, _B…)"
+              >
+                Par sous-zone (_A, _B…)
+              </button>
+              <button
+                type="button"
+                className={`dicr-type-btn ${!avecSousZones ? "active" : ""}`}
+                onClick={() => setAvecSousZones(false)}
+                title="Une étiquette par zone, code GISM1 seul (sans suffixe _A/_B)"
+              >
+                Par zone (sans suffixe)
+              </button>
+            </div>
             <span className="dicr-hint-inline">
-              Génère {totalSousZones} étiquette(s) à partir du fichier{" "}
-              <strong>enregistré</strong>.
+              Génère {avecSousZones ? totalSousZones : nbCodes} étiquette(s) à
+              partir du fichier <strong>enregistré</strong>
+              {avecSousZones
+                ? " (une par sous-zone)."
+                : " (une par zone, code sans suffixe)."}
               {dirty ? " Enregistrez d'abord vos modifications." : ""}
             </span>
 

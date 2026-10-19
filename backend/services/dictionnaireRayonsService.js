@@ -405,15 +405,22 @@ export const buildZonesWorkbookBuffer = async (rows, emplacement = null) => {
   return { buffer, count: zones.length };
 };
 
-// Développe les lignes en items d'étiquettes { code, libelle } (1 par sous-zone).
+// Développe les lignes en items d'étiquettes { code, libelle }.
 // `filtre` : Set de codes GISM1 à conserver (optionnel ; sinon tous).
-export const expandSubZones = (rows, filtre = null) => {
+// `sousZones` (défaut true) : true → 1 item par sous-zone (« <GISM1>_A », …) ;
+//   false → 1 item par ZONE, code = GISM1 seul (sans suffixe _A/_B) — choix
+//   offert à la génération des étiquettes quand le découpage n'est pas utilisé.
+export const expandSubZones = (rows, filtre = null, sousZones = true) => {
   const items = [];
   for (const r of Array.isArray(rows) ? rows : []) {
     const code = safeTrim(r?.gism1);
     if (!code) continue;
     if (filtre && !filtre.has(code)) continue;
     const libelle = safeTrim(r?.libelle);
+    if (!sousZones) {
+      items.push({ code, libelle });
+      continue;
+    }
     const n = Math.max(1, Math.round(Number(r?.metrage) || 0)); // toujours au moins 1 (_A)
     for (let i = 0; i < n; i++) {
       items.push({ code: `${code}_${letterSuffix(i)}`, libelle });

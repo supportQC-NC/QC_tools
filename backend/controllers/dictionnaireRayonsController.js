@@ -2,7 +2,8 @@
 //
 // Dictionnaire des rayons (fichier Excel « <TRIG>_dictionnaire_rayons.xlsx »
 // sur le partage « collecteur ») : lecture, écriture (éditeur), et génération
-// d'étiquettes QR/code-barres par sous-zone (metrage → « _A, _B, … »).
+// d'étiquettes QR/code-barres — par sous-zone (metrage → « _A, _B, … ») ou par
+// zone seule (GISM1 sans suffixe), au choix de l'utilisateur.
 
 import fs from "fs";
 import asyncHandler from "../middleware/asyncHandler.js";
@@ -87,14 +88,19 @@ export const saveDictionnaire = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Étiquettes (A8, Code128/QR) par sous-zone à partir du dictionnaire
+// @desc    Étiquettes (A8, Code128/QR) à partir du dictionnaire. Deux modes
+//          (champ « sousZones ») : true (défaut) = une étiquette par sous-zone
+//          (« <GISM1>_A », …) ; false = une étiquette par ZONE, le code encodé
+//          est le GISM1 seul (sans suffixe _A/_B).
 // @route   POST /api/dictionnaire-rayons/:nomDossierDBF/etiquettes
-// @body    { codeType?: "barcode"|"qr", codes?: string[] }  (codes vide -> tous)
+// @body    { codeType?: "barcode"|"qr", codes?: string[], sousZones?: boolean }
+//          (codes vide -> tous)
 // @access  Private (export_gisements_admin, read) + accès entreprise
 export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const codeType = req.body?.codeType === "qr" ? "qr" : "barcode";
   const codes = Array.isArray(req.body?.codes) ? req.body.codes : [];
+  const sousZones = req.body?.sousZones !== false; // défaut : avec sous-zones
 
   const { rows } = await readDictionnaire(entreprise);
   if (!rows.length) {
@@ -106,10 +112,14 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
     ? new Set(codes.map((c) => (c == null ? "" : String(c)).trim()).filter(Boolean))
     : null;
 
-  let items = expandSubZones(rows, filtre);
+  let items = expandSubZones(rows, filtre, sousZones);
   if (items.length === 0) {
     res.status(404);
-    throw new Error("Aucune sous-zone à générer pour la sélection.");
+    throw new Error(
+      sousZones
+        ? "Aucune sous-zone à générer pour la sélection."
+        : "Aucune zone à générer pour la sélection.",
+    );
   }
 
   // Garde-fou volume.
