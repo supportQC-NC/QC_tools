@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "b6aa384d-52b8-45bd-a410-098da190653d"
+      }
+    },
+    "android": {
+      "package": "com.stoyann.outil_en_ligne_qc"
+    }
+  }
+}

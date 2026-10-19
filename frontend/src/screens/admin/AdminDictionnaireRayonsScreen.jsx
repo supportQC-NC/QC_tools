@@ -5,6 +5,7 @@
 //   1) Éditer le fichier (GISM1 / libellé / métrage) et l'enregistrer ;
 //   2) Générer des étiquettes A8 (QR ou code-barres) découpées en SOUS-ZONES :
 //      métrage N → N sous-zones « <GISM1>_A, _B, … » (toujours au moins « _A »).
+//      Filtrables par emplacement (tous / MAGASIN / DOCK).
 // Société lue depuis la sélection GLOBALE (Header).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -70,6 +71,8 @@ const AdminDictionnaireRayonsScreen = () => {
   // Étiquettes : true = une par SOUS-ZONE (<GISM1>_A…), false = une par ZONE
   // (code GISM1 seul, sans suffixe _A/_B).
   const [avecSousZones, setAvecSousZones] = useState(true);
+  // Étiquettes : emplacement à imprimer (TOUS | MAGASIN | DOCK).
+  const [emplEtiquettes, setEmplEtiquettes] = useState("TOUS");
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -162,6 +165,27 @@ const AdminDictionnaireRayonsScreen = () => {
   );
   const nbCodes = rows.filter((r) => String(r.gism1).trim()).length;
 
+  // Lignes retenues pour les ÉTIQUETTES (selon l'emplacement choisi).
+  const rowsEtiquettes = useMemo(
+    () =>
+      emplEtiquettes === "TOUS"
+        ? rows
+        : rows.filter(
+            (r) =>
+              (r.emplacement === "DOCK" ? "DOCK" : "MAGASIN") === emplEtiquettes,
+          ),
+    [rows, emplEtiquettes],
+  );
+  const nbCodesEtiq = rowsEtiquettes.filter((r) => String(r.gism1).trim()).length;
+  const totalSousZonesEtiq = useMemo(
+    () =>
+      rowsEtiquettes.reduce(
+        (n, r) => n + (String(r.gism1).trim() ? nbSousZones(r.metrage) : 0),
+        0,
+      ),
+    [rowsEtiquettes],
+  );
+
   // ── Recherche + filtre emplacement (affichage seulement, édition via _id) ─────
   const visibleRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -233,7 +257,12 @@ const AdminDictionnaireRayonsScreen = () => {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ codeType, sousZones: avecSousZones }),
+          body: JSON.stringify({
+            codeType,
+            sousZones: avecSousZones,
+            // TOUS → pas de filtre côté serveur
+            ...(emplEtiquettes !== "TOUS" && { emplacement: emplEtiquettes }),
+          }),
         },
       );
       if (!res.ok) throw await erreurReponse(res, "Génération échouée");
@@ -243,7 +272,9 @@ const AdminDictionnaireRayonsScreen = () => {
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = href;
-      a.download = `etiquettes_rayons_${codeType}${avecSousZones ? "" : "_zones"}.pdf`;
+      a.download = `etiquettes_rayons_${codeType}${
+        emplEtiquettes !== "TOUS" ? `_${emplEtiquettes.toLowerCase()}` : ""
+      }${avecSousZones ? "" : "_zones"}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -744,12 +775,32 @@ const AdminDictionnaireRayonsScreen = () => {
                 Par zone (sans suffixe)
               </button>
             </div>
+            <div className="dicr-types">
+              {["TOUS", "MAGASIN", "DOCK"].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`dicr-type-btn ${emplEtiquettes === v ? "active" : ""}`}
+                  onClick={() => setEmplEtiquettes(v)}
+                  title={
+                    v === "TOUS"
+                      ? "Imprimer les rayons des deux emplacements"
+                      : `N'imprimer que les rayons de l'emplacement ${v}`
+                  }
+                >
+                  {v === "TOUS" ? "Tous les emplacements" : v}
+                </button>
+              ))}
+            </div>
             <span className="dicr-hint-inline">
-              Génère {avecSousZones ? totalSousZones : nbCodes} étiquette(s) à
-              partir du fichier <strong>enregistré</strong>
+              Génère {avecSousZones ? totalSousZonesEtiq : nbCodesEtiq}{" "}
+              étiquette(s) à partir du fichier <strong>enregistré</strong>
               {avecSousZones
-                ? " (une par sous-zone)."
-                : " (une par zone, code sans suffixe)."}
+                ? " (une par sous-zone"
+                : " (une par zone, code sans suffixe"}
+              {emplEtiquettes !== "TOUS"
+                ? `, emplacement ${emplEtiquettes}).`
+                : ")."}
               {dirty ? " Enregistrez d'abord vos modifications." : ""}
             </span>
 
@@ -758,7 +809,12 @@ const AdminDictionnaireRayonsScreen = () => {
                 type="button"
                 className="dicr-generate"
                 onClick={generer}
-                disabled={generating || dirty || nbCodes === 0}
+                disabled={generating || dirty || nbCodesEtiq === 0}
+                title={
+                  nbCodesEtiq === 0 && nbCodes > 0
+                    ? `Aucun rayon pour l'emplacement ${emplEtiquettes}`
+                    : undefined
+                }
               >
                 <HiTag /> {generating ? "Génération…" : "Générer les étiquettes (A8)"}
               </button>

@@ -91,9 +91,11 @@ export const saveDictionnaire = asyncHandler(async (req, res) => {
 // @desc    Étiquettes (A8, Code128/QR) à partir du dictionnaire. Deux modes
 //          (champ « sousZones ») : true (défaut) = une étiquette par sous-zone
 //          (« <GISM1>_A », …) ; false = une étiquette par ZONE, le code encodé
-//          est le GISM1 seul (sans suffixe _A/_B).
+//          est le GISM1 seul (sans suffixe _A/_B). Filtrable par emplacement
+//          (« MAGASIN » | « DOCK », absent/autre = tous).
 // @route   POST /api/dictionnaire-rayons/:nomDossierDBF/etiquettes
-// @body    { codeType?: "barcode"|"qr", codes?: string[], sousZones?: boolean }
+// @body    { codeType?: "barcode"|"qr", codes?: string[], sousZones?: boolean,
+//            emplacement?: "MAGASIN"|"DOCK" }
 //          (codes vide -> tous)
 // @access  Private (export_gisements_admin, read) + accès entreprise
 export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
@@ -101,6 +103,8 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
   const codeType = req.body?.codeType === "qr" ? "qr" : "barcode";
   const codes = Array.isArray(req.body?.codes) ? req.body.codes : [];
   const sousZones = req.body?.sousZones !== false; // défaut : avec sous-zones
+  const emplRaw = (req.body?.emplacement ?? "").toString().trim().toUpperCase();
+  const emplacement = ["MAGASIN", "DOCK"].includes(emplRaw) ? emplRaw : null;
 
   const { rows } = await readDictionnaire(entreprise);
   if (!rows.length) {
@@ -108,17 +112,21 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
     throw new Error("Dictionnaire vide ou introuvable pour cette société.");
   }
 
+  const rowsFiltrees = emplacement
+    ? rows.filter((r) => normEmplacement(r.emplacement) === emplacement)
+    : rows;
+
   const filtre = codes.length
     ? new Set(codes.map((c) => (c == null ? "" : String(c)).trim()).filter(Boolean))
     : null;
 
-  let items = expandSubZones(rows, filtre, sousZones);
+  let items = expandSubZones(rowsFiltrees, filtre, sousZones);
   if (items.length === 0) {
     res.status(404);
     throw new Error(
-      sousZones
-        ? "Aucune sous-zone à générer pour la sélection."
-        : "Aucune zone à générer pour la sélection.",
+      `Aucune ${sousZones ? "sous-zone" : "zone"} à générer pour la sélection${
+        emplacement ? ` (emplacement ${emplacement})` : ""
+      }.`,
     );
   }
 
@@ -128,10 +136,11 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
   if (tronque) items = items.slice(0, MAX);
 
   const ext = codeType === "qr" ? "qr" : "cb";
+  const suffixEmpl = emplacement ? `_${emplacement.toLowerCase()}` : "";
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="etiquettes_rayons_${ext}_${trigOf(entreprise)}.pdf"`,
+    `attachment; filename="etiquettes_rayons_${ext}${suffixEmpl}_${trigOf(entreprise)}.pdf"`,
   );
   res.setHeader("Access-Control-Expose-Headers", "X-Etiquettes, X-Tronque");
   res.setHeader("X-Etiquettes", String(items.length));
