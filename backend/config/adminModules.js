@@ -41,6 +41,7 @@ export const PERMISSION_MODULES = [
   { key: "communication_client", label: "Communication client", group: "gestion" },
   { key: "assistant_ia", label: "Assistant IA", group: "gestion" },
   { key: "veille", label: "Veille", group: "gestion" },
+  { key: "mediatheque", label: "Médiathèque (signatures)", group: "gestion" },
   // ── Données (écrans admin) ────────────────────────────────────────────────
   { key: "client", label: "Clients", group: "donnees" },
   { key: "commandes", label: "Commandes", group: "donnees" },

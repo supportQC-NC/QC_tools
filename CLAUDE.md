@@ -682,7 +682,10 @@ l'ERP n'utilise plus n'a pas de sens.
 automatisations, stats d'ouverture/clic, désinscription), `communication_client`
 (catalogue nouveautés), `assistant_ia` (chat OpenAI cadré sur les données société
 via outils lecture seule, SSE), `veille` (rapports d'actualité hebdomadaires
-générés par l'IA, personnels).
+générés par l'IA, personnels), `mediatheque` (banque d'images/HTML en GridFS avec
+lien public `/api/mediatheque/public/<slug>` **sans auth** — les clients mail
+chargent les images de signature sans cookie ; le slug est figé à la création
+pour ne jamais casser les signatures, le HTML/SVG est servi avec CSP `sandbox`).
 
 **Données (admin)** — `client`, `commandes`, `facture`, `bipage`, `concurrents`,
 `inventaire_proforma_admin`, `fiches_controle_admin`, `reception_suivi_admin`,

@@ -112,6 +112,8 @@ import reportSubscriptionRoutes from "./routes/reportSubscriptionRoutes.js";
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 // ========== ROUTES EXÉCUTABLES (catalogue téléchargeable, GridFS) ==========
 import executableRoutes from "./routes/executableRoutes.js";
+// ========== ROUTES MÉDIATHÈQUE (images/HTML en ligne pour signatures mail) ==========
+import mediathequeRoutes from "./routes/mediathequeRoutes.js";
 // ========== ROUTES MESSAGES (chat temps réel) ==========
 import messageRoutes from "./routes/messageRoutes.js";
 // ========== ROUTES NOTIFICATIONS (badges sidebar) ==========
@@ -281,6 +283,8 @@ app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 app.use("/api/analyse-ca", analyseCaRoutes);
 // ========== ROUTES EXÉCUTABLES ==========
 app.use("/api/executables", executableRoutes);
+
+app.use("/api/mediatheque", mediathequeRoutes);
 // ========== ROUTES MESSAGES (chat) ==========
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);

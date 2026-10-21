@@ -121,6 +121,8 @@ export const apiSlice = createApi({
     // ========== TAGS VEILLE (rapports IA hebdomadaires) ==========
     "VeilleConfig",
     "VeilleRapport",
+    // ========== TAGS MÉDIATHÈQUE (images/HTML pour signatures mail) ==========
+    "Media",
   ],
   endpoints: (builder) => ({}),
 });

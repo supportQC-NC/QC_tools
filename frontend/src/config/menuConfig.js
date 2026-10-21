@@ -30,7 +30,8 @@ import {
   HiUser,
   HiClock,
   HiCalendar,
-  HiCog
+  HiCog,
+  HiPhotograph
 } from "react-icons/hi";
 import { moduleForPath, estCommercial } from "./adminModules";
 
@@ -351,6 +352,12 @@ export const moduleMenuStructure = [
         label: "Veille",
         path: "/veille",
         icon: HiDocumentReport,
+      },
+      {
+        moduleKey: "mediatheque",
+        label: "Médiathèque",
+        path: "/mediatheque",
+        icon: HiPhotograph,
       },
     ],
   },
@@ -752,6 +759,8 @@ export const DEFAULT_MENU_HINTS = {
   "/assistant-ia": "Assistant IA branché sur les données société.",
   "/veille":
     "Veille hebdomadaire rédigée par l'IA : un rapport HTML sur vos thématiques.",
+  "/mediatheque":
+    "Banque d'images et de signatures HTML en ligne : copiez le lien public pour vos signatures mail.",
   "/communication-client":
     "Catalogue des nouveautés en stock, envoyé aux clients abonnés.",
 };

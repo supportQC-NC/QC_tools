@@ -53,6 +53,7 @@ import AdminEditionPromoScreen from "./screens/admin/AdminEditionPromoScreen";
 import AdminMailingScreen from "./screens/admin/AdminMailingScreen";
 import AssistantIAScreen from "./screens/user/AssistantIAScreen";
 import VeilleScreen from "./screens/user/VeilleScreen";
+import MediathequeScreen from "./screens/user/MediathequeScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
 import AdminSuiviBipageScreen from "./screens/admin/AdminSuiviBipageScreen";
 import AdminSuiviDemandesBipageScreen from "./screens/admin/AdminSuiviDemandesBipageScreen";
@@ -221,6 +222,11 @@ const router = createBrowserRouter(
       {/* Communication · Catalogue nouveautés -> module "communication_client" */}
       <Route element={<ModuleRoute module="communication_client" />}>
         <Route path="/communication-client" element={<CommunicationClientScreen />} />
+      </Route>
+
+      {/* Communication · Médiathèque (images/HTML pour signatures mail) */}
+      <Route element={<ModuleRoute module="mediatheque" />}>
+        <Route path="/mediatheque" element={<MediathequeScreen />} />
       </Route>
 
       {/* Gestion · Changement de prix de vente -> module "changement_prix" */}
