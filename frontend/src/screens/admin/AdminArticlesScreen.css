@@ -161,6 +161,13 @@
 }
 .admin-articles-page .btn-icon-action:hover { color: var(--aa-accent); border-color: var(--aa-accent); }
 .admin-articles-page .btn-icon-action.active { background: var(--aa-accent); border-color: var(--aa-accent); color: #0f0f1a; }
+/* Export Excel du résultat filtré : icône + libellé, largeur libre. */
+.admin-articles-page .btn-export-excel {
+  width: auto; padding: 0 14px; gap: 8px; font-size: 0.85rem; font-weight: 600;
+}
+.admin-articles-page .btn-export-excel:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
 .admin-articles-page .spinning { animation: aa-spin 0.9s linear infinite; }
 @keyframes aa-spin { to { transform: rotate(360deg); } }
 

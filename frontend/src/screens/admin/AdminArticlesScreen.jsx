@@ -99,6 +99,7 @@ const AdminArticlesScreen = () => {
   const [photoError, setPhotoError] = useState(false);
   const [photoLoaded, setPhotoLoaded] = useState(false);
   const [fichePdfLoading, setFichePdfLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     identification: true,
     stock: true,
@@ -373,6 +374,49 @@ const AdminArticlesScreen = () => {
       </div>
     );
   }
+
+  // Export Excel des articles FILTRÉS (tout le résultat, pas la page affichée).
+  // Les filtres sont traduits en query params EXACTEMENT comme getArticles du
+  // slice — le serveur applique donc le même filtrage que la liste.
+  const exportExcel = async () => {
+    if (!selectedEntreprise || exportLoading) return;
+    setExportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.search) params.set("search", filters.search);
+      if (filters.nart) params.set("nart", filters.nart);
+      if (filters.groupe) params.set("groupe", filters.groupe);
+      if (filters.fourn) params.set("fourn", filters.fourn);
+      if (filters.gisement) params.set("gisement", filters.gisement);
+      if (filters.stock === "POSITIF") params.set("enStock", "true");
+      if (filters.gencod === "OUI") params.set("hasGencod", "true");
+      if (filters.promo === "OUI") params.set("hasPromo", "true");
+      if (filters.deprec === "OUI") params.set("hasDeprec", "true");
+      if (filters.web === "OUI") params.set("isWeb", "true");
+      if (filters.photo === "OUI") params.set("hasPhoto", "true");
+      if (filters.reappro === "OUI") params.set("reapproMag", "true");
+      if (filters.tgc && filters.tgc !== "TOUT") params.set("tgc", filters.tgc);
+
+      const res = await fetch(
+        `${BASE_URL}/api/articles/${selectedEntreprise}/export?${params.toString()}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `articles_${selectedEntreprise}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch {
+      /* ignore */
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   const downloadFichePdf = async (nart) => {
     setFichePdfLoading(true);
@@ -770,6 +814,19 @@ const AdminArticlesScreen = () => {
               )}
 
               <div className="stats-actions">
+                <button
+                  className="btn-icon-action btn-export-excel"
+                  onClick={exportExcel}
+                  disabled={
+                    exportLoading ||
+                    isFetching ||
+                    !articlesData?.pagination?.totalRecords
+                  }
+                  title="Exporter le résultat filtré en Excel (NART, DESIGN, GENCOD, STOCK, PVTE, PVTETTC)"
+                >
+                  <HiDownload className={exportLoading ? "spinning" : ""} />
+                  <span>{exportLoading ? "Export…" : "Excel"}</span>
+                </button>
                 <button
                   className={`btn-icon-action ${showFilters ? "active" : ""}`}
                   onClick={() => setShowFilters(!showFilters)}

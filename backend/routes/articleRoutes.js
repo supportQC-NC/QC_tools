@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import {
   getArticles,
+  exportArticles,
   getArticleByNart,
   getArticleByGencod,
   getArticlesStructure,
@@ -75,6 +76,16 @@ router.post(
   checkModuleAccess("export_gisements_admin", "read"),
   uploadExcel,
   genererEtiquettesDepuisExcel,
+);
+
+// Export Excel des articles filtrés (colonnes réduites : NART, DESIGN,
+// GENCOD, STOCK total, PVTE, PVTETTC) — mêmes query params que la liste.
+router.get(
+  "/:nomDossierDBF/export",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("stock", "read"),
+  exportArticles,
 );
 
 // Liste des articles avec pagination et filtres avancés

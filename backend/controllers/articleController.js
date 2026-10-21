@@ -3,6 +3,9 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import articleCacheService from "../services/articleService.js";
 import path from "path";
 import fs from "fs";
+import ExcelJS from "exceljs";
+import { champMasque } from "../middleware/masquerChampsDbf.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 
 /**
  * Structure du fichier article.dbf :
@@ -195,6 +198,128 @@ const getArticles = asyncHandler(async (req, res) => {
     res.status(500);
     throw new Error(`Erreur lors de la lecture des articles: ${error.message}`);
   }
+});
+
+/**
+ * @desc    Export Excel des articles FILTRÉS (mêmes filtres que la liste)
+ * @route   GET /api/articles/:nomDossierDBF/export
+ * @access  Private (module stock, read) + accès entreprise
+ *
+ * Mêmes query params que GET /api/articles/:nomDossierDBF (sans pagination) :
+ * on exporte TOUT ce que le filtre retient, pas la page affichée.
+ * Colonnes volontairement réduites (demande client du 21/10/2026) :
+ * NART, DESIGN, GENCOD, STOCK (total S1..S5), PVTE, PVTETTC — rien d'autre.
+ */
+const exportArticles = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+
+  const dbfPath = path.join(
+    entreprise.cheminBase,
+    entreprise.nomDossierDBF,
+    "article.dbf",
+  );
+  if (!fs.existsSync(dbfPath)) {
+    res.status(404);
+    throw new Error(
+      `Fichier articles non trouvé pour l'entreprise ${entreprise.nomComplet}`,
+    );
+  }
+
+  // Mêmes filtres que getArticles, mais SANS pagination : tout le résultat.
+  const result = await articleCacheService.getPaginated(entreprise, {
+    page: 1,
+    limit: Number.MAX_SAFE_INTEGER,
+    search: req.query.search || undefined,
+    nart: req.query.nart || undefined,
+    groupe: req.query.groupe || undefined,
+    fourn: req.query.fourn || undefined,
+    gisement: req.query.gisement || undefined,
+    enStock: req.query.enStock === "true",
+    hasGencod: req.query.hasGencod === "true",
+    hasPromo: req.query.hasPromo === "true",
+    hasDeprec: req.query.hasDeprec === "true",
+    isWeb: req.query.isWeb === "true",
+    hasPhoto: req.query.hasPhoto === "true",
+    reapproMag: req.query.reapproMag === "true",
+    tgc: req.query.tgc || undefined,
+  });
+
+  const safeTrim = (v) => (v === null || v === undefined ? "" : String(v).trim());
+
+  // Colonnes de l'export, avec leurs champs DBF sources pour les droits
+  // « champ par champ » (un export ne passe pas par le masque JSON global).
+  // STOCK est un calcul : il est masqué dès qu'UN de ses composants l'est.
+  const colonnes = [
+    {
+      header: "NART",
+      sources: ["NART"],
+      width: 10,
+      valeur: (a) => safeTrim(a.NART),
+    },
+    {
+      header: "DESIGN",
+      sources: ["DESIGN"],
+      width: 52,
+      valeur: (a) => safeTrim(a.DESIGN),
+    },
+    {
+      header: "GENCOD",
+      sources: ["GENCOD"],
+      width: 16,
+      // En texte : Excel transformerait les EAN en notation scientifique et
+      // perdrait les zéros de tête (interdits de suppression — cf. CLAUDE.md).
+      valeur: (a) => safeTrim(a.GENCOD),
+    },
+    {
+      header: "STOCK",
+      sources: ["S1", "S2", "S3", "S4", "S5"],
+      width: 12,
+      numFmt: "#,##0.###",
+      valeur: (a) => articleCacheService.calculateStockTotal(a),
+    },
+    {
+      header: "PVTE",
+      sources: ["PVTE"],
+      width: 14,
+      numFmt: "#,##0.##",
+      valeur: (a) => parseFloat(a.PVTE) || 0,
+    },
+    {
+      header: "PVTETTC",
+      sources: ["PVTETTC"],
+      width: 14,
+      numFmt: "#,##0",
+      valeur: (a) => parseFloat(a.PVTETTC) || 0,
+    },
+  ].filter((c) => !c.sources.some((ch) => champMasque(req, ch)));
+
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet("Articles");
+  ws.columns = colonnes.map((c) => ({
+    header: c.header,
+    width: c.width,
+    style: c.numFmt ? { numFmt: c.numFmt } : undefined,
+  }));
+  ws.getRow(1).font = { bold: true };
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: colonnes.length },
+  };
+
+  for (const article of result.articles) {
+    ws.addRow(colonnes.map((c) => c.valeur(article)));
+  }
+
+  const trig = safeTrim(entreprise.trigramme || entreprise.nomDossierDBF);
+  const horodatage = new Date().toISOString().slice(0, 10);
+  await envoyerClasseur(
+    req,
+    res,
+    workbook,
+    `articles_${trig}_${horodatage}.xlsx`,
+    { "X-Lignes": result.totalRecords },
+  );
 });
 
 /**
@@ -704,6 +829,7 @@ const getAdjacentArticles = asyncHandler(async (req, res) => {
 
 export {
   getArticles,
+  exportArticles,
   getArticleByNart,
   getArticleByGencod,
   getArticlesStructure,
