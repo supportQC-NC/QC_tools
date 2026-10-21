@@ -333,7 +333,14 @@ const serveMediaPublic = asyncHandler(async (req, res) => {
     throw new Error("Fichier introuvable dans GridFS");
   }
 
-  res.setHeader("Content-Type", media.mimeType);
+  // Sans charset explicite, le navigateur devine l'encodage d'un HTML (souvent
+  // windows-1252) et casse les accents. Les types texte sont déclarés UTF-8.
+  const estTexte =
+    media.mimeType === "text/html" || media.mimeType === "image/svg+xml";
+  res.setHeader(
+    "Content-Type",
+    estTexte ? `${media.mimeType}; charset=utf-8` : media.mimeType,
+  );
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (gridFile.length) res.setHeader("Content-Length", gridFile.length);
 
