@@ -24,6 +24,14 @@ const mediaFichierSchema = new mongoose.Schema(
     // Catégorie simple pour le filtrage à l'écran.
     type: { type: String, enum: ["image", "html"], required: true },
 
+    // Dossier de classement (null = racine). Pur rangement d'écran : ne figure
+    // pas dans l'URL publique, déplacer un fichier ne casse donc aucun lien.
+    dossier: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MediaDossier",
+      default: null,
+    },
+
     // Référence GridFS + métadonnées du binaire.
     fileId: { type: mongoose.Schema.Types.ObjectId, required: true },
     fileName: { type: String, required: true }, // nom du fichier d'origine

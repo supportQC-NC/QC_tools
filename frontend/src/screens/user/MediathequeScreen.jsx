@@ -22,12 +22,19 @@ import {
   HiX,
   HiExclamationCircle,
   HiSearch,
+  HiFolder,
+  HiFolderAdd,
+  HiFolderOpen,
 } from "react-icons/hi";
 import {
   useGetMediasQuery,
   useUploadMediasMutation,
   useUpdateMediaMutation,
   useDeleteMediaMutation,
+  useGetMediaDossiersQuery,
+  useCreateMediaDossierMutation,
+  useUpdateMediaDossierMutation,
+  useDeleteMediaDossierMutation,
   mediaLienAbsolu,
 } from "../../slices/mediathequeApiSlice";
 import { hasModuleAccess } from "../../config/adminModules";
@@ -55,9 +62,13 @@ const MediathequeScreen = () => {
 
   const { data: medias, isLoading, error, refetch, isFetching } =
     useGetMediasQuery();
+  const { data: dossiers } = useGetMediaDossiersQuery();
   const [uploadMedias, { isLoading: uploading }] = useUploadMediasMutation();
   const [updateMedia] = useUpdateMediaMutation();
   const [deleteMedia] = useDeleteMediaMutation();
+  const [createDossier] = useCreateMediaDossierMutation();
+  const [updateDossier] = useUpdateMediaDossierMutation();
+  const [deleteDossier] = useDeleteMediaDossierMutation();
 
   const inputRef = useRef(null);
   // Fichiers choisis mais pas encore envoyés : [{ file, nom }].
@@ -66,6 +77,8 @@ const MediathequeScreen = () => {
 
   const [recherche, setRecherche] = useState("");
   const [filtreType, setFiltreType] = useState("tous"); // tous | image | html
+  // Dossier affiché : "tous", "racine" (fichiers sans dossier) ou un id.
+  const [dossierActif, setDossierActif] = useState("tous");
 
   const [copieId, setCopieId] = useState(null);
   const [editionId, setEditionId] = useState(null);
@@ -75,12 +88,31 @@ const MediathequeScreen = () => {
     const terme = recherche.trim().toLowerCase();
     return (medias || []).filter((m) => {
       if (filtreType !== "tous" && m.type !== filtreType) return false;
+      if (dossierActif === "racine" && m.dossier) return false;
+      if (
+        dossierActif !== "tous" &&
+        dossierActif !== "racine" &&
+        (m.dossier?._id || "") !== dossierActif
+      )
+        return false;
       if (!terme) return true;
       return (
         m.nom.toLowerCase().includes(terme) || m.slug.toLowerCase().includes(terme)
       );
     });
-  }, [medias, recherche, filtreType]);
+  }, [medias, recherche, filtreType, dossierActif]);
+
+  const nbRacine = useMemo(
+    () => (medias || []).filter((m) => !m.dossier).length,
+    [medias],
+  );
+
+  // Le dossier cible des mises en ligne = le dossier affiché (si c'en est un).
+  const dossierCible =
+    dossierActif !== "tous" && dossierActif !== "racine" ? dossierActif : null;
+  const dossierCibleNom = dossierCible
+    ? (dossiers || []).find((d) => d._id === dossierCible)?.nom
+    : null;
 
   const choisirFichiers = (fileList) => {
     const fichiers = [...(fileList || [])];
@@ -99,6 +131,7 @@ const MediathequeScreen = () => {
       await uploadMedias({
         fichiers: attente.map((a) => a.file),
         noms: attente.map((a) => a.nom.trim() || nomDepuisFichier(a.file)),
+        dossier: dossierCible,
       }).unwrap();
       setAttente([]);
       if (inputRef.current) inputRef.current.value = "";
@@ -134,6 +167,50 @@ const MediathequeScreen = () => {
       }
     }
     setEditionId(null);
+  };
+
+  const deplacer = async (media, dossier) => {
+    try {
+      await updateMedia({ id: media._id, dossier: dossier || null }).unwrap();
+    } catch (err) {
+      setMessageErreur(err?.data?.message || "Échec du déplacement");
+    }
+  };
+
+  const creerDossier = async () => {
+    const nom = window.prompt("Nom du nouveau dossier :");
+    if (!nom || !nom.trim()) return;
+    try {
+      const cree = await createDossier({ nom: nom.trim() }).unwrap();
+      setDossierActif(cree._id);
+    } catch (err) {
+      setMessageErreur(err?.data?.message || "Échec de la création du dossier");
+    }
+  };
+
+  const renommerDossier = async (dossier) => {
+    const nom = window.prompt("Nouveau nom du dossier :", dossier.nom);
+    if (!nom || !nom.trim() || nom.trim() === dossier.nom) return;
+    try {
+      await updateDossier({ id: dossier._id, nom: nom.trim() }).unwrap();
+    } catch (err) {
+      setMessageErreur(err?.data?.message || "Échec du renommage du dossier");
+    }
+  };
+
+  const supprimerDossier = async (dossier) => {
+    const ok = window.confirm(
+      `Supprimer le dossier « ${dossier.nom} » ?\n\n` +
+        "Les fichiers qu'il contient ne sont PAS supprimés : ils reviennent " +
+        "à la racine et leurs liens publics continuent de fonctionner.",
+    );
+    if (!ok) return;
+    try {
+      await deleteDossier(dossier._id).unwrap();
+      if (dossierActif === dossier._id) setDossierActif("tous");
+    } catch (err) {
+      setMessageErreur(err?.data?.message || "Échec de la suppression du dossier");
+    }
   };
 
   const supprimer = async (media) => {
@@ -186,6 +263,14 @@ const MediathequeScreen = () => {
             />
             <span className="mdt-upload-hint">
               PNG, JPEG, GIF, WebP, SVG ou HTML — 10 Mo max par fichier
+              {dossierCibleNom && (
+                <>
+                  {" — envoi dans "}
+                  <strong>
+                    <HiFolder /> {dossierCibleNom}
+                  </strong>
+                </>
+              )}
             </span>
           </div>
 
@@ -239,6 +324,67 @@ const MediathequeScreen = () => {
           <HiExclamationCircle /> {messageErreur}
         </div>
       )}
+
+      <div className="mdt-dossiers">
+        <button
+          className={`mdt-dossier-chip ${dossierActif === "tous" ? "actif" : ""}`}
+          onClick={() => setDossierActif("tous")}
+        >
+          <HiPhotograph /> Tous ({medias?.length || 0})
+        </button>
+        <button
+          className={`mdt-dossier-chip ${dossierActif === "racine" ? "actif" : ""}`}
+          onClick={() => setDossierActif("racine")}
+          title="Fichiers non classés"
+        >
+          <HiFolderOpen /> Non classés ({nbRacine})
+        </button>
+        {(dossiers || []).map((d) => (
+          <span
+            key={d._id}
+            className={`mdt-dossier-chip ${dossierActif === d._id ? "actif" : ""}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => setDossierActif(d._id)}
+            onKeyDown={(e) => e.key === "Enter" && setDossierActif(d._id)}
+          >
+            <HiFolder /> {d.nom} ({d.nbFichiers})
+            {dossierActif === d._id && peutEcrire && (
+              <button
+                className="mdt-dossier-action"
+                title="Renommer le dossier"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  renommerDossier(d);
+                }}
+              >
+                <HiPencil />
+              </button>
+            )}
+            {dossierActif === d._id && peutSupprimer && (
+              <button
+                className="mdt-dossier-action danger"
+                title="Supprimer le dossier (les fichiers reviennent à la racine)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  supprimerDossier(d);
+                }}
+              >
+                <HiTrash />
+              </button>
+            )}
+          </span>
+        ))}
+        {peutEcrire && (
+          <button
+            className="mdt-dossier-chip nouveau"
+            onClick={creerDossier}
+            title="Créer un dossier"
+          >
+            <HiFolderAdd /> Nouveau dossier
+          </button>
+        )}
+      </div>
 
       <div className="mdt-filtres">
         <div className="mdt-recherche">
@@ -342,6 +488,29 @@ const MediathequeScreen = () => {
                     </span>
                   )}
                 </div>
+                {peutEcrire ? (
+                  <label className="mdt-classement">
+                    <HiFolder />
+                    <select
+                      value={m.dossier?._id || ""}
+                      onChange={(e) => deplacer(m, e.target.value)}
+                      title="Classer dans un dossier (le lien ne change pas)"
+                    >
+                      <option value="">Non classé</option>
+                      {(dossiers || []).map((d) => (
+                        <option key={d._id} value={d._id}>
+                          {d.nom}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  m.dossier?.nom && (
+                    <div className="mdt-classement lecture">
+                      <HiFolder /> {m.dossier.nom}
+                    </div>
+                  )
+                )}
               </div>
               <div className="mdt-actions">
                 <button

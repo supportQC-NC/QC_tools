@@ -123,6 +123,7 @@ export const apiSlice = createApi({
     "VeilleRapport",
     // ========== TAGS MÉDIATHÈQUE (images/HTML pour signatures mail) ==========
     "Media",
+    "MediaDossier",
   ],
   endpoints: (builder) => ({}),
 });

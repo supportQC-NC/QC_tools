@@ -9,6 +9,7 @@
 import path from "path";
 import asyncHandler from "../middleware/asyncHandler.js";
 import MediaFichier from "../models/MediaFichierModel.js";
+import MediaDossier from "../models/MediaDossierModel.js";
 import {
   uploadBufferToGridFS,
   deleteFromGridFS,
@@ -79,9 +80,22 @@ const getMedias = asyncHandler(async (req, res) => {
   const medias = await MediaFichier.find()
     .sort({ createdAt: -1 })
     .populate("createdBy", "nom prenom email")
+    .populate("dossier", "nom")
     .lean();
   res.json(medias.map(serialiser));
 });
+
+// Résout un id de dossier envoyé par le front : "" / null -> racine ; sinon le
+// dossier doit exister (évite de rattacher un fichier à un dossier supprimé).
+const resoudreDossier = async (res, valeur) => {
+  if (!valeur) return null;
+  const dossier = await MediaDossier.findById(valeur).lean();
+  if (!dossier) {
+    res.status(400);
+    throw new Error("Dossier inconnu");
+  }
+  return dossier._id;
+};
 
 /**
  * @desc    Mettre en ligne un ou plusieurs fichiers (images / HTML)
@@ -92,6 +106,7 @@ const getMedias = asyncHandler(async (req, res) => {
  *  - fichiers : 1..20 fichiers
  *  - noms     : JSON (tableau de noms alignés sur les fichiers, facultatif) —
  *               à défaut, le nom du fichier d'origine sans extension.
+ *  - dossier  : id du dossier de destination (facultatif, défaut racine).
  */
 const createMedias = asyncHandler(async (req, res) => {
   const fichiers = req.files || [];
@@ -106,6 +121,8 @@ const createMedias = asyncHandler(async (req, res) => {
   } catch {
     noms = [];
   }
+
+  const dossierId = await resoudreDossier(res, req.body?.dossier);
 
   // Tout valider AVANT d'écrire quoi que ce soit dans GridFS.
   for (const f of fichiers) {
@@ -138,6 +155,7 @@ const createMedias = asyncHandler(async (req, res) => {
         nom,
         slug,
         type,
+        dossier: dossierId,
         fileId,
         fileName,
         mimeType: f.mimetype,
@@ -155,9 +173,11 @@ const createMedias = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Renommer un média (nom d'affichage SEUL — le lien public ne bouge pas)
+ * @desc    Renommer et/ou déplacer un média (le lien public ne bouge jamais)
  * @route   PATCH /api/mediatheque/:id
  * @access  Private (module mediatheque, write)
+ *
+ * body : { nom? , dossier? } — `dossier` à null/"" pour remettre à la racine.
  */
 const updateMedia = asyncHandler(async (req, res) => {
   const media = await MediaFichier.findById(req.params.id);
@@ -166,15 +186,114 @@ const updateMedia = asyncHandler(async (req, res) => {
     throw new Error("Fichier non trouvé");
   }
 
+  if (req.body?.nom !== undefined) {
+    const nom = (req.body.nom || "").trim();
+    if (!nom) {
+      res.status(400);
+      throw new Error("Le nom est requis");
+    }
+    media.nom = nom;
+  }
+
+  if (req.body?.dossier !== undefined) {
+    media.dossier = await resoudreDossier(res, req.body.dossier);
+  }
+
+  const updated = await media.save();
+  await updated.populate("dossier", "nom");
+  res.json(serialiser(updated.toObject()));
+});
+
+// ---------------------------------------------------------------------------
+// DOSSIERS DE CLASSEMENT
+// ---------------------------------------------------------------------------
+
+/**
+ * @desc    Liste des dossiers (avec le nombre de fichiers de chacun)
+ * @route   GET /api/mediatheque/dossiers
+ * @access  Private (module mediatheque, read)
+ */
+const getDossiers = asyncHandler(async (req, res) => {
+  const [dossiers, comptes] = await Promise.all([
+    MediaDossier.find().sort({ nom: 1 }).lean(),
+    MediaFichier.aggregate([
+      { $group: { _id: "$dossier", nb: { $sum: 1 } } },
+    ]),
+  ]);
+  const nbParDossier = new Map(
+    comptes.map((c) => [String(c._id || ""), c.nb]),
+  );
+  res.json(
+    dossiers.map((d) => ({
+      ...d,
+      nbFichiers: nbParDossier.get(String(d._id)) || 0,
+    })),
+  );
+});
+
+/**
+ * @desc    Créer un dossier
+ * @route   POST /api/mediatheque/dossiers
+ * @access  Private (module mediatheque, write)
+ */
+const createDossier = asyncHandler(async (req, res) => {
   const nom = (req.body?.nom || "").trim();
   if (!nom) {
     res.status(400);
-    throw new Error("Le nom est requis");
+    throw new Error("Le nom du dossier est requis");
   }
+  const existant = await MediaDossier.findOne({ nom }).collation({
+    locale: "fr",
+    strength: 2,
+  });
+  if (existant) {
+    res.status(409);
+    throw new Error(`Le dossier « ${nom} » existe déjà`);
+  }
+  const dossier = await MediaDossier.create({ nom, createdBy: req.user?._id });
+  res.status(201).json({ ...dossier.toObject(), nbFichiers: 0 });
+});
 
-  media.nom = nom;
-  const updated = await media.save();
-  res.json(serialiser(updated.toObject()));
+/**
+ * @desc    Renommer un dossier
+ * @route   PATCH /api/mediatheque/dossiers/:id
+ * @access  Private (module mediatheque, write)
+ */
+const updateDossier = asyncHandler(async (req, res) => {
+  const dossier = await MediaDossier.findById(req.params.id);
+  if (!dossier) {
+    res.status(404);
+    throw new Error("Dossier non trouvé");
+  }
+  const nom = (req.body?.nom || "").trim();
+  if (!nom) {
+    res.status(400);
+    throw new Error("Le nom du dossier est requis");
+  }
+  dossier.nom = nom;
+  const updated = await dossier.save();
+  res.json(updated);
+});
+
+/**
+ * @desc    Supprimer un dossier — ses fichiers reviennent à la racine
+ * @route   DELETE /api/mediatheque/dossiers/:id
+ * @access  Private (module mediatheque, delete)
+ */
+const deleteDossier = asyncHandler(async (req, res) => {
+  const dossier = await MediaDossier.findById(req.params.id);
+  if (!dossier) {
+    res.status(404);
+    throw new Error("Dossier non trouvé");
+  }
+  // Les fichiers ne sont JAMAIS supprimés avec le dossier (leurs liens publics
+  // sont peut-être dans des signatures) : ils repassent simplement à la racine.
+  await MediaFichier.updateMany(
+    { dossier: dossier._id },
+    { $set: { dossier: null } },
+  );
+  await dossier.deleteOne();
+  res.json({ message: "Dossier supprimé", _id: req.params.id });
 });
 
 /**
@@ -238,4 +357,14 @@ const serveMediaPublic = asyncHandler(async (req, res) => {
   stream.pipe(res);
 });
 
-export { getMedias, createMedias, updateMedia, deleteMedia, serveMediaPublic };
+export {
+  getMedias,
+  createMedias,
+  updateMedia,
+  deleteMedia,
+  serveMediaPublic,
+  getDossiers,
+  createDossier,
+  updateDossier,
+  deleteDossier,
+};

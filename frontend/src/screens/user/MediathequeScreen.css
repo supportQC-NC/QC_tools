@@ -163,6 +163,58 @@
   font-size: 0.85rem;
 }
 
+/* ===== Dossiers de classement ===== */
+.mediatheque-screen .mdt-dossiers {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.mediatheque-screen .mdt-dossier-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--admin-card, #1e293b);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 999px;
+  color: var(--admin-text, #e2e8f0);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+}
+.mediatheque-screen .mdt-dossier-chip:hover {
+  background: var(--admin-hover, rgba(148, 163, 184, 0.1));
+}
+.mediatheque-screen .mdt-dossier-chip.actif {
+  background: var(--admin-accent, #6366f1);
+  border-color: var(--admin-accent, #6366f1);
+  color: #fff;
+}
+.mediatheque-screen .mdt-dossier-chip.nouveau {
+  border-style: dashed;
+  color: var(--admin-text-muted, #94a3b8);
+}
+.mediatheque-screen .mdt-dossier-action {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+  padding: 0 0.1rem;
+  margin-left: 0.15rem;
+  font-size: 0.85em;
+}
+.mediatheque-screen .mdt-dossier-action:hover {
+  opacity: 1;
+}
+.mediatheque-screen .mdt-dossier-action.danger:hover {
+  color: #fecaca;
+}
+
 /* ===== Filtres ===== */
 .mediatheque-screen .mdt-filtres {
   display: flex;
@@ -293,6 +345,26 @@
   font-size: 0.72rem;
   margin-top: 0.4rem;
 }
+/* Classement d'une carte dans un dossier */
+.mediatheque-screen .mdt-classement {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  color: var(--admin-text-muted, #94a3b8);
+  font-size: 0.78rem;
+}
+.mediatheque-screen .mdt-classement select {
+  flex: 1;
+  min-width: 0;
+  background: var(--admin-input, #0f172a);
+  border: 1px solid var(--admin-border, #334155);
+  border-radius: 6px;
+  color: var(--admin-text, #e2e8f0);
+  padding: 0.25rem 0.4rem;
+  font-size: 0.78rem;
+}
+
 .mediatheque-screen .mdt-actions {
   display: flex;
   align-items: center;

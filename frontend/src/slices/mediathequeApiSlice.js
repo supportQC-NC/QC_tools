@@ -20,12 +20,13 @@ export const mediathequeApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Media"],
     }),
 
-    // Mise en ligne (multipart : fichiers + noms alignés).
+    // Mise en ligne (multipart : fichiers + noms alignés + dossier cible).
     uploadMedias: builder.mutation({
-      query: ({ fichiers, noms }) => {
+      query: ({ fichiers, noms, dossier }) => {
         const formData = new FormData();
         (fichiers || []).forEach((f) => formData.append("fichiers", f));
         formData.append("noms", JSON.stringify(noms || []));
+        if (dossier) formData.append("dossier", dossier);
         return {
           url: MEDIATHEQUE_URL,
           method: "POST",
@@ -33,17 +34,18 @@ export const mediathequeApiSlice = apiSlice.injectEndpoints({
           // Pas de Content-Type : le navigateur pose la boundary multipart.
         };
       },
-      invalidatesTags: ["Media"],
+      invalidatesTags: ["Media", "MediaDossier"],
     }),
 
-    // Renommage (nom d'affichage seul : le lien public ne change jamais).
+    // Renommage et/ou déplacement (le lien public ne change jamais).
+    // `dossier` : id de dossier, ou "" / null pour remettre à la racine.
     updateMedia: builder.mutation({
-      query: ({ id, nom }) => ({
+      query: ({ id, ...body }) => ({
         url: `${MEDIATHEQUE_URL}/${id}`,
         method: "PATCH",
-        body: { nom },
+        body,
       }),
-      invalidatesTags: ["Media"],
+      invalidatesTags: ["Media", "MediaDossier"],
     }),
 
     // Suppression (le lien public cesse de fonctionner).
@@ -52,7 +54,41 @@ export const mediathequeApiSlice = apiSlice.injectEndpoints({
         url: `${MEDIATHEQUE_URL}/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Media"],
+      invalidatesTags: ["Media", "MediaDossier"],
+    }),
+
+    // ===== Dossiers de classement =====
+    getMediaDossiers: builder.query({
+      query: () => ({ url: `${MEDIATHEQUE_URL}/dossiers` }),
+      providesTags: ["MediaDossier"],
+    }),
+
+    createMediaDossier: builder.mutation({
+      query: ({ nom }) => ({
+        url: `${MEDIATHEQUE_URL}/dossiers`,
+        method: "POST",
+        body: { nom },
+      }),
+      invalidatesTags: ["MediaDossier"],
+    }),
+
+    updateMediaDossier: builder.mutation({
+      query: ({ id, nom }) => ({
+        url: `${MEDIATHEQUE_URL}/dossiers/${id}`,
+        method: "PATCH",
+        body: { nom },
+      }),
+      // Le nom du dossier apparaît aussi sur les cartes (media.dossier.nom).
+      invalidatesTags: ["MediaDossier", "Media"],
+    }),
+
+    // Suppression d'un dossier : ses fichiers reviennent à la racine.
+    deleteMediaDossier: builder.mutation({
+      query: (id) => ({
+        url: `${MEDIATHEQUE_URL}/dossiers/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["MediaDossier", "Media"],
     }),
   }),
 });
@@ -62,4 +98,8 @@ export const {
   useUploadMediasMutation,
   useUpdateMediaMutation,
   useDeleteMediaMutation,
+  useGetMediaDossiersQuery,
+  useCreateMediaDossierMutation,
+  useUpdateMediaDossierMutation,
+  useDeleteMediaDossierMutation,
 } = mediathequeApiSlice;
