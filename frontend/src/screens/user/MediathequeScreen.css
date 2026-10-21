@@ -2,10 +2,10 @@
    Médiathèque — tout est scopé sous .mediatheque-screen (variables --admin-*
    définies globalement dans index.css). */
 
+/* Pleine largeur : écran destiné aux postes de travail, pas de plafond centré. */
 .mediatheque-screen {
   padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 /* ===== En-tête ===== */
