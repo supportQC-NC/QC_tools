@@ -1,6 +1,7 @@
 // backend/controllers/articleController.js
 import asyncHandler from "../middleware/asyncHandler.js";
 import articleCacheService from "../services/articleService.js";
+import fournissCacheService from "../services/fournissCacheService.js";
 import path from "path";
 import fs from "fs";
 import ExcelJS from "exceljs";
@@ -208,7 +209,8 @@ const getArticles = asyncHandler(async (req, res) => {
  * Mêmes query params que GET /api/articles/:nomDossierDBF (sans pagination) :
  * on exporte TOUT ce que le filtre retient, pas la page affichée.
  * Colonnes volontairement réduites (demande client du 21/10/2026) :
- * NART, DESIGN, GENCOD, STOCK (total S1..S5), PVTE, PVTETTC — rien d'autre.
+ * NART, DESIGN, GENCOD, FOURN, FOURNISSEUR (nom croisé fourniss.dbf), REFER,
+ * STOCK (total S1..S5), PVTE, PVTETTC — rien d'autre.
  */
 const exportArticles = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
@@ -246,6 +248,19 @@ const exportArticles = asyncHandler(async (req, res) => {
 
   const safeTrim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
+  // Nom du fournisseur par code (fourniss.dbf, cache 10 min). NON BLOQUANT :
+  // sans fourniss.dbf, l'export sort quand même avec la colonne nom vide.
+  const nomsFournisseurs = new Map();
+  try {
+    const cacheFourn = await fournissCacheService.getFournisseurs(entreprise);
+    for (const f of cacheFourn.records) {
+      const code = parseInt(f.FOURN);
+      if (!isNaN(code)) nomsFournisseurs.set(code, safeTrim(f.NOM));
+    }
+  } catch {
+    // fourniss.dbf absent ou illisible : noms vides.
+  }
+
   // Colonnes de l'export, avec leurs champs DBF sources pour les droits
   // « champ par champ » (un export ne passe pas par le masque JSON global).
   // STOCK est un calcul : il est masqué dès qu'UN de ses composants l'est.
@@ -269,6 +284,32 @@ const exportArticles = asyncHandler(async (req, res) => {
       // En texte : Excel transformerait les EAN en notation scientifique et
       // perdrait les zéros de tête (interdits de suppression — cf. CLAUDE.md).
       valeur: (a) => safeTrim(a.GENCOD),
+    },
+    {
+      header: "FOURN",
+      sources: ["FOURN"],
+      width: 8,
+      valeur: (a) => {
+        const code = parseInt(a.FOURN);
+        return isNaN(code) ? "" : code;
+      },
+    },
+    {
+      header: "FOURNISSEUR",
+      // Nom croisé depuis fourniss.dbf : masqué si FOURN (la jointure) ou NOM
+      // (le champ affiché) est interdit à l'utilisateur.
+      sources: ["FOURN", "NOM"],
+      width: 32,
+      valeur: (a) => {
+        const code = parseInt(a.FOURN);
+        return isNaN(code) ? "" : nomsFournisseurs.get(code) || "";
+      },
+    },
+    {
+      header: "REFER",
+      sources: ["REFER"],
+      width: 16,
+      valeur: (a) => safeTrim(a.REFER),
     },
     {
       header: "STOCK",

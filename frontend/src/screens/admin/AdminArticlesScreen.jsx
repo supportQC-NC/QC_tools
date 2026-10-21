@@ -822,7 +822,7 @@ const AdminArticlesScreen = () => {
                     isFetching ||
                     !articlesData?.pagination?.totalRecords
                   }
-                  title="Exporter le résultat filtré en Excel (NART, DESIGN, GENCOD, STOCK, PVTE, PVTETTC)"
+                  title="Exporter le résultat filtré en Excel (NART, DESIGN, GENCOD, FOURN, FOURNISSEUR, REFER, STOCK, PVTE, PVTETTC)"
                 >
                   <HiDownload className={exportLoading ? "spinning" : ""} />
                   <span>{exportLoading ? "Export…" : "Excel"}</span>
