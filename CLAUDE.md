@@ -432,6 +432,13 @@ déployées de l'app mobile s'en servaient).
   réappro classique** : `stock.dat <nom du rayon>_<code rayon>` (même
   sanitisation que `exportReappro`), contenu figé NART(13)|QTE(8 entier)|000.
   Rien n'apparaît dans les listes ni le suivi.
+- **Où ranger ?** (mode mobile *Réappro ▸ Où ranger ?*) : consultation pure,
+  sans état. L'agent choisit sa zone (dock/magasin, bascule rapide en haut
+  d'écran), scanne un article (gencode/NART/référence, renvois GENDOUBL suivis
+  vers la fiche active) et `POST /mobile/rangement` renvoie les DEUX
+  emplacements + libellés du dictionnaire (`gism2`/`rayonDock`,
+  `gism1`/`rayonMagasin`) — l'app met en avant celui de la zone choisie,
+  rappelle l'autre en petit, et avertit si la fiche n'a pas de gisement.
 - **Quantités décimales** (22/10/2026) : beaucoup d'articles se vendent au mètre —
   plus aucun `parseInt`/`Math.round` à l'unité sur une quantité, ni côté backend
   (helper `round3`, 3 décimales, dans les contrôleurs réappro/bipage/inventaire/

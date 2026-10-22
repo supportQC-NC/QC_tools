@@ -21,6 +21,11 @@ import {
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import articleCacheService from "../services/articleService.js";
+import fournissCacheService from "../services/fournissCacheService.js";
+import {
+  buildIndexRayons,
+  lookupRayon,
+} from "../services/dictionnaireRayonsService.js";
 import { memeCodeBarres } from "../utils/codeBarres.js";
 import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
 import { importerProformasReappro } from "../services/reapproProformaImportService.js";
@@ -1016,6 +1021,92 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
   res.json({ fileName: nomFichier, lignes: nbLignes });
 });
 
+// @desc    (MOBILE) Où ranger : code article -> emplacements DOCK et MAGASIN
+// @route   POST /api/demande-reappro/mobile/rangement
+// @body    { entreprise (nomDossierDBF), code (gencode, NART ou référence) }
+// @access  Private — périmètre société seul (comme les autres routes mobiles)
+// Lecture seule, sans état : l'agent scanne un article et l'app affiche le
+// rayon où le ranger selon la zone où il se trouve — GISM2 (+ libellé dock du
+// dictionnaire des rayons) au dock, GISM1 (+ libellé magasin) au magasin.
+// Résolution du code : gencode (zéros de tête tolérés) puis NART, puis
+// référence fournisseur (balayage exact, même repli que le scan des listes).
+// Une fiche RENVOYÉE (GENDOUBL) est suivie vers sa fiche active : les
+// gisements de l'ancienne fiche ne veulent plus rien dire.
+const rangementArticleMobile = asyncHandler(async (req, res) => {
+  const key = String(req.body.entreprise || "").trim();
+  const code = cleanCode(req.body.code);
+  if (!key || !code) {
+    res.status(400);
+    throw new Error("Société et code article requis");
+  }
+  const autorises = await dossiersAutorises(req.user);
+  if (autorises && !autorises.has(key)) {
+    res.status(403);
+    throw new Error("Vous n'avez pas accès à cette société");
+  }
+  const entreprise = await Entreprise.findOne({ nomDossierDBF: key });
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Société inconnue");
+  }
+
+  const cache = await articleCacheService.getArticles(entreprise);
+  let article = await articleCacheService.findByCode(entreprise, code);
+  if (!article) {
+    // Référence fournisseur : balayage exact du cache (search() tronque avant
+    // de filtrer sur REFER, cf. module réappro).
+    article =
+      (cache.records || []).find((a) => cleanCode(a.REFER) === code) || null;
+  }
+  if (!article) {
+    res.status(404).json({ message: "Code inconnu", motif: "code_inconnu" });
+    return;
+  }
+
+  // Fiche renvoyée -> fiche active (zéros de tête du NART tolérés).
+  let renvoiDepuis = "";
+  const gendoubl = String(article.GENDOUBL || "").trim();
+  if (gendoubl) {
+    const idx = articleCacheService.lookupNart(cache, gendoubl);
+    if (idx !== undefined) {
+      renvoiDepuis = cleanCode(article.NART);
+      article = cache.records[idx];
+    }
+  }
+
+  const [{ index: rayons }, fourCache] = await Promise.all([
+    buildIndexRayons(entreprise),
+    fournissCacheService.getFournisseurs(entreprise),
+  ]);
+  const fournM =
+    article.FOURN != null
+      ? (fourCache.records || []).find(
+          (f) => String(f.FOURN).trim() === String(article.FOURN).trim(),
+        )
+      : null;
+
+  const num = (v) => Number(v) || 0;
+  const gism1 = String(article.GISM1 || "").trim();
+  const gism2 = String(article.GISM2 || "").trim();
+  res.json({
+    nart: cleanCode(article.NART),
+    design: String(article.DESIGN || "").trim(),
+    gencod: String(article.GENCOD || "").trim(),
+    refer: String(article.REFER || "").trim(),
+    fournNom: fournM ? String(fournM.NOM || "").trim() : "",
+    renvoiDepuis, // NART bipé quand la fiche était renvoyée ("" sinon)
+    s1: num(article.S1), s2: num(article.S2), s3: num(article.S3),
+    s4: num(article.S4), s5: num(article.S5),
+    stock:
+      num(article.S1) + num(article.S2) + num(article.S3) +
+      num(article.S4) + num(article.S5),
+    gism1,
+    rayonMagasin: lookupRayon(rayons, gism1, "MAGASIN")?.libelle || "",
+    gism2,
+    rayonDock: lookupRayon(rayons, gism2, "DOCK")?.libelle || "",
+  });
+});
+
 // @desc    (MOBILE) Ouvrir une liste : pose le verrou et passe « en cours »
 // @route   POST /api/demande-reappro/mobile/:id/ouvrir
 // @access  Private — module demande_reappro (write)
@@ -1257,6 +1348,7 @@ export {
   getMobileDemandes,
   getArticlesRayonMobile,
   transfertRayonMobile,
+  rangementArticleMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,

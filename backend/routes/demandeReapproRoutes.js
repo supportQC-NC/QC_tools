@@ -19,6 +19,7 @@ import {
   getMobileDemandes,
   getArticlesRayonMobile,
   transfertRayonMobile,
+  rangementArticleMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,
@@ -71,6 +72,8 @@ router.get("/mobile/list", protect, getMobileDemandes);
 // Aucune DemandeReappro n'est créée.
 router.post("/mobile/rayon/transfert", protect, transfertRayonMobile);
 router.post("/mobile/rayon", protect, getArticlesRayonMobile);
+// Où ranger (sans état) : code article -> emplacements GISM1/GISM2 + libellés.
+router.post("/mobile/rangement", protect, rangementArticleMobile);
 router.post("/mobile/:id/ouvrir", protect, ouvrirDemande);
 router.post("/mobile/:id/liberer", protect, libererDemande);
 router.post("/mobile/:id/scan", protect, scanDemande);
