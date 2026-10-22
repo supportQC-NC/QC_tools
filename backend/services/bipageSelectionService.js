@@ -63,6 +63,22 @@ const ventes12Mois = (a) => {
   return s;
 };
 
+// Vente moyenne MENSUELLE corrigée des ruptures — MÊME formule que l'analyse
+// réappro et le réappro local (`vte_moy_mois = (vAn*30)/(360 - jours_rupture)`,
+// repli vAn/12) : c'est elle qui sert de « quantité à prendre » proposée au
+// réappro rayon (couvrir ~1 mois de ventes).
+const joursRupture = (a) => {
+  let s = 0;
+  for (let i = 1; i <= 12; i += 1) s += Math.abs(num(a[`RUP${i}`]));
+  return s;
+};
+const vteMoyMois = (a) => {
+  const vAn = ventes12Mois(a);
+  const denom = 360 - joursRupture(a);
+  const v = denom > 0 ? (vAn * 30) / denom : vAn / 12;
+  return Math.round(v * 100) / 100;
+};
+
 // ⚠️ La fiche article porte DEUX codes d'emplacement, un par zone :
 //     GISM1 = MAGASIN (le rayon)   ·   GISM2 = DOCK (la réserve).
 // Leur libellé vient du DICTIONNAIRE DES RAYONS, interrogé sur le couple
@@ -138,6 +154,7 @@ const ligneArticle = (a, fournByCode, isQC = false, rayons = null) => {
     // Réserve du DOCK seule : c'est elle qui alimente le rayon en réappro.
     stockDock: num(a.S2),
     ventes12: ventes12Mois(a),
+    vteMoyMois: vteMoyMois(a),
     prioritaire: s1 === 0 && reserves > 0 && !estHorsRayon(gis, isQC),
   };
 };

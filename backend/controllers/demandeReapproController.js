@@ -926,6 +926,16 @@ const createDemandeRayonMobile = asyncHandler(async (req, res) => {
     return;
   }
 
+  // Quantité à prendre PROPOSÉE — règle du module réappro magasin (analyse
+  // réappro / réappro local) : couvrir ~1 mois de ventes (`vteMoyMois`,
+  // corrigée des jours de rupture), bornée à la réserve réellement disponible,
+  // 1 minimum. C'est une SUGGESTION : la saisie de l'opérateur n'est pas
+  // bornée au stock (CDC §4), il ajuste librement.
+  const qteProposee = (a) => {
+    const besoin = Math.max(1, Math.ceil(Number(a.vteMoyMois) || 0));
+    return round3(Math.min(Number(a.stockReserves) || 0, besoin));
+  };
+
   const libelleDock = articles.find((a) => a.rayonDock)?.rayonDock || "";
   const demande = new DemandeReappro({
     entreprise: key,
@@ -937,8 +947,6 @@ const createDemandeRayonMobile = asyncHandler(async (req, res) => {
     sourceRef: code,
     priorite: "a_faire",
     statut: "en_attente",
-    // Pas de quantiteDemandee : comme les listes par gisement, l'opérateur
-    // prend ce qu'il faut, le stock reste indicatif (CDC §4).
     articles: articles.map((a) => ({
       nart: a.nart,
       design: a.design,
@@ -947,6 +955,8 @@ const createDemandeRayonMobile = asyncHandler(async (req, res) => {
       gencod: a.gencod,
       s1: a.s1, s2: a.s2, s3: a.s3, s4: a.s4, s5: a.s5,
       stock: a.stock,
+      quantiteDemandee: qteProposee(a),
+      vteMoyMois: a.vteMoyMois,
       gism1: a.gism1,
       rayonMagasin: a.rayonMagasin,
     })),
