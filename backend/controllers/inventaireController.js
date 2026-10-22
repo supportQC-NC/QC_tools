@@ -534,6 +534,11 @@ import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
+// Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
+// l'unité. Le .dat, lui, reste en entiers (format Stock XL figé, arrondi au
+// moment de l'écriture).
+const round3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
+
 /**
  * @desc    Créer un nouvel inventaire
  * @route   POST /api/inventaires
@@ -771,14 +776,14 @@ const addLigne = asyncHandler(async (req, res) => {
   );
 
   if (ligneExistante) {
-    ligneExistante.quantite += parseInt(quantite);
+    ligneExistante.quantite = round3(ligneExistante.quantite + round3(quantite));
     ligneExistante.scannedAt = new Date();
   } else {
     inventaire.lignes.push({
       nart,
       gencod: gencod || "",
       designation: designation || "",
-      quantite: parseInt(quantite),
+      quantite: round3(quantite),
       isUnknown: isUnknown || false,
       isRenvoi: isRenvoi || false,
       articleOriginal: articleOriginal || null,
@@ -817,7 +822,7 @@ const updateLigne = asyncHandler(async (req, res) => {
     throw new Error("Ligne non trouvée");
   }
 
-  ligne.quantite = parseInt(quantite);
+  ligne.quantite = round3(quantite);
   inventaire.calculerTotaux();
   await inventaire.save();
 
@@ -859,7 +864,11 @@ const genererContenuFichier = (lignes) => {
     // Toujours le NART (jamais le GENCODE), complété par des espaces à droite
     // jusqu'à 13 caractères au total (NART de 6 -> 6 + 7 espaces).
     const code = (ligne.nart || "").trim().padEnd(13, " ");
-    const quantiteFormatee = ligne.quantite.toString().padStart(8, "0");
+    // Format Stock XL figé : quantité ENTIÈRE. Les décimales (articles au
+    // mètre) ne sont arrondies qu'ici, à l'écriture du fichier.
+    const quantiteFormatee = String(
+      Math.round(Number(ligne.quantite) || 0),
+    ).padStart(8, "0");
     const suffixe = "000";
     contenu += `${code}|${quantiteFormatee}|${suffixe}\r\n`;
   });

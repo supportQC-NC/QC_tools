@@ -1463,6 +1463,14 @@ import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
+// Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
+// l'unité. NaN est conservé pour les gardes « quantité invalide » (l'ancien
+// parseInt).
+const parseQte = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : NaN;
+};
+
 // ===========================================
 // CONSTANTES
 // ===========================================
@@ -2481,8 +2489,8 @@ const addComptage = asyncHandler(async (req, res) => {
     throw new Error("Cette réception est déjà terminée");
   }
 
-  const q = parseInt(quantite, 10);
-  if (isNaN(q) || q < 1) {
+  const q = parseQte(quantite);
+  if (isNaN(q) || q <= 0) {
     res.status(400);
     throw new Error("Quantité invalide");
   }
@@ -2653,7 +2661,7 @@ const updateComptage = asyncHandler(async (req, res) => {
     throw new Error("Comptage non trouvé");
   }
 
-  const q = parseInt(quantite, 10);
+  const q = parseQte(quantite);
   if (isNaN(q) || q < 0) {
     res.status(400);
     throw new Error("Quantité invalide");

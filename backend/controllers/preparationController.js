@@ -6,6 +6,14 @@ import User from "../models/UserModel.js";
 import articleCacheService from "../services/articleService.js";
 import preparationService from "../services/preparationService.js";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
+
+// Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
+// l'unité. NaN est conservé pour les gardes « quantité invalide » (l'ancien
+// parseInt). Le .dat, lui, reste en entiers (format Stock XL figé).
+const parseQte = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : NaN;
+};
 import preparationReportService from "../services/preparationReportService.js";
 
 // ===========================================
@@ -307,7 +315,7 @@ const preparerLigne = asyncHandler(async (req, res) => {
     throw new Error("Ligne non trouvée");
   }
 
-  const q = parseInt(quantite, 10);
+  const q = parseQte(quantite);
   if (isNaN(q) || q < 0) {
     res.status(400);
     throw new Error("Quantité invalide");
@@ -473,7 +481,7 @@ const traiterControleFinal = asyncHandler(async (req, res) => {
   switch (action) {
     case "retour_dock": {
       // L'opérateur retourne chercher au dock : on cumule la quantité prélevée.
-      const q = parseInt(quantite, 10);
+      const q = parseQte(quantite);
       if (isNaN(q) || q < 0) {
         res.status(400);
         throw new Error("Quantité invalide");
@@ -485,7 +493,7 @@ const traiterControleFinal = asyncHandler(async (req, res) => {
       break;
     }
     case "retour_magasin": {
-      const q = parseInt(quantite, 10);
+      const q = parseQte(quantite);
       if (isNaN(q) || q < 0) {
         res.status(400);
         throw new Error("Quantité invalide");
@@ -507,7 +515,7 @@ const traiterControleFinal = asyncHandler(async (req, res) => {
     }
     case "corriger_qte": {
       // Sur-préparation corrigée : la quantité retenue est celle validée.
-      const q = parseInt(quantite, 10);
+      const q = parseQte(quantite);
       if (isNaN(q) || q < 0) {
         res.status(400);
         throw new Error("Quantité invalide");

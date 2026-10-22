@@ -28,6 +28,11 @@ const ACTIF = ["en_attente", "en_cours"];
 const nomUtilisateur = (u) =>
   [u?.prenom, u?.nom].filter(Boolean).join(" ") || u?.email || "Utilisateur";
 
+// Quantités à 3 décimales (articles vendus au mètre, proforma.QTE est un
+// N(x.3)), jamais arrondies à l'unité. Le .dat, lui, reste en entiers
+// (format Stock XL figé, arrondi au moment de l'écriture).
+const round3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
+
 const normPriorite = (p) =>
   ["urgent", "a_faire", "normal"].includes(p) ? p : "a_faire";
 
@@ -54,7 +59,7 @@ const createDemandeProforma = asyncHandler(async (req, res) => {
       fournNom: l.fournisseurNom || l.fournNom || "",
       gencod: l.gencod || "",
       stock: Number(l.stockMagasin ?? l.stock ?? 0) || 0,
-      quantiteDemandee: Math.round(Number(l.qteCommandee) || 0),
+      quantiteDemandee: round3(l.qteCommandee),
     }))
     .filter((a) => a.nart);
 
@@ -314,7 +319,7 @@ const createDemandePanier = asyncHandler(async (req, res) => {
     // eslint-disable-next-line no-await-in-loop
     const art = await resolveArticleForReappro(entreprise, it.nart);
     if (!art) continue;
-    const q = Math.round(Number(it.quantite) || 0);
+    const q = round3(it.quantite);
     articles.push({
       nart: art.nart,
       design: art.design,
@@ -688,7 +693,7 @@ const realiserDemande = asyncHandler(async (req, res) => {
       .map((l) => ({
         nart: String(l.nart || "").trim(),
         gencod: String(l.gencod || "").trim(),
-        quantite: Math.round(Number(l.quantite) || 0),
+        quantite: round3(l.quantite),
       }))
       .filter((l) => (l.nart || l.gencod) && l.quantite > 0);
 

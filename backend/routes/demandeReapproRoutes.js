@@ -17,6 +17,7 @@ import {
   updateUrgence,
   deleteDemande,
   getMobileDemandes,
+  createDemandeRayonMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,
@@ -64,6 +65,8 @@ router.delete("/:id", protect, canDelete, deleteDemande);
 // n'ayant que `inventaire`/`reception` recevait un 403 que l'app affiche comme
 // une liste VIDE — d'où « aucune demande ne s'affiche » sans le moindre message.
 router.get("/mobile/list", protect, getMobileDemandes);
+// Réappro rayon : scan du QR d'un gisement DOCK -> crée (ou reprend) la liste.
+router.post("/mobile/rayon", protect, createDemandeRayonMobile);
 router.post("/mobile/:id/ouvrir", protect, ouvrirDemande);
 router.post("/mobile/:id/liberer", protect, libererDemande);
 router.post("/mobile/:id/scan", protect, scanDemande);

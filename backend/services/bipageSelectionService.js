@@ -276,12 +276,16 @@ export const getArticlesParFournisseur = async (
  * @param {object} [options]
  * @param {number} [options.limit=500]  nombre de lignes renvoyées
  * @param {string} [options.fourn]      ne garder qu'un fournisseur
+ * @param {string} [options.gism2]      ne garder qu'un gisement DOCK (réappro
+ *                                      rayon : scan du QR gondole, qui encode
+ *                                      le code GISM2 brut)
  * @param {string} [options.emplacement] MAGASIN (défaut, bipage) | DOCK (réappro)
  * @returns {Promise<{total, articles, fournisseurs}>}
  */
 export const getArticlesRayonVide = async (entreprise, options = {}) => {
   const limit = Math.min(parseInt(options.limit, 10) || 500, 3000);
   const fournFiltre = safeTrim(options.fourn);
+  const gism2Filtre = safeTrim(options.gism2).toUpperCase();
   // `emplacement` ne sert QU'À l'affichage (quel gisement montrer) : le
   // critère de sélection est le même pour le bipage et le réappro.
   const emplacement = normEmplacementTravail(options.emplacement);
@@ -315,6 +319,11 @@ export const getArticlesRayonVide = async (entreprise, options = {}) => {
     if (!nart || !estAReapprovisionner(a, isQC)) return;
 
     const ligne = ligneArticle(a, fournByCode, isQC, rayons);
+    // Réappro rayon : seul le gisement DOCK scanné nous intéresse. Le filtre
+    // passe AVANT le comptage fournisseurs, qui n'a de sens que sur la liste
+    // complète (pas de menu fournisseur dans ce mode).
+    if (gism2Filtre && ligne.gism2.toUpperCase() !== gism2Filtre) return;
+
     const code = ligne.fourn;
     if (!parFourn.has(code)) {
       parFourn.set(code, { code, nom: ligne.fournNom, nb: 0 });

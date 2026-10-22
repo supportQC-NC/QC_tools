@@ -990,6 +990,11 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
+
+// Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
+// l'unité. Le .dat, lui, reste en entiers (format Stock XL figé, arrondi au
+// moment de l'écriture).
+const round3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
 import User from "../models/UserModel.js";
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1016,7 +1021,11 @@ const genererContenuFichier = (lignes) => {
         ? ligne.nart.trim()
         : (ligne.gencod || "").trim();
     const code = brut.padEnd(13, " ");
-    const quantiteFormatee = ligne.quantite.toString().padStart(8, "0");
+    // Format Stock XL figé : quantité ENTIÈRE. Les décimales (articles au
+    // mètre) ne sont arrondies qu'ici, à l'écriture du fichier.
+    const quantiteFormatee = String(
+      Math.round(Number(ligne.quantite) || 0),
+    ).padStart(8, "0");
     const suffixe = "000";
     contenu += `${code}|${quantiteFormatee}|${suffixe}\r\n`;
   });
@@ -1461,14 +1470,14 @@ const addLigneCollecte = asyncHandler(async (req, res) => {
   );
 
   if (ligneExistante) {
-    ligneExistante.quantite += parseInt(quantite, 10);
+    ligneExistante.quantite = round3(ligneExistante.quantite + round3(quantite));
     ligneExistante.scannedAt = new Date();
   } else {
     collecte.lignes.push({
       nart,
       gencod: gencod || "",
       designation: designation || "",
-      quantite: parseInt(quantite, 10),
+      quantite: round3(quantite),
       isUnknown: isUnknown || false,
       isRenvoi: isRenvoi || false,
       articleOriginal: articleOriginal || null,
@@ -1506,7 +1515,7 @@ const updateLigneCollecte = asyncHandler(async (req, res) => {
     throw new Error("Ligne non trouvée");
   }
 
-  ligne.quantite = parseInt(quantite, 10);
+  ligne.quantite = round3(quantite);
   collecte.calculerTotaux();
   await collecte.save();
 

@@ -37,6 +37,12 @@ const NOMMAGES = ["gisement", "proforma", "libre"];
 const nomUtilisateur = (u) =>
   [u?.prenom, u?.nom].filter(Boolean).join(" ") || u?.email || "Utilisateur";
 
+// Quantités à 3 décimales, JAMAIS arrondies à l'unité : beaucoup d'articles se
+// vendent au mètre (tuyau, câble), « prendre 38,5 m » ne doit pas devenir 38.
+// 3 décimales = la précision des N(x.3) de l'ERP. Seul le fichier de transfert
+// .dat arrondit encore à l'entier (format Stock XL figé, voir le service).
+const round3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
+
 // Date plancher d'affichage (null = pas de filtre).
 const dateDepuis = (jours) => {
   if (!jours || jours <= 0) return null;
@@ -723,7 +729,7 @@ const createDemandePanier = asyncHandler(async (req, res) => {
       inconnus.push(String(it.nart || "").trim());
       continue; // code inconnu -> ignoré, remonté à l'appelant
     }
-    const q = Math.round(Number(it.quantite) || 0);
+    const q = round3(it.quantite);
     if (q <= 0) continue;
     gisements.add(art.gisement);
     articles.push({
@@ -856,6 +862,101 @@ const getMobileDemandes = asyncHandler(async (req, res) => {
       new Date(a.createdAt) - new Date(b.createdAt),
   );
   res.json(visibles);
+});
+
+// @desc    (MOBILE) Réappro rayon : scan du QR d'un gisement DOCK -> liste
+// @route   POST /api/demande-reappro/mobile/rayon
+// @body    { entreprise (nomDossierDBF), code (GISM2, contenu brut du QR gondole) }
+// @access  Private — périmètre société seul (comme les autres routes mobiles)
+// Le QR des étiquettes gondole encode le CODE du gisement, sans emplacement :
+// ce mode impose DOCK (GISM2), c'est l'écran qui porte la convention. Articles
+// retenus : la règle « rayon vide » partagée (S1 = 0, réserve S2..S5 > 0, hors
+// techniques/renvois), filtrée sur le GISM2 scanné, meilleures ventes d'abord.
+// Anti-doublon : un rayon ayant déjà une liste ACTIVE la fait reprendre au lieu
+// d'en créer une deuxième (sauf si elle est verrouillée par un autre opérateur).
+const createDemandeRayonMobile = asyncHandler(async (req, res) => {
+  const key = String(req.body.entreprise || "").trim();
+  const code = cleanCode(req.body.code);
+  if (!key || !code) {
+    res.status(400);
+    throw new Error("Société et code de rayon requis");
+  }
+
+  const autorises = await dossiersAutorises(req.user);
+  if (autorises && !autorises.has(key)) {
+    res.status(403);
+    throw new Error("Vous n'avez pas accès à cette société");
+  }
+  const entreprise = await Entreprise.findOne({ nomDossierDBF: key });
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Société inconnue");
+  }
+
+  // Liste active déjà ouverte sur ce rayon -> on la reprend.
+  const existante = await DemandeReappro.findOne({
+    entreprise: key,
+    type: "magasin",
+    source: "rayon",
+    sourceRef: code,
+    statut: { $in: ACTIF },
+  }).sort({ createdAt: -1 });
+  if (existante) {
+    if (verrouAutreOperateur(existante, req.user)) {
+      res.status(409);
+      throw new Error(
+        `Rayon en cours de préparation par ${existante.operateur.nom}`,
+      );
+    }
+    res.json({ demande: existante, reprise: true });
+    return;
+  }
+
+  const { articles } = await getArticlesRayonVide(entreprise, {
+    gism2: code,
+    emplacement: "DOCK",
+    limit: 3000,
+  });
+  if (articles.length === 0) {
+    // `motif` : l'app distingue « rayon à jour » d'un code qui n'existe pas.
+    res.status(404).json({
+      message: `Rien à réapprovisionner depuis le rayon dock ${code}`,
+      motif: "rayon_vide",
+    });
+    return;
+  }
+
+  const libelleDock = articles.find((a) => a.rayonDock)?.rayonDock || "";
+  const demande = new DemandeReappro({
+    entreprise: key,
+    type: "magasin",
+    gisement: code, // sert aussi au nommage du .dat (défaut « gisement »)
+    nom: `Réappro rayon ${code}${libelleDock ? ` — ${libelleDock}` : ""}`,
+    rayon: libelleDock,
+    source: "rayon",
+    sourceRef: code,
+    priorite: "a_faire",
+    statut: "en_attente",
+    // Pas de quantiteDemandee : comme les listes par gisement, l'opérateur
+    // prend ce qu'il faut, le stock reste indicatif (CDC §4).
+    articles: articles.map((a) => ({
+      nart: a.nart,
+      design: a.design,
+      fourn: a.fourn,
+      fournNom: a.fournNom,
+      gencod: a.gencod,
+      s1: a.s1, s2: a.s2, s3: a.s3, s4: a.s4, s5: a.s5,
+      stock: a.stock,
+      gism1: a.gism1,
+      rayonMagasin: a.rayonMagasin,
+    })),
+    createdBy: req.user?._id,
+    createdByNom: nomUtilisateur(req.user),
+  });
+  demande.calculerTotaux();
+  await demande.save();
+
+  res.status(201).json({ demande, reprise: false });
 });
 
 // @desc    (MOBILE) Ouvrir une liste : pose le verrou et passe « en cours »
@@ -1002,7 +1103,7 @@ const enregistrerLigne = asyncHandler(async (req, res) => {
   }
 
   const introuvable = Boolean(req.body.introuvable);
-  const quantite = Math.round(Number(req.body.quantite) || 0);
+  const quantite = round3(req.body.quantite);
   if (!introuvable && quantite <= 0) {
     res.status(400);
     throw new Error("Quantité invalide");
@@ -1036,7 +1137,7 @@ const realiserDemande = asyncHandler(async (req, res) => {
     const lignesBody = (Array.isArray(req.body?.lignes) ? req.body.lignes : [])
       .map((l) => ({
         nart: String(l.nart || "").trim(),
-        quantite: Math.round(Number(l.quantite) || 0),
+        quantite: round3(l.quantite),
       }))
       .filter((l) => l.nart && l.quantite > 0);
 
@@ -1054,7 +1155,7 @@ const realiserDemande = asyncHandler(async (req, res) => {
 
     const lignes = (d.articles || [])
       .filter((a) => (Number(a.quantitePrise) || 0) > 0)
-      .map((a) => ({ nart: a.nart, quantite: Math.round(a.quantitePrise) }));
+      .map((a) => ({ nart: a.nart, quantite: round3(a.quantitePrise) }));
 
     // Fichier de transfert (réserve -> rayon), même format/endroit que la prépa.
     if (lignes.length > 0) {
@@ -1097,6 +1198,7 @@ export {
   updateUrgence,
   deleteDemande,
   getMobileDemandes,
+  createDemandeRayonMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,

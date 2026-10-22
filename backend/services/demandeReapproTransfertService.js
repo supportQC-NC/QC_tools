@@ -38,6 +38,10 @@ const libelleTransfert = (demande) => {
 };
 
 // NART(13, gauche) | QTE(8, zéros) | 000
+// ⚠️ Le format Stock XL est FIGÉ : la quantité y est un ENTIER. Les quantités
+// décimales (articles au mètre) vivent partout ailleurs (Mongo, écrans,
+// rapports) mais sont arrondies ICI, et seulement ici, à l'entier le plus
+// proche — même règle que le transfert de la préparation scannée.
 const construireContenu = (lignes) => {
   let contenu = "";
   (lignes || []).forEach((l) => {

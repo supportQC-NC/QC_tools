@@ -607,6 +607,12 @@ import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
+// Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
+// l'unité — même règle que les listes de réappro. Un corps sans quantité vaut
+// 0 (l'ancien parseInt produisait NaN). Le .dat, lui, reste en entiers
+// (format Stock XL figé, arrondi au moment de l'écriture).
+const round3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
+
 /**
  * @desc    Créer un nouveau réappro
  * @route   POST /api/reappros
@@ -988,7 +994,7 @@ const addLigneReappro = asyncHandler(async (req, res) => {
 
   if (ligneExistante) {
     // Ajouter la quantité à la ligne existante
-    ligneExistante.quantite += parseInt(quantite);
+    ligneExistante.quantite = round3(ligneExistante.quantite + round3(quantite));
     ligneExistante.scannedAt = new Date();
   } else {
     // Créer une nouvelle ligne
@@ -997,7 +1003,7 @@ const addLigneReappro = asyncHandler(async (req, res) => {
       gencod: gencod || "",
       designation: designation || "",
       refer: refer || "",
-      quantite: parseInt(quantite),
+      quantite: round3(quantite),
       stocksSnapshot: stocks || {
         S1: 0,
         S2: 0,
@@ -1043,7 +1049,7 @@ const updateLigneReappro = asyncHandler(async (req, res) => {
     throw new Error("Ligne non trouvée");
   }
 
-  ligne.quantite = parseInt(quantite);
+  ligne.quantite = round3(quantite);
   reappro.calculerTotaux();
   await reappro.save();
 
@@ -1085,7 +1091,11 @@ const genererContenuFichier = (lignes) => {
     // Toujours le NART (jamais le GENCODE), complété par des espaces à droite
     // jusqu'à 13 caractères au total (NART de 6 -> 6 + 7 espaces).
     const code = (ligne.nart || "").trim().padEnd(13, " ");
-    const quantiteFormatee = ligne.quantite.toString().padStart(8, "0");
+    // Format Stock XL figé : quantité ENTIÈRE. Les décimales (articles au
+    // mètre) ne sont arrondies qu'ici, à l'écriture du fichier.
+    const quantiteFormatee = String(
+      Math.round(Number(ligne.quantite) || 0),
+    ).padStart(8, "0");
     const suffixe = "000";
     contenu += `${code}|${quantiteFormatee}|${suffixe}\r\n`;
   });
