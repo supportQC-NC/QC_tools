@@ -423,10 +423,15 @@ déployées de l'app mobile s'en servaient).
   `gism2` : S1 = 0, réserve S2..S5 > 0, meilleures ventes d'abord), avec
   `qteProposee` = `min(réserve, max(1, ceil(vteMoyMois)))` (formule du module
   réappro magasin) et `gism1`/`rayonMagasin` (destination). L'app déroule le
-  parcours en local (Réappro avec quantité réellement prise, ou Passer), puis
-  `POST /mobile/rayon/transfert` écrit le `.dat` dans collect_sec via
-  `ecrireTransfertMagasin` — **le même fichier que tous les réappros**, nommé
-  sur le GISM2 scanné. Rien n'apparaît dans les listes ni le suivi.
+  parcours en local : pour valider une référence l'agent doit **la biper**
+  (gencode tolérant aux zéros de tête, correspondance locale ; biper un autre
+  article du rayon saute à sa ligne ; saisie NART en secours) puis saisit la
+  quantité réellement prise — « Passer » reste direct. À la fin,
+  `POST /mobile/rayon/transfert` écrit le `.dat` dans le
+  `cheminExportInventaire` de la société (collect_sec), **nommé comme le
+  réappro classique** : `stock.dat <nom du rayon>_<code rayon>` (même
+  sanitisation que `exportReappro`), contenu figé NART(13)|QTE(8 entier)|000.
+  Rien n'apparaît dans les listes ni le suivi.
 - **Quantités décimales** (22/10/2026) : beaucoup d'articles se vendent au mètre —
   plus aucun `parseInt`/`Math.round` à l'unité sur une quantité, ni côté backend
   (helper `round3`, 3 décimales, dans les contrôleurs réappro/bipage/inventaire/

@@ -1,4 +1,6 @@
 // backend/controllers/demandeReapproController.js
+import fs from "fs";
+import path from "path";
 import asyncHandler from "../middleware/asyncHandler.js";
 import DemandeReappro from "../models/DemandeReapproModel.js";
 // Réappro LIBRE (scan sans liste, depuis l'app mobile) : autre collection,
@@ -949,13 +951,21 @@ const getArticlesRayonMobile = asyncHandler(async (req, res) => {
 
 // @desc    (MOBILE) Réappro rayon : fin de parcours -> fichier .dat collect_sec
 // @route   POST /api/demande-reappro/mobile/rayon/transfert
-// @body    { entreprise, code, lignes: [{ nart, quantite }] }
+// @body    { entreprise, code, libelle?, lignes: [{ nart, quantite }] }
 // @access  Private — périmètre société seul
-// Le fichier est STRICTEMENT le même que celui des autres réappros
-// (ecrireTransfertMagasin : NART(13)|QTE(8)|000 dans collect_sec), nommé sur
-// le gisement scanné : tsf_reappro_mag_<societe>_<GISM2>_<horodatage>.dat.
+// MÊME convention que le réappro classique (exportReappro de reaproController) :
+// contenu NART(13)|QTE(8, entier)|000, déposé dans le cheminExportInventaire de
+// la société (collect_sec), et NOM « stock.dat <nom du rayon>_<code rayon> »
+// (décision client du 23/10/2026 — le réappro classique écrit « stock.dat
+// reappro <nom> », ici le nom est imposé par le rayon scanné). Le libellé vient
+// du dictionnaire des rayons (renvoyé par /mobile/rayon), repli sur le code seul.
 const transfertRayonMobile = asyncHandler(async (req, res) => {
   const { key, code } = await lireRayonBody(req, res);
+  const entreprise = await Entreprise.findOne({ nomDossierDBF: key });
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Société inconnue");
+  }
 
   const lignes = (Array.isArray(req.body.lignes) ? req.body.lignes : [])
     .map((l) => ({
@@ -968,18 +978,42 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
     throw new Error("Aucune ligne à transférer.");
   }
 
-  // ecrireTransfertMagasin n'a besoin que de { entreprise, gisement,
-  // nommageTransfert } : un objet nu suffit, aucune DemandeReappro n'existe.
-  const tsf = await ecrireTransfertMagasin(
-    { entreprise: key, gisement: code, nommageTransfert: "gisement" },
-    lignes,
-  );
-  if (!tsf.fileName) {
-    // Toutes les quantités arrondies à 0 (format .dat entier) : rien à écrire.
+  // Contenu : format Stock XL figé — quantité ENTIÈRE, arrondie ici seulement
+  // (les décimales des articles au mètre vivent partout ailleurs).
+  let contenu = "";
+  lignes.forEach((l) => {
+    const q = Math.round(l.quantite);
+    if (q <= 0) return;
+    contenu += `${l.nart.padEnd(13, " ")}|${String(q).padStart(8, "0")}|000\r\n`;
+  });
+  const nbLignes = contenu
+    ? contenu.trimEnd().split("\r\n").filter(Boolean).length
+    : 0;
+  if (nbLignes === 0) {
     res.status(400);
     throw new Error("Aucune quantité transférable (arrondi entier du .dat).");
   }
-  res.json({ fileName: tsf.fileName, lignes: tsf.lignes });
+
+  // « stock.dat <nom du rayon>_<code> » — même sanitisation que le réappro
+  // classique (espaces conservés, le reste remplacé par _).
+  const libelle = String(req.body.libelle || "").trim();
+  const brut = `${libelle ? `${libelle}_` : ""}${code}`;
+  const nomFichier = `stock.dat ${brut.replace(/[^a-zA-Z0-9_\- ]/g, "_")}`;
+
+  // Même destination que le réappro classique : le chemin d'export PROPRE À LA
+  // SOCIÉTÉ (le getter du modèle le traduit en prod vers le montage Linux).
+  const dir =
+    String(entreprise.cheminExportInventaire || "").trim() ||
+    "/mnt/rcommun/STOCK/collect_sec";
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, nomFichier), contenu, "utf8");
+  } catch (error) {
+    res.status(400);
+    throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
+  }
+
+  res.json({ fileName: nomFichier, lignes: nbLignes });
 });
 
 // @desc    (MOBILE) Ouvrir une liste : pose le verrou et passe « en cours »
