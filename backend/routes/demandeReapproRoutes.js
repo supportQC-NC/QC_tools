@@ -20,7 +20,6 @@ import {
   getArticlesRayonMobile,
   transfertRayonMobile,
   rangementArticleMobile,
-  rangementCacheMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,
@@ -74,9 +73,8 @@ router.get("/mobile/list", protect, getMobileDemandes);
 router.post("/mobile/rayon/transfert", protect, transfertRayonMobile);
 router.post("/mobile/rayon", protect, getArticlesRayonMobile);
 // Où ranger (sans état) : code article -> emplacements GISM1/GISM2 + libellés.
-// Le cache complet (articles + dictionnaire) se télécharge une fois par session
-// pour que le bip s'affiche sans aller-retour réseau.
-router.post("/mobile/rangement/cache", protect, rangementCacheMobile);
+// Rapide comme la recherche d'articles : tout est servi par les caches
+// SERVEUR (articles, fournisseurs, index du dictionnaire des rayons).
 router.post("/mobile/rangement", protect, rangementArticleMobile);
 router.post("/mobile/:id/ouvrir", protect, ouvrirDemande);
 router.post("/mobile/:id/liberer", protect, libererDemande);

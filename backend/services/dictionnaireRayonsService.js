@@ -156,7 +156,16 @@ export const readDictionnaire = async (entreprise) => {
  * Les sous-zones matérialisées (« A_1_B », type « sous ») sont ignorées : la
  * fiche parle du rayon, pas de sa découpe en mètres linéaires.
  */
-export const buildIndexRayons = async (entreprise) => {
+// Cache de l'index — même logique que le cache articles : relire le xlsx sur
+// le partage réseau à CHAQUE appel coûtait l'essentiel du temps de réponse des
+// bips « Où ranger » (et se payait aussi sur les étiquettes et les sélections
+// bipage/réappro). Invalidation sur mtime/taille du fichier (l'écran
+// Dictionnaire des rayons le réécrit) + TTL de secours. L'index renvoyé est
+// PARTAGÉ entre appelants : lecture seule par convention (lookupRayon).
+const INDEX_TTL_MS = 10 * 60 * 1000;
+const indexCache = new Map(); // fichier -> { at, mtimeMs, size, resultat }
+
+const construireIndexRayons = async (entreprise) => {
   const index = new Map();
   let fichier = "";
   try {
@@ -183,6 +192,42 @@ export const buildIndexRayons = async (entreprise) => {
     // l'appelant retombera sur l'ancien fichier de gisements.
     return { index, fichier, exists: false };
   }
+};
+
+export const buildIndexRayons = async (entreprise) => {
+  let fichier = "";
+  let stat = null;
+  try {
+    fichier = resolveDictionnaireFile(entreprise);
+    try {
+      stat = fs.statSync(fichier);
+    } catch {
+      stat = null; // fichier absent ou partage injoignable
+    }
+    const memo = indexCache.get(fichier);
+    if (
+      memo &&
+      Date.now() - memo.at < INDEX_TTL_MS &&
+      memo.mtimeMs === (stat ? stat.mtimeMs : 0) &&
+      memo.size === (stat ? stat.size : 0)
+    ) {
+      return memo.resultat;
+    }
+  } catch {
+    // resolveDictionnaireFile peut jeter (chemins société incomplets) : on
+    // laisse construireIndexRayons produire son résultat vide habituel.
+  }
+
+  const resultat = await construireIndexRayons(entreprise);
+  if (fichier) {
+    indexCache.set(fichier, {
+      at: Date.now(),
+      mtimeMs: stat ? stat.mtimeMs : 0,
+      size: stat ? stat.size : 0,
+      resultat,
+    });
+  }
+  return resultat;
 };
 
 /** Cherche un rayon par son code ET son emplacement. */
