@@ -1021,6 +1021,69 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
   res.json({ fileName: nomFichier, lignes: nbLignes });
 });
 
+// @desc    (MOBILE) Où ranger : CACHE de rangement complet d'une société
+// @route   POST /api/demande-reappro/mobile/rangement/cache
+// @body    { entreprise (nomDossierDBF) }
+// @access  Private — périmètre société seul
+// Téléchargé UNE fois à l'ouverture du module (puis TTL côté app) pour que le
+// bip s'affiche sans aller-retour réseau : l'app résout localement NART /
+// gencode -> gisements + libellés. Format volontairement compact (lignes
+// « NART|GENCOD|GISM1|GISM2|GENDOUBL|DESIGN ») : ~100 k articles chez QC, un
+// JSON par article pèserait plusieurs fois plus. Les stocks n'y sont PAS :
+// ils périment à chaque vente, l'app les rafraîchit article par article en
+// arrière-plan (l'endpoint unitaire /mobile/rangement reste la référence).
+const rangementCacheMobile = asyncHandler(async (req, res) => {
+  const key = String(req.body.entreprise || "").trim();
+  if (!key) {
+    res.status(400);
+    throw new Error("Société requise");
+  }
+  const autorises = await dossiersAutorises(req.user);
+  if (autorises && !autorises.has(key)) {
+    res.status(403);
+    throw new Error("Vous n'avez pas accès à cette société");
+  }
+  const entreprise = await Entreprise.findOne({ nomDossierDBF: key });
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Société inconnue");
+  }
+
+  const [cache, dico] = await Promise.all([
+    articleCacheService.getArticles(entreprise),
+    buildIndexRayons(entreprise),
+  ]);
+
+  // Dictionnaire des rayons : petit (quelques centaines de lignes), envoyé en
+  // triplets [code, emplacement, libellé].
+  const rayons = [];
+  dico.index.forEach((v, k) => {
+    const [code, emplacement] = k.split("|");
+    rayons.push([code, emplacement, v.libelle || ""]);
+  });
+
+  const t = (v) => String(v ?? "").trim();
+  const lignes = [];
+  (cache.records || []).forEach((a) => {
+    const nart = t(a.NART);
+    if (!nart) return;
+    // Le « | » est le séparateur : on l'écarte de la désignation (jamais vu
+    // dans les NART/GENCOD/GISM, par prudence quand même).
+    const design = t(a.DESIGN).replace(/\|/g, "/");
+    lignes.push(
+      `${nart}|${t(a.GENCOD)}|${t(a.GISM1)}|${t(a.GISM2)}|${t(a.GENDOUBL)}|${design}`,
+    );
+  });
+
+  res.json({
+    entreprise: key,
+    generatedAt: new Date().toISOString(),
+    nbArticles: lignes.length,
+    rayons,
+    articles: lignes.join("\n"),
+  });
+});
+
 // @desc    (MOBILE) Où ranger : code article -> emplacements DOCK et MAGASIN
 // @route   POST /api/demande-reappro/mobile/rangement
 // @body    { entreprise (nomDossierDBF), code (gencode, NART ou référence) }
@@ -1349,6 +1412,7 @@ export {
   getArticlesRayonMobile,
   transfertRayonMobile,
   rangementArticleMobile,
+  rangementCacheMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,
