@@ -864,52 +864,44 @@ const getMobileDemandes = asyncHandler(async (req, res) => {
   res.json(visibles);
 });
 
-// @desc    (MOBILE) Réappro rayon : scan du QR d'un gisement DOCK -> liste
-// @route   POST /api/demande-reappro/mobile/rayon
-// @body    { entreprise (nomDossierDBF), code (GISM2, contenu brut du QR gondole) }
-// @access  Private — périmètre société seul (comme les autres routes mobiles)
-// Le QR des étiquettes gondole encode le CODE du gisement, sans emplacement :
-// ce mode impose DOCK (GISM2), c'est l'écran qui porte la convention. Articles
-// retenus : la règle « rayon vide » partagée (S1 = 0, réserve S2..S5 > 0, hors
-// techniques/renvois), filtrée sur le GISM2 scanné, meilleures ventes d'abord.
-// Anti-doublon : un rayon ayant déjà une liste ACTIVE la fait reprendre au lieu
-// d'en créer une deuxième (sauf si elle est verrouillée par un autre opérateur).
-const createDemandeRayonMobile = asyncHandler(async (req, res) => {
+// ====================== RÉAPPRO RAYON (mobile, SANS état) ======================
+// Décision client du 23/10/2026 : le réappro rayon fonctionne comme le réappro
+// de base — AUCUNE DemandeReappro n'est créée, rien n'apparaît dans les listes
+// ni dans le suivi. L'agent bipe le QR d'un gisement DOCK, le serveur lui dit
+// ce qui est à réapprovisionner, il passe ou valide chaque article avec la
+// quantité réellement prise, et la fin de parcours génère directement le
+// fichier .dat dans collect_sec (même format/endroit que tous les réappros).
+
+// Garde commune des deux endpoints : société + code du rayon.
+const lireRayonBody = async (req, res) => {
   const key = String(req.body.entreprise || "").trim();
   const code = cleanCode(req.body.code);
   if (!key || !code) {
     res.status(400);
     throw new Error("Société et code de rayon requis");
   }
-
   const autorises = await dossiersAutorises(req.user);
   if (autorises && !autorises.has(key)) {
     res.status(403);
     throw new Error("Vous n'avez pas accès à cette société");
   }
+  return { key, code };
+};
+
+// @desc    (MOBILE) Réappro rayon : scan du QR d'un gisement DOCK -> articles
+// @route   POST /api/demande-reappro/mobile/rayon
+// @body    { entreprise (nomDossierDBF), code (GISM2, contenu brut du QR gondole) }
+// @access  Private — périmètre société seul (comme les autres routes mobiles)
+// Le QR gondole encode le CODE du gisement, sans emplacement : ce mode impose
+// DOCK (GISM2). Articles retenus : la règle « rayon vide » partagée (S1 = 0,
+// réserve S2..S5 > 0, hors techniques/renvois), filtrée sur le GISM2 scanné,
+// meilleures ventes d'abord. Lecture seule : rien n'est écrit nulle part.
+const getArticlesRayonMobile = asyncHandler(async (req, res) => {
+  const { key, code } = await lireRayonBody(req, res);
   const entreprise = await Entreprise.findOne({ nomDossierDBF: key });
   if (!entreprise) {
     res.status(404);
     throw new Error("Société inconnue");
-  }
-
-  // Liste active déjà ouverte sur ce rayon -> on la reprend.
-  const existante = await DemandeReappro.findOne({
-    entreprise: key,
-    type: "magasin",
-    source: "rayon",
-    sourceRef: code,
-    statut: { $in: ACTIF },
-  }).sort({ createdAt: -1 });
-  if (existante) {
-    if (verrouAutreOperateur(existante, req.user)) {
-      res.status(409);
-      throw new Error(
-        `Rayon en cours de préparation par ${existante.operateur.nom}`,
-      );
-    }
-    res.json({ demande: existante, reprise: true });
-    return;
   }
 
   const { articles } = await getArticlesRayonVide(entreprise, {
@@ -936,17 +928,9 @@ const createDemandeRayonMobile = asyncHandler(async (req, res) => {
     return round3(Math.min(Number(a.stockReserves) || 0, besoin));
   };
 
-  const libelleDock = articles.find((a) => a.rayonDock)?.rayonDock || "";
-  const demande = new DemandeReappro({
-    entreprise: key,
-    type: "magasin",
-    gisement: code, // sert aussi au nommage du .dat (défaut « gisement »)
-    nom: `Réappro rayon ${code}${libelleDock ? ` — ${libelleDock}` : ""}`,
-    rayon: libelleDock,
-    source: "rayon",
-    sourceRef: code,
-    priorite: "a_faire",
-    statut: "en_attente",
+  res.json({
+    code,
+    libelle: articles.find((a) => a.rayonDock)?.rayonDock || "",
     articles: articles.map((a) => ({
       nart: a.nart,
       design: a.design,
@@ -955,18 +939,47 @@ const createDemandeRayonMobile = asyncHandler(async (req, res) => {
       gencod: a.gencod,
       s1: a.s1, s2: a.s2, s3: a.s3, s4: a.s4, s5: a.s5,
       stock: a.stock,
-      quantiteDemandee: qteProposee(a),
       vteMoyMois: a.vteMoyMois,
+      qteProposee: qteProposee(a),
       gism1: a.gism1,
       rayonMagasin: a.rayonMagasin,
     })),
-    createdBy: req.user?._id,
-    createdByNom: nomUtilisateur(req.user),
   });
-  demande.calculerTotaux();
-  await demande.save();
+});
 
-  res.status(201).json({ demande, reprise: false });
+// @desc    (MOBILE) Réappro rayon : fin de parcours -> fichier .dat collect_sec
+// @route   POST /api/demande-reappro/mobile/rayon/transfert
+// @body    { entreprise, code, lignes: [{ nart, quantite }] }
+// @access  Private — périmètre société seul
+// Le fichier est STRICTEMENT le même que celui des autres réappros
+// (ecrireTransfertMagasin : NART(13)|QTE(8)|000 dans collect_sec), nommé sur
+// le gisement scanné : tsf_reappro_mag_<societe>_<GISM2>_<horodatage>.dat.
+const transfertRayonMobile = asyncHandler(async (req, res) => {
+  const { key, code } = await lireRayonBody(req, res);
+
+  const lignes = (Array.isArray(req.body.lignes) ? req.body.lignes : [])
+    .map((l) => ({
+      nart: String(l.nart || "").trim(),
+      quantite: round3(l.quantite),
+    }))
+    .filter((l) => l.nart && l.quantite > 0);
+  if (lignes.length === 0) {
+    res.status(400);
+    throw new Error("Aucune ligne à transférer.");
+  }
+
+  // ecrireTransfertMagasin n'a besoin que de { entreprise, gisement,
+  // nommageTransfert } : un objet nu suffit, aucune DemandeReappro n'existe.
+  const tsf = await ecrireTransfertMagasin(
+    { entreprise: key, gisement: code, nommageTransfert: "gisement" },
+    lignes,
+  );
+  if (!tsf.fileName) {
+    // Toutes les quantités arrondies à 0 (format .dat entier) : rien à écrire.
+    res.status(400);
+    throw new Error("Aucune quantité transférable (arrondi entier du .dat).");
+  }
+  res.json({ fileName: tsf.fileName, lignes: tsf.lignes });
 });
 
 // @desc    (MOBILE) Ouvrir une liste : pose le verrou et passe « en cours »
@@ -1208,7 +1221,8 @@ export {
   updateUrgence,
   deleteDemande,
   getMobileDemandes,
-  createDemandeRayonMobile,
+  getArticlesRayonMobile,
+  transfertRayonMobile,
   ouvrirDemande,
   libererDemande,
   scanDemande,

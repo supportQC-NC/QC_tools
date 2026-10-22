@@ -7,10 +7,11 @@
 // multiples et évolutives (`source`) :
 //   - "manuel"   : saisie à la volée (écran Listes de réappro / analyse réappro)
 //   - "proforma" : proforma dont l'observation (TEXTE) commence par « Reappro »
-//   - "rayon"    : scan du QR d'un gisement DOCK au collecteur (réappro rayon) ;
-//                  sourceRef = le code GISM2 scanné, articles = rayon vide
-//                  (S1 = 0, réserve S2..S5 > 0) de ce gisement
 //   - "rapport"  : à venir (que dock…)
+//
+// ⚠️ Le « réappro rayon » du collecteur ne passe PAS par cette collection
+// (décision client du 23/10/2026) : il est sans état, comme le réappro libre —
+// scan du QR GISM2 -> articles -> .dat direct, rien en base.
 //
 // Le cycle de vie est : en_attente (« À faire ») -> en_cours (un opérateur a
 // ouvert la liste sur le collecteur, elle lui est VERROUILLÉE) -> realisee
@@ -34,11 +35,6 @@ const articleSnapSchema = new mongoose.Schema(
     stock: Number, // stock total (ΣS1..S5)
     quantiteDemandee: Number, // quantité demandée par l'utilisateur
     vteMoyMois: Number,
-    // Rayon MAGASIN de destination (réappro rayon : l'opérateur part du dock,
-    // le GISM1 lui dit où ranger). Libellé lu au couple code+MAGASIN dans le
-    // dictionnaire des rayons au moment de la création (photo, pas de re-lookup).
-    gism1: String,
-    rayonMagasin: String,
 
     // ---- Suivi de préparation (collecteur) ----
     // Renseigné ligne par ligne : sert à la progression (%) ET au calcul du
@@ -83,12 +79,11 @@ const demandeReapproSchema = new mongoose.Schema(
     rayon: { type: String, default: "" }, // facultatif (libellé libre)
     source: {
       type: String,
-      enum: ["manuel", "proforma", "rayon", "rapport"],
+      enum: ["manuel", "proforma", "rapport"],
       default: "manuel",
       index: true,
     },
-    // proforma : NUMFACT d'origine ; rayon : code GISM2 scanné
-    sourceRef: { type: String, default: "" },
+    sourceRef: { type: String, default: "" }, // proforma : NUMFACT d'origine
 
     priorite: {
       type: String,

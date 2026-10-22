@@ -410,20 +410,23 @@ permission est **`demande_reappro`** ; `analyse_reappro_admin` et `reapro` reste
 acceptés en secours sur les routes (l'écran Analyse Réappro et les versions déjà
 déployées de l'app mobile s'en servaient).
 
-- `source` = `manuel` | `proforma` | `rayon` | `rapport` (+ `sourceRef` =
-  NUMFACT, ou code GISM2 pour `rayon`). Index unique **partiel** sur
-  `(entreprise, source, sourceRef)` limité à `source: "proforma"` : une
-  proforma ne peut donner qu'une liste.
-- **Réappro rayon** (`source: "rayon"`, mode mobile *Réappro ▸ Réappro rayon*) :
-  l'agent bipe le **QR d'un gisement DOCK** (étiquette gondole — le QR encode le
-  code GISM2 **brut**, sans emplacement ; l'app tolère aussi « code|emplacement »
-  des fiches de zone). `POST /mobile/rayon` crée la liste avec la règle « rayon
-  vide » partagée (`getArticlesRayonVide` + option `gism2`) : S1 = 0, réserve
-  S2..S5 > 0, hors techniques/renvois, meilleures ventes d'abord. Chaque ligne
-  photographie `gism1` + `rayonMagasin` (libellé du dictionnaire au couple
-  code+MAGASIN) — c'est la destination affichée au collecteur. Anti-doublon :
-  un rayon ayant déjà une liste ACTIVE la fait reprendre (409 si verrouillée par
-  un autre). Le reste du parcours (verrou, lignes, `.dat`) est celui des listes.
+- `source` = `manuel` | `proforma` | `rapport` (+ `sourceRef` = NUMFACT). Index
+  unique **partiel** sur `(entreprise, source, sourceRef)` limité à
+  `source: "proforma"` : une proforma ne peut donner qu'une liste.
+- **Réappro rayon** (mode mobile *Réappro ▸ Réappro rayon*) : **SANS ÉTAT**,
+  comme le réappro libre — **aucune `DemandeReappro` n'est créée** (décision
+  client du 23/10/2026, une première version qui créait une liste a été
+  retirée). L'agent bipe le **QR d'un gisement DOCK** (étiquette gondole — le
+  QR encode le code GISM2 **brut**, sans emplacement ; l'app tolère aussi
+  « code|emplacement » des fiches de zone). `POST /mobile/rayon` renvoie les
+  articles (règle « rayon vide » partagée, `getArticlesRayonVide` + option
+  `gism2` : S1 = 0, réserve S2..S5 > 0, meilleures ventes d'abord), avec
+  `qteProposee` = `min(réserve, max(1, ceil(vteMoyMois)))` (formule du module
+  réappro magasin) et `gism1`/`rayonMagasin` (destination). L'app déroule le
+  parcours en local (Réappro avec quantité réellement prise, ou Passer), puis
+  `POST /mobile/rayon/transfert` écrit le `.dat` dans collect_sec via
+  `ecrireTransfertMagasin` — **le même fichier que tous les réappros**, nommé
+  sur le GISM2 scanné. Rien n'apparaît dans les listes ni le suivi.
 - **Quantités décimales** (22/10/2026) : beaucoup d'articles se vendent au mètre —
   plus aucun `parseInt`/`Math.round` à l'unité sur une quantité, ni côté backend
   (helper `round3`, 3 décimales, dans les contrôleurs réappro/bipage/inventaire/
