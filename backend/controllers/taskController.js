@@ -3,11 +3,13 @@
 // Tâches (voir TaskModel). Périmètre :
 //   - Super-admin : toutes les tâches.
 //   - Admin       : tâches de ses sociétés.
-//   - Responsable : tâches de ses équipes.
-//   - Membre      : ses tâches assignées (lecture + changement de STATUT).
+//   - Responsable : tâches de ses équipes (dirigées ou dont il est membre).
+//   - Membre      : ses tâches assignées + LECTURE des tâches de ses équipes
+//                   (visibilité d'équipe : tout le monde voit ce qui est en cours).
 //
 // Création/édition/suppression : responsable de l'équipe ou admin de la société.
-// Le membre assigné ne peut QUE faire évoluer le statut de SES tâches.
+// Le membre assigné ne peut QUE faire évoluer le statut de SES tâches (un membre
+// non assigné consulte, dépose des documents, discute — mais ne change pas le statut).
 
 import asyncHandler from "../middleware/asyncHandler.js";
 import Task, { TASK_STATUTS } from "../models/TaskModel.js";
@@ -71,9 +73,22 @@ const isPersoOwner = (actor, task) =>
 const isAssignee = (actor, task) =>
   (task.assignes || []).some((a) => (a?._id || a)?.toString() === actor._id.toString());
 
+// Membre (non assigné) de l'équipe de la tâche : il VOIT les tâches de son
+// équipe — décision « visibilité d'équipe » : une tâche créée par le
+// responsable est visible du responsable ET de tous les membres.
+const isTeamMember = async (actor, task) => {
+  if (!task.equipe) return false;
+  const team = await Team.findById(task.equipe).select("membres");
+  return (
+    !!team &&
+    (team.membres || []).some((m) => m.toString() === actor._id.toString())
+  );
+};
+
 const canAccessTask = async (actor, task) => {
   if (isAssignee(actor, task)) return true;
   if (isPersoOwner(actor, task)) return true;
+  if (await isTeamMember(actor, task)) return true;
   return canManageTask(actor, task);
 };
 
@@ -141,11 +156,28 @@ const getTasks = asyncHandler(async (req, res) => {
     const { all, ids } = await getAccessibleEntreprises(req.user);
     filter = all ? q : { ...q, entreprise: { $in: ids } };
   } else if (req.user.role === "responsable") {
-    const teams = await Team.find({ responsable: req.user._id }).select("_id");
-    filter = { ...q, equipe: { $in: teams.map((t) => t._id) } };
+    // Ses équipes (dirigées OU dont il est membre) + ses tâches assignées.
+    const teams = await Team.find({
+      $or: [{ responsable: req.user._id }, { membres: req.user._id }],
+    }).select("_id");
+    filter = {
+      ...q,
+      $or: [
+        { equipe: { $in: teams.map((t) => t._id) } },
+        { assignes: req.user._id },
+      ],
+    };
   } else {
-    // Membre : uniquement ses tâches (on ignore un éventuel ?assigneA).
-    filter = { ...q, assignes: req.user._id };
+    // Membre : ses tâches assignées + TOUTES les tâches de ses équipes
+    // (visibilité d'équipe), hors tâches perso des autres (equipe = null).
+    const teams = await Team.find({ membres: req.user._id }).select("_id");
+    filter = {
+      ...q,
+      $or: [
+        { assignes: req.user._id },
+        { equipe: { $in: teams.map((t) => t._id) } },
+      ],
+    };
   }
 
   const tasks = await populateTask(
@@ -163,7 +195,7 @@ const getTaskById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Tâche non trouvée");
   }
-  if (!isAssignee(req.user, task) && !(await canManageTask(req.user, task))) {
+  if (!(await canAccessTask(req.user, task))) {
     res.status(403);
     throw new Error("Tâche hors de votre périmètre");
   }

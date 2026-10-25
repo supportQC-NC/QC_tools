@@ -14,7 +14,11 @@ import {
   useCreateUserMutation,
   useUpdateUserMutation,
 } from "../../slices/userApiSlice";
-import { useGetEntreprisesQuery } from "../../slices/entrepriseApiSlice";
+import {
+  useGetEntreprisesQuery,
+  useGetMyEntreprisesQuery,
+} from "../../slices/entrepriseApiSlice";
+import { useGetTeamsQuery } from "../../slices/teamApiSlice";
 import ChampsDbfSection from "./ChampsDbfSection";
 import {
   PERMISSION_MODULES,
@@ -99,6 +103,9 @@ const UserModal = ({ user, onClose, asPage = false }) => {
     password: "",
     role: "user",
     isActive: true,
+    // Équipes de rattachement À LA CRÉATION (le compte devient membre ; la
+    // société de chaque équipe lui est accordée d'office côté serveur).
+    equipes: [],
     permissions: {
       allEntreprises: false,
       allModules: false,
@@ -115,8 +122,26 @@ const UserModal = ({ user, onClose, asPage = false }) => {
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
-  const { data: entreprises, isLoading: isLoadingEntreprises } =
-    useGetEntreprisesQuery();
+
+  // Liste des sociétés : GET /api/entreprises est gaté par le module
+  // entreprises_admin (les admins le court-circuitent) — un RESPONSABLE
+  // passe donc par /my-entreprises (self-service, son périmètre), sans quoi
+  // sa liste serait vide et le compte créé resterait sans société.
+  const actorIsAdmin = actor?.role === "admin";
+  const { data: entreprisesAdmin, isLoading: loadingEntAdmin } =
+    useGetEntreprisesQuery(undefined, { skip: !actorIsAdmin });
+  const { data: entreprisesMine, isLoading: loadingEntMine } =
+    useGetMyEntreprisesQuery(undefined, { skip: actorIsAdmin });
+  const entreprises = actorIsAdmin ? entreprisesAdmin : entreprisesMine;
+  const isLoadingEntreprises = actorIsAdmin ? loadingEntAdmin : loadingEntMine;
+
+  // Équipes gérées par l'acteur (admin : ses sociétés ; responsable : les
+  // siennes) — proposées au RATTACHEMENT lors de la création d'un compte.
+  const canPickTeams =
+    !isEdit && (actor?.role === "admin" || actor?.role === "responsable");
+  const { data: teams = [] } = useGetTeamsQuery(undefined, {
+    skip: !canPickTeams,
+  });
 
   // ── Atténuation (miroir client) : ce que l'ACTEUR a le droit d'accorder ──
   const canGrantAllModules = actorCanGrantAllModules(actor);
@@ -606,6 +631,48 @@ const UserModal = ({ user, onClose, asPage = false }) => {
             </span>
           )}
         </div>
+
+        {/* Rattachement d'équipe (CRÉATION uniquement — ensuite via /admin/equipes).
+            Le nouveau compte devient membre des équipes cochées ; la société de
+            chaque équipe lui est accordée automatiquement côté serveur. */}
+        {canPickTeams && teams.length > 0 && formData.role !== "admin" && (
+          <div className="form-group">
+            <label>Rattacher à une équipe</label>
+            <div className="ent-pills">
+              {teams.map((t) => {
+                const on = formData.equipes.includes(t._id);
+                return (
+                  <button
+                    type="button"
+                    key={t._id}
+                    className={`ent-pill ${on ? "selected" : ""}`}
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        equipes: on
+                          ? prev.equipes.filter((id) => id !== t._id)
+                          : [...prev.equipes, t._id],
+                      }))
+                    }
+                    title={t.nom}
+                  >
+                    {on && <HiCheck />}
+                    <span>
+                      <HiUserGroup /> {t.nom}
+                      {t.entreprise?.trigramme
+                        ? ` · ${t.entreprise.trigramme}`
+                        : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="label-hint">
+              Le compte devient membre de l'équipe : il voit ses discussions et
+              ses tâches, et la société de l'équipe lui est accordée d'office.
+            </span>
+          </div>
+        )}
 
         <div className="form-group">
           <label className="checkbox-label">

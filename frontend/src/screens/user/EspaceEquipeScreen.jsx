@@ -539,8 +539,12 @@ const EspaceEquipeScreen = () => {
                       </button>
                     </>
                   )}
+                  {/* Discussion d'ÉQUIPE : la visibilité suit l'équipe — pas de
+                      « Quitter » ; suppression par le créateur OU le gestionnaire
+                      de l'équipe (isModerator). */}
                   {isUserConv &&
-                    (current.isOwner ? (
+                    (current.isOwner ||
+                    (current.equipe && current.isModerator) ? (
                       <button
                         className="ee-act ee-act--danger"
                         onClick={() => handleDelete(current)}
@@ -548,7 +552,7 @@ const EspaceEquipeScreen = () => {
                       >
                         <HiTrash />
                       </button>
-                    ) : (
+                    ) : current.equipe ? null : (
                       <button
                         className="ee-act ee-act--danger"
                         onClick={() => handleLeave(current)}

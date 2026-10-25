@@ -16,6 +16,7 @@
 import asyncHandler from "./asyncHandler.js";
 import Permission from "../models/PermissionModel.js";
 import Team from "../models/TeamModel.js";
+import User from "../models/UserModel.js";
 
 /**
  * Renvoie le périmètre d'entreprises accessible à un utilisateur.
@@ -215,6 +216,11 @@ export const getManageableUserScope = async (actor) => {
       entreprises: { $in: ids },
     }).select("user");
     const userIds = new Set(perms.map((p) => p.user.toString()));
+    // + les comptes qu'il a lui-même créés : sans ce repli, un utilisateur créé
+    // sans société cochée (Permission.entreprises vide) disparaîtrait de la
+    // liste de son propre créateur, qui ne pourrait plus le corriger.
+    const created = await User.find({ createdBy: actor._id }).select("_id");
+    for (const u of created) userIds.add(u._id.toString());
     userIds.add(selfId);
     return { all: false, userIds: [...userIds] };
   }

@@ -16,10 +16,17 @@ import {
 const idEq = (a, b) => a && b && a.toString() === b.toString();
 
 // Accès au chat d'une CONVERSATION user : participant, ou super-admin.
+// Conversation rattachée à une ÉQUIPE : la visibilité suit l'équipe (membres +
+// responsable + admin société), comme le salon team:<id> — un membre ajouté à
+// l'équipe APRÈS la création voit donc aussi la discussion.
 const canAccessConvChat = async (user, conv) => {
   if (!conv) return false;
   if (await isSuperAdmin(user)) return true;
-  return (conv.participants || []).some((p) => idEq(p, user._id));
+  if ((conv.participants || []).some((p) => idEq(p, user._id))) return true;
+  if (conv.equipe) {
+    return canAccessTeamChat(user, await Team.findById(conv.equipe));
+  }
+  return false;
 };
 
 // Accès au chat d'une ÉQUIPE : membre, responsable, admin de la société, super.
@@ -45,6 +52,9 @@ const canAccessTaskChat = async (user, task) => {
     const team = await Team.findById(task.equipe);
     if (team) {
       if (idEq(team.responsable, user._id)) return true;
+      // Les MEMBRES de l'équipe voient les tâches de leur équipe (même non
+      // assignés) : ils accèdent donc aussi au chat de ces tâches.
+      if ((team.membres || []).some((m) => idEq(m, user._id))) return true;
       if (user.role === "admin") {
         const { all, ids } = await getAccessibleEntreprises(user);
         if (all || ids.includes(team.entreprise?.toString())) return true;
@@ -99,7 +109,14 @@ export const canModerateRoom = async (user, room) => {
   }
   if (kind === "conv") {
     const conv = await Conversation.findById(id);
-    return conv ? idEq(conv.createdBy, user._id) : false;
+    if (!conv) return false;
+    if (idEq(conv.createdBy, user._id)) return true;
+    // Conversation d'équipe : le gestionnaire de l'équipe modère aussi.
+    if (conv.equipe) {
+      const team = await Team.findById(conv.equipe);
+      return team ? canAccessTeam(user, team) : false;
+    }
+    return false;
   }
   if (kind === "task") {
     const task = await Task.findById(id);
@@ -139,9 +156,21 @@ export const roomRecipients = async (room) => {
       .map((x) => x.toString());
   }
   if (kind === "conv") {
-    const conv = await Conversation.findById(id).select("participants");
+    const conv = await Conversation.findById(id).select("participants equipe");
     if (!conv) return [];
-    return (conv.participants || []).filter(Boolean).map((x) => x.toString());
+    const ids = new Set(
+      (conv.participants || []).filter(Boolean).map((x) => x.toString()),
+    );
+    // Conversation d'équipe : membres + responsable sont aussi destinataires.
+    if (conv.equipe) {
+      const team = await Team.findById(conv.equipe).select("membres responsable");
+      if (team) {
+        for (const m of [...(team.membres || []), team.responsable]) {
+          if (m) ids.add(m.toString());
+        }
+      }
+    }
+    return [...ids];
   }
   return [];
 };

@@ -15,6 +15,7 @@ import {
   findGridFSFile,
   openDownloadStream,
 } from "../utils/gridfsBucket.js";
+import Team from "../models/TeamModel.js";
 import {
   getManageableUserScope,
   canManageUser,
@@ -22,6 +23,7 @@ import {
   assertGrantWithinScope,
   canAssignRole,
   isSuperAdmin,
+  canAccessTeam,
 } from "../middleware/accessControl.js";
 import {
   genererListePDF,
@@ -441,7 +443,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 // @route   POST /api/users
 // @access  Private/Admin
 const createUser = asyncHandler(async (req, res) => {
-  const { email, password, nom, prenom, role, permissions } = req.body;
+  const { email, password, nom, prenom, role, permissions, equipes } = req.body;
 
   const userExists = await User.findOne({ email });
 
@@ -475,6 +477,25 @@ const createUser = asyncHandler(async (req, res) => {
     }
   }
 
+  // ── Rattachement d'ÉQUIPE à la création (optionnel) ───────────────────────
+  // Un responsable (ou un admin) peut créer un compte directement DANS une de
+  // ses équipes : chaque équipe demandée doit être gérable par l'acteur
+  // (canAccessTeam : son équipe pour un responsable, ses sociétés pour un admin).
+  const equipeIds = [...new Set((equipes || []).map(String))];
+  const equipesValides = [];
+  for (const teamId of equipeIds) {
+    const team = await Team.findById(teamId);
+    if (!team) {
+      res.status(404);
+      throw new Error("Équipe non trouvée");
+    }
+    if (!(await canAccessTeam(req.user, team))) {
+      res.status(403);
+      throw new Error("Équipe hors de votre périmètre");
+    }
+    equipesValides.push(team);
+  }
+
   const user = await User.create({
     email,
     password,
@@ -488,6 +509,15 @@ const createUser = asyncHandler(async (req, res) => {
   // tous les modules), sauf si l'UI restreint explicitement son périmètre.
   const isAdminRole = targetRole === "admin";
 
+  // La société de chaque équipe de rattachement est accordée d'office : un
+  // membre d'équipe sans sa société serait invisible du périmètre société de
+  // son responsable et ne verrait pas les données de l'équipe. Ces sociétés
+  // sont par construction dans le périmètre de l'acteur (canAccessTeam).
+  const entreprisesEquipes = equipesValides.map((t) => String(t.entreprise));
+  const unionEntreprises = (base = []) => [
+    ...new Set([...base.map(String), ...entreprisesEquipes]),
+  ];
+
   if (permissions) {
     const actorPerm = await Permission.findOne({ user: req.user._id });
     const commercial = await sanitizeCommercial(permissions.commercial, {
@@ -498,7 +528,7 @@ const createUser = asyncHandler(async (req, res) => {
     });
     await Permission.create({
       user: user._id,
-      entreprises: permissions.entreprises || [],
+      entreprises: unionEntreprises(permissions.entreprises || []),
       modules: appliquerAccesCommercial(permissions.modules || {}, commercial),
       // analyse / commerciauxScope : réservés au super-admin (sinon ignorés,
       // pour empêcher toute injection/escalade par un acteur non super-admin).
@@ -519,7 +549,7 @@ const createUser = asyncHandler(async (req, res) => {
   } else {
     await Permission.create({
       user: user._id,
-      entreprises: [],
+      entreprises: unionEntreprises(),
       modules: {},
       analyse: {},
       commerciauxScope: {},
@@ -527,6 +557,15 @@ const createUser = asyncHandler(async (req, res) => {
       allEntreprises: isAdminRole,
       allModules: isAdminRole,
     });
+  }
+
+  // Rattachement effectif aux équipes demandées (après la Permission, pour que
+  // le nouveau membre arrive complet dans les salons/compteurs d'équipe).
+  if (equipesValides.length) {
+    await Team.updateMany(
+      { _id: { $in: equipesValides.map((t) => t._id) } },
+      { $addToSet: { membres: user._id } },
+    );
   }
 
   try {

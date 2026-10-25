@@ -33,10 +33,15 @@ const accessibleChatRooms = async (user) => {
     teamFilter = { $or: [{ responsable: user._id }, { membres: user._id }] };
   }
 
-  const [teams, convs] = await Promise.all([
-    Team.find(teamFilter).select("_id"),
-    Conversation.find({ participants: user._id }).select("_id"),
-  ]);
+  const teams = await Team.find(teamFilter).select("_id");
+  // Convs où je suis participant + convs RATTACHÉES à une de mes équipes
+  // (même règle que getConversations — à garder synchronisés).
+  const convs = await Conversation.find({
+    $or: [
+      { participants: user._id },
+      { equipe: { $in: teams.map((t) => t._id) } },
+    ],
+  }).select("_id");
   return [
     "global",
     ...teams.map((t) => `team:${t._id}`),

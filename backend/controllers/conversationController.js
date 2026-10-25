@@ -36,6 +36,17 @@ const CONV_PHOTOS_BUCKET = "convphotos";
 const isParticipant = (conv, userId) =>
   (conv.participants || []).some((p) => String(p) === String(userId));
 
+// Visibilité d'une conversation : participant, OU — conversation d'ÉQUIPE —
+// membre/responsable de l'équipe (même ajouté après la création).
+const canSeeConv = async (conv, userId) => {
+  if (isParticipant(conv, userId)) return true;
+  if (!conv.equipe) return false;
+  const team = await Team.findById(conv.equipe).select("membres responsable");
+  if (!team) return false;
+  if (String(team.responsable) === String(userId)) return true;
+  return (team.membres || []).some((m) => String(m) === String(userId));
+};
+
 const userLite = "nom prenom email photo photoUpdatedAt";
 
 // Nudge temps réel : demande aux participants de rafraîchir leur liste de convs.
@@ -95,9 +106,16 @@ const getConversations = asyncHandler(async (req, res) => {
     });
   }
 
-  // 3) Discussions créées par les users (violet) — où je suis participant.
-  const convs = await Conversation.find({ participants: user._id })
+  // 3) Discussions créées par les users (violet) — où je suis participant, OU
+  //    rattachées à une de mes équipes (la visibilité d'une conversation
+  //    d'équipe suit l'équipe : responsable + membres, admins de la société via
+  //    le teamFilter ci-dessus).
+  const teamIds = teams.map((t) => t._id);
+  const convs = await Conversation.find({
+    $or: [{ participants: user._id }, { equipe: { $in: teamIds } }],
+  })
     .populate("participants", userLite)
+    .populate("equipe", "nom")
     .sort({ updatedAt: -1 });
   for (const c of convs) {
     let nom = c.nom;
@@ -107,6 +125,7 @@ const getConversations = asyncHandler(async (req, res) => {
       );
       nom = other ? `${other.prenom} ${other.nom}` : "Discussion";
     }
+    const isOwner = String(c.createdBy) === String(user._id);
     out.push({
       room: `conv:${c._id}`,
       type: c.type, // "direct" | "group"
@@ -115,7 +134,9 @@ const getConversations = asyncHandler(async (req, res) => {
       sub:
         c.type === "direct"
           ? "Discussion privée"
-          : `${c.participants.length} participants`,
+          : c.equipe
+            ? `Équipe ${c.equipe.nom}`
+            : `${c.participants.length} participants`,
       icone: c.icone || "chat",
       photo: c.photo || null,
       photoUpdatedAt: c.photoUpdatedAt || null,
@@ -127,9 +148,16 @@ const getConversations = asyncHandler(async (req, res) => {
         photoUpdatedAt: p.photoUpdatedAt || null,
       })),
       createdBy: String(c.createdBy),
-      isOwner: String(c.createdBy) === String(user._id),
-      // Modérateur d'une conv = son créateur.
-      isModerator: String(c.createdBy) === String(user._id),
+      equipe: c.equipe ? { _id: String(c.equipe._id), nom: c.equipe.nom } : null,
+      isOwner,
+      // Modérateur d'une conv = son créateur ; pour une conversation d'équipe,
+      // le gestionnaire de l'équipe (responsable / admin société) modère aussi.
+      isModerator:
+        superA ||
+        isOwner ||
+        (c.equipe
+          ? await canAccessTeam(user, await Team.findById(c.equipe._id))
+          : false),
       membresCount: c.participants.length,
     });
   }
@@ -223,13 +251,30 @@ const getRoomMembers = asyncHandler(async (req, res) => {
 // @route   POST /api/conversations
 // @access  Privé
 const createConversation = asyncHandler(async (req, res) => {
-  const { participants = [], nom = "", icone = "chat" } = req.body;
+  const { participants = [], nom = "", icone = "chat", equipe = null } = req.body;
+
+  // ── Discussion rattachée à une ÉQUIPE (optionnel) ─────────────────────────
+  // Réservée au GESTIONNAIRE de l'équipe (responsable / admin de la société) :
+  // la visibilité suit alors l'équipe (responsable + membres), les participants
+  // explicites restent possibles en plus (invités hors équipe).
+  let team = null;
+  if (equipe) {
+    team = await Team.findById(equipe);
+    if (!team) {
+      res.status(404);
+      throw new Error("Équipe non trouvée");
+    }
+    if (!(await canAccessTeam(req.user, team))) {
+      res.status(403);
+      throw new Error("Équipe hors de votre périmètre");
+    }
+  }
 
   // Périmètre : chaque participant doit être dans le périmètre société de l'acteur.
   const ids = [...new Set(participants.map(String))].filter(
     (id) => id !== String(req.user._id),
   );
-  if (ids.length === 0) {
+  if (ids.length === 0 && !team) {
     res.status(400);
     throw new Error("Sélectionnez au moins un participant");
   }
@@ -248,7 +293,8 @@ const createConversation = asyncHandler(async (req, res) => {
   }
 
   const icon = isValidChatIcon(icone) ? icone : "chat";
-  const type = ids.length > 1 ? "group" : "direct";
+  // Une discussion d'équipe est toujours un groupe (l'audience = l'équipe).
+  const type = team || ids.length > 1 ? "group" : "direct";
 
   // Pour un 1:1, réutiliser la conversation existante si elle existe déjà.
   if (type === "direct") {
@@ -263,13 +309,21 @@ const createConversation = asyncHandler(async (req, res) => {
 
   const conv = await Conversation.create({
     type,
-    nom: type === "group" ? (nom || "").trim() : "",
+    nom: type === "group" ? (nom || "").trim() || (team ? team.nom : "") : "",
     icone: icon,
     participants: [req.user._id, ...ids],
     createdBy: req.user._id,
+    equipe: team ? team._id : null,
   });
 
-  notifyConvRefresh(req, ids);
+  // Rafraîchir les participants explicites + toute l'équipe le cas échéant.
+  const toNotify = new Set(ids);
+  if (team) {
+    for (const m of [...(team.membres || []), team.responsable]) {
+      if (m && String(m) !== String(req.user._id)) toNotify.add(String(m));
+    }
+  }
+  notifyConvRefresh(req, [...toNotify]);
   res.status(201).json({ _id: conv._id, room: `conv:${conv._id}` });
 });
 
@@ -283,7 +337,13 @@ const deleteConversation = asyncHandler(async (req, res) => {
     throw new Error("Discussion introuvable");
   }
   const owner = String(conv.createdBy) === String(req.user._id);
-  if (!owner && !(await isSuperAdmin(req.user))) {
+  // Conversation d'équipe : le gestionnaire de l'équipe peut aussi la supprimer.
+  let teamManager = false;
+  if (!owner && conv.equipe) {
+    const team = await Team.findById(conv.equipe);
+    teamManager = team ? await canAccessTeam(req.user, team) : false;
+  }
+  if (!owner && !teamManager && !(await isSuperAdmin(req.user))) {
     res.status(403);
     throw new Error("Seul le créateur peut supprimer cette discussion");
   }
@@ -300,7 +360,8 @@ const deleteConversation = asyncHandler(async (req, res) => {
   );
   await Message.deleteMany({ room });
 
-  const participantIds = (conv.participants || []).map((p) => String(p));
+  // Destinataires AVANT suppression (inclut l'équipe pour une conv d'équipe).
+  const participantIds = await roomRecipients(room);
   await Conversation.deleteOne({ _id: conv._id });
 
   notifyConvRefresh(req, participantIds);
@@ -315,6 +376,14 @@ const leaveConversation = asyncHandler(async (req, res) => {
   if (!conv) {
     res.status(404);
     throw new Error("Discussion introuvable");
+  }
+  // La visibilité d'une discussion d'équipe suit l'équipe : on ne peut pas la
+  // quitter individuellement (comme le salon team:<id>).
+  if (conv.equipe) {
+    res.status(400);
+    throw new Error(
+      "Cette discussion est rattachée à une équipe : elle suit l'équipe et ne peut pas être quittée individuellement",
+    );
   }
   const isParticipant = (conv.participants || []).some(
     (p) => String(p) === String(req.user._id),
@@ -364,7 +433,7 @@ const uploadConversationPhoto = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error("Seuls les groupes ont une photo");
   }
-  if (!isParticipant(conv, req.user._id)) {
+  if (!(await canSeeConv(conv, req.user._id))) {
     res.status(403);
     throw new Error("Vous ne faites pas partie de ce groupe");
   }
@@ -392,9 +461,9 @@ const uploadConversationPhoto = asyncHandler(async (req, res) => {
 // @access  Participant
 const getConversationPhoto = asyncHandler(async (req, res) => {
   const conv = await Conversation.findById(req.params.id).select(
-    "participants photo",
+    "participants equipe photo",
   );
-  if (!conv || !conv.photo || !isParticipant(conv, req.user._id)) {
+  if (!conv || !conv.photo || !(await canSeeConv(conv, req.user._id))) {
     res.status(404);
     throw new Error("Pas de photo");
   }
@@ -423,7 +492,7 @@ const deleteConversationPhoto = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Discussion introuvable");
   }
-  if (!isParticipant(conv, req.user._id)) {
+  if (!(await canSeeConv(conv, req.user._id))) {
     res.status(403);
     throw new Error("Vous ne faites pas partie de ce groupe");
   }

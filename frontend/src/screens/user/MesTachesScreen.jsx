@@ -5,6 +5,7 @@
 // changer de statut. Tout utilisateur crée des tâches PERSO (fond distinct,
 // éditables). Cartes cliquables -> détail + documents.
 import React, { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import {
   HiRefresh,
   HiClipboardCheck,
@@ -39,9 +40,15 @@ const isPerso = (t) => t.type === "perso";
 const ACTIVE_STATUTS = ["a_faire", "en_cours", "bloque"];
 
 const MesTachesScreen = () => {
+  // Vue « Mes tâches » (assignées à moi) ou « Mon équipe » (toutes les tâches
+  // de mes équipes — visibilité d'équipe, le scope exact est côté serveur).
+  const [view, setView] = useState("mine"); // "mine" | "equipe"
   const { data: tasks, isLoading, error, refetch, isFetching } =
-    useGetTasksQuery({ mine: true });
+    useGetTasksQuery(view === "mine" ? { mine: true } : {});
   const [updateStatut] = useUpdateTaskStatutMutation();
+
+  const { userInfo } = useSelector((state) => state.auth);
+  const myId = userInfo?._id;
 
   // Ouvrir « Mes tâches » = marquer les tâches comme vues (efface le badge).
   const [markTasksSeen] = useMarkTasksSeenMutation();
@@ -91,14 +98,20 @@ const MesTachesScreen = () => {
     const perso = isPerso(task);
     const overdue = isOverdue(task);
     const nbDocs = task.documents?.length || 0;
+    // En vue « Mon équipe », une tâche où je ne suis PAS assigné est en lecture
+    // seule (le serveur refuse le changement de statut) : pas de drag.
+    const mine = (task.assignes || []).some(
+      (a) => String(a?._id || a) === String(myId),
+    );
+    const canDrag = perso || mine || view === "mine";
     return (
       <div
         key={task._id}
         className={`mt-task ${perso ? "perso" : ""} ${
           dragId === task._id ? "dragging" : ""
         } ${task.archive ? "archived" : ""}`}
-        draggable
-        onDragStart={() => setDragId(task._id)}
+        draggable={canDrag}
+        onDragStart={() => canDrag && setDragId(task._id)}
         onDragEnd={() => {
           setDragId(null);
           setOverZone(null);
@@ -132,6 +145,17 @@ const MesTachesScreen = () => {
 
         <p className="mt-task-title">{task.titre}</p>
         {task.description && <p className="mt-task-desc">{task.description}</p>}
+
+        {/* Vue « Mon équipe » : qui est sur la tâche (moi = carte déplaçable). */}
+        {view === "equipe" && !perso && (task.assignes?.length || 0) > 0 && (
+          <p className="mt-task-assignes">
+            <HiUser />
+            {task.assignes
+              .map((a) => `${a.prenom || ""} ${a.nom || ""}`.trim())
+              .filter(Boolean)
+              .join(", ")}
+          </p>
+        )}
 
         <div className="mt-task-foot">
           {task.deadline && (
@@ -180,7 +204,7 @@ const MesTachesScreen = () => {
             <HiClipboardCheck />
           </div>
           <div>
-            <h1>Mes tâches</h1>
+            <h1>{view === "mine" ? "Mes tâches" : "Tâches de mon équipe"}</h1>
             <p className="mt-header-sub">
               {stats.total} tâche{stats.total > 1 ? "s" : ""} · {stats.perso}{" "}
               perso · {stats.retard} en retard
@@ -188,6 +212,23 @@ const MesTachesScreen = () => {
           </div>
         </div>
         <div className="mt-header-actions">
+          {/* Bascule Mes tâches / Mon équipe (visibilité d'équipe : un membre
+              voit toutes les tâches de ses équipes, en lecture seule si non
+              assigné). */}
+          <div className="mt-view-toggle">
+            <button
+              className={view === "mine" ? "on" : ""}
+              onClick={() => setView("mine")}
+            >
+              <HiUser /> Les miennes
+            </button>
+            <button
+              className={view === "equipe" ? "on" : ""}
+              onClick={() => setView("equipe")}
+            >
+              <HiUserGroup /> Mon équipe
+            </button>
+          </div>
           <button
             className="mt-refresh"
             onClick={refetch}

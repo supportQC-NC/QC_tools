@@ -776,3 +776,42 @@
   color: var(--danger);
   background: rgba(255, 107, 107, 0.12);
 }
+
+/* ── Bascule « Les miennes / Mon équipe » (visibilité d'équipe) ─────────── */
+.mt-view-toggle {
+  display: inline-flex;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.mt-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mt-view-toggle button.on {
+  background: linear-gradient(135deg, #4da6ff, #3d7fd9);
+  color: #fff;
+}
+
+/* Assignés d'une tâche (vue « Mon équipe ») */
+.mt-task-assignes {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

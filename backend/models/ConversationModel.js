@@ -38,6 +38,15 @@ const conversationSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // Discussion RATTACHÉE à une équipe (optionnel) : la visibilité suit alors
+    // l'équipe — responsable + membres (y compris ajoutés APRÈS la création),
+    // en plus des participants explicites. Créée par le gestionnaire de
+    // l'équipe (responsable / admin de la société).
+    equipe: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Team",
+      default: null,
+    },
     // Photo de groupe (optionnelle) : id GridFS (bucket "convphotos").
     photo: {
       type: mongoose.Schema.Types.ObjectId,
@@ -52,6 +61,7 @@ const conversationSchema = new mongoose.Schema(
 );
 
 conversationSchema.index({ participants: 1 });
+conversationSchema.index({ equipe: 1 });
 
 const Conversation = mongoose.model("Conversation", conversationSchema);
 
