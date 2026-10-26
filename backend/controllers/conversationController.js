@@ -107,12 +107,20 @@ const getConversations = asyncHandler(async (req, res) => {
   }
 
   // 3) Discussions créées par les users (violet) — où je suis participant, OU
-  //    rattachées à une de mes équipes (la visibilité d'une conversation
-  //    d'équipe suit l'équipe : responsable + membres, admins de la société via
-  //    le teamFilter ci-dessus).
-  const teamIds = teams.map((t) => t._id);
+  //    rattachées à une équipe dont je fais PARTIE (responsable ou membre),
+  //    comme canSeeConv. Un admin / super-admin garde l'ACCÈS aux autres
+  //    (canAccessRoom, modération), mais sa liste ne montre pas les
+  //    discussions qui ne le concernent pas — `teams` contient toutes ses
+  //    équipes accessibles, on ne retient ici que les siennes.
+  const mesTeamIds = teams
+    .filter(
+      (t) =>
+        String(t.responsable) === String(user._id) ||
+        (t.membres || []).some((m) => String(m) === String(user._id)),
+    )
+    .map((t) => t._id);
   const convs = await Conversation.find({
-    $or: [{ participants: user._id }, { equipe: { $in: teamIds } }],
+    $or: [{ participants: user._id }, { equipe: { $in: mesTeamIds } }],
   })
     .populate("participants", userLite)
     .populate("equipe", "nom")
