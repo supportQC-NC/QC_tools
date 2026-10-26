@@ -2,9 +2,10 @@
 //
 // DISCUSSIONS de l'Espace équipe. La liste unifiée regroupe TROIS familles :
 //   - « global »   : canal de toute l'entreprise (bleu) — toujours présent ;
-//   - « team:<id> »: une discussion par équipe accessible (vert) — DÉRIVÉE des
-//                     Team, visible par les MEMBRES (corrige la limite où seul
-//                     le responsable voyait l'équipe) ;
+//   - « team:<id> »: une discussion par équipe (vert) — DÉRIVÉE des Team,
+//                     visible par ses MEMBRES uniquement (responsable + membres,
+//                     plus d'accès admin société / super-admin non membre —
+//                     décision client du 26/10/2026) ;
 //   - « conv:<id> »: discussions libres créées par les users (violet), 1:1 ou
 //                     groupe — persistées via ConversationModel.
 // Le code couleur est porté par le champ `type` renvoyé au front.
@@ -17,7 +18,6 @@ import RoomRead from "../models/RoomReadModel.js";
 import User from "../models/UserModel.js";
 import {
   isSuperAdmin,
-  getAccessibleEntreprises,
   canChatWith,
   canAccessTeam,
 } from "../middleware/accessControl.js";
@@ -76,16 +76,12 @@ const getConversations = asyncHandler(async (req, res) => {
     isModerator: superA,
   });
 
-  // 2) Équipes accessibles (vert) — membre OU responsable ; admin = ses sociétés.
-  let teamFilter;
-  if (await isSuperAdmin(user)) {
-    teamFilter = {};
-  } else if (user.role === "admin") {
-    const { all, ids } = await getAccessibleEntreprises(user);
-    teamFilter = all ? {} : { entreprise: { $in: ids } };
-  } else {
-    teamFilter = { $or: [{ responsable: user._id }, { membres: user._id }] };
-  }
+  // 2) Équipes dont je suis MEMBRE (vert) — responsable ou membre, pour TOUS les
+  //    rôles : un admin / super-admin non membre ne voit plus les discussions
+  //    d'équipe (décision client du 26/10/2026, alignée sur canAccessTeamChat).
+  const teamFilter = {
+    $or: [{ responsable: user._id }, { membres: user._id }],
+  };
   const teams = await Team.find(teamFilter)
     .populate("entreprise", "trigramme")
     .select("nom icone membres entreprise responsable");
@@ -101,16 +97,16 @@ const getConversations = asyncHandler(async (req, res) => {
       }`,
       icone: t.icone || "users",
       membresCount: nb,
-      // Modérateur = responsable de l'équipe / admin de la société / super-admin.
-      isModerator: await canAccessTeam(user, t),
+      // Modérateur = responsable de l'équipe (aligné sur canModerateRoom).
+      isModerator: String(t.responsable) === String(user._id),
     });
   }
 
   // 3) Discussions créées par les users (violet) — où je suis participant, OU
   //    rattachées à une de mes équipes (la visibilité d'une conversation
-  //    d'équipe suit l'équipe : responsable + membres, admins de la société via
-  //    le teamFilter ci-dessus).
+  //    d'équipe suit l'équipe : responsable + membres, rien d'autre).
   const teamIds = teams.map((t) => t._id);
+  const teamById = new Map(teams.map((t) => [String(t._id), t]));
   const convs = await Conversation.find({
     $or: [{ participants: user._id }, { equipe: { $in: teamIds } }],
   })
@@ -151,12 +147,12 @@ const getConversations = asyncHandler(async (req, res) => {
       equipe: c.equipe ? { _id: String(c.equipe._id), nom: c.equipe.nom } : null,
       isOwner,
       // Modérateur d'une conv = son créateur ; pour une conversation d'équipe,
-      // le gestionnaire de l'équipe (responsable / admin société) modère aussi.
+      // le responsable de l'équipe modère aussi (aligné sur canModerateRoom).
       isModerator:
-        superA ||
         isOwner ||
         (c.equipe
-          ? await canAccessTeam(user, await Team.findById(c.equipe._id))
+          ? String(teamById.get(String(c.equipe._id))?.responsable) ===
+            String(user._id)
           : false),
       membresCount: c.participants.length,
     });
@@ -327,9 +323,11 @@ const createConversation = asyncHandler(async (req, res) => {
   res.status(201).json({ _id: conv._id, room: `conv:${conv._id}` });
 });
 
-// @desc    Supprimer une discussion (créateur / super-admin) — + ses messages
+// @desc    Supprimer une discussion (créateur ; conv d'équipe : responsable)
+//          — + ses messages. Pas de bypass admin/super-admin : seuls les
+//          membres d'une discussion la voient et y interagissent.
 // @route   DELETE /api/conversations/:id
-// @access  Créateur ou super-admin
+// @access  Créateur (ou responsable de l'équipe pour une conv d'équipe)
 const deleteConversation = asyncHandler(async (req, res) => {
   const conv = await Conversation.findById(req.params.id);
   if (!conv) {
@@ -337,13 +335,15 @@ const deleteConversation = asyncHandler(async (req, res) => {
     throw new Error("Discussion introuvable");
   }
   const owner = String(conv.createdBy) === String(req.user._id);
-  // Conversation d'équipe : le gestionnaire de l'équipe peut aussi la supprimer.
+  // Conversation d'équipe : le responsable de l'équipe peut aussi la supprimer.
   let teamManager = false;
   if (!owner && conv.equipe) {
-    const team = await Team.findById(conv.equipe);
-    teamManager = team ? await canAccessTeam(req.user, team) : false;
+    const team = await Team.findById(conv.equipe).select("responsable");
+    teamManager = team
+      ? String(team.responsable) === String(req.user._id)
+      : false;
   }
-  if (!owner && !teamManager && !(await isSuperAdmin(req.user))) {
+  if (!owner && !teamManager) {
     res.status(403);
     throw new Error("Seul le créateur peut supprimer cette discussion");
   }

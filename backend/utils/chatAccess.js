@@ -10,18 +10,17 @@ import User from "../models/UserModel.js";
 import {
   isSuperAdmin,
   getAccessibleEntreprises,
-  canAccessTeam,
 } from "../middleware/accessControl.js";
 
 const idEq = (a, b) => a && b && a.toString() === b.toString();
 
-// Accès au chat d'une CONVERSATION user : participant, ou super-admin.
-// Conversation rattachée à une ÉQUIPE : la visibilité suit l'équipe (membres +
-// responsable + admin société), comme le salon team:<id> — un membre ajouté à
-// l'équipe APRÈS la création voit donc aussi la discussion.
+// Accès au chat d'une CONVERSATION user : MEMBRES UNIQUEMENT (décision client du
+// 26/10/2026 — seuls les membres d'une discussion la voient et y interagissent,
+// AUCUN bypass admin / super-admin). Participant explicite, ou — conversation
+// rattachée à une ÉQUIPE — membre/responsable de l'équipe (un membre ajouté à
+// l'équipe APRÈS la création voit donc aussi la discussion).
 const canAccessConvChat = async (user, conv) => {
   if (!conv) return false;
-  if (await isSuperAdmin(user)) return true;
   if ((conv.participants || []).some((p) => idEq(p, user._id))) return true;
   if (conv.equipe) {
     return canAccessTeamChat(user, await Team.findById(conv.equipe));
@@ -29,17 +28,13 @@ const canAccessConvChat = async (user, conv) => {
   return false;
 };
 
-// Accès au chat d'une ÉQUIPE : membre, responsable, admin de la société, super.
+// Accès au chat d'une ÉQUIPE : MEMBRES UNIQUEMENT — responsable ou membre.
+// (Même décision : un admin de la société / super-admin non membre n'y accède
+// plus ; la GESTION de l'équipe reste, elle, soumise à canAccessTeam.)
 const canAccessTeamChat = async (user, team) => {
   if (!team) return false;
-  if (await isSuperAdmin(user)) return true;
   if (idEq(team.responsable, user._id)) return true;
-  if ((team.membres || []).some((m) => idEq(m, user._id))) return true;
-  if (user.role === "admin") {
-    const { all, ids } = await getAccessibleEntreprises(user);
-    return all || ids.includes(team.entreprise?.toString());
-  }
-  return false;
+  return (team.membres || []).some((m) => idEq(m, user._id));
 };
 
 // Accès au chat d'une TÂCHE : assigné, auteur, ou gestionnaire de l'équipe.
@@ -87,16 +82,17 @@ export const canAccessRoom = async (user, room) => {
 };
 
 // Peut MODÉRER le salon = supprimer n'importe quel message (au-delà de son
-// propre message, toujours autorisé). Règles :
-//   - super-admin : partout ;
-//   - global : super-admin uniquement (déjà couvert) ;
-//   - team:<id> : responsable de l'équipe / admin de la société (canAccessTeam) ;
-//   - conv:<id> : créateur de la conversation ;
-//   - task:<id> : auteur de la tâche.
+// propre message, toujours autorisé). Un modérateur est forcément un MEMBRE du
+// salon (même décision du 26/10/2026 : plus de bypass admin/super-admin sur les
+// discussions). Règles :
+//   - global : super-admin uniquement ;
+//   - team:<id> : responsable de l'équipe ;
+//   - conv:<id> : créateur de la conversation ; conversation d'équipe : le
+//     responsable de l'équipe modère aussi ;
+//   - task:<id> : auteur de la tâche, ou super-admin.
 export const canModerateRoom = async (user, room) => {
   if (!user || !room) return false;
-  if (await isSuperAdmin(user)) return true;
-  if (room === "global") return false;
+  if (room === "global") return isSuperAdmin(user);
 
   const sep = room.indexOf(":");
   if (sep === -1) return false;
@@ -105,22 +101,24 @@ export const canModerateRoom = async (user, room) => {
 
   if (kind === "team") {
     const team = await Team.findById(id);
-    return team ? canAccessTeam(user, team) : false;
+    return team ? idEq(team.responsable, user._id) : false;
   }
   if (kind === "conv") {
     const conv = await Conversation.findById(id);
     if (!conv) return false;
     if (idEq(conv.createdBy, user._id)) return true;
-    // Conversation d'équipe : le gestionnaire de l'équipe modère aussi.
+    // Conversation d'équipe : le responsable de l'équipe modère aussi.
     if (conv.equipe) {
       const team = await Team.findById(conv.equipe);
-      return team ? canAccessTeam(user, team) : false;
+      return team ? idEq(team.responsable, user._id) : false;
     }
     return false;
   }
   if (kind === "task") {
     const task = await Task.findById(id);
-    return task ? idEq(task.creePar, user._id) : false;
+    if (!task) return false;
+    if (idEq(task.creePar, user._id)) return true;
+    return isSuperAdmin(user);
   }
   return false;
 };
