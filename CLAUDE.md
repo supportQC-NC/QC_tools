@@ -416,13 +416,18 @@ déployées de l'app mobile s'en servaient).
 - **Réappro rayon** (mode mobile *Réappro ▸ Réappro rayon*) : **SANS ÉTAT**,
   comme le réappro libre — **aucune `DemandeReappro` n'est créée** (décision
   client du 23/10/2026, une première version qui créait une liste a été
-  retirée). L'agent bipe le **QR d'un gisement DOCK** (étiquette gondole — le
-  QR encode le code GISM2 **brut**, sans emplacement ; l'app tolère aussi
-  « code|emplacement » des fiches de zone). `POST /mobile/rayon` renvoie les
-  articles (règle « rayon vide » partagée, `getArticlesRayonVide` + option
-  `gism2` : S1 = 0, réserve S2..S5 > 0, meilleures ventes d'abord), avec
+  retirée). L'agent **choisit d'abord sa zone — dock ou magasin** (27/10/2026,
+  mêmes tuiles que « Où ranger ? ») puis bipe le **QR / code-barres de
+  l'étiquette du rayon** (l'étiquette encode le code du gisement **brut**, sans
+  emplacement ; l'app tolère aussi « code|emplacement » des fiches de zone).
+  `POST /mobile/rayon` (body `zone`, défaut `DOCK` — compat apps déployées)
+  filtre sur **GISM2 si dock, GISM1 si magasin** (règle « rayon vide »
+  partagée, `getArticlesRayonVide` + option `gism2`/`gism1` : S1 = 0, réserve
+  S2..S5 > 0, meilleures ventes d'abord), avec
   `qteProposee` = `min(réserve, max(1, ceil(vteMoyMois)))` (formule du module
-  réappro magasin) et `gism1`/`rayonMagasin` (destination). L'app déroule le
+  réappro magasin) et les DEUX gisements par article — côté dock l'app met en
+  avant `gism1`/`rayonMagasin` (destination), côté magasin
+  `gism2`/`rayonDock` (où aller chercher). L'app déroule le
   parcours en local : pour valider une référence l'agent doit **la biper**
   (gencode tolérant aux zéros de tête, correspondance locale ; biper un autre
   article du rayon saute à sa ligne ; saisie NART en secours) puis saisit la

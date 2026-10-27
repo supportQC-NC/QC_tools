@@ -874,9 +874,10 @@ const getMobileDemandes = asyncHandler(async (req, res) => {
 // ====================== RÉAPPRO RAYON (mobile, SANS état) ======================
 // Décision client du 23/10/2026 : le réappro rayon fonctionne comme le réappro
 // de base — AUCUNE DemandeReappro n'est créée, rien n'apparaît dans les listes
-// ni dans le suivi. L'agent bipe le QR d'un gisement DOCK, le serveur lui dit
-// ce qui est à réapprovisionner, il passe ou valide chaque article avec la
-// quantité réellement prise, et la fin de parcours génère directement le
+// ni dans le suivi. L'agent choisit SA zone (dock ou magasin, 27/10/2026) puis
+// bipe l'étiquette du rayon — GISM2 côté dock, GISM1 côté magasin —, le serveur
+// lui dit ce qui est à réapprovisionner, il passe ou valide chaque article avec
+// la quantité réellement prise, et la fin de parcours génère directement le
 // fichier .dat dans collect_sec (même format/endroit que tous les réappros).
 
 // Garde commune des deux endpoints : société + code du rayon.
@@ -895,16 +896,24 @@ const lireRayonBody = async (req, res) => {
   return { key, code };
 };
 
-// @desc    (MOBILE) Réappro rayon : scan du QR d'un gisement DOCK -> articles
+// @desc    (MOBILE) Réappro rayon : scan de l'étiquette d'un rayon -> articles
 // @route   POST /api/demande-reappro/mobile/rayon
-// @body    { entreprise (nomDossierDBF), code (GISM2, contenu brut du QR gondole) }
+// @body    { entreprise (nomDossierDBF), code (contenu brut du QR / code-barres
+//           de l'étiquette), zone? ("DOCK" | "MAGASIN", défaut DOCK) }
 // @access  Private — périmètre société seul (comme les autres routes mobiles)
-// Le QR gondole encode le CODE du gisement, sans emplacement : ce mode impose
-// DOCK (GISM2). Articles retenus : la règle « rayon vide » partagée (S1 = 0,
-// réserve S2..S5 > 0, hors techniques/renvois), filtrée sur le GISM2 scanné,
-// meilleures ventes d'abord. Lecture seule : rien n'est écrit nulle part.
+// L'étiquette encode le CODE du gisement, sans emplacement : c'est la `zone`
+// choisie par l'agent AVANT le scan qui dit quel champ filtrer — GISM2 pour une
+// étiquette du DOCK (défaut, compat des apps déjà déployées qui n'envoient pas
+// `zone`), GISM1 pour celle d'un rayon MAGASIN (27/10/2026). Articles retenus :
+// la règle « rayon vide » partagée (S1 = 0, réserve S2..S5 > 0, hors
+// techniques/renvois), filtrée sur le gisement scanné, meilleures ventes
+// d'abord. Lecture seule : rien n'est écrit nulle part.
 const getArticlesRayonMobile = asyncHandler(async (req, res) => {
   const { key, code } = await lireRayonBody(req, res);
+  const zone =
+    String(req.body.zone || "").trim().toUpperCase() === "MAGASIN"
+      ? "MAGASIN"
+      : "DOCK";
   const entreprise = await Entreprise.findOne({ nomDossierDBF: key });
   if (!entreprise) {
     res.status(404);
@@ -912,14 +921,16 @@ const getArticlesRayonMobile = asyncHandler(async (req, res) => {
   }
 
   const { articles } = await getArticlesRayonVide(entreprise, {
-    gism2: code,
-    emplacement: "DOCK",
+    ...(zone === "MAGASIN" ? { gism1: code } : { gism2: code }),
+    emplacement: zone,
     limit: 3000,
   });
   if (articles.length === 0) {
     // `motif` : l'app distingue « rayon à jour » d'un code qui n'existe pas.
     res.status(404).json({
-      message: `Rien à réapprovisionner depuis le rayon dock ${code}`,
+      message: `Rien à réapprovisionner depuis le rayon ${
+        zone === "MAGASIN" ? "magasin" : "dock"
+      } ${code}`,
       motif: "rayon_vide",
     });
     return;
@@ -935,9 +946,17 @@ const getArticlesRayonMobile = asyncHandler(async (req, res) => {
     return round3(Math.min(Number(a.stockReserves) || 0, besoin));
   };
 
+  // Le libellé du rayon scanné vient du dictionnaire, interrogé sur le couple
+  // code + emplacement : celui de la zone bipée, pas de l'autre.
+  const libelle =
+    zone === "MAGASIN"
+      ? articles.find((a) => a.rayonMagasin)?.rayonMagasin || ""
+      : articles.find((a) => a.rayonDock)?.rayonDock || "";
+
   res.json({
     code,
-    libelle: articles.find((a) => a.rayonDock)?.rayonDock || "",
+    zone,
+    libelle,
     articles: articles.map((a) => ({
       nart: a.nart,
       design: a.design,
@@ -948,8 +967,12 @@ const getArticlesRayonMobile = asyncHandler(async (req, res) => {
       stock: a.stock,
       vteMoyMois: a.vteMoyMois,
       qteProposee: qteProposee(a),
+      // Les DEUX gisements : destination magasin (GISM1) côté dock, et
+      // emplacement où aller chercher au dock (GISM2) côté magasin.
       gism1: a.gism1,
       rayonMagasin: a.rayonMagasin,
+      gism2: a.gism2,
+      rayonDock: a.rayonDock,
     })),
   });
 });
