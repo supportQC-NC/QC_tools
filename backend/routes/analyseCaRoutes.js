@@ -23,7 +23,10 @@ router.post(
   genererRapport,
 );
 
-// Aperçu (période, KPIs, graphiques, onglets) pour le dashboard.
+// Aperçu (période, KPIs, graphiques, onglets) calculé depuis le DBF.
+// ⚠️ Plus consommé par le web depuis que l'écran Analyse CA lit les matrices
+// Excel du Rcommun (/api/analyse-ca-matrices). Conservé le temps de valider le
+// nouvel écran — à retirer avec analyseCaGenerator.apercu() si confirmé.
 router.get(
   "/:nomDossierDBF",
   protect,

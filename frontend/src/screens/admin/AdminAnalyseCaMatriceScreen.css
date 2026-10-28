@@ -293,3 +293,118 @@
   border-radius: 50%;
   display: inline-block;
 }
+/* ── Tableaux (mensuel + quotidien + catégories) ── */
+.aca-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.aca-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  color: #22303c;
+}
+
+.aca-table th {
+  text-align: right;
+  padding: 0.55rem 0.7rem;
+  background: #f2f6fa;
+  color: #5b6b7b;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #e1e8ef;
+  white-space: nowrap;
+}
+
+.aca-table th:first-child,
+.aca-table td:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+
+.aca-table td {
+  text-align: right;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid #eef2f6;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.aca-table tbody tr:hover {
+  background: #f8fbfe;
+}
+
+.aca-table tr.aca-row-total td {
+  background: #f2f6fa;
+  font-weight: 700;
+  border-top: 2px solid #d5dee7;
+}
+
+.aca-table .pos {
+  color: #1e8e4e;
+  font-weight: 600;
+}
+
+.aca-table .neg {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.aca-table .muted {
+  color: #9aa8b5;
+  font-weight: 400;
+}
+
+/* Pastille de catégorie (couleur fixe par nom) */
+.aca-cat-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: baseline;
+}
+
+/* ── Bloc détail du mois ── */
+.aca-mois-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.75rem 0 0.9rem;
+}
+
+.aca-mois-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.8rem 1.1rem;
+  background: #fff;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.aca-mois-kpis strong {
+  color: #1f4e79;
+}
+
+/* ── Pied de page (fichier source) ── */
+.aca-source-note {
+  font-size: 0.78rem;
+  color: #8494a4;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.aca-source-note code {
+  background: #f2f6fa;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+}

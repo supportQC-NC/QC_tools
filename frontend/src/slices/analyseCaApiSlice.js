@@ -24,17 +24,12 @@ function filenameFrom(cd, fallback) {
   return m ? decodeURIComponent(m[1]) : fallback;
 }
 
+// ⚠️ L'aperçu DBF (GET /api/analyse-ca/:dossier) n'est plus consommé ici :
+// le dashboard de l'écran Analyse CA lit désormais les matrices Excel du
+// Rcommun (voir analyseCaMatriceApiSlice). Seule la génération du rapport
+// détaillé 13 onglets reste branchée sur ce routeur.
 export const analyseCaApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    // Aperçu (période, KPIs, onglets) pour le dashboard.
-    getAnalyseCaApercu: builder.query({
-      query: ({ nomDossierDBF, moisCoupure }) => ({
-        url: `${URL}/${nomDossierDBF}`,
-        params: moisCoupure ? { moisCoupure } : undefined,
-      }),
-      keepUnusedDataFor: 60,
-    }),
-
     // Génération du fichier .xlsx (13 onglets). Renvoie { blob, filename, meta }.
     genererAnalyseCa: builder.mutation({
       query: ({ nomDossierDBF, moisCoupure }) => ({
@@ -64,7 +59,4 @@ export const analyseCaApiSlice = apiSlice.injectEndpoints({
   }),
 });
 
-export const {
-  useGetAnalyseCaApercuQuery,
-  useGenererAnalyseCaMutation,
-} = analyseCaApiSlice;
+export const { useGenererAnalyseCaMutation } = analyseCaApiSlice;
