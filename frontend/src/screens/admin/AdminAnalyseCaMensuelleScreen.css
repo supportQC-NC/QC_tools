@@ -316,3 +316,117 @@
 .acm-table tr.acm-row-groupe td {
   border-top: 2px solid var(--admin-border);
 }
+
+/* ── Bandeau KPI (cumuls du mois, bloc TOTAL MENSUEL de TYPES_CLIENT) ── */
+.acm-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.acm-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.05rem 1.2rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
+}
+
+.acm-kpi-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-muted);
+  font-weight: 600;
+}
+
+.acm-kpi-value {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.acm-kpi-evol {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.acm-kpi-evol.pos {
+  color: var(--admin-success);
+}
+
+.acm-kpi-evol.neg {
+  color: var(--admin-danger);
+}
+
+.acm-kpi-sub {
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary);
+}
+
+/* ── Graphiques par onglet ── */
+.acm-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.acm-chart-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1rem 1rem 0.5rem;
+  box-shadow: var(--admin-shadow);
+  min-width: 0;
+}
+
+.acm-chart-wide {
+  grid-column: 1 / -1;
+}
+
+.acm-chart-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--admin-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.8rem;
+}
+
+/* Tooltip recharts custom (même style que l'écran Analyse CA) */
+.acm-tooltip {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.55rem 0.75rem;
+  box-shadow: var(--admin-shadow-lg);
+  font-size: 0.82rem;
+  color: var(--admin-text);
+}
+
+.acm-tooltip-label {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  color: var(--admin-primary);
+}
+
+.acm-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  line-height: 1.55;
+  color: var(--admin-text);
+}
+
+.acm-tooltip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}

@@ -18,6 +18,20 @@ import {
   useGetAnalyseCaMensuelleSourcesQuery,
   useGetAnalyseCaMensuelleClasseurQuery,
 } from "../../slices/analyseCaMensuelleApiSlice";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+  PieChart,
+  Pie,
+} from "recharts";
 import "./AdminAnalyseCaMensuelleScreen.css";
 
 const PAGE_SIZE = 100;
@@ -37,10 +51,72 @@ const LABELS_FEUILLES = {
   Client_Interne: "Clients internes",
 };
 
+// ── Couleurs des graphiques (thème sombre de l'admin) ──
+const CH = {
+  grille: "#2a2a3a",
+  axe: "#a7a7b8",
+  caN: "#4da6ff",
+  caN1: "#4a5570",
+  hausse: "#10b981",
+  baisse: "#ef4444",
+  depreciation: "#f59e0b",
+};
+
+// Couleur FIXE par type de client (jamais réaffectée selon le rang).
+const TYPE_COLORS = {
+  PARTICULIER: "#4da6ff",
+  FIDELITE: "#34d399",
+  "PRO COMPTANT": "#fbbf24",
+  "PRO DEBIT": "#fb7185",
+  REVENDEUR: "#2dd4bf",
+  GROUPE: "#c084fc",
+  ADMINISTRATION: "#94a3b8",
+  AGRICULTEUR: "#a3e635",
+  EMPLOYE: "#f97316",
+  AUTRE: "#f472b6",
+};
+const PALETTE_SECOURS = ["#60a5fa", "#fb923c", "#818cf8", "#e879f9", "#4ade80"];
+const typeColor = (nom, i) =>
+  TYPE_COLORS[nom] || PALETTE_SECOURS[i % PALETTE_SECOURS.length];
+
 // ── Formats ──
 const fmtNb = (n, dec = 0) =>
   new Intl.NumberFormat("fr-FR", { maximumFractionDigits: dec }).format(n);
 const fmtPct = (n) => `${fmtNb(n, 1)} %`;
+const fmtEvol = (n) =>
+  typeof n === "number" ? `${n > 0 ? "+" : ""}${fmtNb(n, 1)} %` : "—";
+const evolClass = (n) => (typeof n !== "number" ? "" : n >= 0 ? "pos" : "neg");
+const fmtCompact = (n) => {
+  if (typeof n !== "number") return "";
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${(n / 1e9).toFixed(1)} Md`;
+  if (abs >= 1e6) return `${(n / 1e6).toFixed(1)} M`;
+  if (abs >= 1e3) return `${Math.round(n / 1e3)} k`;
+  return String(n);
+};
+const tronque = (s, n = 24) => {
+  const t = String(s ?? "");
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+};
+
+// Tooltip recharts en XPF complet.
+const XpfTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="acm-tooltip">
+      {label != null && <div className="acm-tooltip-label">{label}</div>}
+      {payload.map((p) => (
+        <div key={p.dataKey || p.name} className="acm-tooltip-row">
+          <span className="acm-tooltip-dot" style={{ background: p.color || p.payload?.fill }} />
+          {p.name} :{" "}
+          <strong>
+            {typeof p.value === "number" ? `${fmtNb(p.value)} XPF` : p.value}
+          </strong>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const sansAccents = (s) =>
   String(s)
@@ -88,6 +164,317 @@ function Cellule({ valeur, colonne, pct, colore }) {
   return <>{fmtNb(valeur, 2)}</>;
 }
 
+// ── Graphiques par feuille ──────────────────────────────────────────────────
+
+// Index de la colonne dont l'en-tête (normalisé sans accents) satisfait le motif.
+const idxCol = (feuille, motif) =>
+  feuille.colonnes.findIndex((c) => motif.test(sansAccents(c.label)));
+
+// Feuilles « classement » (une ligne par entité, CA N / CA N-1) et l'index de
+// leur colonne libellé.
+const FEUILLES_CLASSEES = {
+  Client: 1,
+  Fournisseurs: 1,
+  Classes: 2,
+  Sous_Classes: 2,
+  Locates: 2,
+  Groupes: 1,
+  Familles: 1,
+  Sous_Familles: 1,
+};
+
+const donneesFeuille = (feuille) =>
+  feuille.lignes.filter((l) => !estLigneTotal(l));
+
+// Prépare les jeux de données des graphiques de la feuille active.
+function construireGraphes(feuille) {
+  const lignes = donneesFeuille(feuille);
+  if (lignes.length < 2) return null;
+
+  // TYPES_CLIENT : CA mensuel empilé par type + répartition + taux de marge.
+  if (feuille.nom === "TYPES_CLIENT") {
+    const iCumul = idxCol(feuille, /^cumul$/);
+    if (iCumul === -1) return null;
+    const lignesCA = lignes.filter((l) => l[1] === "CA");
+    const types = lignesCA.map((l) => l[0]);
+    const empile = feuille.colonnes
+      .map((c, i) => ({ label: c.label, i }))
+      .filter(({ i }) => i >= 2 && i !== iCumul)
+      .map(({ label, i }) => {
+        const point = { mois: label };
+        lignesCA.forEach((l) => {
+          point[l[0]] = typeof l[i] === "number" ? l[i] : 0;
+        });
+        return point;
+      })
+      .filter((p) => types.some((t) => p[t]));
+    const donut = lignesCA
+      .map((l) => ({ nom: l[0], ca: typeof l[iCumul] === "number" ? l[iCumul] : 0 }))
+      .filter((d) => d.ca > 0);
+    const margePct = lignes
+      .filter((l) => l[1] === "Marge %")
+      .map((l) => ({
+        nom: l[0],
+        taux: typeof l[iCumul] === "number" ? l[iCumul] : 0,
+      }));
+    return { type: "typesClient", empile, types, donut, margePct };
+  }
+
+  // Feuilles de classement : top 15 CA N vs N-1 + plus fortes variations.
+  if (feuille.nom in FEUILLES_CLASSEES) {
+    const iLabel = FEUILLES_CLASSEES[feuille.nom];
+    const iCaN = idxCol(feuille, /^ca n \(xpf\)/);
+    const iCaN1 = idxCol(feuille, /^ca n-1 \(xpf\)/);
+    if (iCaN === -1) return null;
+    const avecCa = lignes.filter((l) => typeof l[iCaN] === "number");
+    const top = [...avecCa]
+      .sort((a, b) => b[iCaN] - a[iCaN])
+      .slice(0, 15)
+      .map((l) => ({
+        nom: tronque(l[iLabel]),
+        caN: l[iCaN],
+        caN1: iCaN1 !== -1 && typeof l[iCaN1] === "number" ? l[iCaN1] : 0,
+      }));
+    let deltas = [];
+    if (iCaN1 !== -1) {
+      const tries = avecCa
+        .filter((l) => typeof l[iCaN1] === "number")
+        .map((l) => ({ nom: tronque(l[iLabel]), delta: l[iCaN] - l[iCaN1] }))
+        .sort((a, b) => b.delta - a.delta);
+      // 7 plus fortes hausses + 7 plus fortes baisses (sans doublon si < 14).
+      deltas = [...tries.slice(0, 7), ...tries.slice(-7)].filter(
+        (d, i, arr) => arr.findIndex((x) => x.nom === d.nom) === i,
+      );
+    }
+    return { type: "classement", top, deltas };
+  }
+
+  // Rayons : top CA + plus fortes valeurs de dépréciation.
+  if (feuille.nom === "Rayons") {
+    const iCa = idxCol(feuille, /^ca$/);
+    const iDeprec = idxCol(feuille, /^valeur_deprec$/);
+    if (iCa === -1) return null;
+    const avecCa = lignes.filter((l) => typeof l[iCa] === "number");
+    const top = [...avecCa]
+      .sort((a, b) => b[iCa] - a[iCa])
+      .slice(0, 15)
+      .map((l) => ({ nom: tronque(l[0]), ca: l[iCa] }));
+    const deprec =
+      iDeprec === -1
+        ? []
+        : [...avecCa]
+            .filter((l) => typeof l[iDeprec] === "number" && l[iDeprec] > 0)
+            .sort((a, b) => b[iDeprec] - a[iDeprec])
+            .slice(0, 10)
+            .map((l) => ({ nom: tronque(l[0]), valeur: l[iDeprec] }));
+    return { type: "rayons", top, deprec };
+  }
+
+  // Clients internes : CA N vs N-1 par compte.
+  if (feuille.nom === "Client_Interne") {
+    const iCaN = idxCol(feuille, /^ca n \(xpf\)/);
+    const iCaN1 = idxCol(feuille, /^ca n-1 \(xpf\)/);
+    if (iCaN === -1) return null;
+    const comptes = lignes
+      .filter((l) => typeof l[iCaN] === "number")
+      .map((l) => ({
+        nom: tronque(l[2], 18),
+        caN: l[iCaN],
+        caN1: iCaN1 !== -1 && typeof l[iCaN1] === "number" ? l[iCaN1] : 0,
+      }));
+    return { type: "interne", comptes };
+  }
+
+  return null;
+}
+
+// Hauteur d'un graphique à barres horizontales selon le nombre de lignes.
+const hBarres = (n) => Math.max(180, n * 28 + 70);
+
+// Les graphiques de la feuille active, au-dessus du tableau.
+const GraphiquesFeuille = ({ feuille }) => {
+  const g = useMemo(() => construireGraphes(feuille), [feuille]);
+  if (!g) return null;
+
+  const axes = (
+    <>
+      <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+    </>
+  );
+
+  if (g.type === "typesClient") {
+    return (
+      <section className="acm-charts">
+        <div className="acm-chart-card acm-chart-wide">
+          <h3 className="acm-chart-title">CA HT mensuel empilé par type de client</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={g.empile}>
+              {axes}
+              <XAxis dataKey="mois" fontSize={11} stroke={CH.axe} />
+              <YAxis fontSize={11} stroke={CH.axe} tickFormatter={fmtCompact} width={52} />
+              <Tooltip content={<XpfTooltip />} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              {g.types.map((t, i) => (
+                <Bar key={t} dataKey={t} stackId="types" name={t} fill={typeColor(t, i)} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="acm-chart-card">
+          <h3 className="acm-chart-title">Répartition du CA cumulé</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie
+                data={g.donut}
+                dataKey="ca"
+                nameKey="nom"
+                cx="50%"
+                cy="50%"
+                outerRadius={95}
+                innerRadius={48}
+                paddingAngle={2}
+              >
+                {g.donut.map((d, i) => (
+                  <Cell key={d.nom} fill={typeColor(d.nom, i)} />
+                ))}
+              </Pie>
+              <Tooltip content={<XpfTooltip />} />
+              <Legend wrapperStyle={{ fontSize: "10px" }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="acm-chart-card">
+          <h3 className="acm-chart-title">Taux de marge cumulé par type (%)</h3>
+          <ResponsiveContainer width="100%" height={hBarres(g.margePct.length)}>
+            <BarChart data={g.margePct} layout="vertical" margin={{ left: 8, right: 16 }}>
+              {axes}
+              <XAxis type="number" fontSize={10} stroke={CH.axe} unit=" %" />
+              <YAxis type="category" dataKey="nom" width={130} fontSize={10} stroke={CH.axe} />
+              <Tooltip
+                content={({ active, payload, label }) =>
+                  active && payload?.length ? (
+                    <div className="acm-tooltip">
+                      <div className="acm-tooltip-label">{label}</div>
+                      <div className="acm-tooltip-row">
+                        Taux de marge : <strong>{fmtPct(payload[0].value)}</strong>
+                      </div>
+                    </div>
+                  ) : null
+                }
+              />
+              <Bar dataKey="taux" name="Taux de marge" radius={[0, 3, 3, 0]}>
+                {g.margePct.map((d, i) => (
+                  <Cell key={d.nom} fill={typeColor(d.nom, i)} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+    );
+  }
+
+  if (g.type === "classement") {
+    return (
+      <section className="acm-charts">
+        <div className={`acm-chart-card ${g.deltas.length ? "" : "acm-chart-wide"}`}>
+          <h3 className="acm-chart-title">Top 15 par CA HT — N vs N-1</h3>
+          <ResponsiveContainer width="100%" height={hBarres(g.top.length)}>
+            <BarChart data={g.top} layout="vertical" margin={{ left: 8, right: 16 }}>
+              {axes}
+              <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
+              <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
+              <Tooltip content={<XpfTooltip />} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Bar dataKey="caN1" name="CA N-1" fill={CH.caN1} radius={[0, 3, 3, 0]} />
+              <Bar dataKey="caN" name="CA N" fill={CH.caN} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {g.deltas.length > 0 && (
+          <div className="acm-chart-card">
+            <h3 className="acm-chart-title">Plus fortes variations de CA (Δ N vs N-1)</h3>
+            <ResponsiveContainer width="100%" height={hBarres(g.deltas.length)}>
+              <BarChart data={g.deltas} layout="vertical" margin={{ left: 8, right: 16 }}>
+                {axes}
+                <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
+                <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
+                <ReferenceLine x={0} stroke={CH.axe} />
+                <Tooltip content={<XpfTooltip />} />
+                <Bar dataKey="delta" name="Δ CA" radius={[0, 3, 3, 0]}>
+                  {g.deltas.map((d) => (
+                    <Cell key={d.nom} fill={d.delta >= 0 ? CH.hausse : CH.baisse} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  if (g.type === "rayons") {
+    return (
+      <section className="acm-charts">
+        <div className={`acm-chart-card ${g.deprec.length ? "" : "acm-chart-wide"}`}>
+          <h3 className="acm-chart-title">Top 15 rayons par CA HT</h3>
+          <ResponsiveContainer width="100%" height={hBarres(g.top.length)}>
+            <BarChart data={g.top} layout="vertical" margin={{ left: 8, right: 16 }}>
+              {axes}
+              <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
+              <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
+              <Tooltip content={<XpfTooltip />} />
+              <Bar dataKey="ca" name="CA" fill={CH.caN} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {g.deprec.length > 0 && (
+          <div className="acm-chart-card">
+            <h3 className="acm-chart-title">Top 10 valeur de dépréciation</h3>
+            <ResponsiveContainer width="100%" height={hBarres(g.deprec.length)}>
+              <BarChart data={g.deprec} layout="vertical" margin={{ left: 8, right: 16 }}>
+                {axes}
+                <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
+                <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
+                <Tooltip content={<XpfTooltip />} />
+                <Bar dataKey="valeur" name="Dépréciation" fill={CH.depreciation} radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  if (g.type === "interne") {
+    return (
+      <section className="acm-charts">
+        <div className="acm-chart-card acm-chart-wide">
+          <h3 className="acm-chart-title">Comptes internes — CA N vs N-1</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={g.comptes}>
+              {axes}
+              <XAxis dataKey="nom" fontSize={10} stroke={CH.axe} interval={0} angle={-20} textAnchor="end" height={70} />
+              <YAxis fontSize={11} stroke={CH.axe} tickFormatter={fmtCompact} width={52} />
+              <Tooltip content={<XpfTooltip />} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Bar dataKey="caN1" name="CA N-1" fill={CH.caN1} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="caN" name="CA N" fill={CH.caN} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+    );
+  }
+
+  return null;
+};
+
 const AdminAnalyseCaMensuelleScreen = () => {
   const globalDossier = useSelector(selectGlobalDossier) || "";
 
@@ -117,6 +504,30 @@ const AdminAnalyseCaMensuelleScreen = () => {
   );
   const feuille =
     feuilles.find((f) => f.nom === ongletActif) || feuilles[0] || null;
+
+  // KPI du mois : bloc TOTAL MENSUEL (colonne CUMUL) de la feuille TYPES_CLIENT.
+  const kpis = useMemo(() => {
+    const tc = (data?.feuilles || []).find((f) => f.nom === "TYPES_CLIENT");
+    if (!tc) return null;
+    const iCumul = tc.colonnes.findIndex((c) =>
+      /^cumul$/.test(sansAccents(c.label)),
+    );
+    if (iCumul === -1) return null;
+    const totales = tc.lignes.filter(estLigneTotal);
+    const v = (metrique) => {
+      const l = totales.find((x) => x[1] === metrique);
+      return l && typeof l[iCumul] === "number" ? l[iCumul] : null;
+    };
+    return {
+      ca: v("CA"),
+      marge: v("Marge"),
+      margePct: v("Marge %"),
+      caRh: v("CA R/H %"),
+      margeRh: v("Marge R/H %"),
+      nbFactures: v("NB Factures"),
+      pm: v("Panier Moyen"),
+    };
+  }, [data]);
 
   const changerOnglet = (nom) => {
     setOngletActif(nom);
@@ -247,6 +658,51 @@ const AdminAnalyseCaMensuelleScreen = () => {
 
       {!busy && data && feuilles.length > 0 && (
         <>
+          {/* KPI du mois (cumuls à date, bloc TOTAL MENSUEL de TYPES_CLIENT) */}
+          {kpis && (
+            <section className="acm-kpis">
+              <div className="acm-kpi">
+                <span className="acm-kpi-label">CA HT cumulé</span>
+                <span className="acm-kpi-value">
+                  {kpis.ca != null ? `${fmtNb(kpis.ca)} XPF` : "—"}
+                </span>
+                <span className={`acm-kpi-evol ${evolClass(kpis.caRh)}`}>
+                  {fmtEvol(kpis.caRh)} vs N-1
+                </span>
+              </div>
+              <div className="acm-kpi">
+                <span className="acm-kpi-label">Marge HT cumulée</span>
+                <span className="acm-kpi-value">
+                  {kpis.marge != null ? `${fmtNb(kpis.marge)} XPF` : "—"}
+                </span>
+                <span className={`acm-kpi-evol ${evolClass(kpis.margeRh)}`}>
+                  {fmtEvol(kpis.margeRh)} vs N-1
+                </span>
+              </div>
+              <div className="acm-kpi">
+                <span className="acm-kpi-label">Taux de marge</span>
+                <span className="acm-kpi-value">
+                  {kpis.margePct != null ? fmtPct(kpis.margePct) : "—"}
+                </span>
+                <span className="acm-kpi-sub">cumul à date</span>
+              </div>
+              <div className="acm-kpi">
+                <span className="acm-kpi-label">Factures</span>
+                <span className="acm-kpi-value">
+                  {kpis.nbFactures != null ? fmtNb(kpis.nbFactures) : "—"}
+                </span>
+                <span className="acm-kpi-sub">cumul à date</span>
+              </div>
+              <div className="acm-kpi">
+                <span className="acm-kpi-label">Panier moyen</span>
+                <span className="acm-kpi-value">
+                  {kpis.pm != null ? `${fmtNb(kpis.pm)} XPF` : "—"}
+                </span>
+                <span className="acm-kpi-sub">cumul à date</span>
+              </div>
+            </section>
+          )}
+
           <nav className="acm-tabs">
             {feuilles.map((f) => (
               <button
@@ -262,6 +718,8 @@ const AdminAnalyseCaMensuelleScreen = () => {
               </button>
             ))}
           </nav>
+
+          {feuille && <GraphiquesFeuille feuille={feuille} />}
 
           {feuille && (
             <>
