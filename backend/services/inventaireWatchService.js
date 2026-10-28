@@ -277,6 +277,7 @@ const traiterFichier = async (
   // Agent : le .DAT ne porte aucune identité, mais la COLLECTE qui l'a produit
   // sait quel compte utilisateur a bipé la zone. On reprend son nom/prénom.
   let agentNom = "";
+  let agentUserId = null;
   try {
     const collecte = await InventaireCollecte.findOne({
       entreprise: entreprise._id,
@@ -292,6 +293,7 @@ const traiterFichier = async (
       agentNom =
         `${(u.prenom || "").trim()} ${(u.nom || "").trim()}`.trim() ||
         (u.email || "");
+      agentUserId = u._id;
     }
   } catch {
     agentNom = "";
@@ -390,6 +392,27 @@ const traiterFichier = async (
     },
     { upsert: true },
   );
+
+  // Un .DAT traité VAUT la phase « bipage » faite pour la zone (parité avec le
+  // dépôt mobile, qui coche déjà la phase) : couvre aussi les fichiers déposés
+  // à la main sur le partage. « Recommencer la zone » remet `fait: false`.
+  const normCode = (s) => String(s || "").trim().toUpperCase();
+  const zoneSession =
+    session.zones.find(
+      (z) =>
+        normCode(z.code) === normCode(zone.code) &&
+        normCode(z.type) === normCode(zone.type),
+    ) || session.zones.find((z) => normCode(z.code) === normCode(zone.code));
+  if (zoneSession && !zoneSession.bipage?.fait) {
+    zoneSession.bipage = {
+      fait: true,
+      at: new Date(),
+      by: agentUserId,
+      saisiPar: null,
+    };
+    session.markModified("zones");
+    await session.save();
+  }
 
   // Miroir FTP de RÉFÉRENCE (inventaire/<TRIG>/<slug>/<EMPLACEMENT>/) :
   // le .DAT final + la fiche PDF générée. Mêmes chemins que le dépôt mobile

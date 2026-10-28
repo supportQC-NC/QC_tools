@@ -1650,6 +1650,32 @@ const exportCollecte = asyncHandler(async (req, res) => {
   }
   await collecte.save();
 
+  // Le dépôt VAUT la phase « bipage » de la zone (demande client 29/10/2026) :
+  // elle est cochée sur la session d'inventaire, créditée à l'agent de la
+  // collecte — plus besoin de scanner le coupon pour cette phase. L'inverse
+  // (« Recommencer la zone ») remet déjà `bipage.fait = false`. Match
+  // code + emplacement d'abord (un même code peut exister aux deux), repli
+  // code seul (collectes/zones sans type).
+  if (session) {
+    const norm = (s) => String(s || "").trim().toUpperCase();
+    const zone =
+      session.zones.find(
+        (z) =>
+          norm(z.code) === norm(collecte.zoneCode) &&
+          norm(z.type) === norm(collecte.zoneType),
+      ) || session.zones.find((z) => norm(z.code) === norm(collecte.zoneCode));
+    if (zone && !zone.bipage?.fait) {
+      zone.bipage = {
+        fait: true,
+        at: new Date(),
+        by: collecte.user || null,
+        saisiPar: collecte.user || null,
+      };
+      session.markModified("zones");
+      await session.save();
+    }
+  }
+
   res.json({
     message: redepot
       ? "Zone déjà déposée — fichier réécrit"
