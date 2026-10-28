@@ -264,6 +264,31 @@
   margin: 0 0 0.8rem;
 }
 
+/* Entête de carte avec option à droite (ex. recalage N-1 du quotidien). */
+.aca-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.aca-chart-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  margin-bottom: 0.8rem;
+}
+
+.aca-chart-option input {
+  accent-color: #4da6ff;
+  cursor: pointer;
+}
+
 /* Tooltip recharts custom */
 .aca-tooltip {
   background: var(--admin-bg-tertiary);

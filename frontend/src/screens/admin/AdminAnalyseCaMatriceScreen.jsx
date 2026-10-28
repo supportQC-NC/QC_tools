@@ -176,12 +176,21 @@ const MetriqueTooltip = ({ active, payload, label, unite }) => {
       {payload.map((p) => (
         <div key={p.dataKey || p.name} className="aca-tooltip-row">
           <span className="aca-tooltip-dot" style={{ background: p.color || p.stroke }} />
-          {p.name} : <strong>{fmtUnite(unite, p.value)}</strong>
+          {p.name}
+          {/* Date N-1 réelle du point (utile quand N-1 est recalé sur le jour de semaine). */}
+          {p.dataKey === "valN1" && p.payload?.dateN1 ? ` (${p.payload.dateN1})` : ""}
+          {" : "}
+          <strong>{fmtUnite(unite, p.value)}</strong>
         </div>
       ))}
     </div>
   );
 };
+
+// Jour de semaine d'un libellé de date de la matrice ("jeu. 01" → 4).
+const JOURS_SEMAINE = { dim: 0, lun: 1, mar: 2, mer: 3, jeu: 4, ven: 5, sam: 6 };
+const jourSemaine = (lib) =>
+  JOURS_SEMAINE[String(lib || "").trim().slice(0, 3).toLowerCase()] ?? null;
 
 // Mois précédent (YYYY-MM), défaut du rapport Excel détaillé.
 function moisPrecedent() {
@@ -199,6 +208,7 @@ const AdminAnalyseCaMatriceScreen = () => {
   const [annee, setAnnee] = useState(null); // null = plus récente
   const [moisSel, setMoisSel] = useState(null); // null = dernier mois disponible
   const [metrique, setMetrique] = useState("ca"); // KPI actif (pilote les graphiques)
+  const [alignerN1, setAlignerN1] = useState(true); // N-1 calé sur le jour de semaine (graphique quotidien)
   const [compareIds, setCompareIds] = useState([]); // sources du comparateur
 
   const { data: sources } = useGetAnalyseCaMatriceSourcesQuery();
@@ -283,15 +293,32 @@ const AdminAnalyseCaMatriceScreen = () => {
   );
 
   // Quotidien du mois sélectionné, métrique active.
-  const chartJours = useMemo(
-    () =>
-      (detail?.jours || []).map((j) => ({
+  // La matrice apparie le jour J de N avec le MÊME jour calendaire de N-1,
+  // donc un jour de semaine de décalage (dim. 04/2026 en face du sam. 04/2025) :
+  // les creux du dimanche ne tombent pas au même endroit sur les deux courbes.
+  // `alignerN1` recale N-1 sur le même jour de semaine, POUR LE GRAPHIQUE
+  // SEULEMENT — KPI, cumuls et tableaux restent appariés par date.
+  const chartJours = useMemo(() => {
+    const jours = detail?.jours || [];
+    return jours.map((j, i) => {
+      let src = j;
+      if (alignerN1) {
+        const wN = jourSemaine(j.date);
+        const wN1 = jourSemaine(j.dateN1);
+        if (wN != null && wN1 != null) {
+          let off = (wN - wN1 + 7) % 7;
+          if (off > 3) off -= 7; // toujours le plus petit décalage (±1 ou ±2)
+          src = jours[i + off] || null; // fin de mois : pas de contrepartie → trou
+        }
+      }
+      return {
         label: j.date,
         valN: M.jourN(j),
-        valN1: M.jourN1(j),
-      })),
-    [detail, M],
-  );
+        valN1: src ? M.jourN1(src) : null,
+        dateN1: src ? src.dateN1 : null,
+      };
+    });
+  }, [detail, M, alignerN1]);
 
   // ── Comparateur multi-sources ──
   const sourcesDispo = useMemo(
@@ -808,9 +835,22 @@ const AdminAnalyseCaMatriceScreen = () => {
 
               <section className="aca-charts">
                 <div className="aca-chart-card aca-chart-wide">
-                  <h3 className="aca-chart-title">
-                    {M.label} quotidien — {detail?.label} N vs N-1
-                  </h3>
+                  <div className="aca-chart-head">
+                    <h3 className="aca-chart-title">
+                      {M.label} quotidien — {detail?.label} N vs N-1
+                    </h3>
+                    <label
+                      className="aca-chart-option"
+                      title="Compare chaque jour au même jour de semaine de N-1 (dimanche en face de dimanche) au lieu de la même date. Les derniers jours du mois peuvent rester sans valeur N-1."
+                    >
+                      <input
+                        type="checkbox"
+                        checked={alignerN1}
+                        onChange={(e) => setAlignerN1(e.target.checked)}
+                      />
+                      N-1 calé sur le jour de semaine
+                    </label>
+                  </div>
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={chartJours}>
                       <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
