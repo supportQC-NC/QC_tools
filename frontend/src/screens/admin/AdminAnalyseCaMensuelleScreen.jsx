@@ -51,7 +51,24 @@ const LABELS_FEUILLES = {
   Sous_Familles: "Sous-familles",
   Rayons: "Rayons",
   Client_Interne: "Clients internes",
+  Promos: "Promos",
+  Detail_Promos: "Détail promos",
 };
+
+// Ligne « en pour-cent » d'une feuille à métriques en lignes : TYPES_CLIENT
+// (métrique en colonne 2, valeurs en RATIO normalisées par le backend) et
+// Promos (métrique en colonne 1, valeurs DÉJÀ en pour-cent).
+const estLignePct = (feuille, l) => {
+  if (feuille.nom === "TYPES_CLIENT") return /%/.test(String(l[1] ?? ""));
+  if (feuille.nom === "Promos") return /%|taux/i.test(String(l[0] ?? ""));
+  return false;
+};
+
+// Ligne de SECTION (« ▌ INDICATEURS… ») : seule la 1re cellule est remplie.
+const estLigneSection = (l) =>
+  typeof l[0] === "string" &&
+  l[0].startsWith("▌") &&
+  l.slice(1).every((v) => v === null || v === "");
 
 // ── Couleurs des graphiques (thème sombre de l'admin) ──
 const CH = {
@@ -138,9 +155,13 @@ const labelPeriode = (p) => {
 
 // Une ligne TOTAL ? Se reconnaît à sa PREMIÈRE colonne : les lignes de données
 // y portent un numéro (#/Rang) — un client « TOTAL ENERGIES… » (colonne 2)
-// n'est PAS un total.
+// n'est PAS un total. Cas Detail_Promos : 1re colonne VIDE et « TOTAL » en
+// colonne 2 — accepté uniquement quand la 1re colonne est vide.
 const estLigneTotal = (l) =>
-  typeof l[0] === "string" && /^TOTAL/i.test(l[0].trim());
+  (typeof l[0] === "string" && /^TOTAL/i.test(l[0].trim())) ||
+  ((l[0] === null || l[0] === "") &&
+    typeof l[1] === "string" &&
+    /^TOTAL/i.test(l[1].trim()));
 
 // Formatage d'une cellule selon la colonne (et la ligne pour TYPES_CLIENT).
 // Un pourcentage d'ÉVOLUTION (Évol., R/H) se colore vert/rouge ; un taux ou
@@ -183,6 +204,7 @@ const FEUILLES_CLASSEES = {
   Groupes: 1,
   Familles: 1,
   Sous_Familles: 1,
+  Detail_Promos: 1, // articles en promotion du mois (pas de N-1)
 };
 
 const donneesFeuille = (feuille) =>
@@ -246,7 +268,8 @@ function construireGraphes(feuille, opts = {}) {
   // variations de CA (Δ N vs N-1).
   if (feuille.nom in FEUILLES_CLASSEES) {
     const iLabel = FEUILLES_CLASSEES[feuille.nom];
-    const iCaN = idxCol(feuille, /^ca n \(xpf\)/);
+    // "CA N (XPF)" sur les feuilles historiques, "CA (XPF)" sur Detail_Promos.
+    const iCaN = idxCol(feuille, /^ca (n )?\(xpf\)/);
     const iCaN1 = idxCol(feuille, /^ca n-1 \(xpf\)/);
     if (iCaN === -1) return null;
 
@@ -301,6 +324,34 @@ function construireGraphes(feuille, opts = {}) {
       colTri,
       avecN1: iTri === iCaN && iCaN1 !== -1,
     };
+  }
+
+  // Promos : métriques en LIGNES (libellés colonne A), mois en colonnes.
+  // Les lignes % sont DÉJÀ en pour-cent dans le fichier.
+  if (feuille.nom === "Promos") {
+    // ⚠️ les libellés du fichier ont des espaces de tête ("  CA réalisé…").
+    const chercher = (re) =>
+      lignes.find((l) => re.test(sansAccents(String(l[0] ?? "").trim())));
+    const ca = chercher(/^ca realise promo/);
+    const marge = chercher(/^marge promo/);
+    const pctMarge = chercher(/^% marge promo/);
+    const partCa = chercher(/^% ca promo/);
+    const nbArticles = chercher(/^nb articles en promo/);
+    const nbUnites = chercher(/^nb unites vendues/);
+    if (!ca) return null;
+    const mois = feuille.colonnes
+      .map((c, i) => ({ colLabel: c.label, i }))
+      .filter(({ colLabel, i }) => i > 0 && !/^total$/i.test(colLabel))
+      .map(({ colLabel, i }) => ({
+        label: colLabel.slice(0, 4),
+        ca: typeof ca[i] === "number" ? ca[i] : 0,
+        marge: typeof marge?.[i] === "number" ? marge[i] : 0,
+        pctMarge: typeof pctMarge?.[i] === "number" ? pctMarge[i] : null,
+        partCa: typeof partCa?.[i] === "number" ? partCa[i] : null,
+        nbArticles: typeof nbArticles?.[i] === "number" ? nbArticles[i] : 0,
+        nbUnites: typeof nbUnites?.[i] === "number" ? nbUnites[i] : 0,
+      }));
+    return { type: "promos", mois };
   }
 
   // Rayons : top CA + plus fortes valeurs de dépréciation.
@@ -634,6 +685,57 @@ const GraphiquesFeuille = ({ feuille }) => {
     );
   }
 
+  if (g.type === "promos") {
+    return (
+      <section className="acm-charts">
+        <div className="acm-chart-card acm-chart-wide">
+          <h3 className="acm-chart-title">CA et marge des promotions par mois</h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={g.mois}>
+              {axes}
+              <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
+              <YAxis fontSize={11} stroke={CH.axe} tickFormatter={fmtCompact} width={52} />
+              <Tooltip content={<ValTooltip unite="xpf" />} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Bar dataKey="ca" name="CA promo" fill={CH.caN} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="marge" name="Marge promo" fill={CH.hausse} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="acm-chart-card">
+          <h3 className="acm-chart-title">% marge promo · part du CA total</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={g.mois}>
+              {axes}
+              <XAxis dataKey="label" fontSize={10} stroke={CH.axe} />
+              <YAxis fontSize={10} stroke={CH.axe} tickFormatter={(v) => `${v} %`} width={52} />
+              <Tooltip content={<ValTooltip unite="pct" />} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Line type="monotone" dataKey="pctMarge" name="% marge promo" stroke={CH.depreciation} strokeWidth={2} dot={false} connectNulls />
+              <Line type="monotone" dataKey="partCa" name="% CA promo / CA total" stroke={CH.caN} strokeWidth={2} dot={false} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="acm-chart-card">
+          <h3 className="acm-chart-title">Volumes promo (articles · unités vendues)</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={g.mois}>
+              {axes}
+              <XAxis dataKey="label" fontSize={10} stroke={CH.axe} />
+              <YAxis fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} width={48} />
+              <Tooltip content={<ValTooltip unite="nb" />} />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Bar dataKey="nbArticles" name="Articles en promo" fill={CH.caN1} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="nbUnites" name="Unités vendues" fill="#c084fc" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+    );
+  }
+
   if (g.type === "rayons") {
     return (
       <section className="acm-charts">
@@ -692,6 +794,210 @@ const GraphiquesFeuille = ({ feuille }) => {
   return null;
 };
 
+// ── Vue dédiée de l'onglet PROMOS ───────────────────────────────────────────
+// Le rendu générique (14 colonnes de tableur, métriques en vrac) est illisible :
+// on recompose la feuille en KPI annuels + tableau d'indicateurs formaté par
+// ligne (XPF / % / nb) + top 3 articles PAR MOIS.
+
+// "27/08/2026" -> Date (ou null).
+const dateFr = (s) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s ?? "").trim());
+  return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+};
+
+// Déstockage = plage début→fin strictement supérieure à 2 mois.
+const estDestockage = (debut, fin) => {
+  const d = dateFr(debut);
+  const f = dateFr(fin);
+  if (!d || !f) return false;
+  const limite = new Date(d);
+  limite.setMonth(limite.getMonth() + 2);
+  return f > limite;
+};
+
+const PromosVue = ({ feuille }) => {
+  const donnees = useMemo(() => {
+    const lignes = donneesFeuille(feuille).filter((l) => !estLigneSection(l));
+    // ⚠️ les libellés du fichier ont des espaces de tête ("  CA réalisé…").
+    const chercher = (re) =>
+      lignes.find((l) => re.test(sansAccents(String(l[0] ?? "").trim())));
+
+    const iTotal = feuille.colonnes.findIndex((c) => /^total$/i.test(c.label));
+    const mois = feuille.colonnes
+      .map((c, i) => ({ label: c.label, i }))
+      .filter(({ label, i }) => i > 0 && i !== iTotal && label);
+
+    const indicateurs = [
+      { label: "CA promo", unite: "xpf", l: chercher(/^ca realise promo/) },
+      { label: "Marge promo", unite: "xpf", l: chercher(/^marge promo/) },
+      { label: "% marge promo", unite: "pct", l: chercher(/^% marge promo/) },
+      { label: "Part du CA total", unite: "pct", l: chercher(/^% ca promo/) },
+      { label: "Taux de transformation", unite: "pct", l: chercher(/^taux de transfo/) },
+      { label: "Panier moyen promo", unite: "xpf", l: chercher(/^panier moyen promo/) },
+      { label: "Articles en promo", unite: "nb", l: chercher(/^nb articles en promo/) },
+      { label: "Unités vendues", unite: "nb", l: chercher(/^nb unites vendues/) },
+    ].filter((m) => m.l);
+
+    // Top 3 par rang : lignes "#k Article" / "#k CA (XPF)" / "#k Qté vendue".
+    const top3 = [1, 2, 3]
+      .map((k) => ({
+        article: chercher(new RegExp(`^#${k}\\s+article`)),
+        ca: chercher(new RegExp(`^#${k}\\s+ca`)),
+        qte: chercher(new RegExp(`^#${k}\\s+qte`)),
+      }))
+      .filter((t) => t.article);
+
+    const kpi = (re, defaut = null) => {
+      const l = chercher(re);
+      const v = l && iTotal !== -1 ? l[iTotal] : null;
+      return typeof v === "number" ? v : defaut;
+    };
+
+    return {
+      mois,
+      iTotal,
+      indicateurs,
+      top3,
+      kpis: {
+        ca: kpi(/^ca realise promo/),
+        marge: kpi(/^marge promo/),
+        pctMarge: kpi(/^% marge promo/),
+        unites: kpi(/^nb unites vendues/),
+        panier: kpi(/^panier moyen promo/),
+      },
+    };
+  }, [feuille]);
+
+  const { mois, iTotal, indicateurs, top3, kpis } = donnees;
+  const fmtCell = (unite, v) =>
+    typeof v !== "number" || v === 0 ? "—" : fmtUnite(unite, v);
+
+  return (
+    <>
+      {/* KPI annuels des promotions */}
+      <section className="acm-kpis">
+        <div className="acm-kpi">
+          <span className="acm-kpi-label">CA promo (année)</span>
+          <span className="acm-kpi-value">
+            {kpis.ca != null ? `${fmtNb(kpis.ca)} XPF` : "—"}
+          </span>
+        </div>
+        <div className="acm-kpi">
+          <span className="acm-kpi-label">Marge promo (année)</span>
+          <span className="acm-kpi-value">
+            {kpis.marge != null ? `${fmtNb(kpis.marge)} XPF` : "—"}
+          </span>
+        </div>
+        <div className="acm-kpi">
+          <span className="acm-kpi-label">% marge promo</span>
+          <span className="acm-kpi-value">
+            {kpis.pctMarge != null ? fmtPct(kpis.pctMarge) : "—"}
+          </span>
+        </div>
+        <div className="acm-kpi">
+          <span className="acm-kpi-label">Unités vendues</span>
+          <span className="acm-kpi-value">
+            {kpis.unites != null ? fmtNb(kpis.unites) : "—"}
+          </span>
+        </div>
+        <div className="acm-kpi">
+          <span className="acm-kpi-label">Panier moyen promo</span>
+          <span className="acm-kpi-value">
+            {kpis.panier != null ? `${fmtNb(kpis.panier)} XPF` : "—"}
+          </span>
+        </div>
+      </section>
+
+      {/* Indicateurs × mois, formatés par ligne */}
+      <h2 className="acm-sheet-title" style={{ marginBottom: "0.6rem" }}>
+        Indicateurs mensuels
+      </h2>
+      <div className="acm-table-wrap">
+        <table className="acm-table acm-table-sticky">
+          <thead>
+            <tr>
+              <th className="gauche">Indicateur</th>
+              {mois.map((m) => (
+                <th key={m.i}>{m.label.slice(0, 4)}</th>
+              ))}
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {indicateurs.map((ind) => (
+              <tr key={ind.label}>
+                <td className="gauche">{ind.label}</td>
+                {mois.map((m) => (
+                  <td key={m.i}>{fmtCell(ind.unite, ind.l[m.i])}</td>
+                ))}
+                <td className="acm-cell-total">
+                  {fmtCell(ind.unite, iTotal !== -1 ? ind.l[iTotal] : null)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Top 3 articles PAR MOIS (bien plus lisible que 9 lignes × 14 colonnes) */}
+      {top3.length > 0 && (
+        <>
+          <h2 className="acm-sheet-title" style={{ margin: "0 0 0.6rem" }}>
+            Top 3 articles promo par mois
+          </h2>
+          <div className="acm-table-wrap">
+            <table className="acm-table acm-table-sticky">
+              <thead>
+                <tr>
+                  <th className="gauche">Mois</th>
+                  {top3.map((_, k) => (
+                    <th key={k} className="gauche">
+                      Top {k + 1}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {mois
+                  .filter(({ i }) =>
+                    top3.some(
+                      (t) =>
+                        typeof t.article?.[i] === "string" &&
+                        t.article[i].trim() &&
+                        t.article[i].trim() !== "—",
+                    ),
+                  )
+                  .map(({ label, i }) => (
+                    <tr key={i}>
+                      <td className="gauche">{label}</td>
+                      {top3.map((t, k) => {
+                        const nom = String(t.article?.[i] ?? "").trim();
+                        if (!nom || nom === "—") {
+                          return <td key={k} className="gauche">—</td>;
+                        }
+                        const ca = t.ca?.[i];
+                        const qte = t.qte?.[i];
+                        return (
+                          <td key={k} className="gauche" title={nom}>
+                            {tronque(nom, 34)}
+                            <span className="acm-cell-sub">
+                              {typeof ca === "number" ? `${fmtNb(ca)} XPF` : "—"}
+                              {typeof qte === "number" ? ` · ${fmtNb(qte)} u.` : ""}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
 const AdminAnalyseCaMensuelleScreen = () => {
   const globalDossier = useSelector(selectGlobalDossier) || "";
 
@@ -700,6 +1006,8 @@ const AdminAnalyseCaMensuelleScreen = () => {
   const [filtre, setFiltre] = useState("");
   const [tri, setTri] = useState(null); // { index, dir: 1|-1 }
   const [page, setPage] = useState(0);
+  // Détail promos : tout | promo (≤ 2 mois) | destockage (> 2 mois).
+  const [filtreDuree, setFiltreDuree] = useState("tout");
 
   const { data: sources } = useGetAnalyseCaMensuelleSourcesQuery();
   const sourceGlobale = (sources?.societes || []).find(
@@ -751,7 +1059,71 @@ const AdminAnalyseCaMensuelleScreen = () => {
     setFiltre("");
     setTri(null);
     setPage(0);
+    setFiltreDuree("tout");
   };
+
+  // ── Filtre promo / déstockage (onglet Détail promos — INTERFACE seulement,
+  // le fichier n'est pas retouché) : une plage début→fin > 2 mois n'est plus
+  // une promotion mais du DÉSTOCKAGE. ──
+  const estDetailPromos = feuille?.nom === "Detail_Promos";
+  const detailPromos = useMemo(() => {
+    if (!estDetailPromos) return null;
+    const iDebut = idxCol(feuille, /^debut promo/);
+    const iFin = idxCol(feuille, /^fin promo/);
+    const iCa = idxCol(feuille, /^ca (n )?\(xpf\)/);
+    const iMarge = idxCol(feuille, /^marge \(xpf\)/);
+    const iQte = idxCol(feuille, /^qte vendue/);
+    const iFact = idxCol(feuille, /^nb factures/);
+
+    const donnees = feuille.lignes.filter((l) => !estLigneTotal(l));
+    const dest =
+      iDebut !== -1 && iFin !== -1
+        ? new Set(donnees.filter((l) => estDestockage(l[iDebut], l[iFin])))
+        : new Set();
+    const promo = donnees.filter((l) => !dest.has(l));
+    const retenues =
+      filtreDuree === "promo"
+        ? promo
+        : filtreDuree === "destockage"
+          ? [...dest]
+          : donnees;
+
+    const somme = (i) =>
+      i === -1
+        ? null
+        : retenues.reduce(
+            (s, l) => s + (typeof l[i] === "number" ? l[i] : 0),
+            0,
+          );
+    const ca = somme(iCa);
+    const marge = somme(iMarge);
+    return {
+      comptes: {
+        tout: donnees.length,
+        promo: promo.length,
+        destockage: dest.size,
+      },
+      kpis: {
+        nb: retenues.length,
+        ca,
+        marge,
+        taux: ca ? (marge / ca) * 100 : null,
+        qte: somme(iQte),
+        factures: somme(iFact),
+      },
+      lignes: retenues,
+    };
+  }, [feuille, estDetailPromos, filtreDuree]);
+
+  // Feuille réellement affichée (tableau + graphiques) : filtrée côté interface
+  // pour Détail promos — la ligne TOTAL du fichier est retirée dès qu'on filtre
+  // (elle ne correspondrait plus aux lignes affichées).
+  const feuilleAffichee = useMemo(() => {
+    if (!estDetailPromos || !detailPromos || filtreDuree === "tout") {
+      return feuille;
+    }
+    return { ...feuille, lignes: detailPromos.lignes };
+  }, [feuille, estDetailPromos, detailPromos, filtreDuree]);
 
   // TYPES_CLIENT : les lignes « % » se repèrent à la MÉTRIQUE (2e colonne).
   const estTypesClient = feuille?.nom === "TYPES_CLIENT";
@@ -759,10 +1131,11 @@ const AdminAnalyseCaMensuelleScreen = () => {
 
   // Filtre + tri + pagination, lignes TOTAL épinglées hors pagination.
   const { lignesPage, totaux, nbFiltre, nbPages } = useMemo(() => {
-    if (!feuille) return { lignesPage: [], totaux: [], nbFiltre: 0, nbPages: 0 };
+    if (!feuilleAffichee)
+      return { lignesPage: [], totaux: [], nbFiltre: 0, nbPages: 0 };
 
-    const totaux = feuille.lignes.filter(estLigneTotal);
-    let donnees = feuille.lignes.filter((l) => !estLigneTotal(l));
+    const totaux = feuilleAffichee.lignes.filter(estLigneTotal);
+    let donnees = feuilleAffichee.lignes.filter((l) => !estLigneTotal(l));
 
     if (filtre.trim()) {
       const mots = sansAccents(filtre).split(/\s+/).filter(Boolean);
@@ -796,7 +1169,7 @@ const AdminAnalyseCaMensuelleScreen = () => {
       nbFiltre: donnees.length,
       nbPages,
     };
-  }, [feuille, filtre, tri, page]);
+  }, [feuilleAffichee, filtre, tri, page]);
 
   const pageCourante = Math.min(page, Math.max(0, nbPages - 1));
 
@@ -936,11 +1309,96 @@ const AdminAnalyseCaMensuelleScreen = () => {
             ))}
           </nav>
 
+          {/* Détail promos : filtre promo / déstockage (règle : plage début→fin
+              > 2 mois = déstockage) + KPI de la sélection. */}
+          {estDetailPromos && detailPromos && (
+            <>
+              <div className="acm-chips">
+                <button
+                  type="button"
+                  className={`acm-chip ${filtreDuree === "tout" ? "actif" : ""}`}
+                  onClick={() => {
+                    setFiltreDuree("tout");
+                    setPage(0);
+                  }}
+                >
+                  Tout ({fmtNb(detailPromos.comptes.tout)})
+                </button>
+                <button
+                  type="button"
+                  className={`acm-chip ${filtreDuree === "promo" ? "actif" : ""}`}
+                  onClick={() => {
+                    setFiltreDuree("promo");
+                    setPage(0);
+                  }}
+                >
+                  Promos ≤ 2 mois ({fmtNb(detailPromos.comptes.promo)})
+                </button>
+                <button
+                  type="button"
+                  className={`acm-chip ${filtreDuree === "destockage" ? "actif" : ""}`}
+                  onClick={() => {
+                    setFiltreDuree("destockage");
+                    setPage(0);
+                  }}
+                >
+                  Déstockage &gt; 2 mois ({fmtNb(detailPromos.comptes.destockage)})
+                </button>
+              </div>
+
+              <section className="acm-kpis">
+                <div className="acm-kpi">
+                  <span className="acm-kpi-label">Articles</span>
+                  <span className="acm-kpi-value">
+                    {fmtNb(detailPromos.kpis.nb)}
+                  </span>
+                </div>
+                <div className="acm-kpi">
+                  <span className="acm-kpi-label">CA HT</span>
+                  <span className="acm-kpi-value">
+                    {detailPromos.kpis.ca != null
+                      ? `${fmtNb(detailPromos.kpis.ca)} XPF`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="acm-kpi">
+                  <span className="acm-kpi-label">Marge</span>
+                  <span className="acm-kpi-value">
+                    {detailPromos.kpis.marge != null
+                      ? `${fmtNb(detailPromos.kpis.marge)} XPF`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="acm-kpi">
+                  <span className="acm-kpi-label">Taux de marge</span>
+                  <span className="acm-kpi-value">
+                    {detailPromos.kpis.taux != null
+                      ? fmtPct(detailPromos.kpis.taux)
+                      : "—"}
+                  </span>
+                </div>
+                <div className="acm-kpi">
+                  <span className="acm-kpi-label">Qté vendue</span>
+                  <span className="acm-kpi-value">
+                    {detailPromos.kpis.qte != null
+                      ? fmtNb(detailPromos.kpis.qte)
+                      : "—"}
+                  </span>
+                </div>
+              </section>
+            </>
+          )}
+
           {/* key = nom de feuille : les contrôles (métrique, tri, top)
               repartent à zéro quand on change d'onglet */}
-          {feuille && <GraphiquesFeuille key={feuille.nom} feuille={feuille} />}
-
           {feuille && (
+            <GraphiquesFeuille key={feuille.nom} feuille={feuilleAffichee} />
+          )}
+
+          {/* Promos : vue dédiée (le rendu tableur générique est illisible). */}
+          {feuille?.nom === "Promos" && <PromosVue feuille={feuille} />}
+
+          {feuille && feuille.nom !== "Promos" && (
             <>
               <div className="acm-sheetbar">
                 <h2 className="acm-sheet-title">{feuille.titre || feuille.nom}</h2>
@@ -1006,16 +1464,26 @@ const AdminAnalyseCaMensuelleScreen = () => {
                   </thead>
                   <tbody>
                     {lignesPage.map((l, li) => {
+                      // Ligne de section fusionnée (« ▌ … », onglet Promos).
+                      if (estLigneSection(l)) {
+                        return (
+                          <tr key={li} className="acm-row-section">
+                            <td colSpan={feuille.colonnes.length} className="gauche">
+                              {String(l[0]).replace(/^▌\s*/, "")}
+                            </td>
+                          </tr>
+                        );
+                      }
                       // Séparation visuelle des blocs TYPES_CLIENT.
                       const nouveauGroupe =
                         estTypesClient &&
                         li > 0 &&
                         l[0] !== lignesPage[li - 1][0];
-                      const metrique = estTypesClient
-                        ? String(l[indexMetrique] ?? "")
-                        : "";
-                      const pctLigne = /%/.test(metrique);
-                      const coloreLigne = /r\/h/i.test(metrique);
+                      const pctLigne = estLignePct(feuille, l);
+                      const coloreLigne =
+                        estTypesClient &&
+                        /r\/h/i.test(String(l[indexMetrique] ?? ""));
+                      const debutValeurs = estTypesClient ? 2 : 1;
                       return (
                         <tr
                           key={li}
@@ -1031,8 +1499,8 @@ const AdminAnalyseCaMensuelleScreen = () => {
                               <Cellule
                                 valeur={v}
                                 colonne={feuille.colonnes[ci]}
-                                pct={pctLigne && ci > indexMetrique}
-                                colore={coloreLigne && ci > indexMetrique}
+                                pct={pctLigne && ci >= debutValeurs}
+                                colore={coloreLigne && ci >= debutValeurs}
                               />
                             </td>
                           ))}
@@ -1040,9 +1508,11 @@ const AdminAnalyseCaMensuelleScreen = () => {
                       );
                     })}
                     {totaux.map((l, li) => {
-                      const metrique = estTypesClient
-                        ? String(l[indexMetrique] ?? "")
-                        : "";
+                      const pctLigne = estLignePct(feuille, l);
+                      const coloreLigne =
+                        estTypesClient &&
+                        /r\/h/i.test(String(l[indexMetrique] ?? ""));
+                      const debutValeurs = estTypesClient ? 2 : 1;
                       return (
                         <tr
                           key={`total-${li}`}
@@ -1058,10 +1528,8 @@ const AdminAnalyseCaMensuelleScreen = () => {
                               <Cellule
                                 valeur={v}
                                 colonne={feuille.colonnes[ci]}
-                                pct={/%/.test(metrique) && ci > indexMetrique}
-                                colore={
-                                  /r\/h/i.test(metrique) && ci > indexMetrique
-                                }
+                                pct={pctLigne && ci >= debutValeurs}
+                                colore={coloreLigne && ci >= debutValeurs}
                               />
                             </td>
                           ))}

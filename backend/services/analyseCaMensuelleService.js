@@ -143,12 +143,26 @@ function parseFeuille(ws) {
   const titre = String(val(ws.getRow(1).getCell(1)) ?? "").trim();
 
   // En-têtes : retours à la ligne remplacés par des espaces.
+  // ⚠️ Une colonne à EN-TÊTE VIDE n'est pas forcément vide : sur l'onglet
+  // Promos, la colonne A porte les libellés de métriques sous un en-tête
+  // vide — on la garde si au moins une cellule de données est renseignée.
   const colonnes = [];
   const entete = ws.getRow(2);
   for (let c = 1; c <= ws.columnCount; c++) {
     const brut = String(val(entete.getCell(c)) ?? "").trim();
-    if (!brut) continue;
-    const label = brut.replace(/\s*\n\s*/g, " ");
+    let label = brut.replace(/\s*\n\s*/g, " ");
+    if (!brut) {
+      let aDesDonnees = false;
+      for (let r = 3; r <= ws.rowCount; r++) {
+        const v = val(ws.getRow(r).getCell(c));
+        if (v !== null && v !== "" && v !== FORMULE_SANS_RESULTAT) {
+          aDesDonnees = true;
+          break;
+        }
+      }
+      if (!aDesDonnees) continue;
+      label = "";
+    }
     const pct =
       /%|r\/h/i.test(label) ||
       (ws.name === "Rayons" && COLONNES_RATIO_RAYONS.has(label));
@@ -165,19 +179,51 @@ function parseFeuille(ws) {
     });
     if (valeurs.every((v) => v === null || v === "")) continue; // séparateur
 
-    // Normalisation ratio -> pour-cent.
-    colonnes.forEach((col, i) => {
-      if (col.format === "pct" && typeof valeurs[i] === "number") {
-        valeurs[i] = ratioEnPct(valeurs[i]);
-      }
-    });
-    // TYPES_CLIENT : la nature de la ligne dépend de la MÉTRIQUE (colonne 2).
-    if (estTypesClient && /%/.test(String(valeurs[1] ?? ""))) {
-      for (let i = 2; i < valeurs.length; i++) {
-        if (typeof valeurs[i] === "number") valeurs[i] = ratioEnPct(valeurs[i]);
+    // Ligne de SECTION fusionnée (« ▌ INDICATEURS… » sur l'onglet Promos) :
+    // exceljs répète la valeur maîtresse sur toute la fusion — on ne garde
+    // que la première cellule, le front la stylera en en-tête de groupe.
+    const nonVides = valeurs.filter((v) => v !== null && v !== "");
+    if (
+      nonVides.length > 1 &&
+      nonVides.every((v) => typeof v === "string" && v === nonVides[0])
+    ) {
+      const premier = valeurs.findIndex((v) => v !== null && v !== "");
+      valeurs.fill(null);
+      valeurs[premier] = String(nonVides[0]).trim();
+    }
+
+    lignes.push(valeurs);
+  }
+
+  // ── Normalisation des pourcentages ──
+  // Les fichiers mélangent DEUX conventions : ratios (0.59 = 59 %, feuilles
+  // historiques) et valeurs déjà en pour-cent (25.2, onglets Promos). On
+  // tranche PAR COLONNE sur la médiane des valeurs non nulles : un taux /
+  // une part en ratio est presque toujours ≤ 1, jamais > 3.
+  const estRatio = (valeursNum) => {
+    const abs = valeursNum.map(Math.abs).filter((v) => v > 0).sort((a, b) => a - b);
+    if (!abs.length) return true; // colonne vide : convention historique
+    return abs[Math.floor(abs.length / 2)] <= 3;
+  };
+  colonnes.forEach((col, i) => {
+    if (col.format !== "pct") return;
+    const nums = lignes.map((l) => l[i]).filter((v) => typeof v === "number");
+    if (!estRatio(nums)) return; // déjà en pour-cent : rien à faire
+    for (const l of lignes) {
+      if (typeof l[i] === "number") l[i] = ratioEnPct(l[i]);
+    }
+  });
+  // TYPES_CLIENT : la nature de la ligne dépend de la MÉTRIQUE (colonne 2) —
+  // même heuristique, par LIGNE.
+  if (estTypesClient) {
+    for (const l of lignes) {
+      if (!/%/.test(String(l[1] ?? ""))) continue;
+      const nums = l.slice(2).filter((v) => typeof v === "number");
+      if (!estRatio(nums)) continue;
+      for (let i = 2; i < l.length; i++) {
+        if (typeof l[i] === "number") l[i] = ratioEnPct(l[i]);
       }
     }
-    lignes.push(valeurs);
   }
 
   // Formules sans résultat en cache (constaté sur la ligne TOTAL de l'onglet
@@ -185,9 +231,13 @@ function parseFeuille(ws) {
   // qu'on laisse vides. Une cellule simplement vide reste vide.
   // ⚠️ Une ligne TOTAL se reconnaît à sa PREMIÈRE colonne : les lignes de
   // données y portent un numéro (#/Rang) — tester « la première cellule texte »
-  // prendrait les clients « TOTAL ENERGIES… » pour des totaux.
+  // prendrait les clients « TOTAL ENERGIES… » pour des totaux. Cas
+  // Detail_Promos : 1re colonne VIDE et « TOTAL » en colonne 2.
   const estTotal = (l) =>
-    typeof l[0] === "string" && /^TOTAL/i.test(l[0].trim());
+    (typeof l[0] === "string" && /^TOTAL/i.test(l[0].trim())) ||
+    ((l[0] === null || l[0] === "") &&
+      typeof l[1] === "string" &&
+      /^TOTAL/i.test(l[1].trim()));
   const donnees = lignes.filter((l) => !estTotal(l));
   for (const l of lignes) {
     colonnes.forEach((col, i) => {

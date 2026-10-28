@@ -474,3 +474,44 @@
 .acm-chart-controls .acm-field select {
   min-width: 170px;
 }
+
+/* Ligne de section fusionnée (onglet Promos : « INDICATEURS », « VOLUMES »…) */
+.acm-table tr.acm-row-section td {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-primary);
+  font-weight: 700;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 2px solid var(--admin-border);
+}
+
+/* Première colonne figée (tableaux larges : Promos, catégories…) */
+.acm-table-sticky td:first-child,
+.acm-table-sticky th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--admin-bg-secondary);
+  z-index: 1;
+}
+
+.acm-table-sticky thead th:first-child {
+  background: var(--admin-bg-tertiary);
+  z-index: 3;
+}
+
+/* Sous-valeur affichée sous le contenu d'une cellule (CA · qté du top 3) */
+.acm-cell-sub {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--admin-text-muted);
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+/* Colonne TOTAL mise en avant (tableau d'indicateurs Promos) */
+.acm-table td.acm-cell-total {
+  background: var(--admin-bg-tertiary);
+  font-weight: 700;
+  border-left: 2px solid var(--admin-border);
+}
