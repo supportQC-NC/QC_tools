@@ -14,7 +14,10 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
         method: "POST",
         body: { nom, ...(filtreProformas && { filtreProformas }) },
       }),
-      invalidatesTags: ["InventaireZone"],
+      // L'init purge aussi LigneBipage / collectes / fiches : sans « Bipage »
+      // et « SuiviBipage », l'écran Détail des bipages ressert son cache
+      // d'avant l'initialisation ({active:false} → « Aucun inventaire actif »).
+      invalidatesTags: ["InventaireZone", "Bipage", "SuiviBipage"],
     }),
 
     // Correction de cette sélection en cours d'inventaire.
@@ -33,7 +36,9 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
         url: `${BASE}/${entrepriseId}/annuler`,
         method: "POST",
       }),
-      invalidatesTags: ["InventaireZone"],
+      // Même raison que l'init : table rase des bipages → tous les écrans qui
+      // les affichent doivent refetcher.
+      invalidatesTags: ["InventaireZone", "Bipage", "SuiviBipage"],
     }),
 
     // Biper un code-barres.

@@ -126,10 +126,11 @@ const AdminBipagesScreen = () => {
     return () => clearTimeout(t);
   }, [msg]);
 
-  const { data, isLoading, isFetching, refetch } = useGetBipagesQuery(
-    { entrepriseId: selectedEntreprise, zone, type, search, marque },
-    { skip: !selectedEntreprise },
-  );
+  const { data, isLoading, isFetching, error: queryError, refetch } =
+    useGetBipagesQuery(
+      { entrepriseId: selectedEntreprise, zone, type, search, marque },
+      { skip: !selectedEntreprise },
+    );
 
   const [updateBipage] = useUpdateBipageMutation();
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
@@ -400,6 +401,22 @@ const AdminBipagesScreen = () => {
         </div>
       ) : isLoading ? (
         <div className="admin-loading">Chargement…</div>
+      ) : queryError ? (
+        /* Une requête en ÉCHEC (serveur arrêté, droit manquant…) n'est PAS
+           « aucun inventaire actif » : afficher la vraie cause, sinon on
+           cherche le problème du mauvais côté. */
+        <div className="admin-bipages-placeholder">
+          <HiClipboardList />
+          <p>
+            Impossible de joindre le serveur :{" "}
+            {queryError?.data?.message ||
+              queryError?.error ||
+              `erreur ${queryError?.status || "inconnue"}`}
+          </p>
+          <button className="btn-secondary" onClick={refetch}>
+            <HiRefresh /> Réessayer
+          </button>
+        </div>
       ) : !active ? (
         <div className="admin-bipages-placeholder">
           <HiClipboardList />
