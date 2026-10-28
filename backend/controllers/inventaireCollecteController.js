@@ -1567,10 +1567,12 @@ const exportCollecte = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Collecte non trouvée");
   }
-  if (collecte.status !== "en_cours") {
-    res.status(400);
-    throw new Error("Cette zone est déjà déposée");
-  }
+  // RE-DÉPÔT d'une zone déjà exportée : cas typique du « délai d'attente
+  // dépassé » côté collecteur alors que le serveur avait fini (constaté le
+  // 29/10/2026). Réécrire le même .DAT est idempotent (mêmes lignes, même
+  // nom de fichier) : on refait l'export et on répond SUCCÈS au lieu d'un 400
+  // qui laissait l'agent coincé devant « zone déjà déposée ».
+  const redepot = collecte.status === "exporte";
   if (collecte.lignes.length === 0) {
     res.status(400);
     throw new Error("La zone est vide");
@@ -1614,10 +1616,13 @@ const exportCollecte = asyncHandler(async (req, res) => {
   // <EMPLACEMENT>/stock.dat <code>), le dossier de référence de l'inventaire.
   // Nom FINAL directement (sans le suffixe d'emplacement que le watcher
   // retirera côté partage) → le retraitement par l'agent écrase le même
-  // fichier, pas de doublon. Best-effort : un FTP injoignable ne bloque
-  // jamais le dépôt terrain (le partage reste le flux opérationnel).
+  // fichier, pas de doublon.
+  // ⚠️ SANS await : la réponse au collecteur ne doit JAMAIS dépendre du FTP
+  // (connexion TLS + ensureDir, et jusqu'à 2 × 15 s si le serveur ne répond
+  // pas → « délai d'attente dépassé » sur l'app alors que le dépôt avait
+  // réussi). Le service logge lui-même les échecs et ne rejette jamais.
   if (session && (session.dossierSlug || session.nom)) {
-    await deposerFichierInventaireFtp(
+    void deposerFichierInventaireFtp(
       collecte.entreprise.trigramme,
       session.dossierSlug || session.nom,
       emplacementDir(collecte.zoneType),
@@ -1630,7 +1635,10 @@ const exportCollecte = asyncHandler(async (req, res) => {
   collecte.fichierExport = nomFichier;
   collecte.cheminExport = cheminFichier;
   collecte.modeExport = mode;
-  collecte.exportedAt = new Date();
+  // Au re-dépôt, l'horodatage d'origine est conservé : c'est lui que le suivi
+  // bipage utilise pour le temps de collecte (un retry des minutes plus tard
+  // fausserait la durée).
+  if (!redepot || !collecte.exportedAt) collecte.exportedAt = new Date();
   // Observation facultative saisie par l'agent dans la modale de dépôt du
   // collecteur ; elle remonte telle quelle dans l'écran « Suivi bipage ».
   if (req.body && req.body.observation !== undefined) {
@@ -1643,7 +1651,9 @@ const exportCollecte = asyncHandler(async (req, res) => {
   await collecte.save();
 
   res.json({
-    message: "Zone déposée avec succès",
+    message: redepot
+      ? "Zone déjà déposée — fichier réécrit"
+      : "Zone déposée avec succès",
     collecte: collecteResume(collecte),
     fichier: {
       nom: nomFichier,

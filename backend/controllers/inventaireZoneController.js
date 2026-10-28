@@ -207,15 +207,12 @@ const initInventaireZone = asyncHandler(async (req, res) => {
   }
 
   // Dossier de RÉFÉRENCE sur le FTPS robot-documents : inventaire/<TRIG>/<slug>
-  // (demande client 29/10/2026). Best-effort : FTP injoignable ≠ init bloquée,
-  // le chemin est stocké quand même (les dépôts suivants recréeront le dossier).
+  // (demande client 29/10/2026). SANS await : un FTP qui ne répond pas mettrait
+  // jusqu'à 30 s avant de rendre la main (2 hôtes × 15 s) alors que le chemin
+  // est connu d'avance et que les dépôts suivants recréent le dossier au
+  // besoin (ensureDir). Le service logge lui-même les échecs.
   const dossierFtp = cheminFtpInventaire(entreprise.trigramme, dossierSlug);
-  const ftp = await creerDossierInventaireFtp(entreprise.trigramme, dossierSlug);
-  if (!ftp.ok) {
-    console.error(
-      `[Inventaire] Dossier FTP non créé (${dossierFtp}): ${ftp.erreur}`,
-    );
-  }
+  void creerDossierInventaireFtp(entreprise.trigramme, dossierSlug);
 
   const session = await InventaireZoneSession.create({
     entreprise: entreprise._id,
@@ -575,9 +572,10 @@ const annulerInventaireZone = asyncHandler(async (req, res) => {
     }
   }
 
-  // 1 bis) Suppression du dossier miroir FTP (best-effort, comme le partage).
+  // 1 bis) Suppression du dossier miroir FTP — SANS await (même raison que
+  // l'init : ne pas suspendre la réponse au FTP), échecs loggés par le service.
   if (slug) {
-    await supprimerDossierInventaireFtp(entreprise.trigramme, slug);
+    void supprimerDossierInventaireFtp(entreprise.trigramme, slug);
   }
 
   // 2) Purge des données liées (fiches de cette session + collectes/bipages de

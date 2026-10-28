@@ -366,7 +366,15 @@ const CustomEtiquetteDesigner = ({
     let inner = null;
     let extra = {};
     if (el.kind === "text" || el.kind === "field") {
-      extra = { fontSize: (el.fontSize || 16) * scale, fontWeight: el.bold ? 700 : 400, color: el.color };
+      extra = {
+        fontSize: (el.fontSize || 16) * scale,
+        fontWeight: el.bold ? 700 : 400,
+        color: el.color,
+        // Alignement DANS le bloc (référence = sa ligne la plus large), comme
+        // le PDF : le bloc est à largeur de contenu, text-align suffit.
+        textAlign:
+          el.align === "centre" ? "center" : el.align === "droite" ? "right" : "left",
+      };
       inner = el.kind === "text" ? el.text || " " : fieldSample(el);
     } else if (el.kind === "line") {
       const w = (el.orientation === "v" ? el.thickness : el.length) * scale;
@@ -597,6 +605,19 @@ const CustomEtiquetteDesigner = ({
                   <label className="ced-check">
                     <input type="checkbox" checked={selected.bold} onChange={(e) => updateSel({ bold: e.target.checked })} /> Gras
                   </label>
+                  <div className="ced-field">
+                    <label>Alignement</label>
+                    <select
+                      className="ced-pselect"
+                      value={selected.align || "gauche"}
+                      onChange={(e) => updateSel({ align: e.target.value })}
+                      title="Alignement des lignes entre elles (visible sur un texte en 2-3 lignes)"
+                    >
+                      <option value="gauche">Gauche</option>
+                      <option value="centre">Centré</option>
+                      <option value="droite">Droite</option>
+                    </select>
+                  </div>
                 </div>
               )}
 

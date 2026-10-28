@@ -1062,15 +1062,41 @@ const drawTextEl = (rl, cellX, cellBottomY, hpt, el, text) => {
       .join("\n");
   }
   const sizePt = Math.max(1, (Number(el.fontSize) || 12) * PX);
-  rl.setFont(el.bold ? "Helvetica-Bold" : "Helvetica", sizePt);
+  const fontName = el.bold ? "Helvetica-Bold" : "Helvetica";
+  rl.setFont(fontName, sizePt);
   const [r, g, b] = hexToRgb01(el.color || "#000000");
   rl.setFillColorRGB(r, g, b);
   const exPt = (Number(el.x) || 0) * PX;
   const eyPt = (Number(el.y) || 0) * PX;
   const lineH = sizePt * 1.2;
-  raw.split("\n").forEach((line, li) => {
+  const lines = raw.split("\n");
+
+  // `align` (gauche par défaut, centre, droite) : alignement des lignes DANS le
+  // bloc, par rapport à sa ligne la plus large — l'ancre (x,y) reste le coin
+  // haut-gauche, exactement comme le `text-align` de l'aperçu du designer
+  // (largeur du bloc = contenu). Largeurs mesurées en points via pdfkit.
+  const align =
+    el.align === "centre" || el.align === "center"
+      ? "centre"
+      : el.align === "droite" || el.align === "right"
+        ? "droite"
+        : "gauche";
+  let widths = null;
+  let maxW = 0;
+  if (align !== "gauche" && lines.length > 1) {
+    rl.doc.font(fontName).fontSize(sizePt);
+    widths = lines.map((l) => rl.doc.widthOfString(l));
+    maxW = Math.max(...widths);
+  }
+
+  lines.forEach((line, li) => {
+    const dx = widths
+      ? align === "centre"
+        ? (maxW - widths[li]) / 2
+        : maxW - widths[li]
+      : 0;
     const topY = cellBottomY + hpt - eyPt - li * lineH; // Y-up du haut de ligne
-    rl.drawString(cellX + exPt, topY - ASCENT * sizePt, line);
+    rl.drawString(cellX + exPt + dx, topY - ASCENT * sizePt, line);
   });
 };
 
