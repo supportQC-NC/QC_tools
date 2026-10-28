@@ -1,10 +1,14 @@
-/* src/screens/admin/AdminAnalyseCaScreen.css */
+/* src/screens/admin/AdminAnalyseCaMatriceScreen.css
+   Écran Analyse CA (matrices Excel). Thème SOMBRE de l'admin : tout repose sur
+   les variables globales --admin-* d'index.css — pas de couleurs claires en
+   dur, sinon le texte hérité devient illisible sur les cartes. */
 
 /* Pleine largeur : l'écran occupe tout l'espace disponible. */
 .aca-screen {
   padding: 1.5rem 2rem 2.5rem;
   width: 100%;
   margin: 0;
+  color: var(--admin-text);
 }
 
 @media (max-width: 900px) {
@@ -18,17 +22,19 @@
 }
 
 .aca-title {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 700;
-  color: #1e4366;
-  margin: 0 0 0.25rem;
+  color: var(--admin-text);
+  margin: 0 0 0.3rem;
+  letter-spacing: -0.01em;
 }
 
 .aca-subtitle {
-  color: #5b6b7b;
-  font-size: 0.9rem;
+  color: var(--admin-text-secondary);
+  font-size: 0.92rem;
   margin: 0;
-  max-width: 720px;
+  max-width: 760px;
+  line-height: 1.5;
 }
 
 /* ── Barre d'outils ── */
@@ -37,10 +43,10 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 1rem;
-  padding: 1rem;
-  background: #f6f9fc;
-  border: 1px solid #e1e8ef;
-  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
   margin-bottom: 1.25rem;
 }
 
@@ -48,122 +54,125 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  color: #34495e;
+  color: var(--admin-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .aca-field select,
 .aca-field input {
   min-width: 220px;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid #cdd7e1;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  background: #fff;
-  color: #22303c;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  font-size: 0.92rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  transition: var(--admin-transition);
 }
 
 .aca-field select:focus,
 .aca-field input:focus {
   outline: none;
-  border-color: #2e75b6;
-  box-shadow: 0 0 0 3px rgba(46, 117, 182, 0.15);
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.2);
 }
 
 .aca-btn {
-  padding: 0.6rem 1.1rem;
+  padding: 0.6rem 1.15rem;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--admin-radius-sm);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  transition: var(--admin-transition);
 }
 
 .aca-btn-primary {
-  background: #1f4e79;
-  color: #fff;
+  background: var(--admin-primary);
+  color: #0a0a0f;
 }
 
 .aca-btn-primary:hover:not(:disabled) {
-  background: #163a5c;
+  background: var(--admin-primary-dark);
 }
 
 .aca-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 /* ── Alertes ── */
 .aca-alert {
-  padding: 0.7rem 0.9rem;
-  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  border-radius: var(--admin-radius-sm);
   font-size: 0.88rem;
   margin-bottom: 1rem;
   border: 1px solid transparent;
 }
 
 .aca-alert-error {
-  background: #fdecea;
-  border-color: #f5c6cb;
-  color: #a12622;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
 }
 
 .aca-alert-success {
-  background: #eaf7ee;
-  border-color: #b7e0c3;
-  color: #1e6b3a;
+  background: var(--admin-success-light);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
 }
 
 .aca-alert-info {
-  background: #eef4fb;
-  border-color: #cfe0f3;
-  color: #1f4e79;
+  background: var(--admin-info-light);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
   margin-top: 0.75rem;
 }
 
 .aca-alert code {
-  background: rgba(31, 78, 121, 0.1);
-  padding: 0.05rem 0.3rem;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--admin-radius-xs);
 }
 
 .aca-empty,
 .aca-loading {
-  padding: 2rem;
+  padding: 2.25rem;
   text-align: center;
-  color: #7a8a99;
-  background: #f8fafc;
-  border: 1px dashed #d5dee7;
-  border-radius: 10px;
+  color: var(--admin-text-muted);
+  background: var(--admin-bg-secondary);
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius);
 }
 
-/* ── Période ── */
+/* ── Bandeau période / source ── */
 .aca-periode {
   display: flex;
   flex-wrap: wrap;
-  gap: 2rem;
-  padding: 0.9rem 1.1rem;
-  background: #fff;
-  border: 1px solid #e1e8ef;
-  border-radius: 10px;
+  gap: 2.25rem;
+  padding: 0.9rem 1.2rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
   margin-bottom: 1.25rem;
 }
 
 .aca-periode-label {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #8494a4;
-  margin-bottom: 0.15rem;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-muted);
+  margin-bottom: 0.2rem;
 }
 
 .aca-periode-value {
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 600;
-  color: #22303c;
+  color: var(--admin-text);
 }
 
 /* ── KPIs ── */
@@ -177,30 +186,32 @@
 .aca-kpi {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 1rem 1.1rem;
-  background: #fff;
-  border: 1px solid #e1e8ef;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(31, 78, 121, 0.04);
+  gap: 0.35rem;
+  padding: 1.05rem 1.2rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
 }
 
 .aca-kpi-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #8494a4;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-muted);
+  font-weight: 600;
 }
 
 .aca-kpi-value {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 700;
-  color: #1f4e79;
+  color: var(--admin-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .aca-kpi-sub {
   font-size: 0.8rem;
-  color: #5b6b7b;
+  color: var(--admin-text-secondary);
 }
 
 .aca-kpi-evol {
@@ -209,38 +220,19 @@
 }
 
 .aca-kpi-evol.pos {
-  color: #1e8e4e;
+  color: var(--admin-success);
 }
 
 .aca-kpi-evol.neg {
-  color: #c0392b;
+  color: var(--admin-danger);
 }
 
-/* ── Onglets ── */
+/* ── Titres de section ── */
 .aca-section-title {
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
-  color: #34495e;
-  margin: 0 0 0.6rem;
-}
-
-.aca-onglets-list {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0;
-  margin: 0;
-}
-
-.aca-onglet-chip {
-  padding: 0.35rem 0.7rem;
-  background: #eef4fb;
-  color: #1f4e79;
-  border: 1px solid #d5e3f2;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  color: var(--admin-text);
+  margin: 0 0 0.7rem;
 }
 
 /* ── Graphiques ── */
@@ -252,11 +244,11 @@
 }
 
 .aca-chart-card {
-  background: #fff;
-  border: 1px solid #e1e8ef;
-  border-radius: 10px;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
   padding: 1rem 1rem 0.5rem;
-  box-shadow: 0 1px 2px rgba(31, 78, 121, 0.04);
+  box-shadow: var(--admin-shadow);
 }
 
 .aca-chart-wide {
@@ -266,32 +258,35 @@
 .aca-chart-title {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #34495e;
-  margin: 0 0 0.75rem;
+  color: var(--admin-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.8rem;
 }
 
 /* Tooltip recharts custom */
 .aca-tooltip {
-  background: #fff;
-  border: 1px solid #d5dee7;
-  border-radius: 8px;
-  padding: 0.5rem 0.7rem;
-  box-shadow: 0 4px 12px rgba(31, 78, 121, 0.12);
-  font-size: 0.8rem;
-  color: #22303c;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  padding: 0.55rem 0.75rem;
+  box-shadow: var(--admin-shadow-lg);
+  font-size: 0.82rem;
+  color: var(--admin-text);
 }
 
 .aca-tooltip-label {
   font-weight: 700;
   margin-bottom: 0.3rem;
-  color: #1f4e79;
+  color: var(--admin-primary);
 }
 
 .aca-tooltip-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  line-height: 1.5;
+  gap: 0.45rem;
+  line-height: 1.55;
+  color: var(--admin-text);
 }
 
 .aca-tooltip-dot {
@@ -300,31 +295,32 @@
   border-radius: 50%;
   display: inline-block;
 }
+
 /* ── Tableaux (mensuel + quotidien + catégories) ── */
 .aca-table-wrap {
   overflow-x: auto;
-  background: #fff;
-  border: 1px solid #e1e8ef;
-  border-radius: 10px;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
   margin-bottom: 1.5rem;
 }
 
 .aca-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.82rem;
-  color: #22303c;
+  font-size: 0.84rem;
+  color: var(--admin-text);
 }
 
 .aca-table th {
   text-align: right;
-  padding: 0.55rem 0.7rem;
-  background: #f2f6fa;
-  color: #5b6b7b;
-  font-size: 0.72rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  border-bottom: 1px solid #e1e8ef;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--admin-border);
   white-space: nowrap;
 }
 
@@ -336,34 +332,34 @@
 
 .aca-table td {
   text-align: right;
-  padding: 0.45rem 0.7rem;
-  border-bottom: 1px solid #eef2f6;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--admin-border);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .aca-table tbody tr:hover {
-  background: #f8fbfe;
+  background: var(--admin-bg-hover);
 }
 
 .aca-table tr.aca-row-total td {
-  background: #f2f6fa;
+  background: var(--admin-bg-tertiary);
   font-weight: 700;
-  border-top: 2px solid #d5dee7;
+  border-top: 2px solid var(--admin-primary);
 }
 
 .aca-table .pos {
-  color: #1e8e4e;
+  color: var(--admin-success);
   font-weight: 600;
 }
 
 .aca-table .neg {
-  color: #c0392b;
+  color: var(--admin-danger);
   font-weight: 600;
 }
 
 .aca-table .muted {
-  color: #9aa8b5;
+  color: var(--admin-text-muted);
   font-weight: 400;
 }
 
@@ -390,39 +386,50 @@
 .aca-mois-kpis {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
-  padding: 0.8rem 1.1rem;
-  background: #fff;
-  border: 1px solid #e1e8ef;
-  border-radius: 10px;
+  gap: 1.75rem;
+  padding: 0.85rem 1.2rem;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
   margin-bottom: 1rem;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  color: var(--admin-text-secondary);
 }
 
 .aca-mois-kpis strong {
-  color: #1f4e79;
+  color: var(--admin-text);
+}
+
+.aca-mois-kpis .pos {
+  color: var(--admin-success);
+  font-weight: 600;
+}
+
+.aca-mois-kpis .neg {
+  color: var(--admin-danger);
+  font-weight: 600;
 }
 
 /* ── Pied de page (fichier source) ── */
 .aca-source-note {
   font-size: 0.78rem;
-  color: #8494a4;
+  color: var(--admin-text-muted);
   margin: 0.5rem 0 1.5rem;
 }
 
 .aca-source-note code {
-  background: #f2f6fa;
-  padding: 0.05rem 0.35rem;
-  border-radius: 4px;
+  background: var(--admin-bg-tertiary);
+  padding: 0.08rem 0.4rem;
+  border-radius: var(--admin-radius-xs);
 }
 
 /* Part (%) affichée sous le montant dans les cellules catégorie. */
 .aca-cell-sub {
   display: block;
   font-size: 0.68rem;
-  color: #9aa8b5;
+  color: var(--admin-text-muted);
   font-weight: 400;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 /* Première colonne figée sur les tableaux larges (catégories par jour). */
@@ -430,10 +437,14 @@
 .aca-table-sticky th:first-child {
   position: sticky;
   left: 0;
-  background: #fff;
+  background: var(--admin-bg-secondary);
   z-index: 1;
 }
 
 .aca-table-sticky thead th:first-child {
-  background: #f2f6fa;
+  background: var(--admin-bg-tertiary);
+}
+
+.aca-table-sticky tr.aca-row-total td:first-child {
+  background: var(--admin-bg-tertiary);
 }

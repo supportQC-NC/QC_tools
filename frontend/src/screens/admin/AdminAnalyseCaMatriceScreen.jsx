@@ -36,19 +36,31 @@ import "./AdminAnalyseCaMatriceScreen.css";
 
 // Couleur FIXE par catégorie de client (jamais réaffectée selon le rang,
 // pour que PART reste bleu d'un mois et d'une société à l'autre).
+// Palette calibrée pour le THÈME SOMBRE de l'admin.
 const CAT_COLORS = {
-  PART: "#2e75b6",
-  FIDELITE: "#70ad47",
-  "PRO CPT": "#ffc000",
-  "PRO DEBIT": "#c55a11",
-  GROUPE: "#9966cc",
-  ADMIN: "#a5a5a5",
-  REVEND: "#5b9bd5",
-  AGRI: "#548235",
-  AUTRE: "#7f7f7f",
+  PART: "#4da6ff",
+  FIDELITE: "#34d399",
+  "PRO CPT": "#fbbf24",
+  "PRO DEBIT": "#fb7185",
+  GROUPE: "#c084fc",
+  ADMIN: "#94a3b8",
+  REVEND: "#2dd4bf",
+  AGRI: "#a3e635",
+  AUTRE: "#f472b6",
 };
 const catColor = (nom, i) =>
-  CAT_COLORS[nom] || ["#1f4e79", "#ed7d31", "#8db4e2"][i % 3];
+  CAT_COLORS[nom] || ["#60a5fa", "#fb923c", "#818cf8"][i % 3];
+
+// Couleurs partagées des graphiques (thème sombre).
+const CH = {
+  grille: "#2a2a3a",
+  axe: "#a7a7b8",
+  caN: "#4da6ff",
+  caN1: "#4a5570",
+  marge: "#f59e0b",
+  clientsN: "#10b981",
+  clientsN1: "#3d5c50",
+};
 
 // ── Formats ──
 const fmtXPF = (n) =>
@@ -445,11 +457,11 @@ const AdminAnalyseCaMatriceScreen = () => {
               <h3 className="aca-chart-title">CA HT mensuel N vs N-1 · marge N</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <ComposedChart data={chartMois}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
-                  <XAxis dataKey="label" fontSize={11} stroke="#8494a4" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+                  <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
                   <YAxis
                     fontSize={11}
-                    stroke="#8494a4"
+                    stroke={CH.axe}
                     tickFormatter={fmtCompact}
                     width={48}
                   />
@@ -458,20 +470,20 @@ const AdminAnalyseCaMatriceScreen = () => {
                   <Bar
                     dataKey="caN1"
                     name="CA N-1"
-                    fill="#c9d6e3"
+                    fill={CH.caN1}
                     radius={[3, 3, 0, 0]}
                   />
                   <Bar
                     dataKey="caN"
                     name="CA N"
-                    fill="#2e75b6"
+                    fill={CH.caN}
                     radius={[3, 3, 0, 0]}
                   />
                   <Line
                     type="monotone"
                     dataKey="margeN"
                     name="Marge N"
-                    stroke="#e65100"
+                    stroke={CH.marge}
                     strokeWidth={2}
                     dot={false}
                   />
@@ -483,11 +495,11 @@ const AdminAnalyseCaMatriceScreen = () => {
               <h3 className="aca-chart-title">Clients par mois N vs N-1</h3>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartMois}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
-                  <XAxis dataKey="label" fontSize={11} stroke="#8494a4" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+                  <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
                   <YAxis
                     fontSize={11}
-                    stroke="#8494a4"
+                    stroke={CH.axe}
                     tickFormatter={fmtCompact}
                     width={48}
                   />
@@ -496,13 +508,13 @@ const AdminAnalyseCaMatriceScreen = () => {
                   <Bar
                     dataKey="clientsN1"
                     name="Clients N-1"
-                    fill="#d9e4d2"
+                    fill={CH.clientsN1}
                     radius={[3, 3, 0, 0]}
                   />
                   <Bar
                     dataKey="clientsN"
                     name="Clients N"
-                    fill="#70ad47"
+                    fill={CH.clientsN}
                     radius={[3, 3, 0, 0]}
                   />
                 </BarChart>
@@ -593,11 +605,11 @@ const AdminAnalyseCaMatriceScreen = () => {
                   </h3>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={chartMoisCategories}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
-                      <XAxis dataKey="label" fontSize={11} stroke="#8494a4" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+                      <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
                       <YAxis
                         fontSize={11}
-                        stroke="#8494a4"
+                        stroke={CH.axe}
                         tickFormatter={fmtCompact}
                         width={48}
                       />
@@ -710,11 +722,11 @@ const AdminAnalyseCaMatriceScreen = () => {
                   </h3>
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={chartJours}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
-                      <XAxis dataKey="label" fontSize={10} stroke="#8494a4" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+                      <XAxis dataKey="label" fontSize={10} stroke={CH.axe} />
                       <YAxis
                         fontSize={11}
-                        stroke="#8494a4"
+                        stroke={CH.axe}
                         tickFormatter={fmtCompact}
                         width={48}
                       />
@@ -724,7 +736,7 @@ const AdminAnalyseCaMatriceScreen = () => {
                         type="monotone"
                         dataKey="caN1"
                         name="CA N-1"
-                        stroke="#c9d6e3"
+                        stroke="#6b7694"
                         strokeWidth={2}
                         dot={false}
                       />
@@ -732,7 +744,7 @@ const AdminAnalyseCaMatriceScreen = () => {
                         type="monotone"
                         dataKey="caN"
                         name="CA N"
-                        stroke="#2e75b6"
+                        stroke={CH.caN}
                         strokeWidth={2}
                         dot={false}
                       />
@@ -810,11 +822,11 @@ const AdminAnalyseCaMatriceScreen = () => {
                   </h3>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={chartJoursCategories}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
-                      <XAxis dataKey="label" fontSize={10} stroke="#8494a4" />
+                      <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+                      <XAxis dataKey="label" fontSize={10} stroke={CH.axe} />
                       <YAxis
                         fontSize={11}
-                        stroke="#8494a4"
+                        stroke={CH.axe}
                         tickFormatter={fmtCompact}
                         width={48}
                       />
