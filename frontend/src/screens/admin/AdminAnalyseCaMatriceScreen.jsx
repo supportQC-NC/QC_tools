@@ -1,7 +1,7 @@
 // src/screens/admin/AdminAnalyseCaMatriceScreen.jsx
 //
 // Analyse CA : KPI et graphiques lus dans les MATRICES Excel du Rcommun
-// (\\192.168.0.250\Rcommun\STOYANN\CA), régénérées chaque jour — elles
+// (\\192.168.0.250\Rcommun\STOCK\doc_temp\CA), régénérées chaque jour — elles
 // remplacent l'aperçu calculé depuis le DBF. La société suit la sélection
 // GLOBALE du header ; un admin peut basculer sur une vue GROUPE consolidée.
 // Le bouton « Rapport Excel détaillé » conserve la génération 13 onglets

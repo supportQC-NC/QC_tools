@@ -1,6 +1,6 @@
 // backend/controllers/analyseCaMatriceController.js
 //
-// Analyse CA sur MATRICES Excel (Rcommun STOYANN/CA) — voir le service pour la
+// Analyse CA sur MATRICES Excel (Rcommun STOCK/doc_temp/CA) — voir le service pour la
 // structure des fichiers. Deux dimensions d'accès :
 //   - sociétés : module `analyse_ca_admin` + checkEntrepriseAccess (:nomDossierDBF) ;
 //   - groupes  : données CONSOLIDÉES multi-sociétés, réservées aux admins

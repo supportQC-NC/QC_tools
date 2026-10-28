@@ -1,6 +1,6 @@
 // src/slices/analyseCaMatriceApiSlice.js
 //
-// Analyse CA sur MATRICES Excel (Rcommun STOYANN/CA). Lecture seule : les
+// Analyse CA sur MATRICES Excel (Rcommun STOCK/doc_temp/CA). Lecture seule : les
 // fichiers sont régénérés chaque jour côté serveur de fichiers, le backend
 // les recharge sur mtime — un keepUnusedDataFor court suffit.
 

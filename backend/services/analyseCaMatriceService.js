@@ -1,8 +1,8 @@
 // backend/services/analyseCaMatriceService.js
 //
 // MATRICES CA : lecture des classeurs Excel déposés sur le Rcommun
-// (\\192.168.0.250\Rcommun\STOYANN\CA) qui servent de base de données au
-// module Analyse CA. Deux familles de fichiers, même structure interne :
+// (\\192.168.0.250\Rcommun\STOCK\doc_temp\CA) qui servent de base de données
+// au module Analyse CA. Deux familles de fichiers, même structure interne :
 //
 //   matrice_ca_ht_<slug>_<annee>.xlsx          -> une société (slug ≈ nomDossierDBF)
 //   Analyse_CA_GROUPE_<NOM>_<annee>.xlsx       -> un groupe consolidé
@@ -30,7 +30,7 @@ import ExcelJS from "exceljs";
 
 const DOSSIER_MATRICES =
   process.env.ANALYSE_CA_MATRICES_PATH ||
-  "\\\\192.168.0.250\\Rcommun\\STOYANN\\CA";
+  "\\\\192.168.0.250\\Rcommun\\STOCK\\doc_temp\\CA";
 
 // Le slug des fichiers suit nomDossierDBF, à une exception près.
 const ALIAS_SLUG_VERS_DOSSIER = { quinckone: "konequincaillerie" };
