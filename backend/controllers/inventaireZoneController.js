@@ -1,5 +1,9 @@
 // backend/controllers/inventaireZoneController.js
 import fs from "fs";
+import os from "os";
+import path from "path";
+// archiver v8 : plus d'export par défaut, l'archive ZIP est une classe nommée.
+import { ZipArchive } from "archiver";
 import mongoose from "mongoose";
 import asyncHandler from "../middleware/asyncHandler.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
@@ -11,7 +15,14 @@ import User from "../models/UserModel.js";
 import {
   getInventaireDirs,
   makeInventaireSlug,
+  sanitizeName,
 } from "../services/ficheControleService.js";
+import {
+  cheminFtpInventaire,
+  creerDossierInventaireFtp,
+  supprimerDossierInventaireFtp,
+  telechargerDossierInventaireFtp,
+} from "../services/inventaireFtpService.js";
 
 const PHASES = ["papillonnage", "bipage", "controle"];
 
@@ -195,11 +206,23 @@ const initInventaireZone = asyncHandler(async (req, res) => {
     );
   }
 
+  // Dossier de RÉFÉRENCE sur le FTPS robot-documents : inventaire/<TRIG>/<slug>
+  // (demande client 29/10/2026). Best-effort : FTP injoignable ≠ init bloquée,
+  // le chemin est stocké quand même (les dépôts suivants recréeront le dossier).
+  const dossierFtp = cheminFtpInventaire(entreprise.trigramme, dossierSlug);
+  const ftp = await creerDossierInventaireFtp(entreprise.trigramme, dossierSlug);
+  if (!ftp.ok) {
+    console.error(
+      `[Inventaire] Dossier FTP non créé (${dossierFtp}): ${ftp.erreur}`,
+    );
+  }
+
   const session = await InventaireZoneSession.create({
     entreprise: entreprise._id,
     nom: nomFinal,
     dossierDat,
     dossierSlug,
+    dossierFtp,
     statut: "actif",
     zones: zonesSnapshot,
     totalZones: zonesSnapshot.length,
@@ -552,6 +575,11 @@ const annulerInventaireZone = asyncHandler(async (req, res) => {
     }
   }
 
+  // 1 bis) Suppression du dossier miroir FTP (best-effort, comme le partage).
+  if (slug) {
+    await supprimerDossierInventaireFtp(entreprise.trigramme, slug);
+  }
+
   // 2) Purge des données liées (fiches de cette session + collectes/bipages de
   //    l'entreprise, comme une réinitialisation).
   await FicheControle.deleteMany({ session: session._id });
@@ -656,6 +684,84 @@ const setFiltreProformas = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Télécharger le dossier complet d'un inventaire en ZIP, pour
+ *          l'enregistrer EN LOCAL sur le poste de l'utilisateur (une app web
+ *          ne peut pas écrire ailleurs que dans les téléchargements du
+ *          navigateur). Contenu = FUSION du dossier miroir FTP et du dossier
+ *          du partage STOCK quand il est accessible (le partage porte les PDF
+ *          générés par l'agent d'impression et peut être la seule source des
+ *          anciens inventaires ; le VPS, lui, n'a parfois QUE le FTP).
+ * @route   GET /api/inventaires-zones/:entrepriseId/dossier-zip[?sessionId=]
+ * @access  Private/Admin
+ */
+const telechargerDossierZip = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+
+  const session = req.query.sessionId
+    ? await InventaireZoneSession.findOne({
+        _id: req.query.sessionId,
+        entreprise: entreprise._id,
+      })
+    : await InventaireZoneSession.findOne({
+        entreprise: entreprise._id,
+        statut: "actif",
+      });
+  if (!session) {
+    res.status(404);
+    throw new Error("Aucun inventaire trouvé pour cette société.");
+  }
+
+  const slug = session.dossierSlug || session.nom;
+
+  // Dossier de travail temporaire : d'abord le contenu FTP, puis le partage
+  // par-dessus (mêmes chemins relatifs → le partage, qui porte les PDF et les
+  // .DAT retraités par l'agent, a le dernier mot).
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "inv-zip-"));
+  try {
+    let rienTrouve = true;
+
+    try {
+      if (await telechargerDossierInventaireFtp(entreprise.trigramme, slug, tmpDir)) {
+        rienTrouve = false;
+      }
+    } catch (err) {
+      console.error(`[Inventaire] ZIP : FTP injoignable (${err.message})`);
+    }
+
+    const basePartage = slug ? getInventaireDirs(slug).base : "";
+    if (basePartage && fs.existsSync(basePartage)) {
+      fs.cpSync(basePartage, tmpDir, { recursive: true, force: true });
+      rienTrouve = false;
+    }
+
+    if (rienTrouve) {
+      res.status(404);
+      throw new Error(
+        "Dossier introuvable : ni sur le FTP robot-documents, ni sur le partage STOCK.",
+      );
+    }
+
+    const nomZip = `${sanitizeName(slug)}.zip`;
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(nomZip)}"`,
+    );
+
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    archive.on("error", (err) => {
+      console.error(`[Inventaire] ZIP : ${err.message}`);
+      res.destroy(err);
+    });
+    archive.pipe(res);
+    archive.directory(tmpDir, sanitizeName(slug));
+    await archive.finalize();
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 export {
   initInventaireZone,
   setFiltreProformas,
@@ -667,4 +773,5 @@ export {
   getHistorique,
   setPhaseManuelle,
   deleteSession,
+  telechargerDossierZip,
 };

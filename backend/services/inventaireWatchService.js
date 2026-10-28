@@ -25,6 +25,7 @@ import {
   resoudreCheminPdf,
   sanitizeName,
 } from "./ficheControleService.js";
+import { deposerFichierInventaireFtp } from "./inventaireFtpService.js";
 
 let isRunning = false;
 let intervalHandle = null;
@@ -389,6 +390,28 @@ const traiterFichier = async (
     },
     { upsert: true },
   );
+
+  // Miroir FTP de RÉFÉRENCE (inventaire/<TRIG>/<slug>/<EMPLACEMENT>/) :
+  // le .DAT final + la fiche PDF générée. Mêmes chemins que le dépôt mobile
+  // (écrasement idempotent, pas de doublon). Best-effort : un FTP injoignable
+  // n'empêche ni le traitement ni l'impression.
+  const slugFtp = session.dossierSlug || session.nom;
+  if (slugFtp && entreprise.trigramme) {
+    await deposerFichierInventaireFtp(
+      entreprise.trigramme,
+      slugFtp,
+      dossierEmplacement,
+      nomFinal,
+      workFilePath,
+    );
+    await deposerFichierInventaireFtp(
+      entreprise.trigramme,
+      slugFtp,
+      dossierEmplacement,
+      pdfFileName,
+      workPath,
+    );
+  }
 
   return {
     status: "traite",

@@ -12,6 +12,7 @@ import {
   HiCheckCircle,
   HiExclamationCircle,
   HiTrash,
+  HiDownload,
 } from "react-icons/hi";
 import {
   useGetActiveSessionQuery,
@@ -553,8 +554,28 @@ const AdminInventaireProgressionScreen = () => {
                 {session.createdBy &&
                   ` · par ${session.createdBy.prenom || ""} ${session.createdBy.nom || ""}`}
               </span>
+              {session.dossierFtp && (
+                <span
+                  className="session-meta"
+                  title="Dossier de référence sur le serveur FTP robot-documents (miroir du partage STOCK)"
+                >
+                  Dossier : {session.dossierFtp}
+                </span>
+              )}
             </div>
             <div className="session-actions">
+              <button
+                className="btn-secondary"
+                onClick={() =>
+                  window.open(
+                    `/api/inventaires-zones/${selectedEntreprise}/dossier-zip`,
+                    "_blank",
+                  )
+                }
+                title="Télécharge le dossier complet de l'inventaire (.dat + fiches PDF, FTP et partage fusionnés) en ZIP, à enregistrer sur ce poste"
+              >
+                <HiDownload /> Enregistrer le dossier (ZIP)
+              </button>
               <button
                 className="btn-secondary"
                 onClick={() => setShowHistorique(true)}
@@ -1102,6 +1123,18 @@ const AdminInventaireProgressionScreen = () => {
                           {s.progress.totalPhases})
                         </td>
                         <td>
+                          <button
+                            className="btn-icon"
+                            onClick={() =>
+                              window.open(
+                                `/api/inventaires-zones/${selectedEntreprise}/dossier-zip?sessionId=${s._id}`,
+                                "_blank",
+                              )
+                            }
+                            title="Enregistrer le dossier de cet inventaire (ZIP)"
+                          >
+                            <HiDownload />
+                          </button>
                           <button
                             className="btn-icon danger"
                             onClick={() => handleDeleteHisto(s._id)}

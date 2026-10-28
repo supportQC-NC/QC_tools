@@ -11,6 +11,7 @@ import {
   getHistorique,
   setPhaseManuelle,
   deleteSession,
+  telechargerDossierZip,
 } from "../controllers/inventaireZoneController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
@@ -82,6 +83,16 @@ router.get(
   admin,
   checkEntrepriseAccess,
   getProgress,
+);
+
+// Dossier complet de l'inventaire (FTP + partage fusionnés) en ZIP, pour
+// l'enregistrer en local sur le poste de l'utilisateur.
+router.get(
+  "/:entrepriseId/dossier-zip",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  telechargerDossierZip,
 );
 
 // Historique des sessions archivées

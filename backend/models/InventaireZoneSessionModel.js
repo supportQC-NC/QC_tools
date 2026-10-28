@@ -65,6 +65,10 @@ const sessionSchema = new mongoose.Schema(
     // dossier distinct. Le watcher / le dépôt recalculent le chemin via
     // getInventaireDirs(dossierSlug) pour l'environnement courant (cross-OS).
     dossierSlug: { type: String, default: "" },
+    // Dossier MIROIR sur le FTPS robot-documents : inventaire/<TRIG>/<slug>.
+    // C'est le dossier de RÉFÉRENCE de l'inventaire (demande client 29/10/2026) ;
+    // le partage STOCK reste le flux opérationnel (watcher / impression).
+    dossierFtp: { type: String, default: "" },
     statut: {
       type: String,
       enum: ["actif", "archive"],

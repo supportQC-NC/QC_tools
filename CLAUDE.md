@@ -863,6 +863,17 @@ imprimer. C'est `npm run print-agent` (`backend/printAgent.js`), lancé sur le p
 `192.168.0.250` qui a le Rcommun **et** l'imprimante, qui porte le watcher. Il se
 connecte au **même** MongoDB Atlas.
 
+**Miroir FTP des inventaires par zones** (29/10/2026) : chaque inventaire a un
+dossier de RÉFÉRENCE `inventaire/<TRIG>/<slug>/` sur le FTPS robot-documents
+(`services/inventaireFtpService.js`, chemin stocké dans `session.dossierFtp`),
+alimenté au dépôt mobile (.dat) et par le watcher (.dat final + PDF). ⚠️ Le
+partage STOCK reste le **flux opérationnel** (watcher → FicheControle +
+LigneBipage + impression) : les écritures FTP sont best-effort et ne bloquent
+jamais le terrain ; « Annuler » supprime aussi le dossier FTP. « Enregistrer en
+local » = `GET /api/inventaires-zones/:id/dossier-zip[?sessionId=]` (fusion
+FTP + partage, ZIP streamé — archiver v8 : `new ZipArchive(...)`, plus d'export
+par défaut), bouton sur l'écran Progression + historique.
+
 Depuis le web on **ne réimprime plus à distance** : l'écran Fiches de contrôle
 propose l'**aperçu** et le **téléchargement** du PDF
 (`GET /api/fiches-controle/:entrepriseId/:id/pdf[?download=1]`), et l'utilisateur

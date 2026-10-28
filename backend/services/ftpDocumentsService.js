@@ -102,6 +102,15 @@ async function connecter() {
   throw derniereErreur || new Error("Aucun hôte FTP joignable");
 }
 
+/**
+ * Ouvre une connexion FTPS authentifiée sur robot-documents (LAN puis internet)
+ * pour les services qui ÉCRIVENT sur le serveur (ex. miroir des inventaires).
+ * L'appelant est responsable du `client.close()`.
+ */
+export async function ouvrirConnexionFtp() {
+  return connecter();
+}
+
 // Synchronise un dossier distant vers le cache local. Ne lève JAMAIS : en cas
 // d'échec on sert le cache existant.
 async function synchroniser(dossierDistant) {

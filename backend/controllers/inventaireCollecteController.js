@@ -985,7 +985,9 @@ import {
   construireLignes,
   ecrirePDF,
   getInventaireDirs,
+  emplacementDir,
 } from "../services/ficheControleService.js";
+import { deposerFichierInventaireFtp } from "../services/inventaireFtpService.js";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -1606,6 +1608,22 @@ const exportCollecte = asyncHandler(async (req, res) => {
   } catch (error) {
     res.status(400);
     throw new Error(`Impossible d'écrire le fichier : ${error.message}`);
+  }
+
+  // Copie MIROIR sur le FTPS robot-documents (inventaire/<TRIG>/<slug>/
+  // <EMPLACEMENT>/stock.dat <code>), le dossier de référence de l'inventaire.
+  // Nom FINAL directement (sans le suffixe d'emplacement que le watcher
+  // retirera côté partage) → le retraitement par l'agent écrase le même
+  // fichier, pas de doublon. Best-effort : un FTP injoignable ne bloque
+  // jamais le dépôt terrain (le partage reste le flux opérationnel).
+  if (session && (session.dossierSlug || session.nom)) {
+    await deposerFichierInventaireFtp(
+      collecte.entreprise.trigramme,
+      session.dossierSlug || session.nom,
+      emplacementDir(collecte.zoneType),
+      `stock.dat ${String(collecte.zoneCode || "").trim().replace(/[\\/:*?"<>|]/g, "_")}`,
+      Buffer.from(contenu, "utf8"),
+    );
   }
 
   collecte.status = "exporte";
