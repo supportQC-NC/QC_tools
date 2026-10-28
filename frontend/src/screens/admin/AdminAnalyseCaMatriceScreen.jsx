@@ -307,7 +307,7 @@ const AdminAnalyseCaMatriceScreen = () => {
       {sources && !sources.accessible && (
         <div className="aca-alert aca-alert-error">
           Le dossier des matrices CA est inaccessible (<code>{sources.dossier}</code>).
-          Vérifier le partage réseau ou <code>ANALYSE_CA_MATRICES_PATH</code>.
+          Vérifier le partage réseau (Rcommun\STOCK\doc_temp\CA).
         </div>
       )}
 

@@ -19,6 +19,13 @@
 // ligne "CUMUL"…), jamais par numéro de ligne en dur — le générateur amont
 // peut décaler d'une ligne sans nous casser.
 //
+// ⚠️ Chemin du dossier : EN DUR, pas de variable d'environnement (décision
+// client du 28/10/2026 — « ça doit marcher en prod » sans toucher au .env).
+// Le dossier réel est \\192.168.0.250\Rcommun\STOCK\doc_temp\CA ; en prod
+// (VPS Ubuntu) RCOMMON_STOCK_ROOT pointe déjà sur le montage de ...\STOCK,
+// donc on y lit <RCOMMON_STOCK_ROOT>/doc_temp/CA — même mécanique que
+// utils/reapproMagPaths.js, qui lit déjà ce doc_temp.
+//
 // ⚠️ Unités hétérogènes dans le fichier : TX quotidien en pour-cent (62.3),
 // taux cumulés et parts de catégorie en ratio (0.51), R/H en ratio (peut
 // dépasser 1 : +113 %). Tout est NORMALISÉ ici en pour-cent (0–100) pour que
@@ -28,9 +35,19 @@ import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
 
-const DOSSIER_MATRICES =
-  process.env.ANALYSE_CA_MATRICES_PATH ||
-  "\\\\192.168.0.250\\Rcommun\\STOCK\\doc_temp\\CA";
+// Candidats essayés dans l'ordre ; le premier dossier lisible gagne.
+//   - prod VPS : <RCOMMON_STOCK_ROOT>/doc_temp/CA (montage Linux de ...\STOCK)
+//   - dev Windows : le partage UNC en direct.
+function candidatsDossierMatrices() {
+  const liste = [];
+  const stockRoot = String(process.env.RCOMMON_STOCK_ROOT || "").replace(
+    /[\\/]+$/,
+    "",
+  );
+  if (stockRoot) liste.push(path.posix.join(stockRoot, "doc_temp", "CA"));
+  liste.push("\\\\192.168.0.250\\Rcommun\\STOCK\\doc_temp\\CA");
+  return liste;
+}
 
 // Le slug des fichiers suit nomDossierDBF, à une exception près.
 const ALIAS_SLUG_VERS_DOSSIER = { quinckone: "konequincaillerie" };
@@ -106,30 +123,41 @@ function trouverLigne(ws, libelle, colonne = 1) {
 export function scannerSources() {
   const societes = new Map();
   const groupes = new Map();
+  const candidats = candidatsDossierMatrices();
+
+  let dossierMatrices = null;
   let fichiers = [];
-  try {
-    fichiers = fs.readdirSync(DOSSIER_MATRICES);
-  } catch {
-    // Partage indisponible : renvoyer des listes vides, l'appelant décide.
-    return { societes, groupes, dossier: DOSSIER_MATRICES, accessible: false };
+  for (const candidat of candidats) {
+    try {
+      fichiers = fs.readdirSync(candidat);
+      dossierMatrices = candidat;
+      break;
+    } catch {
+      // Candidat illisible (pas monté sur cette machine) : on essaie le suivant.
+    }
   }
+  if (!dossierMatrices) {
+    // Aucun dossier lisible : listes vides, l'appelant décide.
+    return { societes, groupes, dossier: candidats.join(" | "), accessible: false };
+  }
+
   for (const f of fichiers) {
     let m = RE_SOCIETE.exec(f);
     if (m) {
       const slug = m[1].toLowerCase();
       const dossier = ALIAS_SLUG_VERS_DOSSIER[slug] || slug;
       if (!societes.has(dossier)) societes.set(dossier, new Map());
-      societes.get(dossier).set(Number(m[2]), path.join(DOSSIER_MATRICES, f));
+      societes.get(dossier).set(Number(m[2]), path.join(dossierMatrices, f));
       continue;
     }
     m = RE_GROUPE.exec(f);
     if (m) {
       const id = m[1].toLowerCase();
       if (!groupes.has(id)) groupes.set(id, new Map());
-      groupes.get(id).set(Number(m[2]), path.join(DOSSIER_MATRICES, f));
+      groupes.get(id).set(Number(m[2]), path.join(dossierMatrices, f));
     }
   }
-  return { societes, groupes, dossier: DOSSIER_MATRICES, accessible: true };
+  return { societes, groupes, dossier: dossierMatrices, accessible: true };
 }
 
 // Libellé humain d'un id de groupe ("groupe_ducos_quincaillerie" -> "Groupe Ducos Quincaillerie").
@@ -366,4 +394,4 @@ function parseFeuilleMois(ws, indexMois, annee) {
   };
 }
 
-export default { scannerSources, lireMatrice, libelleGroupe, DOSSIER_MATRICES };
+export default { scannerSources, lireMatrice, libelleGroupe };
