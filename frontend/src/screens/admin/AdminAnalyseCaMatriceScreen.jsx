@@ -218,6 +218,57 @@ const AdminAnalyseCaMatriceScreen = () => {
     [detail],
   );
 
+  // ── Catégories client à l'échelle de l'ANNÉE (comme les feuilles Excel) ──
+  // Noms dans l'ordre du fichier (PART, FIDELITE, PRO CPT…).
+  const nomsCategories = useMemo(() => {
+    for (const m of moisDispo) if (m.categories?.length) return m.categories;
+    return [];
+  }, [moisDispo]);
+
+  // CA par catégorie et par mois (barres empilées).
+  const chartMoisCategories = useMemo(
+    () =>
+      moisDispo
+        .filter((m) => m.cumul)
+        .map((m) => ({
+          label: m.label.slice(0, 4),
+          ...Object.fromEntries(m.cumul.categories.map((c) => [c.nom, c.ca])),
+        })),
+    [moisDispo],
+  );
+
+  // Totaux annuels par catégorie (CA, part, marge, part marge, taux recalculé).
+  const totauxCategories = useMemo(() => {
+    const parNom = new Map();
+    for (const m of moisDispo) {
+      for (const c of m.cumul?.categories || []) {
+        const t = parNom.get(c.nom) || { nom: c.nom, ca: 0, marge: 0 };
+        t.ca += c.ca;
+        t.marge += c.marge || 0;
+        parNom.set(c.nom, t);
+      }
+    }
+    const lignes = nomsCategories.map((nom) => parNom.get(nom)).filter(Boolean);
+    const totalCa = lignes.reduce((s, l) => s + l.ca, 0);
+    const totalMarge = lignes.reduce((s, l) => s + l.marge, 0);
+    return lignes.map((l) => ({
+      ...l,
+      partPct: totalCa ? (l.ca / totalCa) * 100 : 0,
+      partMargePct: totalMarge ? (l.marge / totalMarge) * 100 : 0,
+      tauxMargePct: l.ca ? (l.marge / l.ca) * 100 : 0,
+    }));
+  }, [moisDispo, nomsCategories]);
+
+  // CA par catégorie et par JOUR du mois sélectionné (barres empilées).
+  const chartJoursCategories = useMemo(
+    () =>
+      (detail?.jours || []).map((j) => ({
+        label: j.date,
+        ...Object.fromEntries((j.categories || []).map((c) => [c.nom, c.ca])),
+      })),
+    [detail],
+  );
+
   const sourceCourante = data?.source;
   const anneesDispo = sourceCourante?.annees || [];
 
@@ -529,6 +580,80 @@ const AdminAnalyseCaMatriceScreen = () => {
             </table>
           </div>
 
+          {/* ── Catégories de clients sur l'année (détail des feuilles Excel) ── */}
+          {totauxCategories.length > 0 && (
+            <>
+              <h2 className="aca-section-title">
+                CA par catégorie de client — année {sourceCourante?.annee}
+              </h2>
+              <section className="aca-charts">
+                <div className="aca-chart-card aca-chart-wide">
+                  <h3 className="aca-chart-title">
+                    CA HT mensuel empilé par catégorie
+                  </h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartMoisCategories}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
+                      <XAxis dataKey="label" fontSize={11} stroke="#8494a4" />
+                      <YAxis
+                        fontSize={11}
+                        stroke="#8494a4"
+                        tickFormatter={fmtCompact}
+                        width={48}
+                      />
+                      <Tooltip content={<XpfTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: "11px" }} />
+                      {nomsCategories.map((nom, i) => (
+                        <Bar
+                          key={nom}
+                          dataKey={nom}
+                          stackId="categories"
+                          name={nom}
+                          fill={catColor(nom, i)}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+
+              <div className="aca-table-wrap">
+                <table className="aca-table">
+                  <thead>
+                    <tr>
+                      <th>Catégorie</th>
+                      <th>CA HT cumulé</th>
+                      <th>Part CA</th>
+                      <th>Marge cumulée</th>
+                      <th>Part marge</th>
+                      <th>Taux de marge</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {totauxCategories.map((c, i) => (
+                      <tr key={c.nom}>
+                        <td>
+                          <span
+                            className="aca-cat-dot"
+                            style={{ background: catColor(c.nom, i) }}
+                          />
+                          {c.nom}
+                        </td>
+                        <td className={c.ca < 0 ? "neg" : ""}>{fmtNb(c.ca)}</td>
+                        <td>{fmtTaux(c.partPct)}</td>
+                        <td className={c.marge < 0 ? "neg" : ""}>
+                          {fmtNb(c.marge)}
+                        </td>
+                        <td>{fmtTaux(c.partMargePct)}</td>
+                        <td>{fmtTaux(c.tauxMargePct)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
           {/* ── Détail d'un mois ── */}
           {moisDispo.length > 0 && (
             <>
@@ -678,6 +803,35 @@ const AdminAnalyseCaMatriceScreen = () => {
                     </table>
                   </div>
                 </div>
+
+                <div className="aca-chart-card aca-chart-wide">
+                  <h3 className="aca-chart-title">
+                    CA HT quotidien empilé par catégorie — {detail?.label}
+                  </h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={chartJoursCategories}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eef2f6" />
+                      <XAxis dataKey="label" fontSize={10} stroke="#8494a4" />
+                      <YAxis
+                        fontSize={11}
+                        stroke="#8494a4"
+                        tickFormatter={fmtCompact}
+                        width={48}
+                      />
+                      <Tooltip content={<XpfTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: "11px" }} />
+                      {(detail?.categories || []).map((nom, i) => (
+                        <Bar
+                          key={nom}
+                          dataKey={nom}
+                          stackId="categories"
+                          name={nom}
+                          fill={catColor(nom, i)}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </section>
 
               {/* Tableau quotidien */}
@@ -695,6 +849,8 @@ const AdminAnalyseCaMatriceScreen = () => {
                       <th>Clients</th>
                       <th>Date N-1</th>
                       <th>CA HT N-1</th>
+                      <th>Marge N-1</th>
+                      <th>Taux N-1</th>
                       <th>Clients N-1</th>
                       <th>R/H CA</th>
                     </tr>
@@ -709,12 +865,69 @@ const AdminAnalyseCaMatriceScreen = () => {
                         <td>{j.caN ? fmtNb(j.clientsN) : "—"}</td>
                         <td>{j.dateN1 || "—"}</td>
                         <td>{j.caN1 ? fmtNb(j.caN1) : "—"}</td>
+                        <td>{j.caN1 ? fmtNb(j.margeN1) : "—"}</td>
+                        <td>{j.caN1 ? fmtTaux(j.tauxMargeN1) : "—"}</td>
                         <td>{j.caN1 ? fmtNb(j.clientsN1) : "—"}</td>
                         <td className={evolClass(j.rhCaPct)}>
                           {j.rhCaPct == null ? "—" : fmtEvol(j.rhCaPct)}
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Catégories par jour (montant + part, comme le bloc de droite
+                  des feuilles mensuelles Excel) */}
+              <h2 className="aca-section-title">
+                Catégories de clients par jour — {detail?.label?.toLowerCase()}{" "}
+                {detail?.annee}
+              </h2>
+              <div className="aca-table-wrap">
+                <table className="aca-table aca-table-sticky">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      {(detail?.categories || []).map((nom, i) => (
+                        <th key={nom}>
+                          <span
+                            className="aca-cat-dot"
+                            style={{ background: catColor(nom, i) }}
+                          />
+                          {nom}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detail?.jours || []).map((j) => (
+                      <tr key={j.date}>
+                        <td>{j.date}</td>
+                        {(j.categories || []).map((c) => (
+                          <td key={c.nom} className={c.ca < 0 ? "neg" : ""}>
+                            {j.caN ? fmtNb(c.ca) : "—"}
+                            {j.caN ? (
+                              <span className="aca-cell-sub">
+                                {fmtTaux(c.partPct)}
+                              </span>
+                            ) : null}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {detail?.cumul && (
+                      <tr className="aca-row-total">
+                        <td>CUMUL</td>
+                        {detail.cumul.categories.map((c) => (
+                          <td key={c.nom} className={c.ca < 0 ? "neg" : ""}>
+                            {fmtNb(c.ca)}
+                            <span className="aca-cell-sub">
+                              {fmtTaux(c.partPct)}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

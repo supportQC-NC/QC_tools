@@ -1,9 +1,16 @@
 /* src/screens/admin/AdminAnalyseCaScreen.css */
 
+/* Pleine largeur : l'écran occupe tout l'espace disponible. */
 .aca-screen {
-  padding: 1.5rem;
-  max-width: 1100px;
-  margin: 0 auto;
+  padding: 1.5rem 2rem 2.5rem;
+  width: 100%;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .aca-screen {
+    padding: 1rem;
+  }
 }
 
 .aca-header {
@@ -162,7 +169,7 @@
 /* ── KPIs ── */
 .aca-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -239,7 +246,7 @@
 /* ── Graphiques ── */
 .aca-charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -407,4 +414,26 @@
   background: #f2f6fa;
   padding: 0.05rem 0.35rem;
   border-radius: 4px;
+}
+
+/* Part (%) affichée sous le montant dans les cellules catégorie. */
+.aca-cell-sub {
+  display: block;
+  font-size: 0.68rem;
+  color: #9aa8b5;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+/* Première colonne figée sur les tableaux larges (catégories par jour). */
+.aca-table-sticky td:first-child,
+.aca-table-sticky th:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.aca-table-sticky thead th:first-child {
+  background: #f2f6fa;
 }
