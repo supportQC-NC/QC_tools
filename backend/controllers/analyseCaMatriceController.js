@@ -121,4 +121,68 @@ const getMatriceGroupe = asyncHandler(async (req, res) => {
   });
 });
 
-export { listerSources, getMatriceSociete, getMatriceGroupe };
+// GET /api/analyse-ca-matrices/comparaison?sources=qc,dq,groupe_quincal&annee=YYYY
+// Dashboards (KPI + mensuel) de plusieurs sources d'un coup, pour l'écran de
+// comparaison. Chaque source est filtrée par les mêmes règles que les routes
+// unitaires : société dans le périmètre de l'utilisateur, groupe réservé aux
+// admins — une source hors périmètre est IGNORÉE (pas d'erreur), le front
+// n'affiche que ce qui revient.
+const getComparaison = asyncHandler(async (req, res) => {
+  const demandes = [
+    ...new Set(
+      String(req.query.sources || "")
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ].slice(0, 12);
+  if (!demandes.length) {
+    res.status(400);
+    throw new Error("Paramètre sources requis (ids séparés par des virgules).");
+  }
+
+  const { societes, groupes } = scannerSources();
+  const scope = await getAccessibleEntreprises(req.user);
+  const filtre = scope.all ? {} : { _id: { $in: scope.ids } };
+  const entreprises = await Entreprise.find(filtre).select(
+    "nomDossierDBF nomComplet",
+  );
+  const parDossier = new Map(entreprises.map((e) => [e.nomDossierDBF, e]));
+  const anneeDemandee = Number(req.query.annee) || null;
+
+  const resultats = [];
+  for (const id of demandes) {
+    let parAnnee;
+    let label;
+    let type;
+    if (groupes.has(id)) {
+      if (req.user?.role !== "admin") continue;
+      parAnnee = groupes.get(id);
+      label = libelleGroupe(id);
+      type = "groupe";
+    } else if (societes.has(id)) {
+      const e = parDossier.get(id);
+      if (!e) continue;
+      parAnnee = societes.get(id);
+      label = e.nomComplet || id;
+      type = "societe";
+    } else {
+      continue;
+    }
+    const { annee, chemin } = fichierPourAnnee(parAnnee, anneeDemandee);
+    const data = await lireMatrice(chemin);
+    resultats.push({
+      id,
+      label,
+      type,
+      annee,
+      kpis: data.kpis,
+      mois: data.mois,
+      total: data.total,
+    });
+  }
+
+  res.json({ sources: resultats });
+});
+
+export { listerSources, getMatriceSociete, getMatriceGroupe, getComparaison };

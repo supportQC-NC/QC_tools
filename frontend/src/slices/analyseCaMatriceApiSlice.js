@@ -33,6 +33,15 @@ export const analyseCaMatriceApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 120,
     }),
+
+    // Dashboards de plusieurs sources d'un coup (comparateur).
+    getAnalyseCaMatriceComparaison: builder.query({
+      query: ({ sources, annee }) => ({
+        url: `${URL}/comparaison`,
+        params: { sources: sources.join(","), ...(annee ? { annee } : {}) },
+      }),
+      keepUnusedDataFor: 120,
+    }),
   }),
 });
 
@@ -40,4 +49,5 @@ export const {
   useGetAnalyseCaMatriceSourcesQuery,
   useGetAnalyseCaMatriceSocieteQuery,
   useGetAnalyseCaMatriceGroupeQuery,
+  useGetAnalyseCaMatriceComparaisonQuery,
 } = analyseCaMatriceApiSlice;

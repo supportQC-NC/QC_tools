@@ -448,3 +448,56 @@
 .aca-table-sticky tr.aca-row-total td:first-child {
   background: var(--admin-bg-tertiary);
 }
+
+/* ── KPI cliquables (sélecteur de métrique) ── */
+.aca-kpi-btn {
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.aca-kpi-btn:hover {
+  background: var(--admin-bg-hover);
+  border-color: var(--admin-text-muted);
+}
+
+.aca-kpi.actif {
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 1px var(--admin-primary), var(--admin-shadow);
+}
+
+.aca-kpi.actif .aca-kpi-label {
+  color: var(--admin-primary);
+}
+
+/* ── Puces du comparateur multi-sociétés ── */
+.aca-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.aca-chip {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.aca-chip:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+
+.aca-chip.actif {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+  color: #0a0a0f;
+}

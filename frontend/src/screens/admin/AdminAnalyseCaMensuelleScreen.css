@@ -430,3 +430,47 @@
   border-radius: 50%;
   display: inline-block;
 }
+
+/* ── Puces de métrique (Types de client) ── */
+.acm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.acm-chip {
+  padding: 0.42rem 0.85rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--admin-transition);
+}
+
+.acm-chip:hover {
+  background: var(--admin-bg-hover);
+  color: var(--admin-text);
+}
+
+.acm-chip.actif {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+  color: #0a0a0f;
+}
+
+/* ── Contrôles des graphiques de classement ── */
+.acm-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.acm-chart-controls .acm-field select {
+  min-width: 170px;
+}

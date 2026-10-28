@@ -9,6 +9,7 @@ import {
   listerSources,
   getMatriceSociete,
   getMatriceGroupe,
+  getComparaison,
 } from "../controllers/analyseCaMatriceController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import {
@@ -22,6 +23,9 @@ const canRead = checkModuleAccess("analyse_ca_admin", "read");
 
 // Sources disponibles (sociétés du périmètre + groupes si admin).
 router.get("/", protect, canRead, listerSources);
+
+// Comparaison multi-sources (chaque source refiltrée par le périmètre).
+router.get("/comparaison", protect, canRead, getComparaison);
 
 // Matrice d'une société (scopée entreprise).
 router.get(

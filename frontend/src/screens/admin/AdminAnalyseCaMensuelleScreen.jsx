@@ -22,6 +22,8 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   Cell,
   XAxis,
   YAxis,
@@ -186,67 +188,119 @@ const FEUILLES_CLASSEES = {
 const donneesFeuille = (feuille) =>
   feuille.lignes.filter((l) => !estLigneTotal(l));
 
+// Unité d'affichage d'une métrique TYPES_CLIENT.
+const uniteMetriqueTC = (m) =>
+  /%/.test(m) ? "pct" : /panier|^ca$|^marge$/i.test(m) ? "xpf" : "nb";
+
+// Les métriques qui s'EMPILENT (des volumes) ; les autres (taux, moyennes)
+// se tracent en courbes — empiler des paniers moyens n'a aucun sens.
+const METRIQUES_EMPILABLES = new Set(["CA", "Marge", "NB Factures"]);
+
 // Prépare les jeux de données des graphiques de la feuille active.
-function construireGraphes(feuille) {
+// opts : { metriqueTC, iTri, topN } — les CONTRÔLES dynamiques de l'écran.
+function construireGraphes(feuille, opts = {}) {
   const lignes = donneesFeuille(feuille);
   if (lignes.length < 2) return null;
 
-  // TYPES_CLIENT : CA mensuel empilé par type + répartition + taux de marge.
+  // TYPES_CLIENT : métrique COMMUTABLE (CA, Marge, Marge %, NB Factures,
+  // Panier Moyen, NUC, R/H…) × type de client, par mois + cumul.
   if (feuille.nom === "TYPES_CLIENT") {
     const iCumul = idxCol(feuille, /^cumul$/);
     if (iCumul === -1) return null;
-    const lignesCA = lignes.filter((l) => l[1] === "CA");
-    const types = lignesCA.map((l) => l[0]);
-    const empile = feuille.colonnes
+    const metriques = [...new Set(lignes.map((l) => l[1]).filter(Boolean))];
+    const metrique = metriques.includes(opts.metriqueTC)
+      ? opts.metriqueTC
+      : "CA";
+    const lignesM = lignes.filter((l) => l[1] === metrique);
+    const types = lignesM.map((l) => l[0]);
+    const serie = feuille.colonnes
       .map((c, i) => ({ label: c.label, i }))
       .filter(({ i }) => i >= 2 && i !== iCumul)
       .map(({ label, i }) => {
         const point = { mois: label };
-        lignesCA.forEach((l) => {
+        lignesM.forEach((l) => {
           point[l[0]] = typeof l[i] === "number" ? l[i] : 0;
         });
         return point;
       })
       .filter((p) => types.some((t) => p[t]));
-    const donut = lignesCA
-      .map((l) => ({ nom: l[0], ca: typeof l[iCumul] === "number" ? l[iCumul] : 0 }))
-      .filter((d) => d.ca > 0);
-    const margePct = lignes
-      .filter((l) => l[1] === "Marge %")
-      .map((l) => ({
-        nom: l[0],
-        taux: typeof l[iCumul] === "number" ? l[iCumul] : 0,
-      }));
-    return { type: "typesClient", empile, types, donut, margePct };
+    const cumulParType = lignesM.map((l) => ({
+      nom: l[0],
+      valeur: typeof l[iCumul] === "number" ? l[iCumul] : 0,
+    }));
+    const donut = cumulParType.filter((d) => d.valeur > 0);
+    return {
+      type: "typesClient",
+      metrique,
+      metriques,
+      unite: uniteMetriqueTC(metrique),
+      empilable: METRIQUES_EMPILABLES.has(metrique),
+      serie,
+      types,
+      cumulParType,
+      donut,
+    };
   }
 
-  // Feuilles de classement : top 15 CA N vs N-1 + plus fortes variations.
+  // Feuilles de classement : Top N selon la colonne CHOISIE + plus fortes
+  // variations de CA (Δ N vs N-1).
   if (feuille.nom in FEUILLES_CLASSEES) {
     const iLabel = FEUILLES_CLASSEES[feuille.nom];
     const iCaN = idxCol(feuille, /^ca n \(xpf\)/);
     const iCaN1 = idxCol(feuille, /^ca n-1 \(xpf\)/);
     if (iCaN === -1) return null;
-    const avecCa = lignes.filter((l) => typeof l[iCaN] === "number");
-    const top = [...avecCa]
-      .sort((a, b) => b[iCaN] - a[iCaN])
-      .slice(0, 15)
+
+    // Colonnes numériques proposées au classement (hors rangs et codes).
+    const colonnesTri = feuille.colonnes
+      .map((c, i) => ({ ...c, i }))
+      .filter(
+        ({ label, i }) =>
+          i !== iLabel &&
+          !/^(#|rang|code|four\b)/.test(sansAccents(label)) &&
+          lignes.some((l) => typeof l[i] === "number"),
+      );
+    const iTri =
+      colonnesTri.some((c) => c.i === opts.iTri) ? opts.iTri : iCaN;
+    const colTri = feuille.colonnes[iTri];
+    const topN = opts.topN || 15;
+
+    const valides = lignes.filter((l) => typeof l[iTri] === "number");
+    const top = [...valides]
+      .sort((a, b) => b[iTri] - a[iTri])
+      .slice(0, topN)
       .map((l) => ({
         nom: tronque(l[iLabel]),
-        caN: l[iCaN],
-        caN1: iCaN1 !== -1 && typeof l[iCaN1] === "number" ? l[iCaN1] : 0,
+        valeur: l[iTri],
+        caN1:
+          iTri === iCaN && iCaN1 !== -1 && typeof l[iCaN1] === "number"
+            ? l[iCaN1]
+            : null,
       }));
+
     let deltas = [];
     if (iCaN1 !== -1) {
-      const tries = avecCa
-        .filter((l) => typeof l[iCaN1] === "number")
+      const tries = lignes
+        .filter(
+          (l) => typeof l[iCaN] === "number" && typeof l[iCaN1] === "number",
+        )
         .map((l) => ({ nom: tronque(l[iLabel]), delta: l[iCaN] - l[iCaN1] }))
         .sort((a, b) => b.delta - a.delta);
-      // 7 plus fortes hausses + 7 plus fortes baisses (sans doublon si < 14).
-      deltas = [...tries.slice(0, 7), ...tries.slice(-7)].filter(
+      const moitie = Math.min(Math.ceil(topN / 2), 10);
+      // plus fortes hausses + plus fortes baisses (sans doublon si peu de lignes).
+      deltas = [...tries.slice(0, moitie), ...tries.slice(-moitie)].filter(
         (d, i, arr) => arr.findIndex((x) => x.nom === d.nom) === i,
       );
     }
-    return { type: "classement", top, deltas };
+    return {
+      type: "classement",
+      top,
+      deltas,
+      colonnesTri,
+      iTri,
+      topN,
+      colTri,
+      avecN1: iTri === iCaN && iCaN1 !== -1,
+    };
   }
 
   // Rayons : top CA + plus fortes valeurs de dépréciation.
@@ -291,9 +345,44 @@ function construireGraphes(feuille) {
 // Hauteur d'un graphique à barres horizontales selon le nombre de lignes.
 const hBarres = (n) => Math.max(180, n * 28 + 70);
 
-// Les graphiques de la feuille active, au-dessus du tableau.
+// Tooltip selon l'unité de la métrique affichée.
+const fmtUnite = (unite, v) => {
+  if (typeof v !== "number") return "—";
+  if (unite === "pct") return fmtPct(v);
+  if (unite === "xpf") return `${fmtNb(v)} XPF`;
+  return fmtNb(v, 2);
+};
+const ValTooltip = ({ active, payload, label, unite = "xpf" }) => {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="acm-tooltip">
+      {label != null && <div className="acm-tooltip-label">{label}</div>}
+      {payload.map((p) => (
+        <div key={p.dataKey || p.name} className="acm-tooltip-row">
+          <span
+            className="acm-tooltip-dot"
+            style={{ background: p.color || p.stroke || p.payload?.fill }}
+          />
+          {p.name} : <strong>{fmtUnite(unite, p.value)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Les graphiques de la feuille active, au-dessus du tableau — avec des
+// CONTRÔLES dynamiques : métrique commutable (Types de client), colonne de
+// classement + taille du Top (feuilles de classement). L'état est local au
+// composant et repart à zéro quand on change d'onglet (prop `key`).
 const GraphiquesFeuille = ({ feuille }) => {
-  const g = useMemo(() => construireGraphes(feuille), [feuille]);
+  const [metriqueTC, setMetriqueTC] = useState("CA");
+  const [iTri, setITri] = useState(null);
+  const [topN, setTopN] = useState(15);
+
+  const g = useMemo(
+    () => construireGraphes(feuille, { metriqueTC, iTri, topN }),
+    [feuille, metriqueTC, iTri, topN],
+  );
   if (!g) return null;
 
   const axes = (
@@ -304,116 +393,244 @@ const GraphiquesFeuille = ({ feuille }) => {
 
   if (g.type === "typesClient") {
     return (
-      <section className="acm-charts">
-        <div className="acm-chart-card acm-chart-wide">
-          <h3 className="acm-chart-title">CA HT mensuel empilé par type de client</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={g.empile}>
-              {axes}
-              <XAxis dataKey="mois" fontSize={11} stroke={CH.axe} />
-              <YAxis fontSize={11} stroke={CH.axe} tickFormatter={fmtCompact} width={52} />
-              <Tooltip content={<XpfTooltip />} />
-              <Legend wrapperStyle={{ fontSize: "11px" }} />
-              {g.types.map((t, i) => (
-                <Bar key={t} dataKey={t} stackId="types" name={t} fill={typeColor(t, i)} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+      <>
+        {/* Sélecteur de métrique : pilote les trois graphiques. */}
+        <div className="acm-chips">
+          {g.metriques.map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`acm-chip ${g.metrique === m ? "actif" : ""}`}
+              onClick={() => setMetriqueTC(m)}
+            >
+              {m}
+            </button>
+          ))}
         </div>
 
-        <div className="acm-chart-card">
-          <h3 className="acm-chart-title">Répartition du CA cumulé</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={g.donut}
-                dataKey="ca"
-                nameKey="nom"
-                cx="50%"
-                cy="50%"
-                outerRadius={95}
-                innerRadius={48}
-                paddingAngle={2}
-              >
-                {g.donut.map((d, i) => (
-                  <Cell key={d.nom} fill={typeColor(d.nom, i)} />
-                ))}
-              </Pie>
-              <Tooltip content={<XpfTooltip />} />
-              <Legend wrapperStyle={{ fontSize: "10px" }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <section className="acm-charts">
+          <div className="acm-chart-card acm-chart-wide">
+            <h3 className="acm-chart-title">
+              {g.metrique} par type de client — mensuel
+              {g.empilable ? " (empilé)" : ""}
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              {g.empilable ? (
+                <BarChart data={g.serie}>
+                  {axes}
+                  <XAxis dataKey="mois" fontSize={11} stroke={CH.axe} />
+                  <YAxis
+                    fontSize={11}
+                    stroke={CH.axe}
+                    tickFormatter={fmtCompact}
+                    width={52}
+                  />
+                  <Tooltip content={<ValTooltip unite={g.unite} />} />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  {g.types.map((t, i) => (
+                    <Bar
+                      key={t}
+                      dataKey={t}
+                      stackId="types"
+                      name={t}
+                      fill={typeColor(t, i)}
+                    />
+                  ))}
+                </BarChart>
+              ) : (
+                <LineChart data={g.serie}>
+                  {axes}
+                  <XAxis dataKey="mois" fontSize={11} stroke={CH.axe} />
+                  <YAxis
+                    fontSize={11}
+                    stroke={CH.axe}
+                    tickFormatter={
+                      g.unite === "pct" ? (v) => `${v} %` : fmtCompact
+                    }
+                    width={g.unite === "pct" ? 56 : 52}
+                  />
+                  <Tooltip content={<ValTooltip unite={g.unite} />} />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  {g.types.map((t, i) => (
+                    <Line
+                      key={t}
+                      type="monotone"
+                      dataKey={t}
+                      name={t}
+                      stroke={typeColor(t, i)}
+                      strokeWidth={2}
+                      dot={false}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              )}
+            </ResponsiveContainer>
+          </div>
 
-        <div className="acm-chart-card">
-          <h3 className="acm-chart-title">Taux de marge cumulé par type (%)</h3>
-          <ResponsiveContainer width="100%" height={hBarres(g.margePct.length)}>
-            <BarChart data={g.margePct} layout="vertical" margin={{ left: 8, right: 16 }}>
-              {axes}
-              <XAxis type="number" fontSize={10} stroke={CH.axe} unit=" %" />
-              <YAxis type="category" dataKey="nom" width={130} fontSize={10} stroke={CH.axe} />
-              <Tooltip
-                content={({ active, payload, label }) =>
-                  active && payload?.length ? (
-                    <div className="acm-tooltip">
-                      <div className="acm-tooltip-label">{label}</div>
-                      <div className="acm-tooltip-row">
-                        Taux de marge : <strong>{fmtPct(payload[0].value)}</strong>
-                      </div>
-                    </div>
-                  ) : null
-                }
-              />
-              <Bar dataKey="taux" name="Taux de marge" radius={[0, 3, 3, 0]}>
-                {g.margePct.map((d, i) => (
-                  <Cell key={d.nom} fill={typeColor(d.nom, i)} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
-    );
-  }
+          {g.empilable && g.donut.length > 0 && (
+            <div className="acm-chart-card">
+              <h3 className="acm-chart-title">
+                Répartition — {g.metrique} cumulé
+              </h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={g.donut}
+                    dataKey="valeur"
+                    nameKey="nom"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={95}
+                    innerRadius={48}
+                    paddingAngle={2}
+                  >
+                    {g.donut.map((d, i) => (
+                      <Cell key={d.nom} fill={typeColor(d.nom, i)} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ValTooltip unite={g.unite} />} />
+                  <Legend wrapperStyle={{ fontSize: "10px" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
-  if (g.type === "classement") {
-    return (
-      <section className="acm-charts">
-        <div className={`acm-chart-card ${g.deltas.length ? "" : "acm-chart-wide"}`}>
-          <h3 className="acm-chart-title">Top 15 par CA HT — N vs N-1</h3>
-          <ResponsiveContainer width="100%" height={hBarres(g.top.length)}>
-            <BarChart data={g.top} layout="vertical" margin={{ left: 8, right: 16 }}>
-              {axes}
-              <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
-              <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
-              <Tooltip content={<XpfTooltip />} />
-              <Legend wrapperStyle={{ fontSize: "11px" }} />
-              <Bar dataKey="caN1" name="CA N-1" fill={CH.caN1} radius={[0, 3, 3, 0]} />
-              <Bar dataKey="caN" name="CA N" fill={CH.caN} radius={[0, 3, 3, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {g.deltas.length > 0 && (
           <div className="acm-chart-card">
-            <h3 className="acm-chart-title">Plus fortes variations de CA (Δ N vs N-1)</h3>
-            <ResponsiveContainer width="100%" height={hBarres(g.deltas.length)}>
-              <BarChart data={g.deltas} layout="vertical" margin={{ left: 8, right: 16 }}>
+            <h3 className="acm-chart-title">
+              {g.metrique} cumulé par type
+            </h3>
+            <ResponsiveContainer
+              width="100%"
+              height={hBarres(g.cumulParType.length)}
+            >
+              <BarChart
+                data={g.cumulParType}
+                layout="vertical"
+                margin={{ left: 8, right: 16 }}
+              >
                 {axes}
-                <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
-                <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
-                <ReferenceLine x={0} stroke={CH.axe} />
-                <Tooltip content={<XpfTooltip />} />
-                <Bar dataKey="delta" name="Δ CA" radius={[0, 3, 3, 0]}>
-                  {g.deltas.map((d) => (
-                    <Cell key={d.nom} fill={d.delta >= 0 ? CH.hausse : CH.baisse} />
+                <XAxis
+                  type="number"
+                  fontSize={10}
+                  stroke={CH.axe}
+                  tickFormatter={
+                    g.unite === "pct" ? (v) => `${v} %` : fmtCompact
+                  }
+                />
+                <YAxis
+                  type="category"
+                  dataKey="nom"
+                  width={130}
+                  fontSize={10}
+                  stroke={CH.axe}
+                />
+                <Tooltip content={<ValTooltip unite={g.unite} />} />
+                <Bar dataKey="valeur" name={g.metrique} radius={[0, 3, 3, 0]}>
+                  {g.cumulParType.map((d, i) => (
+                    <Cell key={d.nom} fill={typeColor(d.nom, i)} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        )}
-      </section>
+        </section>
+      </>
+    );
+  }
+
+  if (g.type === "classement") {
+    const uniteTri = g.colTri?.format === "pct"
+      ? "pct"
+      : /\(xpf\)/.test(sansAccents(g.colTri?.label || ""))
+        ? "xpf"
+        : "nb";
+    const tickTri = uniteTri === "pct" ? (v) => `${v} %` : fmtCompact;
+    return (
+      <>
+        {/* Contrôles dynamiques : colonne de classement + taille du Top. */}
+        <div className="acm-chart-controls">
+          <label className="acm-field">
+            Classer par
+            <select
+              value={g.iTri}
+              onChange={(e) => setITri(Number(e.target.value))}
+            >
+              {g.colonnesTri.map((c) => (
+                <option key={c.i} value={c.i}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="acm-field">
+            Top
+            <select value={g.topN} onChange={(e) => setTopN(Number(e.target.value))}>
+              {[10, 15, 25, 50].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <section className="acm-charts">
+          <div className={`acm-chart-card ${g.deltas.length ? "" : "acm-chart-wide"}`}>
+            <h3 className="acm-chart-title">
+              Top {g.topN} — {g.colTri?.label}
+              {g.avecN1 ? " (N vs N-1)" : ""}
+            </h3>
+            <ResponsiveContainer width="100%" height={hBarres(g.top.length)}>
+              <BarChart data={g.top} layout="vertical" margin={{ left: 8, right: 16 }}>
+                {axes}
+                <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={tickTri} />
+                <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
+                <Tooltip content={<ValTooltip unite={uniteTri} />} />
+                {g.avecN1 && <Legend wrapperStyle={{ fontSize: "11px" }} />}
+                {g.avecN1 && (
+                  <Bar dataKey="caN1" name="CA N-1" fill={CH.caN1} radius={[0, 3, 3, 0]} />
+                )}
+                <Bar
+                  dataKey="valeur"
+                  name={g.colTri?.label}
+                  fill={CH.caN}
+                  radius={[0, 3, 3, 0]}
+                >
+                  {!g.avecN1 &&
+                    uniteTri === "pct" &&
+                    g.top.map((d) => (
+                      <Cell
+                        key={d.nom}
+                        fill={d.valeur >= 0 ? CH.hausse : CH.baisse}
+                      />
+                    ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {g.deltas.length > 0 && (
+            <div className="acm-chart-card">
+              <h3 className="acm-chart-title">Plus fortes variations de CA (Δ N vs N-1)</h3>
+              <ResponsiveContainer width="100%" height={hBarres(g.deltas.length)}>
+                <BarChart data={g.deltas} layout="vertical" margin={{ left: 8, right: 16 }}>
+                  {axes}
+                  <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} />
+                  <YAxis type="category" dataKey="nom" width={170} fontSize={10} stroke={CH.axe} />
+                  <ReferenceLine x={0} stroke={CH.axe} />
+                  <Tooltip content={<XpfTooltip />} />
+                  <Bar dataKey="delta" name="Δ CA" radius={[0, 3, 3, 0]}>
+                    {g.deltas.map((d) => (
+                      <Cell key={d.nom} fill={d.delta >= 0 ? CH.hausse : CH.baisse} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </section>
+      </>
     );
   }
 
@@ -719,7 +936,9 @@ const AdminAnalyseCaMensuelleScreen = () => {
             ))}
           </nav>
 
-          {feuille && <GraphiquesFeuille feuille={feuille} />}
+          {/* key = nom de feuille : les contrôles (métrique, tri, top)
+              repartent à zéro quand on change d'onglet */}
+          {feuille && <GraphiquesFeuille key={feuille.nom} feuille={feuille} />}
 
           {feuille && (
             <>

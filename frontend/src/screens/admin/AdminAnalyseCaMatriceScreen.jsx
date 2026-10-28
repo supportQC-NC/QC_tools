@@ -14,13 +14,13 @@ import {
   useGetAnalyseCaMatriceSourcesQuery,
   useGetAnalyseCaMatriceSocieteQuery,
   useGetAnalyseCaMatriceGroupeQuery,
+  useGetAnalyseCaMatriceComparaisonQuery,
 } from "../../slices/analyseCaMatriceApiSlice";
 import { useGenererAnalyseCaMutation } from "../../slices/analyseCaApiSlice";
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  ComposedChart,
   LineChart,
   Line,
   XAxis,
@@ -60,6 +60,68 @@ const CH = {
   marge: "#f59e0b",
   clientsN: "#10b981",
   clientsN1: "#3d5c50",
+};
+
+// Palette des courbes du comparateur multi-sociétés (une couleur par source,
+// dans l'ordre de sélection).
+const COMP_COLORS = [
+  "#4da6ff", "#34d399", "#fbbf24", "#fb7185",
+  "#c084fc", "#2dd4bf", "#a3e635", "#f472b6",
+  "#f97316", "#94a3b8", "#818cf8", "#e879f9",
+];
+
+// ── Métriques commutables : les KPI sont CLIQUABLES et pilotent tous les
+// graphiques (évolution mensuelle, quotidien, comparateur). ──
+const METRIQUES = {
+  ca: {
+    label: "CA HT",
+    unite: "xpf",
+    moisN: (m) => m.caN || null,
+    moisN1: (m) => m.caN1 || null,
+    jourN: (j) => j.caN || null,
+    jourN1: (j) => j.caN1 || null,
+  },
+  marge: {
+    label: "Marge HT",
+    unite: "xpf",
+    moisN: (m) => (m.caN ? m.margeN : null),
+    moisN1: (m) => (m.caN1 ? m.margeN1 : null),
+    jourN: (j) => (j.caN ? j.margeN : null),
+    jourN1: (j) => (j.caN1 ? j.margeN1 : null),
+  },
+  taux: {
+    label: "Taux de marge",
+    unite: "pct",
+    moisN: (m) => (m.caN ? Math.round((m.margeN / m.caN) * 1000) / 10 : null),
+    moisN1: (m) => (m.caN1 ? Math.round((m.margeN1 / m.caN1) * 1000) / 10 : null),
+    jourN: (j) => (j.caN ? j.tauxMargeN : null),
+    jourN1: (j) => (j.caN1 ? j.tauxMargeN1 : null),
+  },
+  clients: {
+    label: "Clients",
+    unite: "nb",
+    moisN: (m) => m.clientsN || null,
+    moisN1: (m) => m.clientsN1 || null,
+    jourN: (j) => j.clientsN || null,
+    jourN1: (j) => j.clientsN1 || null,
+  },
+  pm: {
+    label: "Panier moyen",
+    unite: "xpf",
+    moisN: (m) => (m.clientsN ? Math.round(m.caN / m.clientsN) : null),
+    moisN1: (m) => (m.clientsN1 ? Math.round(m.caN1 / m.clientsN1) : null),
+    jourN: (j) => (j.clientsN ? Math.round(j.caN / j.clientsN) : null),
+    jourN1: (j) => (j.clientsN1 ? Math.round(j.caN1 / j.clientsN1) : null),
+  },
+};
+
+// Format d'une valeur selon l'unité de la métrique.
+const fmtUnite = (unite, v) => {
+  if (typeof v !== "number") return "—";
+  if (unite === "pct") return `${v.toFixed(1)} %`;
+  if (unite === "xpf")
+    return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(v)} XPF`;
+  return new Intl.NumberFormat("fr-FR").format(v);
 };
 
 // ── Formats ──
@@ -105,16 +167,16 @@ const XpfTooltip = ({ active, payload, label }) => {
   );
 };
 
-// Tooltip en nombre simple (clients).
-const NbTooltip = ({ active, payload, label }) => {
+// Tooltip générique selon l'unité de la métrique active.
+const MetriqueTooltip = ({ active, payload, label, unite }) => {
   if (!active || !payload || payload.length === 0) return null;
   return (
     <div className="aca-tooltip">
       {label != null && <div className="aca-tooltip-label">{label}</div>}
       {payload.map((p) => (
         <div key={p.dataKey || p.name} className="aca-tooltip-row">
-          <span className="aca-tooltip-dot" style={{ background: p.color }} />
-          {p.name} : <strong>{fmtNb(p.value)}</strong>
+          <span className="aca-tooltip-dot" style={{ background: p.color || p.stroke }} />
+          {p.name} : <strong>{fmtUnite(unite, p.value)}</strong>
         </div>
       ))}
     </div>
@@ -136,6 +198,8 @@ const AdminAnalyseCaMatriceScreen = () => {
   const [groupeId, setGroupeId] = useState(""); // "" = suivre la société globale
   const [annee, setAnnee] = useState(null); // null = plus récente
   const [moisSel, setMoisSel] = useState(null); // null = dernier mois disponible
+  const [metrique, setMetrique] = useState("ca"); // KPI actif (pilote les graphiques)
+  const [compareIds, setCompareIds] = useState([]); // sources du comparateur
 
   const { data: sources } = useGetAnalyseCaMatriceSourcesQuery();
 
@@ -205,23 +269,63 @@ const AdminAnalyseCaMatriceScreen = () => {
   const pmN1 = kpis && kpis.clientsN1 ? kpis.caN1 / kpis.clientsN1 : null;
   const evolPm = pmN && pmN1 ? ((pmN - pmN1) / pmN1) * 100 : null;
 
+  const M = METRIQUES[metrique];
+
+  // Évolution mensuelle de la MÉTRIQUE ACTIVE (N vs N-1).
   const chartMois = useMemo(
     () =>
       (data?.mois || []).map((m) => ({
-        ...m,
         label: m.periode,
+        valN: M.moisN(m),
+        valN1: M.moisN1(m),
       })),
-    [data],
+    [data, M],
   );
 
+  // Quotidien du mois sélectionné, métrique active.
   const chartJours = useMemo(
     () =>
       (detail?.jours || []).map((j) => ({
-        ...j,
         label: j.date,
+        valN: M.jourN(j),
+        valN1: M.jourN1(j),
       })),
-    [detail],
+    [detail, M],
   );
+
+  // ── Comparateur multi-sources ──
+  const sourcesDispo = useMemo(
+    () => [...(sources?.societes || []), ...(sources?.groupes || [])],
+    [sources],
+  );
+  const compareTri = useMemo(() => [...compareIds].sort(), [compareIds]);
+  const { data: comparaison, isFetching: busyComparaison } =
+    useGetAnalyseCaMatriceComparaisonQuery(
+      { sources: compareTri, annee },
+      { skip: compareTri.length < 2 },
+    );
+
+  const basculerComparaison = (id) =>
+    setCompareIds((ids) =>
+      ids.includes(id)
+        ? ids.filter((x) => x !== id)
+        : ids.length >= 12
+          ? ids
+          : [...ids, id],
+    );
+
+  // Courbes mensuelles du comparateur (métrique active, année N).
+  const chartComparaison = useMemo(() => {
+    const srcs = comparaison?.sources || [];
+    if (!srcs.length) return [];
+    return (srcs[0].mois || []).map((m0, i) => {
+      const point = { label: m0.periode };
+      srcs.forEach((s) => {
+        point[s.label] = s.mois?.[i] ? M.moisN(s.mois[i]) : null;
+      });
+      return point;
+    });
+  }, [comparaison, M]);
 
   // Donut catégories : seules les parts POSITIVES sont représentables ; les
   // montants négatifs (avoirs GROUPE…) restent visibles dans le tableau.
@@ -410,37 +514,58 @@ const AdminAnalyseCaMatriceScreen = () => {
             </div>
           </section>
 
-          {/* ── KPI cumulés (à date) ── */}
+          {/* ── KPI cumulés (à date) — CLIQUABLES : le KPI actif pilote tous
+              les graphiques (mensuel, quotidien, comparateur) ── */}
           <section className="aca-kpis">
-            <div className="aca-kpi">
+            <button
+              type="button"
+              className={`aca-kpi aca-kpi-btn ${metrique === "ca" ? "actif" : ""}`}
+              onClick={() => setMetrique("ca")}
+            >
               <span className="aca-kpi-label">CA HT cumulé</span>
               <span className="aca-kpi-value">{fmtXPF(kpis?.caN)}</span>
               <span className={`aca-kpi-evol ${evolClass(kpis?.evolCaPct)}`}>
                 {fmtEvol(kpis?.evolCaPct)} vs N-1 ({fmtXPF(kpis?.caN1)})
               </span>
-            </div>
-            <div className="aca-kpi">
+            </button>
+            <button
+              type="button"
+              className={`aca-kpi aca-kpi-btn ${metrique === "marge" ? "actif" : ""}`}
+              onClick={() => setMetrique("marge")}
+            >
               <span className="aca-kpi-label">Marge HT cumulée</span>
               <span className="aca-kpi-value">{fmtXPF(kpis?.margeN)}</span>
               <span className={`aca-kpi-evol ${evolClass(kpis?.evolMargePct)}`}>
                 {fmtEvol(kpis?.evolMargePct)} vs N-1
               </span>
-            </div>
-            <div className="aca-kpi">
+            </button>
+            <button
+              type="button"
+              className={`aca-kpi aca-kpi-btn ${metrique === "taux" ? "actif" : ""}`}
+              onClick={() => setMetrique("taux")}
+            >
               <span className="aca-kpi-label">Taux de marge</span>
               <span className="aca-kpi-value">{fmtTaux(kpis?.tauxMargeN)}</span>
               <span className="aca-kpi-sub">
                 N-1 : {fmtTaux(kpis?.tauxMargeN1)}
               </span>
-            </div>
-            <div className="aca-kpi">
+            </button>
+            <button
+              type="button"
+              className={`aca-kpi aca-kpi-btn ${metrique === "clients" ? "actif" : ""}`}
+              onClick={() => setMetrique("clients")}
+            >
               <span className="aca-kpi-label">Clients</span>
               <span className="aca-kpi-value">{fmtNb(kpis?.clientsN)}</span>
               <span className={`aca-kpi-evol ${evolClass(kpis?.evolClientsPct)}`}>
                 {fmtEvol(kpis?.evolClientsPct)} vs N-1
               </span>
-            </div>
-            <div className="aca-kpi">
+            </button>
+            <button
+              type="button"
+              className={`aca-kpi aca-kpi-btn ${metrique === "pm" ? "actif" : ""}`}
+              onClick={() => setMetrique("pm")}
+            >
               <span className="aca-kpi-label">Panier moyen</span>
               <span className="aca-kpi-value">
                 {pmN != null ? fmtXPF(Math.round(pmN)) : "—"}
@@ -448,73 +573,38 @@ const AdminAnalyseCaMatriceScreen = () => {
               <span className={`aca-kpi-evol ${evolClass(evolPm)}`}>
                 {fmtEvol(evolPm)} vs N-1
               </span>
-            </div>
+            </button>
           </section>
 
-          {/* ── Graphiques annuels ── */}
+          {/* ── Évolution mensuelle de la métrique active ── */}
           <section className="aca-charts">
             <div className="aca-chart-card aca-chart-wide">
-              <h3 className="aca-chart-title">CA HT mensuel N vs N-1 · marge N</h3>
+              <h3 className="aca-chart-title">
+                {M.label} par mois — N vs N-1
+              </h3>
               <ResponsiveContainer width="100%" height={280}>
-                <ComposedChart data={chartMois}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
-                  <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
-                  <YAxis
-                    fontSize={11}
-                    stroke={CH.axe}
-                    tickFormatter={fmtCompact}
-                    width={48}
-                  />
-                  <Tooltip content={<XpfTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: "11px" }} />
-                  <Bar
-                    dataKey="caN1"
-                    name="CA N-1"
-                    fill={CH.caN1}
-                    radius={[3, 3, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="caN"
-                    name="CA N"
-                    fill={CH.caN}
-                    radius={[3, 3, 0, 0]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="margeN"
-                    name="Marge N"
-                    stroke={CH.marge}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="aca-chart-card aca-chart-wide">
-              <h3 className="aca-chart-title">Clients par mois N vs N-1</h3>
-              <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartMois}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
                   <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
                   <YAxis
                     fontSize={11}
                     stroke={CH.axe}
-                    tickFormatter={fmtCompact}
-                    width={48}
+                    tickFormatter={M.unite === "pct" ? (v) => `${v} %` : fmtCompact}
+                    width={M.unite === "pct" ? 56 : 48}
+                    domain={M.unite === "pct" ? [0, "auto"] : undefined}
                   />
-                  <Tooltip content={<NbTooltip />} />
+                  <Tooltip content={<MetriqueTooltip unite={M.unite} />} />
                   <Legend wrapperStyle={{ fontSize: "11px" }} />
                   <Bar
-                    dataKey="clientsN1"
-                    name="Clients N-1"
-                    fill={CH.clientsN1}
+                    dataKey="valN1"
+                    name={`${M.label} N-1`}
+                    fill={CH.caN1}
                     radius={[3, 3, 0, 0]}
                   />
                   <Bar
-                    dataKey="clientsN"
-                    name="Clients N"
-                    fill={CH.clientsN}
+                    dataKey="valN"
+                    name={`${M.label} N`}
+                    fill={CH.caN}
                     radius={[3, 3, 0, 0]}
                   />
                 </BarChart>
@@ -718,7 +808,7 @@ const AdminAnalyseCaMatriceScreen = () => {
               <section className="aca-charts">
                 <div className="aca-chart-card aca-chart-wide">
                   <h3 className="aca-chart-title">
-                    CA HT quotidien — {detail?.label} N vs N-1
+                    {M.label} quotidien — {detail?.label} N vs N-1
                   </h3>
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={chartJours}>
@@ -727,23 +817,25 @@ const AdminAnalyseCaMatriceScreen = () => {
                       <YAxis
                         fontSize={11}
                         stroke={CH.axe}
-                        tickFormatter={fmtCompact}
-                        width={48}
+                        tickFormatter={
+                          M.unite === "pct" ? (v) => `${v} %` : fmtCompact
+                        }
+                        width={M.unite === "pct" ? 56 : 48}
                       />
-                      <Tooltip content={<XpfTooltip />} />
+                      <Tooltip content={<MetriqueTooltip unite={M.unite} />} />
                       <Legend wrapperStyle={{ fontSize: "11px" }} />
                       <Line
                         type="monotone"
-                        dataKey="caN1"
-                        name="CA N-1"
+                        dataKey="valN1"
+                        name={`${M.label} N-1`}
                         stroke="#6b7694"
                         strokeWidth={2}
                         dot={false}
                       />
                       <Line
                         type="monotone"
-                        dataKey="caN"
-                        name="CA N"
+                        dataKey="valN"
+                        name={`${M.label} N`}
                         stroke={CH.caN}
                         strokeWidth={2}
                         dot={false}
@@ -943,6 +1035,136 @@ const AdminAnalyseCaMatriceScreen = () => {
                   </tbody>
                 </table>
               </div>
+            </>
+          )}
+
+          {/* ── Comparateur multi-sociétés (suit la métrique active) ── */}
+          {sourcesDispo.length > 1 && (
+            <>
+              <h2 className="aca-section-title">
+                Comparer — {M.label} {sourceCourante?.annee}
+              </h2>
+              <div className="aca-chips">
+                {sourcesDispo.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`aca-chip ${compareIds.includes(s.id) ? "actif" : ""}`}
+                    onClick={() => basculerComparaison(s.id)}
+                  >
+                    {s.label}
+                    {s.type === "groupe" ? " (groupe)" : ""}
+                  </button>
+                ))}
+              </div>
+
+              {compareTri.length < 2 && (
+                <p className="aca-source-note">
+                  Sélectionnez au moins deux sources pour les comparer sur la
+                  métrique active (cliquez un KPI pour en changer).
+                </p>
+              )}
+
+              {busyComparaison && (
+                <div className="aca-loading">Chargement de la comparaison…</div>
+              )}
+
+              {compareTri.length >= 2 &&
+                !busyComparaison &&
+                (comparaison?.sources?.length ?? 0) >= 2 && (
+                  <>
+                    <section className="aca-charts">
+                      <div className="aca-chart-card aca-chart-wide">
+                        <h3 className="aca-chart-title">
+                          {M.label} par mois (année N) — comparaison
+                        </h3>
+                        <ResponsiveContainer width="100%" height={320}>
+                          <LineChart data={chartComparaison}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
+                            <XAxis dataKey="label" fontSize={11} stroke={CH.axe} />
+                            <YAxis
+                              fontSize={11}
+                              stroke={CH.axe}
+                              tickFormatter={
+                                M.unite === "pct" ? (v) => `${v} %` : fmtCompact
+                              }
+                              width={M.unite === "pct" ? 56 : 48}
+                            />
+                            <Tooltip
+                              content={<MetriqueTooltip unite={M.unite} />}
+                            />
+                            <Legend wrapperStyle={{ fontSize: "11px" }} />
+                            {comparaison.sources.map((s, i) => (
+                              <Line
+                                key={s.id}
+                                type="monotone"
+                                dataKey={s.label}
+                                name={s.label}
+                                stroke={COMP_COLORS[i % COMP_COLORS.length]}
+                                strokeWidth={2}
+                                dot={false}
+                                connectNulls
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </section>
+
+                    <div className="aca-table-wrap">
+                      <table className="aca-table">
+                        <thead>
+                          <tr>
+                            <th>Source</th>
+                            <th>CA HT cumulé</th>
+                            <th>Évol. CA</th>
+                            <th>Marge cumulée</th>
+                            <th>Évol. marge</th>
+                            <th>Taux de marge</th>
+                            <th>Clients</th>
+                            <th>Évol. clients</th>
+                            <th>Panier moyen</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparaison.sources.map((s, i) => (
+                            <tr key={s.id}>
+                              <td>
+                                <span
+                                  className="aca-cat-dot"
+                                  style={{
+                                    background:
+                                      COMP_COLORS[i % COMP_COLORS.length],
+                                  }}
+                                />
+                                {s.label}
+                                {s.type === "groupe" ? " (groupe)" : ""}
+                              </td>
+                              <td>{fmtNb(s.kpis?.caN)}</td>
+                              <td className={evolClass(s.kpis?.evolCaPct)}>
+                                {fmtEvol(s.kpis?.evolCaPct)}
+                              </td>
+                              <td>{fmtNb(s.kpis?.margeN)}</td>
+                              <td className={evolClass(s.kpis?.evolMargePct)}>
+                                {fmtEvol(s.kpis?.evolMargePct)}
+                              </td>
+                              <td>{fmtTaux(s.kpis?.tauxMargeN)}</td>
+                              <td>{fmtNb(s.kpis?.clientsN)}</td>
+                              <td className={evolClass(s.kpis?.evolClientsPct)}>
+                                {fmtEvol(s.kpis?.evolClientsPct)}
+                              </td>
+                              <td>
+                                {s.kpis?.clientsN
+                                  ? fmtNb(Math.round(s.kpis.caN / s.kpis.clientsN))
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
             </>
           )}
 
