@@ -18,7 +18,7 @@ const periodesDesc = (parPeriode) => [...parPeriode.keys()].sort().reverse();
 // GET /api/analyse-ca-mensuelle
 // Sources disponibles (sociétés du périmètre ayant au moins un classeur).
 const listerSources = asyncHandler(async (req, res) => {
-  const { sources, dossier, accessible } = scannerSources();
+  const { sources, dossier, accessible } = await scannerSources();
 
   const scope = await getAccessibleEntreprises(req.user);
   const filtre = scope.all ? {} : { _id: { $in: scope.ids } };
@@ -46,7 +46,7 @@ const listerSources = asyncHandler(async (req, res) => {
 // GET /api/analyse-ca-mensuelle/societe/:nomDossierDBF?periode=AAAA-MM
 // Classeur complet d'une société (défaut : période la plus récente).
 const getClasseur = asyncHandler(async (req, res) => {
-  const { sources } = scannerSources();
+  const { sources } = await scannerSources();
   const slug = String(req.entreprise.trigramme || "").toLowerCase();
   const parPeriode = slug && sources.get(slug);
   if (!parPeriode) {

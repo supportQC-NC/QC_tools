@@ -393,9 +393,10 @@ const AdminAnalyseCaMatriceScreen = () => {
       <header className="aca-header">
         <h1 className="aca-title">Analyse CA</h1>
         <p className="aca-subtitle">
-          Chiffre d'affaires, marge et fréquentation, comparés à N-1, lus dans
-          les matrices CA du Rcommun (mises à jour quotidiennes) — par société
-          ou consolidés par groupe.
+          Chiffre d'affaires, marge et fréquentation, comparés à N-1 — par
+          société ou consolidés par groupe. Matrices régénérées chaque soir
+          (19h30, lun-sam) et récupérées automatiquement depuis le serveur
+          documentaire.
         </p>
       </header>
 
@@ -473,8 +474,8 @@ const AdminAnalyseCaMatriceScreen = () => {
 
       {sources && !sources.accessible && (
         <div className="aca-alert aca-alert-error">
-          Le dossier des matrices CA est inaccessible (<code>{sources.dossier}</code>).
-          Vérifier le partage réseau (Rcommun\STOCK\doc_temp\CA).
+          Les matrices CA sont inaccessibles (<code>{sources.dossier}</code>).
+          Vérifier le serveur FTP robot-documents (dossier analyse_CA_jour).
         </div>
       )}
 

@@ -853,9 +853,9 @@ const AdminAnalyseCaMensuelleScreen = () => {
 
       {sources && !sources.accessible && (
         <div className="acm-alert acm-alert-error">
-          Le dossier des analyses mensuelles est inaccessible (
-          <code>{sources.dossier}</code>). Vérifier le partage réseau
-          (Rcommun\STOCK\doc_temp\CA_MENSUELLE).
+          Les analyses mensuelles sont inaccessibles (
+          <code>{sources.dossier}</code>). Vérifier le serveur FTP
+          robot-documents (dossier analyse_CA_mensuelle).
         </div>
       )}
 

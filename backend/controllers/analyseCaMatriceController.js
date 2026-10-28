@@ -29,7 +29,7 @@ function fichierPourAnnee(parAnnee, anneeDemandee) {
 // GET /api/analyse-ca-matrices
 // Sources disponibles, filtrées par le périmètre de l'utilisateur.
 const listerSources = asyncHandler(async (req, res) => {
-  const { societes, groupes, accessible, dossier } = scannerSources();
+  const { societes, groupes, accessible, dossier } = await scannerSources();
 
   const scope = await getAccessibleEntreprises(req.user);
   const filtre = scope.all ? {} : { _id: { $in: scope.ids } };
@@ -76,7 +76,7 @@ const listerSources = asyncHandler(async (req, res) => {
 
 // GET /api/analyse-ca-matrices/societe/:nomDossierDBF?annee=YYYY
 const getMatriceSociete = asyncHandler(async (req, res) => {
-  const { societes } = scannerSources();
+  const { societes } = await scannerSources();
   const parAnnee = societes.get(req.entreprise.nomDossierDBF);
   if (!parAnnee) {
     res.status(404);
@@ -100,7 +100,7 @@ const getMatriceSociete = asyncHandler(async (req, res) => {
 
 // GET /api/analyse-ca-matrices/groupe/:groupeId?annee=YYYY  (admin)
 const getMatriceGroupe = asyncHandler(async (req, res) => {
-  const { groupes } = scannerSources();
+  const { groupes } = await scannerSources();
   const id = String(req.params.groupeId || "").toLowerCase();
   const parAnnee = groupes.get(id);
   if (!parAnnee) {
@@ -141,7 +141,7 @@ const getComparaison = asyncHandler(async (req, res) => {
     throw new Error("Paramètre sources requis (ids séparés par des virgules).");
   }
 
-  const { societes, groupes } = scannerSources();
+  const { societes, groupes } = await scannerSources();
   const scope = await getAccessibleEntreprises(req.user);
   const filtre = scope.all ? {} : { _id: { $in: scope.ids } };
   const entreprises = await Entreprise.find(filtre).select(

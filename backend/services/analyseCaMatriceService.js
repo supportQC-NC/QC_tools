@@ -19,12 +19,12 @@
 // ligne "CUMUL"…), jamais par numéro de ligne en dur — le générateur amont
 // peut décaler d'une ligne sans nous casser.
 //
-// ⚠️ Chemin du dossier : EN DUR, pas de variable d'environnement (décision
-// client du 28/10/2026 — « ça doit marcher en prod » sans toucher au .env).
-// Le dossier réel est \\192.168.0.250\Rcommun\STOCK\doc_temp\CA ; en prod
-// (VPS Ubuntu) RCOMMON_STOCK_ROOT pointe déjà sur le montage de ...\STOCK,
-// donc on y lit <RCOMMON_STOCK_ROOT>/doc_temp/CA — même mécanique que
-// utils/reapproMagPaths.js, qui lit déjà ce doc_temp.
+// ⚠️ Source des fichiers (29/10/2026) : le serveur FTPS « robot-documents »
+// (dossier analyse_CA_jour/, régénéré chaque soir à 19h30 lun-sam), synchronisé
+// vers un cache local par ftpDocumentsService — SEULE source, pas de repli
+// Rcommun (décision client du 29/10/2026). Si le FTP est injoignable on sert
+// le cache local existant ; cache vide = écran « inaccessible ». Tout est EN
+// DUR, pas de variable d'environnement.
 //
 // ⚠️ Unités hétérogènes dans le fichier : TX quotidien en pour-cent (62.3),
 // taux cumulés et parts de catégorie en ratio (0.51), R/H en ratio (peut
@@ -34,20 +34,7 @@
 import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
-
-// Candidats essayés dans l'ordre ; le premier dossier lisible gagne.
-//   - prod VPS : <RCOMMON_STOCK_ROOT>/doc_temp/CA (montage Linux de ...\STOCK)
-//   - dev Windows : le partage UNC en direct.
-function candidatsDossierMatrices() {
-  const liste = [];
-  const stockRoot = String(process.env.RCOMMON_STOCK_ROOT || "").replace(
-    /[\\/]+$/,
-    "",
-  );
-  if (stockRoot) liste.push(path.posix.join(stockRoot, "doc_temp", "CA"));
-  liste.push("\\\\192.168.0.250\\Rcommun\\STOCK\\doc_temp\\CA");
-  return liste;
-}
+import { assurerCacheFtp } from "./ftpDocumentsService.js";
 
 // Le slug des fichiers suit nomDossierDBF, à une exception près.
 const ALIAS_SLUG_VERS_DOSSIER = { quinckone: "konequincaillerie" };
@@ -120,25 +107,17 @@ function trouverLigne(ws, libelle, colonne = 1) {
  *   clés = nomDossierDBF (sociétés) / id groupe en minuscules ; valeurs =
  *   Map année -> chemin complet du fichier.
  */
-export function scannerSources() {
+export async function scannerSources() {
+  // Seule source : le cache local du FTP, rafraîchi au besoin (TTL 5 min).
+  const ftp = await assurerCacheFtp("analyse_CA_jour");
+
   const societes = new Map();
   const groupes = new Map();
-  const candidats = candidatsDossierMatrices();
-
-  let dossierMatrices = null;
   let fichiers = [];
-  for (const candidat of candidats) {
-    try {
-      fichiers = fs.readdirSync(candidat);
-      dossierMatrices = candidat;
-      break;
-    } catch {
-      // Candidat illisible (pas monté sur cette machine) : on essaie le suivant.
-    }
-  }
-  if (!dossierMatrices) {
-    // Aucun dossier lisible : listes vides, l'appelant décide.
-    return { societes, groupes, dossier: candidats.join(" | "), accessible: false };
+  try {
+    fichiers = fs.readdirSync(ftp.dossier);
+  } catch {
+    // Cache jamais créé : traité comme vide ci-dessous.
   }
 
   for (const f of fichiers) {
@@ -147,17 +126,24 @@ export function scannerSources() {
       const slug = m[1].toLowerCase();
       const dossier = ALIAS_SLUG_VERS_DOSSIER[slug] || slug;
       if (!societes.has(dossier)) societes.set(dossier, new Map());
-      societes.get(dossier).set(Number(m[2]), path.join(dossierMatrices, f));
+      societes.get(dossier).set(Number(m[2]), path.join(ftp.dossier, f));
       continue;
     }
     m = RE_GROUPE.exec(f);
     if (m) {
       const id = m[1].toLowerCase();
       if (!groupes.has(id)) groupes.set(id, new Map());
-      groupes.get(id).set(Number(m[2]), path.join(dossierMatrices, f));
+      groupes.get(id).set(Number(m[2]), path.join(ftp.dossier, f));
     }
   }
-  return { societes, groupes, dossier: dossierMatrices, accessible: true };
+
+  return {
+    societes,
+    groupes,
+    dossier: ftp.dossier,
+    accessible: societes.size > 0 || groupes.size > 0,
+    erreurFtp: ftp.erreur,
+  };
 }
 
 // Libellé humain d'un id de groupe ("groupe_ducos_quincaillerie" -> "Groupe Ducos Quincaillerie").

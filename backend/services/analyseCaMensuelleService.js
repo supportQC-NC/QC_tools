@@ -32,30 +32,23 @@
 // cache : les sommes des colonnes « montant » sont recalculées ici, les
 // colonnes ratio restent vides.
 //
-// ⚠️ Chemin EN DUR, pas de variable d'environnement (même décision que les
-// matrices CA) : <RCOMMON_STOCK_ROOT>/doc_temp/CA_MENSUELLE en prod (VPS),
-// le partage UNC en dev Windows.
+// ⚠️ Source des fichiers (29/10/2026) : le serveur FTPS « robot-documents »
+// (dossier analyse_CA_mensuelle/, régénéré le 1er du mois à 04h00 pour le mois
+// précédent), synchronisé vers un cache local par ftpDocumentsService — le
+// cache ACCUMULE les mois au fil des dépôts. SEULE source, pas de repli
+// Rcommun (décision client du 29/10/2026) : FTP injoignable = on sert le
+// cache local existant, cache vide = « inaccessible ». Tout est EN DUR, pas
+// de variable d'environnement.
 
 import fs from "fs";
 import path from "path";
 import ExcelJS from "exceljs";
+import { assurerCacheFtp } from "./ftpDocumentsService.js";
 
 const RE_FICHIER = /^analyse_ca_([a-z0-9]+)_(\d{2})_(\d{4})\.xlsx$/i;
 
 // Colonnes ratio de l'onglet Rayons (pas de « % » dans l'en-tête).
 const COLONNES_RATIO_RAYONS = new Set(["MARGE", "R/H", "R/H_2", "TAUX_DEPREC"]);
-
-// Candidats essayés dans l'ordre ; le premier dossier lisible gagne.
-function candidatsDossier() {
-  const liste = [];
-  const stockRoot = String(process.env.RCOMMON_STOCK_ROOT || "").replace(
-    /[\\/]+$/,
-    "",
-  );
-  if (stockRoot) liste.push(path.posix.join(stockRoot, "doc_temp", "CA_MENSUELLE"));
-  liste.push("\\\\192.168.0.250\\Rcommun\\STOCK\\doc_temp\\CA_MENSUELLE");
-  return liste;
-}
 
 // --- Helpers de cellule (mêmes conventions que analyseCaMatriceService) ----
 
@@ -87,23 +80,16 @@ const ratioEnPct = (v) => Math.round(v * 10000) / 100;
  * @returns {{sources: Map<string, Map<string, string>>, dossier: string, accessible: boolean}}
  *   sources : trigramme minuscule -> Map période "AAAA-MM" -> chemin complet.
  */
-export function scannerSources() {
-  const sources = new Map();
-  const candidats = candidatsDossier();
+export async function scannerSources() {
+  // Seule source : le cache local du FTP, rafraîchi au besoin (TTL 5 min).
+  const ftp = await assurerCacheFtp("analyse_CA_mensuelle");
 
-  let dossier = null;
+  const sources = new Map();
   let fichiers = [];
-  for (const candidat of candidats) {
-    try {
-      fichiers = fs.readdirSync(candidat);
-      dossier = candidat;
-      break;
-    } catch {
-      // Candidat illisible (pas monté sur cette machine) : suivant.
-    }
-  }
-  if (!dossier) {
-    return { sources, dossier: candidats.join(" | "), accessible: false };
+  try {
+    fichiers = fs.readdirSync(ftp.dossier);
+  } catch {
+    // Cache jamais créé : traité comme vide ci-dessous.
   }
 
   for (const f of fichiers) {
@@ -112,9 +98,15 @@ export function scannerSources() {
     const slug = m[1].toLowerCase();
     const periode = `${m[3]}-${m[2]}`; // AAAA-MM (triable)
     if (!sources.has(slug)) sources.set(slug, new Map());
-    sources.get(slug).set(periode, path.join(dossier, f));
+    sources.get(slug).set(periode, path.join(ftp.dossier, f));
   }
-  return { sources, dossier, accessible: true };
+
+  return {
+    sources,
+    dossier: ftp.dossier,
+    accessible: sources.size > 0,
+    erreurFtp: ftp.erreur,
+  };
 }
 
 // --- Parsing d'un classeur --------------------------------------------------

@@ -27,3 +27,6 @@ yarn-error.log*
 
 # App mobile (dépôt git séparé — ne pas pousser dans ce repo)
 test-app-qc/
+
+# Cache local des documents FTP (analyse CA jour / mensuelle)
+backend/.cache-ftp/

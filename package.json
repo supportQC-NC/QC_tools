@@ -36,6 +36,7 @@
     "migrate:groupes-prioritaires": "node backend/migrations/groupesPrioritairesParEntreprise.js"
   },
   "dependencies": {
+    "basic-ftp": "^6.2.3",
     "bcryptjs": "^3.0.3",
     "colors": "^1.4.0",
     "cookie-parser": "^1.4.7",
