@@ -66,6 +66,7 @@ export const PERMISSION_MODULES = [
   { key: "derniere_facturation_admin", label: "Dernière facturation", group: "analyse" },
   { key: "analyse_ca_admin", label: "Analyse CA", group: "analyse" },
   { key: "analyse_ca_mensuelle_admin", label: "Analyse CA mensuelle", group: "analyse" },
+  { key: "stats_commerciaux_admin", label: "Stats commerciaux", group: "analyse" },
   { key: "performance_dock_admin", label: "Performance réappro magasin", group: "analyse" },
   { key: "facture_analyse_admin", label: "Analyse Facturation", group: "analyse" },
   { key: "journal_caisse_admin", label: "Journal de Caisse", group: "analyse" },

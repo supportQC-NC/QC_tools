@@ -258,6 +258,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Stats commerciaux (classeurs stats_<TRIG>.xlsx du FTPS robot-documents)
+      stats_commerciaux_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Performance Dock
       performance_dock_admin: {
         read: { type: Boolean, default: false },

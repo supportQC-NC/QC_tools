@@ -1,0 +1,357 @@
+/* AdminStatsCommerciauxScreen.css — thème sombre admin (variables globales). */
+
+.stc-screen {
+  padding: 1.2rem 1.4rem 2rem;
+  color: var(--admin-text);
+}
+
+.stc-entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.stc-titre {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.stc-sous-titre {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary);
+}
+
+.stc-info {
+  color: var(--admin-text-secondary);
+  font-size: 0.9rem;
+}
+
+.stc-erreur {
+  color: #fb7185;
+  font-size: 0.9rem;
+}
+
+/* ── KPI ── */
+.stc-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1.4rem;
+}
+
+.stc-kpi {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  box-shadow: var(--admin-shadow);
+}
+
+.stc-kpi-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-secondary);
+}
+
+.stc-kpi-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stc-kpi-sub {
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sections ── */
+.stc-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.6rem 0 0.8rem;
+}
+
+.stc-section-titre {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.stc-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stc-option input {
+  accent-color: #4da6ff;
+  cursor: pointer;
+}
+
+.stc-switch {
+  display: inline-flex;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  overflow: hidden;
+}
+
+.stc-switch button {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  border: none;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.stc-switch button.actif {
+  background: #4da6ff22;
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
+.stc-select {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* ── Cartes graphiques ── */
+.stc-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.stc-chart-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1rem 1rem 0.5rem;
+  box-shadow: var(--admin-shadow);
+  min-width: 0;
+}
+
+.stc-chart-wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .stc-chart-wide {
+    grid-column: span 1;
+  }
+}
+
+.stc-chart-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--admin-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.8rem;
+}
+
+.stc-note {
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+  margin: 0.4rem 0 0.6rem;
+}
+
+/* ── Tableaux ── */
+.stc-table-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.8rem 1rem;
+  box-shadow: var(--admin-shadow);
+  margin-bottom: 1rem;
+}
+
+.stc-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.stc-recherche {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  min-width: 260px;
+}
+
+.stc-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.stc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  color: var(--admin-text);
+  /* Chiffres à largeur fixe : colonnes de montants alignées. */
+  font-variant-numeric: tabular-nums;
+}
+
+.stc-table th {
+  text-align: right;
+  padding: 0.55rem 0.7rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stc-table td {
+  text-align: right;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+
+.stc-table th.gauche,
+.stc-table td.gauche {
+  text-align: left;
+}
+
+.stc-table tbody tr:hover {
+  background: var(--admin-bg-tertiary);
+}
+
+.stc-table .pos,
+.stc-kpi-sub .pos,
+.stc-mini-val.pos {
+  color: #34d399;
+}
+
+.stc-table .neg,
+.stc-kpi-sub .neg,
+.stc-mini-val.neg {
+  color: #fb7185;
+}
+
+.stc-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: baseline;
+}
+
+.stc-plus {
+  margin-top: 0.6rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* ── Mini-listes (progressions, baisses, nouveaux/perdus) ── */
+.stc-mini-liste {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+}
+
+.stc-mini-liste li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 0.8rem;
+}
+
+.stc-mini-liste li:last-child {
+  border-bottom: none;
+}
+
+.stc-mini-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stc-mini-val {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stc-deux-listes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 700px) {
+  .stc-deux-listes {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Tooltip recharts ── */
+.stc-tooltip {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.78rem;
+  box-shadow: var(--admin-shadow);
+}
+
+.stc-tooltip-label {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.stc-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stc-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}

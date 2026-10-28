@@ -742,6 +742,13 @@ port 2121, FTPS explicite, certificat auto-signé), synchronisés vers
 `backend/.cache-ftp` par `services/ftpDocumentsService.js` (TTL 5 min, le cache
 accumule l'historique). **Seule source — aucun repli Rcommun** (décision
 client) ; identifiants EN DUR, pas de variable d'env.
+`stats_commerciaux_admin` (écran `/admin/stats-commerciaux`) lit le dossier
+FTP `stats_commerciaux/` : classeurs `stats_<TRIG>.xlsx` (une ligne par client
+avec sa colonne `Commercial`, feuille GLOBAL seule parsée — ignorer les
+`stats_<slug>_<TRIG>_<date>.xlsx`, format ancien sans marges mensuelles).
+⚠️ « MAGASIN » y est un pseudo-commercial (comptoir) exclu par défaut des
+comparaisons ; les % du fichier sont des CHAÎNES (« 12.66% », « ↑ 1% »), les
+évolutions sont recalculées depuis N/N-1.
 `performance_dock_admin`,
 `analyse_reappro_admin`, `collecteurs_admin`, `rapport_tgc` (déclaration fiscale
 mensuelle), `balances_clients`, `derniere_facturation_admin` (dernière facture

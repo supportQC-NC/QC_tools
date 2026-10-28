@@ -112,6 +112,8 @@ import reportSubscriptionRoutes from "./routes/reportSubscriptionRoutes.js";
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 import analyseCaMatriceRoutes from "./routes/analyseCaMatriceRoutes.js";
 import analyseCaMensuelleRoutes from "./routes/analyseCaMensuelleRoutes.js";
+// ========== ROUTES STATS COMMERCIAUX (classeurs stats du FTPS) ==========
+import statsCommerciauxRoutes from "./routes/statsCommerciauxRoutes.js";
 // ========== ROUTES EXÉCUTABLES (catalogue téléchargeable, GridFS) ==========
 import executableRoutes from "./routes/executableRoutes.js";
 // ========== ROUTES MÉDIATHÈQUE (images/HTML en ligne pour signatures mail) ==========
@@ -285,6 +287,7 @@ app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 app.use("/api/analyse-ca", analyseCaRoutes);
 app.use("/api/analyse-ca-matrices", analyseCaMatriceRoutes);
 app.use("/api/analyse-ca-mensuelle", analyseCaMensuelleRoutes);
+app.use("/api/stats-commerciaux", statsCommerciauxRoutes);
 // ========== ROUTES EXÉCUTABLES ==========
 app.use("/api/executables", executableRoutes);
 

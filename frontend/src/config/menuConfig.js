@@ -105,6 +105,7 @@ export const adminMenuStructure = [
       { label: "Analyse Filiales", path: "/admin/filiales", icon: HiOfficeBuilding },
       { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
       { label: "Analyse CA mensuelle", path: "/admin/analyse-ca-mensuelle", icon: HiChartBar },
+      { label: "Stats commerciaux", path: "/admin/stats-commerciaux", icon: HiUserGroup },
       { label: "Analyse Facturation", path: "/admin/facture-analyse", icon: HiDocumentReport },
       { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
       { label: "Rapports TGC", path: "/admin/rapport-tgc", icon: HiCurrencyDollar },
@@ -730,6 +731,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/analyse-ca": "Analyse du chiffre d'affaires.",
   "/admin/analyse-ca-mensuelle":
     "Analyse CA mensuelle détaillée : types de client, clients, fournisseurs, classes, familles, rayons…",
+  "/admin/stats-commerciaux":
+    "Performance des commerciaux : portefeuille clients, CA/marge N vs N-1, top clients, nouveaux/perdus, concentration.",
   "/admin/facture-analyse": "Analyse de la facturation.",
   "/admin/journal-caisse": "Journal de caisse.",
   "/admin/rapport-tgc":
