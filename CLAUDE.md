@@ -734,7 +734,9 @@ rayons).
 
 **Analyse** — `commerciaux_admin`, `filiales_admin`, `reappro_local_admin`,
 `debit_comptant_admin`, `gencod_doublons_admin`, `analyse_ca_admin` (13 onglets,
-générateurs dans `services/analyseCa/`), `performance_dock_admin`,
+générateurs dans `services/analyseCa/`), `analyse_ca_mensuelle_admin`
+(restitution intégrale des classeurs Excel `CA_MENSUELLE` du Rcommun, un par
+société et par mois), `performance_dock_admin`,
 `analyse_reappro_admin`, `collecteurs_admin`, `rapport_tgc` (déclaration fiscale
 mensuelle), `balances_clients`, `derniere_facturation_admin` (dernière facture
 par client), `frequentation_admin` (plages horaires de passage

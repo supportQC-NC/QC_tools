@@ -1,0 +1,288 @@
+/* src/screens/admin/AdminAnalyseCaMensuelleScreen.css */
+
+/* Pleine largeur, comme l'écran Analyse CA. */
+.acm-screen {
+  padding: 1.5rem 2rem 2.5rem;
+  width: 100%;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .acm-screen {
+    padding: 1rem;
+  }
+}
+
+.acm-header {
+  margin-bottom: 1.25rem;
+}
+
+.acm-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e4366;
+  margin: 0 0 0.25rem;
+}
+
+.acm-subtitle {
+  color: #5b6b7b;
+  font-size: 0.9rem;
+  margin: 0;
+  max-width: 760px;
+}
+
+/* ── Barre d'outils ── */
+.acm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f6f9fc;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.acm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #34495e;
+}
+
+.acm-field select,
+.acm-field input {
+  min-width: 200px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #cdd7e1;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #22303c;
+}
+
+.acm-field select:focus,
+.acm-field input:focus {
+  outline: none;
+  border-color: #2e75b6;
+  box-shadow: 0 0 0 3px rgba(46, 117, 182, 0.15);
+}
+
+.acm-meta {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: #8494a4;
+  align-self: center;
+}
+
+.acm-meta code {
+  background: #eef4fb;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+}
+
+/* ── Alertes / vides ── */
+.acm-alert {
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+}
+
+.acm-alert-error {
+  background: #fdecea;
+  border-color: #f5c6cb;
+  color: #a12622;
+}
+
+.acm-alert code {
+  background: rgba(161, 38, 34, 0.08);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+}
+
+.acm-empty,
+.acm-loading {
+  padding: 2rem;
+  text-align: center;
+  color: #7a8a99;
+  background: #f8fafc;
+  border: 1px dashed #d5dee7;
+  border-radius: 10px;
+}
+
+/* ── Onglets (une entrée par feuille du classeur) ── */
+.acm-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.acm-tab {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #d5e3f2;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f4e79;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.acm-tab:hover {
+  background: #eef4fb;
+}
+
+.acm-tab.actif {
+  background: #1f4e79;
+  border-color: #1f4e79;
+  color: #fff;
+}
+
+.acm-tab-count {
+  font-weight: 400;
+  opacity: 0.75;
+  margin-left: 0.3rem;
+  font-size: 0.76rem;
+}
+
+/* ── Barre de la feuille active (recherche + pagination) ── */
+.acm-sheetbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.7rem;
+}
+
+.acm-sheet-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #34495e;
+  margin: 0;
+  flex: 1;
+  min-width: 220px;
+}
+
+.acm-search {
+  min-width: 240px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #cdd7e1;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #22303c;
+}
+
+.acm-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #5b6b7b;
+}
+
+.acm-pager button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #cdd7e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f4e79;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.acm-pager button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Tableau générique ── */
+.acm-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e1e8ef;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.acm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  color: #22303c;
+}
+
+.acm-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  text-align: right;
+  padding: 0.5rem 0.65rem;
+  background: #f2f6fa;
+  color: #5b6b7b;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid #e1e8ef;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.acm-table th .acm-sort {
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+  color: #2e75b6;
+}
+
+.acm-table th:first-child,
+.acm-table td:first-child,
+.acm-table th.gauche,
+.acm-table td.gauche {
+  text-align: left;
+}
+
+.acm-table td {
+  text-align: right;
+  padding: 0.4rem 0.65rem;
+  border-bottom: 1px solid #eef2f6;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.acm-table tbody tr:hover {
+  background: #f8fbfe;
+}
+
+.acm-table tr.acm-row-total td {
+  background: #f2f6fa;
+  font-weight: 700;
+}
+
+.acm-table tr.acm-row-total-debut td {
+  border-top: 2px solid #d5dee7;
+}
+
+.acm-table .pos {
+  color: #1e8e4e;
+  font-weight: 600;
+}
+
+.acm-table .neg {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+/* Séparation visuelle des blocs TYPES_CLIENT (changement de type). */
+.acm-table tr.acm-row-groupe td {
+  border-top: 2px solid #d5dee7;
+}

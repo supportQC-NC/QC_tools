@@ -111,6 +111,7 @@ import reportSubscriptionRoutes from "./routes/reportSubscriptionRoutes.js";
 // ========== ROUTES ANALYSE CA (13 onglets, admin) ==========
 import analyseCaRoutes from "./routes/analyseCaRoutes.js";
 import analyseCaMatriceRoutes from "./routes/analyseCaMatriceRoutes.js";
+import analyseCaMensuelleRoutes from "./routes/analyseCaMensuelleRoutes.js";
 // ========== ROUTES EXÉCUTABLES (catalogue téléchargeable, GridFS) ==========
 import executableRoutes from "./routes/executableRoutes.js";
 // ========== ROUTES MÉDIATHÈQUE (images/HTML en ligne pour signatures mail) ==========
@@ -283,6 +284,7 @@ app.use("/api/report-subscriptions", reportSubscriptionRoutes);
 // ========== ROUTES ANALYSE CA ==========
 app.use("/api/analyse-ca", analyseCaRoutes);
 app.use("/api/analyse-ca-matrices", analyseCaMatriceRoutes);
+app.use("/api/analyse-ca-mensuelle", analyseCaMensuelleRoutes);
 // ========== ROUTES EXÉCUTABLES ==========
 app.use("/api/executables", executableRoutes);
 

@@ -104,6 +104,7 @@ export const adminMenuStructure = [
       { label: "Analyse Commerciaux", path: "/admin/commerciaux", icon: HiUserGroup },
       { label: "Analyse Filiales", path: "/admin/filiales", icon: HiOfficeBuilding },
       { label: "Analyse CA", path: "/admin/analyse-ca", icon: HiChartBar },
+      { label: "Analyse CA mensuelle", path: "/admin/analyse-ca-mensuelle", icon: HiChartBar },
       { label: "Analyse Facturation", path: "/admin/facture-analyse", icon: HiDocumentReport },
       { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
       { label: "Rapports TGC", path: "/admin/rapport-tgc", icon: HiCurrencyDollar },
@@ -727,6 +728,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/commerciaux": "Chiffre d'affaires par commercial (REPRES).",
   "/admin/filiales": "Analyse des filiales.",
   "/admin/analyse-ca": "Analyse du chiffre d'affaires.",
+  "/admin/analyse-ca-mensuelle":
+    "Analyse CA mensuelle détaillée : types de client, clients, fournisseurs, classes, familles, rayons…",
   "/admin/facture-analyse": "Analyse de la facturation.",
   "/admin/journal-caisse": "Journal de caisse.",
   "/admin/rapport-tgc":

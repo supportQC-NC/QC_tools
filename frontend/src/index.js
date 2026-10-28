@@ -99,6 +99,7 @@ import AdminPerformanceDockScreen from "./screens/admin/AdminPerformanceDockScre
 import AdminCollecteursScreen from "./screens/admin/AdminCollecteursScreen";
 import AdminCollecteursMapScreen from "./screens/admin/AdminCollecteursMapScreen";
 import AdminAnalyseCaMatriceScreen from "./screens/admin/AdminAnalyseCaMatriceScreen";
+import AdminAnalyseCaMensuelleScreen from "./screens/admin/AdminAnalyseCaMensuelleScreen";
 import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
 import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
@@ -558,6 +559,14 @@ const router = createBrowserRouter(
       {/* Analyse · Analyse CA -> module "analyse_ca_admin" */}
       <Route element={<ModuleRoute module="analyse_ca_admin" />}>
         <Route path="/admin/analyse-ca" element={<AdminAnalyseCaMatriceScreen />} />
+      </Route>
+
+      {/* Analyse · Analyse CA mensuelle -> module "analyse_ca_mensuelle_admin" */}
+      <Route element={<ModuleRoute module="analyse_ca_mensuelle_admin" />}>
+        <Route
+          path="/admin/analyse-ca-mensuelle"
+          element={<AdminAnalyseCaMensuelleScreen />}
+        />
       </Route>
 
       {/* Analyse · Performance Dock -> module "performance_dock_admin" */}
