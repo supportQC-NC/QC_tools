@@ -34,6 +34,7 @@ import {
   PieChart,
   Pie,
 } from "recharts";
+import { fmtNombreLarge } from "../../utils/format";
 import "./AdminAnalyseCaMensuelleScreen.css";
 
 const PAGE_SIZE = 100;
@@ -99,8 +100,9 @@ const typeColor = (nom, i) =>
   TYPE_COLORS[nom] || PALETTE_SECOURS[i % PALETTE_SECOURS.length];
 
 // ── Formats ──
-const fmtNb = (n, dec = 0) =>
-  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: dec }).format(n);
+// Milliers séparés par une espace LARGE et montants XPF toujours entiers
+// (dec=0 par défaut) — lisibilité des tableaux, demande client du 29/10/2026.
+const fmtNb = (n, dec = 0) => fmtNombreLarge(n, dec);
 const fmtPct = (n) => `${fmtNb(n, 1)} %`;
 const fmtEvol = (n) =>
   typeof n === "number" ? `${n > 0 ? "+" : ""}${fmtNb(n, 1)} %` : "—";

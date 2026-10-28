@@ -32,6 +32,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { fmtMontant } from "../../utils/format";
 import "./AdminAnalyseCaMatriceScreen.css";
 
 // Couleur FIXE par catégorie de client (jamais réaffectée selon le rang,
@@ -116,22 +117,18 @@ const METRIQUES = {
 };
 
 // Format d'une valeur selon l'unité de la métrique.
+// Montants et nombres : entiers, milliers séparés par une espace LARGE
+// (`fmtMontant`) — lisibilité des tableaux, demande client du 29/10/2026.
 const fmtUnite = (unite, v) => {
   if (typeof v !== "number") return "—";
   if (unite === "pct") return `${v.toFixed(1)} %`;
-  if (unite === "xpf")
-    return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(v)} XPF`;
-  return new Intl.NumberFormat("fr-FR").format(v);
+  if (unite === "xpf") return `${fmtMontant(v)} XPF`;
+  return fmtMontant(v);
 };
 
 // ── Formats ──
-const fmtXPF = (n) =>
-  typeof n === "number"
-    ? new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n) +
-      " XPF"
-    : "—";
-const fmtNb = (n) =>
-  typeof n === "number" ? new Intl.NumberFormat("fr-FR").format(n) : "—";
+const fmtXPF = (n) => (typeof n === "number" ? `${fmtMontant(n)} XPF` : "—");
+const fmtNb = fmtMontant;
 const fmtEvol = (n) =>
   typeof n === "number" ? `${n > 0 ? "+" : ""}${n.toFixed(1)} %` : "—";
 const fmtTaux = (n) => (typeof n === "number" ? `${n.toFixed(1)} %` : "—");
@@ -157,9 +154,7 @@ const XpfTooltip = ({ active, payload, label }) => {
           <span className="aca-tooltip-dot" style={{ background: p.color }} />
           {p.name} :{" "}
           <strong>
-            {typeof p.value === "number"
-              ? new Intl.NumberFormat("fr-FR").format(p.value) + " XPF"
-              : p.value}
+            {typeof p.value === "number" ? `${fmtMontant(p.value)} XPF` : p.value}
           </strong>
         </div>
       ))}

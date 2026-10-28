@@ -34,6 +34,42 @@ export const fmtQty = (n) => NF_FR.format(roundInt(n));
  */
 export const fmtFranc = (n) => `${fmtQty(n)} F`;
 
+// Instances par nombre de décimales (créer un Intl.NumberFormat est coûteux,
+// et les tableaux Analyse CA formatent des dizaines de milliers de cellules).
+const NF_FR_PAR_DEC = new Map();
+
+/**
+ * Nombre fr-FR à `dec` décimales maxi, milliers séparés par une espace
+ * insécable NORMALE (U+00A0) : Intl fr-FR émet une espace FINE (U+202F), trop
+ * étroite pour rester lisible sur les gros montants XPF (demande client du
+ * 29/10/2026 sur les tableaux Analyse CA). Non-nombre → `"—"`.
+ * @param {*} n
+ * @param {number} [dec=0]
+ * @returns {string}
+ */
+export const fmtNombreLarge = (n, dec = 0) => {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  let nf = NF_FR_PAR_DEC.get(dec);
+  if (!nf) {
+    nf = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: dec });
+    NF_FR_PAR_DEC.set(dec, nf);
+  }
+  // U+202F (espace fine, separateur Intl fr-FR) -> U+00A0 (espace normale),
+  // les deux insecables. Codepoints construits en ASCII pur : un caractere
+  // invisible en dur dans le source ne survit pas aux copier-coller.
+  const FINE = String.fromCharCode(0x202f);
+  const NORMALE = String.fromCharCode(0x00a0);
+  return nf.format(n).split(FINE).join(NORMALE);
+};
+
+/**
+ * Montant XPF : toujours ENTIER, milliers séparés par une espace large.
+ * Le suffixe (« XPF ») reste à la charge de l'appelant.
+ * @param {*} n
+ * @returns {string}
+ */
+export const fmtMontant = (n) => fmtNombreLarge(n, 0);
+
 /**
  * Pourcentage à N décimales (1 par défaut). `null`/`undefined` → `"—"`.
  * Ex. `fmtPct(33.333)` → `"33.3 %"`.

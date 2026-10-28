@@ -245,6 +245,9 @@
   border-collapse: collapse;
   font-size: 0.82rem;
   color: var(--admin-text);
+  /* Chiffres à largeur fixe : les montants s'alignent en colonne et les
+     groupes de milliers (espaces larges) restent réguliers. */
+  font-variant-numeric: tabular-nums;
 }
 
 .acm-table th {
