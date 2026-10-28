@@ -111,6 +111,24 @@ const wrapPreview = (text, width) => {
   return lines.join("\n");
 };
 
+// Répartit un texte sur AU PLUS `n` lignes équilibrées — MÊME algorithme que
+// `equilibrerLignes` du backend (largeur idéale longueur/n, élargie jusqu'à
+// tenir en n lignes), pour que l'aperçu colle au PDF.
+const equilibrerPreview = (text, n) => {
+  const t = String(text || "").trim();
+  const nb = Math.max(1, Math.floor(Number(n) || 1));
+  if (nb <= 1 || !t) return t;
+  // Jamais plus étroit que le mot le plus long, sinon il serait coupé
+  // (« VIS » sur 3 lignes → « V / I / S »). Même règle que le backend.
+  const motLePlusLong = Math.max(...t.split(/\s+/).map((m) => m.length));
+  const depart = Math.max(Math.ceil(t.length / nb), motLePlusLong);
+  for (let w = depart; w <= t.length; w++) {
+    const lignes = wrapPreview(t, w).split("\n");
+    if (lignes.length <= nb) return lignes.join("\n");
+  }
+  return t;
+};
+
 let _seq = 0;
 const nextId = () => `el-${Date.now()}-${_seq++}`;
 
@@ -131,17 +149,30 @@ const CustomEtiquetteDesigner = ({
     f.maxLen ? `{${f.label}} — ${f.maxLen} car.` : f.label;
   // Texte d'aperçu d'un champ : échantillon à la longueur MAX si connue, sinon
   // le libellé entre accolades (colonnes importées, prix, code, dates…).
-  // Si `wrap` est défini sur l'élément, l'échantillon est coupé en plusieurs lignes.
+  // `lignes` (répartition équilibrée sur 2-3 lignes, prioritaire) ou `wrap`
+  // (coupe fixe) découpent l'échantillon comme le fera le PDF.
   const fieldSample = (el) => {
     const key = el.field;
     const len = fieldMax(key);
+    const lignes = Number(el.lignes) || 0;
     const wrap = Number(el.wrap) || 0;
-    if (!len) return wrap ? wrapPreview(`{${fieldLabel(key)}}`, wrap) : `{${fieldLabel(key)}}`;
+    const decouper = (txt) =>
+      lignes > 1
+        ? equilibrerPreview(txt, lignes)
+        : wrap
+          ? wrapPreview(txt, wrap)
+          : txt;
+    if (!len) {
+      const brut = `{${fieldLabel(key)}}`;
+      return lignes > 1 || wrap ? decouper(brut) : brut;
+    }
     const base = key === "ref" ? "123456789012" : SAMPLE_TEXT;
     const sample = base.slice(0, len);
-    // Avec retour à la ligne : on montre le texte coupé ; sinon padding à la
-    // largeur max (trailing spaces) pour visualiser l'encombrement maximal.
-    return wrap ? wrapPreview(sample, wrap) : sample.padEnd(len, key === "ref" ? "0" : " ");
+    // Avec découpe : on montre le texte coupé ; sinon padding à la largeur max
+    // (trailing spaces) pour visualiser l'encombrement maximal.
+    return lignes > 1 || wrap
+      ? decouper(sample)
+      : sample.padEnd(len, key === "ref" ? "0" : " ");
   };
   // `initial` (optionnel) amorce l'état depuis un template chargé. Comme il n'est
   // lu qu'au montage, le parent REMONTE le designer (via key) au chargement.
@@ -519,19 +550,37 @@ const CustomEtiquetteDesigner = ({
                       <option key={f.key} value={f.key}>{optionLabel(f)}</option>
                     ))}
                   </select>
-                  <label className="ced-plabel">Retour à la ligne tous les (caractères)</label>
-                  <input
-                    type="number"
+                  <label className="ced-plabel">Afficher sur</label>
+                  <select
                     className="ced-pselect"
-                    min="0"
-                    value={selected.wrap || 0}
-                    onChange={(e) => updateSel({ wrap: Math.max(0, parseInt(e.target.value, 10) || 0) })}
-                    placeholder="0 = une seule ligne"
-                  />
+                    value={Number(selected.lignes) > 1 ? selected.lignes : 1}
+                    onChange={(e) => updateSel({ lignes: parseInt(e.target.value, 10) || 1 })}
+                  >
+                    <option value={1}>1 ligne</option>
+                    <option value={2}>2 lignes (réparties)</option>
+                    <option value={3}>3 lignes (réparties)</option>
+                  </select>
                   <span className="ced-phint">
-                    0 = pas de retour (une seule ligne). Sinon le texte passe à la
-                    ligne après ce nombre de caractères (une ou plusieurs lignes).
+                    Sur 2 ou 3 lignes, le texte (ex. la désignation) est réparti
+                    en lignes équilibrées, coupées entre les mots.
                   </span>
+                  {Number(selected.lignes) <= 1 && (
+                    <>
+                      <label className="ced-plabel">Retour à la ligne tous les (caractères)</label>
+                      <input
+                        type="number"
+                        className="ced-pselect"
+                        min="0"
+                        value={selected.wrap || 0}
+                        onChange={(e) => updateSel({ wrap: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                        placeholder="0 = une seule ligne"
+                      />
+                      <span className="ced-phint">
+                        0 = pas de retour (une seule ligne). Sinon le texte passe à la
+                        ligne après ce nombre de caractères (une ou plusieurs lignes).
+                      </span>
+                    </>
+                  )}
                 </>
               )}
 

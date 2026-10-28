@@ -1019,14 +1019,43 @@ const getFieldValue = (record, field) => {
   }
 };
 
+// Répartit un texte sur AU PLUS `n` lignes ÉQUILIBRÉES (coupées aux mots) :
+// on part de la largeur idéale (longueur / n) puis on l'élargit d'un caractère
+// tant que wrapText déborde de n lignes — « PEINTURE ACRYLIQUE BLANCHE MAT
+// 10L » sur 2 lignes donne deux moitiés comparables, pas 90 % / 10 %.
+const equilibrerLignes = (text, n) => {
+  const t = String(text || "").trim();
+  const nb = Math.max(1, Math.floor(Number(n) || 1));
+  if (nb <= 1 || !t) return t;
+  // Largeur de départ jamais inférieure au mot le plus long : wrapText coupe
+  // les mots qui dépassent la largeur, et « VIS » sur 3 lignes sortirait
+  // « V / I / S ». Un texte court reste donc sur moins de lignes que demandé.
+  const motLePlusLong = Math.max(...t.split(/\s+/).map((m) => m.length));
+  const depart = Math.max(Math.ceil(t.length / nb), motLePlusLong);
+  for (let w = depart; w <= t.length; w++) {
+    const lignes = wrapText(t, w);
+    if (lignes.length <= nb) return lignes.join("\n");
+  }
+  return t;
+};
+
 // Dessine un bloc de texte (multi-ligne) ancré en haut-gauche (px depuis le haut).
 const drawTextEl = (rl, cellX, cellBottomY, hpt, el, text) => {
   let raw = text == null ? "" : String(text);
   if (!raw) return;
-  // `wrap` (nb de caractères/ligne, défini sur les champs) : coupe le texte en
-  // plusieurs lignes. Les retours manuels (\n) existants sont préservés.
+  // Deux façons de passer un champ sur plusieurs lignes, `lignes` prioritaire :
+  //  - `lignes` (2 ou 3, choisi dans le designer) : répartition ÉQUILIBRÉE sur
+  //    au plus N lignes, quelle que soit la longueur de la désignation ;
+  //  - `wrap` (nb de caractères/ligne) : coupe fixe, nombre de lignes libre.
+  // Les retours manuels (\n) existants sont préservés dans les deux cas.
+  const lignes = Number(el.lignes) || 0;
   const wrap = Number(el.wrap) || 0;
-  if (wrap > 0) {
+  if (lignes > 1) {
+    raw = raw
+      .split("\n")
+      .map((line) => equilibrerLignes(line, lignes))
+      .join("\n");
+  } else if (wrap > 0) {
     raw = raw
       .split("\n")
       .map((line) => wrapText(line, wrap).join("\n"))
