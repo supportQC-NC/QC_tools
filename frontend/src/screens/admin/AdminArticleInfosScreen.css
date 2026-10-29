@@ -2467,3 +2467,9 @@
   width: 100%;
   height: 100%;
 }
+/* Message « aucune rupture » sous le bloc jours de rupture (onglet Ventes). */
+.no-data-message {
+  color: var(--admin-text-secondary, #a0a0b0);
+  font-size: 0.85rem;
+  margin: 0.4rem 0 0.8rem;
+}

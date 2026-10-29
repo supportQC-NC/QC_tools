@@ -678,7 +678,7 @@ const AdminArticleInfosScreen = () => {
                 <div className="quick-stat"><span className="stat-label">Stock Total</span><span className={`stat-value ${calculateStockTotal(article) > 0 ? "positive" : "zero"}`}>{formatStock(calculateStockTotal(article))}</span></div>
                 <div className="quick-stat"><span className="stat-label">En Commande</span><span className={`stat-value ${getEnCommande(article) > 0 ? "encde" : ""}`}>{formatStock(getEnCommande(article))}</span></div>
                 <div className="quick-stat"><span className="stat-label">Ventes 12 mois</span><span className="stat-value">{formatStock(totalSales)}</span></div>
-                <div className="quick-stat"><span className="stat-label">Ruptures 12 mois</span><span className={`stat-value ${totalRuptures > 0 ? "warning" : ""}`}>{formatStock(totalRuptures)}</span></div>
+                <div className="quick-stat"><span className="stat-label">Jours de rupture 12 mois</span><span className={`stat-value ${totalRuptures > 0 ? "warning" : ""}`}>{formatStock(totalRuptures)}</span></div>
                 <div className="quick-stat highlight">
                   <span className="stat-label"><HiClock style={{ marginRight: "4px", verticalAlign: "middle" }} />Stock en jours</span>
                   <span className={`stat-value ${stockEnJours === 0 ? "zero" : stockEnJours === Infinity ? "positive" : stockEnJours < 30 ? "warning" : stockEnJours < 90 ? "" : "positive"}`}>{formatStockEnJours(stockEnJours)}</span>
@@ -904,11 +904,31 @@ const AdminArticleInfosScreen = () => {
                         </ResponsiveContainer>
                       </div>
                     </div>
+                    {/* Ruptures = NOMBRE DE JOURS de rupture par mois (RUP1..RUP12,
+                        même règle calendaire que V1..V12). Affiché sous les ventes,
+                        AVANT le tableau de détail (demande client du 30/10/2026). */}
+                    <div className="info-section chart-section">
+                      <h3><HiExclamation /> Jours de rupture par mois (12 derniers mois)</h3>
+                      <div className={`chart-stats ${totalRuptures > 0 ? "warning" : ""}`}><div className="chart-stat"><span className="stat-value">{formatStock(totalRuptures)}</span><span className="stat-label">Total jours de rupture</span></div></div>
+                      {totalRuptures > 0 ? (
+                        <div className="chart-container">
+                          <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={ruptureData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" /><XAxis dataKey="name" stroke="#a0a0b0" /><YAxis stroke="#a0a0b0" allowDecimals={false} />
+                              <Tooltip contentStyle={{ backgroundColor: "#1a1a25", border: "1px solid #2a2a3a", borderRadius: "8px" }} labelStyle={{ color: "#f0f0f5" }} formatter={(v) => [v, "Jours de rupture"]} labelFormatter={(l, p) => p?.[0]?.payload?.fullName || l} />
+                              <Bar dataKey="ruptures" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <p className="no-data-message">Aucune rupture sur les 12 derniers mois.</p>
+                      )}
+                    </div>
                     <div className="info-section">
                       <h3><HiChartBar /> Détail des ventes par mois</h3>
                       <div className="sales-table">
                         <table>
-                          <thead><tr><th>Mois</th><th className="text-right">Ventes</th><th className="text-right">Ruptures</th></tr></thead>
+                          <thead><tr><th>Mois</th><th className="text-right">Ventes</th><th className="text-right">Jours de rupture</th></tr></thead>
                           <tbody>
                             {salesData.map((item, i) => (
                               <tr key={item.name + i}>
@@ -922,21 +942,6 @@ const AdminArticleInfosScreen = () => {
                         </table>
                       </div>
                     </div>
-                    {totalRuptures > 0 && (
-                      <div className="info-section chart-section">
-                        <h3><HiExclamation /> Historique des ruptures (12 derniers mois)</h3>
-                        <div className="chart-stats warning"><div className="chart-stat"><span className="stat-value">{formatStock(totalRuptures)}</span><span className="stat-label">Total ruptures</span></div></div>
-                        <div className="chart-container">
-                          <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={ruptureData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" /><XAxis dataKey="name" stroke="#a0a0b0" /><YAxis stroke="#a0a0b0" />
-                              <Tooltip contentStyle={{ backgroundColor: "#1a1a25", border: "1px solid #2a2a3a", borderRadius: "8px" }} labelStyle={{ color: "#f0f0f5" }} formatter={(v) => [v, "Ruptures"]} labelFormatter={(l, p) => p?.[0]?.payload?.fullName || l} />
-                              <Bar dataKey="ruptures" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
