@@ -8,6 +8,7 @@ import {
   listerSources,
   getSynthese,
   getClients,
+  exportPortefeuille,
 } from "../controllers/statsCommerciauxController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -38,6 +39,15 @@ router.get(
   canRead,
   checkEntrepriseAccess,
   getClients,
+);
+
+// Téléchargement du portefeuille sélectionné (?commercial=…&format=xlsx|pdf).
+router.get(
+  "/societe/:nomDossierDBF/portefeuille-export",
+  protect,
+  canRead,
+  checkEntrepriseAccess,
+  exportPortefeuille,
 );
 
 export default router;

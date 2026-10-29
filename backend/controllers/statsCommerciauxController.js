@@ -14,6 +14,12 @@ import {
   construireSynthese,
   clientsDuCommercial,
 } from "../services/statsCommerciauxService.js";
+import {
+  analyserPortefeuille,
+  genererExcelPortefeuille,
+  genererPdfPortefeuille,
+} from "../services/statsCommerciauxExportService.js";
+import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 
 // Résout le chemin du classeur de la société de la requête (404 sinon).
 async function cheminPourEntreprise(req, res) {
@@ -86,4 +92,36 @@ const getClients = asyncHandler(async (req, res) => {
   });
 });
 
-export { listerSources, getSynthese, getClients };
+// GET /api/stats-commerciaux/societe/:nomDossierDBF/portefeuille-export
+//     ?commercial=<sélection>&format=xlsx|pdf
+// Télécharge le portefeuille SÉLECTIONNÉ : Excel (synthèse + liste complète)
+// ou PDF A4 paysage (graphiques pdfkit + analyses + tableau plafonné).
+const exportPortefeuille = asyncHandler(async (req, res) => {
+  const chemin = await cheminPourEntreprise(req, res);
+  const data = await lireStats(chemin);
+  const selection = String(req.query.commercial || "GLOBAL");
+  const clients = clientsDuCommercial(data, selection);
+  const analyses = analyserPortefeuille(clients);
+  const source = {
+    label: req.entreprise.nomComplet || req.entreprise.nomDossierDBF,
+    trigramme: req.entreprise.trigramme,
+  };
+
+  const datePourNom = new Date().toISOString().slice(0, 10);
+  const nomBase = `portefeuille_${req.entreprise.trigramme || "societe"}_${datePourNom}`;
+
+  if (req.query.format === "pdf") {
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${nomBase}.pdf"`,
+    );
+    await genererPdfPortefeuille({ source, selection, clients, analyses }, res);
+    return;
+  }
+
+  const wb = genererExcelPortefeuille({ source, selection, clients, analyses });
+  await envoyerClasseur(req, res, wb, `${nomBase}.xlsx`);
+});
+
+export { listerSources, getSynthese, getClients, exportPortefeuille };

@@ -127,6 +127,12 @@
   font-weight: 600;
 }
 
+/* Boutons de téléchargement du portefeuille (Excel / PDF). */
+.stc-export-btns {
+  display: flex;
+  gap: 0.4rem;
+}
+
 /* Puces de sélection multiple des commerciaux (portefeuille). */
 .stc-com-chips {
   display: flex;

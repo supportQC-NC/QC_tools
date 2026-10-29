@@ -894,9 +894,11 @@ const PromosVue = ({ feuille, nomDossierDBF }) => {
     { skip: !nomDossierDBF || designationsTop3.length === 0 },
   );
   const nartDe = (nom) => nartsData?.narts?.[nom] || "";
+  // Ouvre la PAGE « données article » de l'application (pas le PDF fiche
+  // article, qui se téléchargeait) dans une autre fenêtre.
   const ouvrirFiche = (nart) =>
     window.open(
-      `${BASE_URL}/api/fiche-article/${nomDossierDBF}/${encodeURIComponent(nart)}`,
+      `${BASE_URL}/admin/articles/${nomDossierDBF}/${encodeURIComponent(nart)}`,
       "_blank",
     );
 

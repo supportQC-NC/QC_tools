@@ -433,6 +433,16 @@ const AdminStatsCommerciauxScreen = () => {
   // Portefeuille : SÉLECTION MULTIPLE de commerciaux (vide = toute la
   // société), avec raccourci « tous sauf MAGASIN » (demande client 29/10/2026).
   const [selCommerciaux, setSelCommerciaux] = useState([]);
+  // Téléchargement du portefeuille SÉLECTIONNÉ (Excel ou PDF A4).
+  const exporterPortefeuille = (format) => {
+    const commercial = selCommerciaux.length
+      ? selCommerciaux.join(",")
+      : "GLOBAL";
+    window.open(
+      `/api/stats-commerciaux/societe/${globalDossier}/portefeuille-export?commercial=${encodeURIComponent(commercial)}&format=${format}`,
+      "_blank",
+    );
+  };
 
   const { data, isFetching, error } = useGetStatsCommerciauxSyntheseQuery(
     { nomDossierDBF: globalDossier },
@@ -828,6 +838,25 @@ const AdminStatsCommerciauxScreen = () => {
           {/* ── 4 · Portefeuille — sélection MULTIPLE de commerciaux ── */}
           <div className="stc-section-head">
             <h2 className="stc-section-titre">Portefeuille clients</h2>
+            <div className="stc-export-btns">
+              {/* Téléchargement de la SÉLECTION affichée. */}
+              <button
+                type="button"
+                className="stc-com-chip"
+                onClick={() => exporterPortefeuille("xlsx")}
+                title="Classeur Excel : synthèse + liste complète des clients de la sélection"
+              >
+                ⬇ Excel
+              </button>
+              <button
+                type="button"
+                className="stc-com-chip"
+                onClick={() => exporterPortefeuille("pdf")}
+                title="PDF A4 : KPI, top 15 en graphique, mouvements du portefeuille et tableau des clients"
+              >
+                ⬇ PDF A4
+              </button>
+            </div>
             <div className="stc-com-chips">
               <button
                 type="button"
