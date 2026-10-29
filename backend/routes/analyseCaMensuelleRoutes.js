@@ -7,6 +7,7 @@ import express from "express";
 import {
   listerSources,
   getClasseur,
+  resoudreNarts,
 } from "../controllers/analyseCaMensuelleController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -28,6 +29,15 @@ router.get(
   canRead,
   checkEntrepriseAccess,
   getClasseur,
+);
+
+// Résolution désignation -> NART (Top 3 promos cliquable vers la fiche article).
+router.post(
+  "/societe/:nomDossierDBF/narts",
+  protect,
+  canRead,
+  checkEntrepriseAccess,
+  resoudreNarts,
 );
 
 export default router;

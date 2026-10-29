@@ -504,6 +504,26 @@
 }
 
 /* Sous-valeur affichée sous le contenu d'une cellule (CA · qté du top 3) */
+/* NART cliquable du Top 3 promos : ouvre la fiche article (autre fenêtre). */
+.acm-nart-lien {
+  display: inline-block;
+  background: none;
+  border: 1px solid var(--admin-border);
+  border-radius: 4px;
+  color: #4da6ff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0 5px;
+  margin-right: 6px;
+  cursor: pointer;
+}
+
+.acm-nart-lien:hover {
+  border-color: #4da6ff;
+  text-decoration: underline;
+}
+
 .acm-cell-sub {
   display: block;
   font-size: 0.68rem;

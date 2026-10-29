@@ -23,10 +23,23 @@ export const analyseCaMensuelleApiSlice = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 120,
     }),
+
+    // Résolution désignation -> NART (Top 3 promos cliquable vers la fiche
+    // article). POST pour passer un lot de désignations, mais sémantique de
+    // lecture : on le déclare en query pour profiter du cache RTK.
+    resoudreNartsMensuelle: builder.query({
+      query: ({ nomDossierDBF, designations }) => ({
+        url: `${URL}/societe/${nomDossierDBF}/narts`,
+        method: "POST",
+        body: { designations },
+      }),
+      keepUnusedDataFor: 300,
+    }),
   }),
 });
 
 export const {
   useGetAnalyseCaMensuelleSourcesQuery,
   useGetAnalyseCaMensuelleClasseurQuery,
+  useResoudreNartsMensuelleQuery,
 } = analyseCaMensuelleApiSlice;

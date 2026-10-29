@@ -295,17 +295,34 @@ export function construireSynthese(data) {
 }
 
 /**
- * Lignes clients d'un commercial (ou de toute la société avec "GLOBAL"),
- * triées CA N décroissant. Le détail mensuel par client est retiré de la
- * réponse (l'écran ne s'en sert pas et il triple le payload : 2,4 Mo → bien
- * moins sur les 4 173 clients de QC) — repasser `avecMois: true` le jour où
- * un graphique client en aura besoin.
+ * Lignes clients d'une SÉLECTION de commerciaux, triées CA N décroissant.
+ * `selection` : "GLOBAL" (toute la société), "HORS_MAGASIN" (tout sauf le
+ * pseudo-commercial comptoir), un nom, ou plusieurs noms séparés par des
+ * virgules ("CAMELIA,HUBERT") — demande client du 29/10/2026.
+ * Le détail mensuel par client est retiré de la réponse (l'écran ne s'en sert
+ * pas et il triple le payload : 2,4 Mo → bien moins sur les 4 173 clients de
+ * QC) — repasser `avecMois: true` le jour où un graphique client en aura besoin.
  */
-export function clientsDuCommercial(data, nomCommercial, { avecMois = false } = {}) {
-  const tous =
-    nomCommercial === "GLOBAL"
-      ? data.clients
-      : data.clients.filter((c) => c.commercial === nomCommercial);
+export function clientsDuCommercial(data, selection, { avecMois = false } = {}) {
+  const noms = String(selection || "GLOBAL")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let tous;
+  if (!noms.length || noms.includes("GLOBAL")) {
+    tous = data.clients;
+  } else if (noms.includes("HORS_MAGASIN")) {
+    tous = data.clients.filter(
+      (c) => String(c.commercial).toUpperCase() !== "MAGASIN",
+    );
+  } else {
+    const voulus = new Set(noms.map((n) => n.toUpperCase()));
+    tous = data.clients.filter((c) =>
+      voulus.has(String(c.commercial).toUpperCase()),
+    );
+  }
+
   const tries = [...tous].sort((a, b) => b.caN - a.caN);
   if (avecMois) return tries;
   return tries.map(({ mois, ...reste }) => reste);

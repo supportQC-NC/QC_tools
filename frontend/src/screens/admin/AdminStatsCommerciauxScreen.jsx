@@ -430,7 +430,9 @@ const AdminStatsCommerciauxScreen = () => {
 
   const [inclureMagasin, setInclureMagasin] = useState(false);
   const [metriqueMois, setMetriqueMois] = useState("ca"); // ca | marge
-  const [commercialSel, setCommercialSel] = useState("GLOBAL");
+  // Portefeuille : SÉLECTION MULTIPLE de commerciaux (vide = toute la
+  // société), avec raccourci « tous sauf MAGASIN » (demande client 29/10/2026).
+  const [selCommerciaux, setSelCommerciaux] = useState([]);
 
   const { data, isFetching, error } = useGetStatsCommerciauxSyntheseQuery(
     { nomDossierDBF: globalDossier },
@@ -823,27 +825,59 @@ const AdminStatsCommerciauxScreen = () => {
             </div>
           </section>
 
-          {/* ── 4 · Portefeuille d'un commercial ── */}
+          {/* ── 4 · Portefeuille — sélection MULTIPLE de commerciaux ── */}
           <div className="stc-section-head">
             <h2 className="stc-section-titre">Portefeuille clients</h2>
-            <select
-              className="stc-select"
-              value={commercialSel}
-              onChange={(e) => setCommercialSel(e.target.value)}
-            >
-              <option value="GLOBAL">Toute la société</option>
+            <div className="stc-com-chips">
+              <button
+                type="button"
+                className={`stc-com-chip ${selCommerciaux.length === 0 ? "on" : ""}`}
+                onClick={() => setSelCommerciaux([])}
+              >
+                Toute la société
+              </button>
+              <button
+                type="button"
+                className={`stc-com-chip ${
+                  selCommerciaux.length > 0 &&
+                  selCommerciaux.length ===
+                    commerciaux.filter((c) => c.nom !== "MAGASIN").length &&
+                  !selCommerciaux.includes("MAGASIN")
+                    ? "on"
+                    : ""
+                }`}
+                onClick={() =>
+                  setSelCommerciaux(
+                    commerciaux.filter((c) => c.nom !== "MAGASIN").map((c) => c.nom),
+                  )
+                }
+                title="Tous les commerciaux, ventes comptoir exclues"
+              >
+                Tous sauf MAGASIN
+              </button>
               {commerciaux.map((c) => (
-                <option key={c.nom} value={c.nom}>
+                <button
+                  key={c.nom}
+                  type="button"
+                  className={`stc-com-chip ${selCommerciaux.includes(c.nom) ? "on" : ""}`}
+                  onClick={() =>
+                    setSelCommerciaux((prev) =>
+                      prev.includes(c.nom)
+                        ? prev.filter((n) => n !== c.nom)
+                        : [...prev, c.nom],
+                    )
+                  }
+                >
                   {c.nom}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           <PortefeuilleCommercial
-            key={`${globalDossier}-${commercialSel}`}
+            key={`${globalDossier}-${selCommerciaux.join(",") || "GLOBAL"}`}
             dossier={globalDossier}
-            commercial={commercialSel}
+            commercial={selCommerciaux.length ? selCommerciaux.join(",") : "GLOBAL"}
           />
         </>
       )}

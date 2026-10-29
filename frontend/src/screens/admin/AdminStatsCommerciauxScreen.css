@@ -127,6 +127,31 @@
   font-weight: 600;
 }
 
+/* Puces de sélection multiple des commerciaux (portefeuille). */
+.stc-com-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.stc-com-chip {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.stc-com-chip.on {
+  background: #4da6ff22;
+  border-color: #4da6ff;
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
 .stc-select {
   background: var(--admin-bg-secondary);
   color: var(--admin-text);

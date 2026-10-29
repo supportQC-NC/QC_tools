@@ -17,6 +17,7 @@ import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetAnalyseCaMensuelleSourcesQuery,
   useGetAnalyseCaMensuelleClasseurQuery,
+  useResoudreNartsMensuelleQuery,
 } from "../../slices/analyseCaMensuelleApiSlice";
 import {
   ResponsiveContainer,
@@ -35,6 +36,7 @@ import {
   Pie,
 } from "recharts";
 import { fmtNombreLarge } from "../../utils/format";
+import { BASE_URL } from "../../constants";
 import "./AdminAnalyseCaMensuelleScreen.css";
 
 const PAGE_SIZE = 100;
@@ -817,7 +819,7 @@ const estDestockage = (debut, fin) => {
   return f > limite;
 };
 
-const PromosVue = ({ feuille }) => {
+const PromosVue = ({ feuille, nomDossierDBF }) => {
   const donnees = useMemo(() => {
     const lignes = donneesFeuille(feuille).filter((l) => !estLigneSection(l));
     // ⚠️ les libellés du fichier ont des espaces de tête ("  CA réalisé…").
@@ -873,6 +875,30 @@ const PromosVue = ({ feuille }) => {
   const { mois, iTotal, indicateurs, top3, kpis } = donnees;
   const fmtCell = (unite, v) =>
     typeof v !== "number" || v === 0 ? "—" : fmtUnite(unite, v);
+
+  // NART des articles du Top 3 (le classeur ne porte que les désignations) :
+  // résolus en un lot côté serveur, pour rendre chaque article CLIQUABLE vers
+  // sa fiche article (ouverte dans une autre fenêtre).
+  const designationsTop3 = useMemo(() => {
+    const set = new Set();
+    for (const t of top3) {
+      for (const v of t.article || []) {
+        const nom = String(v ?? "").trim();
+        if (nom && nom !== "—") set.add(nom);
+      }
+    }
+    return [...set].sort();
+  }, [top3]);
+  const { data: nartsData } = useResoudreNartsMensuelleQuery(
+    { nomDossierDBF, designations: designationsTop3 },
+    { skip: !nomDossierDBF || designationsTop3.length === 0 },
+  );
+  const nartDe = (nom) => nartsData?.narts?.[nom] || "";
+  const ouvrirFiche = (nart) =>
+    window.open(
+      `${BASE_URL}/api/fiche-article/${nomDossierDBF}/${encodeURIComponent(nart)}`,
+      "_blank",
+    );
 
   return (
     <>
@@ -979,8 +1005,19 @@ const PromosVue = ({ feuille }) => {
                         }
                         const ca = t.ca?.[i];
                         const qte = t.qte?.[i];
+                        const nart = nartDe(nom);
                         return (
                           <td key={k} className="gauche" title={nom}>
+                            {nart && (
+                              <button
+                                type="button"
+                                className="acm-nart-lien"
+                                onClick={() => ouvrirFiche(nart)}
+                                title={`Ouvrir la fiche article ${nart} (nouvelle fenêtre)`}
+                              >
+                                {nart}
+                              </button>
+                            )}
                             {tronque(nom, 34)}
                             <span className="acm-cell-sub">
                               {typeof ca === "number" ? `${fmtNb(ca)} XPF` : "—"}
@@ -1398,7 +1435,9 @@ const AdminAnalyseCaMensuelleScreen = () => {
           )}
 
           {/* Promos : vue dédiée (le rendu tableur générique est illisible). */}
-          {feuille?.nom === "Promos" && <PromosVue feuille={feuille} />}
+          {feuille?.nom === "Promos" && (
+            <PromosVue feuille={feuille} nomDossierDBF={globalDossier} />
+          )}
 
           {feuille && feuille.nom !== "Promos" && (
             <>

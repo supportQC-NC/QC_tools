@@ -6,6 +6,7 @@
 
 import asyncHandler from "../middleware/asyncHandler.js";
 import Entreprise from "../models/EntrepriseModel.js";
+import articleCacheService from "../services/articleService.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
 import {
   scannerSources,
@@ -73,4 +74,62 @@ const getClasseur = asyncHandler(async (req, res) => {
   });
 });
 
-export { listerSources, getClasseur };
+// POST /api/analyse-ca-mensuelle/societe/:nomDossierDBF/narts
+// Résout des DÉSIGNATIONS d'articles en NART (fiche article), pour rendre le
+// Top 3 des promos cliquable vers la fiche article : le classeur mensuel ne
+// porte que les désignations. Appariement : exact (trim, casse ignorée) puis
+// préfixe UNIQUE (désignation tronquée par le classeur). Non résolu → absent.
+const resoudreNarts = asyncHandler(async (req, res) => {
+  const brutes = Array.isArray(req.body?.designations)
+    ? req.body.designations
+    : [];
+  const designations = [
+    ...new Set(
+      brutes.map((d) => String(d || "").trim()).filter(Boolean),
+    ),
+  ].slice(0, 200); // garde-fou : l'écran n'en envoie que ~36 (3 × 12 mois)
+  if (!designations.length) return res.json({ narts: {} });
+
+  await articleCacheService.preload(req.entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(req.entreprise);
+
+  // Index DESIGN (majuscules) -> NART, construit en une passe.
+  const parDesign = new Map();
+  for (const rec of acache.records) {
+    const design = String(rec.DESIGN || "").trim().toUpperCase();
+    const nart = String(rec.NART || "").trim();
+    if (design && nart && !parDesign.has(design)) parDesign.set(design, nart);
+  }
+
+  const narts = {};
+  const nonResolues = [];
+  for (const d of designations) {
+    const exact = parDesign.get(d.toUpperCase());
+    if (exact) narts[d] = exact;
+    else nonResolues.push(d);
+  }
+  // Repli préfixe : seulement si UN SEUL article commence par la désignation
+  // (le classeur tronque parfois) — un préfixe ambigu ne doit pas lier au
+  // mauvais article.
+  if (nonResolues.length) {
+    for (const d of nonResolues) {
+      const prefixe = d.toUpperCase();
+      let trouve = null;
+      let doublon = false;
+      for (const [design, nart] of parDesign) {
+        if (design.startsWith(prefixe)) {
+          if (trouve) {
+            doublon = true;
+            break;
+          }
+          trouve = nart;
+        }
+      }
+      if (trouve && !doublon) narts[d] = trouve;
+    }
+  }
+
+  res.json({ narts });
+});
+
+export { listerSources, getClasseur, resoudreNarts };
