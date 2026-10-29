@@ -442,6 +442,14 @@
   color: var(--text-muted);
 }
 
+/* État du stock figé, à côté du bouton Figer/Défiger. */
+.ecarts-fige-info {
+  font-size: 11.5px;
+  color: #34d399;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Bulle d'aide du périmètre. Le choix « comptés / stock complet » change
    entièrement le document : une infobulle native ne suffisait pas. */
 .ecarts-label-aide {

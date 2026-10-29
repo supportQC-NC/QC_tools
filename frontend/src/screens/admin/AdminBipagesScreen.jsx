@@ -19,6 +19,7 @@ import {
   useUpdateBipageMutation,
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
+  useSetStockFigeMutation,
   getBipagesCsvUrl,
 } from "../../slices/bipageApiSlice";
 import { useSelector } from "react-redux";
@@ -137,6 +138,27 @@ const AdminBipagesScreen = () => {
     useAjouterLigneBipageMutation();
   const [recommencerZone, { isLoading: recommencing }] =
     useRecommencerZoneMutation();
+  const [setStockFige, { isLoading: figeEnCours }] = useSetStockFigeMutation();
+
+  // Figer / défiger le stock (photo de la base article pour les écarts).
+  const stockFige = data?.session?.stockFige;
+  const basculerStockFige = async () => {
+    const actif = !stockFige?.actif;
+    const confirmation = actif
+      ? "Figer le stock ?\n\nLe stock de TOUS les articles est photographié maintenant : la feuille d'écarts comparera les comptages à cette photo, même si des ventes ou réceptions modifient le stock réel pendant l'inventaire."
+      : "Défiger le stock ?\n\nLa photo est supprimée : la feuille d'écarts repart du stock réel actuel. (Refiger ensuite créera une photo NEUVE, à la date du nouveau gel.)";
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(confirmation)) return;
+    try {
+      const res = await setStockFige({
+        entrepriseId: selectedEntreprise,
+        actif,
+      }).unwrap();
+      setMsg(res?.message || (actif ? "Stock figé." : "Stock défigé."));
+    } catch (e) {
+      alert(e?.data?.message || "Échec du changement d'état du stock figé");
+    }
+  };
 
   const [lignes, setLignes] = useState([]);
   useEffect(() => {
@@ -540,6 +562,36 @@ const AdminBipagesScreen = () => {
                 <HiTable />{" "}
                 {ecartsLoading === "xlsx" ? "Génération…" : "Excel"}
               </button>
+              {/* Stock figé : la feuille d'écarts compare à la PHOTO du stock
+                  prise au gel, pas au stock réel qui bouge pendant
+                  l'inventaire. Défiger supprime la photo (retour au réel). */}
+              <button
+                className={stockFige?.actif ? "btn-danger" : "btn-secondary"}
+                onClick={basculerStockFige}
+                disabled={figeEnCours}
+                title={
+                  stockFige?.actif
+                    ? "Défiger : supprime la photo, les écarts repartent du stock réel"
+                    : "Figer : photographie le stock actuel, les écarts compareront à cette photo"
+                }
+              >
+                {figeEnCours
+                  ? "En cours…"
+                  : stockFige?.actif
+                    ? "Défiger le stock"
+                    : "Figer le stock"}
+              </button>
+              {stockFige?.actif && (
+                <span className="ecarts-fige-info">
+                  Stock figé le{" "}
+                  {new Date(stockFige.at).toLocaleString("fr-FR", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}{" "}
+                  ({new Intl.NumberFormat("fr-FR").format(stockFige.nbArticles)}{" "}
+                  articles)
+                </span>
+              )}
             </div>
 
             <span className="ecarts-hint">

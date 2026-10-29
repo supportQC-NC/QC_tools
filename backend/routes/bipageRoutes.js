@@ -9,6 +9,7 @@ import {
   ajouterLigneBipage,
   exportCsv,
   recommencerZone,
+  setStockFige,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,
@@ -51,6 +52,10 @@ router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exp
 router.get("/:entrepriseId/ecarts", protect, canReadImport, checkEntrepriseAccess, exportEcartsBipage);
 
 router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAccess, recommencerZone);
+
+// Figer / défiger le stock (photo de la base article pour la feuille d'écarts).
+// Même double-droit que la feuille d'écarts (l'action vit à côté d'elle).
+router.post("/:entrepriseId/stock-fige", protect, canWriteImport, checkEntrepriseAccess, setStockFige);
 
 // ─── Import depuis les proformas de l'ERP ─────────────────────────────────
 router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAccess, listProformasBipage);

@@ -77,6 +77,17 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // Figer / défiger le stock : photo de la base article pour que la feuille
+    // d'écarts compare à un stock STABLE pendant l'inventaire.
+    setStockFige: builder.mutation({
+      query: ({ entrepriseId, actif }) => ({
+        url: `${BASE}/${entrepriseId}/stock-fige`,
+        method: "POST",
+        body: { actif },
+      }),
+      invalidatesTags: ["Bipage"],
+    }),
+
     // ─── Import depuis les proformas de l'ERP ──────────────────────────────
     getProformasBipage: builder.query({
       query: ({ entrepriseId, dateDebut, dateFin, clients }) => {
@@ -147,6 +158,7 @@ export const {
   useUpdateBipageMutation,
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
+  useSetStockFigeMutation,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,
   useImportProformasBipageMutation,

@@ -69,6 +69,15 @@ const sessionSchema = new mongoose.Schema(
     // C'est le dossier de RÉFÉRENCE de l'inventaire (demande client 29/10/2026) ;
     // le partage STOCK reste le flux opérationnel (watcher / impression).
     dossierFtp: { type: String, default: "" },
+    // STOCK FIGÉ : quand `actif`, la feuille d'écarts compare les comptages à
+    // la PHOTO du stock (InventaireStockSnapshot) prise au moment du gel, pas
+    // au stock réel qui bouge pendant l'inventaire. Défiger supprime la photo.
+    stockFige: {
+      actif: { type: Boolean, default: false },
+      at: { type: Date, default: null },
+      par: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      nbArticles: { type: Number, default: 0 },
+    },
     statut: {
       type: String,
       enum: ["actif", "archive"],

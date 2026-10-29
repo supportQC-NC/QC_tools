@@ -9,6 +9,7 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
+import InventaireStockSnapshot from "../models/InventaireStockSnapshotModel.js";
 import FicheControle from "../models/FicheControleModel.js";
 import Zone from "../models/ZoneModel.js";
 import User from "../models/UserModel.js";
@@ -170,6 +171,10 @@ const initInventaireZone = asyncHandler(async (req, res) => {
 
   // ⚠ Purge des bipages (lignes des .DAT déjà collectés) de l'entreprise.
   await LigneBipage.deleteMany({ entreprise: entreprise._id });
+
+  // ⚠ Purge des photos de stock figé : une photo n'a de sens que pour SA
+  // session (celle qu'on vient d'archiver).
+  await InventaireStockSnapshot.deleteMany({ entreprise: entreprise._id });
 
   // Snapshot des zones
   const zonesSnapshot = zones.map((z) => ({
@@ -583,6 +588,7 @@ const annulerInventaireZone = asyncHandler(async (req, res) => {
   await FicheControle.deleteMany({ session: session._id });
   await InventaireCollecte.deleteMany({ entreprise: entreprise._id });
   await LigneBipage.deleteMany({ entreprise: entreprise._id });
+  await InventaireStockSnapshot.deleteMany({ entreprise: entreprise._id });
 
   // 3) Suppression de la session active.
   await InventaireZoneSession.deleteOne({ _id: session._id });
@@ -624,6 +630,7 @@ const deleteSession = asyncHandler(async (req, res) => {
     );
   }
 
+  await InventaireStockSnapshot.deleteMany({ session: session._id });
   await InventaireZoneSession.deleteOne({ _id: session._id });
   res.json({ message: "Session supprimée" });
 });

@@ -5,6 +5,9 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import LigneBipage from "../models/LigneBipageModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import FicheControle from "../models/FicheControleModel.js";
+import InventaireStockSnapshot, {
+  TAILLE_BLOC_SNAPSHOT,
+} from "../models/InventaireStockSnapshotModel.js";
 import articleCacheService from "../services/articleService.js";
 import {
   config,
@@ -208,11 +211,113 @@ const getBipages = asyncHandler(async (req, res) => {
 
   res.json({
     active: true,
-    session: { _id: session._id, nom: session.nom },
+    session: {
+      _id: session._id,
+      nom: session.nom,
+      // État du stock figé : pilote le bouton Figer/Défiger de l'écran.
+      stockFige: session.stockFige || { actif: false },
+    },
     zones: zonesMeta.map((z) => z.code), // rétro-compatibilité (liste de codes)
     zonesMeta, // [{ code, type }]
     types, // liste des types distincts présents
     lignes,
+  });
+});
+
+/**
+ * Charge la PHOTO de stock d'une session (stock figé) sous forme de Map
+ * NART (majuscules) -> stock photographié. Renvoie null si le stock n'est
+ * pas figé. Un NART absent de la Map vaut stock 0 (seuls les stocks ≠ 0
+ * sont photographiés).
+ */
+const chargerStockFige = async (session) => {
+  if (!session?.stockFige?.actif) return null;
+  const blocs = await InventaireStockSnapshot.find({ session: session._id })
+    .sort({ ordre: 1 })
+    .lean();
+  const map = new Map();
+  for (const bloc of blocs) {
+    for (let i = 0; i < bloc.narts.length; i++) {
+      map.set(bloc.narts[i], bloc.stocks[i]);
+    }
+  }
+  return map;
+};
+
+/**
+ * @desc    FIGER / DÉFIGER le stock de l'inventaire actif (demande client du
+ *          29/10/2026). Figer photographie le stock total (S1..S5) de tous
+ *          les articles à stock ≠ 0 : la feuille d'écarts compare ensuite les
+ *          comptages à cette photo, pas au stock réel qui bouge (ventes,
+ *          réceptions) pendant l'inventaire. Défiger supprime la photo et
+ *          repasse sur le stock réel ; refiger recrée une photo neuve.
+ * @route   POST /api/bipages/:entrepriseId/stock-fige
+ * @body    { actif: true | false }
+ * @access  Private (module inventaire ou bipage, write)
+ */
+const setStockFige = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  const actif = req.body?.actif === true || req.body?.actif === "true";
+
+  // Dans tous les cas on repart d'une photo vierge : défiger la supprime,
+  // refiger la remplace (jamais de photo périmée qui traîne).
+  await InventaireStockSnapshot.deleteMany({ session: session._id });
+
+  let nbArticles = 0;
+  if (actif) {
+    await articleCacheService.preload(entreprise).catch(() => {});
+    const acache = await articleCacheService.getArticles(entreprise);
+
+    // Photo compacte : seulement les stocks ≠ 0 (négatifs compris — un stock
+    // négatif est un écart réel à montrer). NART en MAJUSCULES, la clé de
+    // recherche des écarts.
+    const narts = [];
+    const stocks = [];
+    for (const rec of acache.records) {
+      const nart = String(rec.NART || "").trim().toUpperCase();
+      if (!nart) continue;
+      const stock = articleCacheService.calculateStockTotal(rec);
+      if (!stock) continue;
+      narts.push(nart);
+      stocks.push(stock);
+    }
+    nbArticles = narts.length;
+
+    const blocs = [];
+    for (let i = 0; i < narts.length; i += TAILLE_BLOC_SNAPSHOT) {
+      blocs.push({
+        entreprise: entreprise._id,
+        session: session._id,
+        ordre: blocs.length,
+        narts: narts.slice(i, i + TAILLE_BLOC_SNAPSHOT),
+        stocks: stocks.slice(i, i + TAILLE_BLOC_SNAPSHOT),
+      });
+    }
+    if (blocs.length) await InventaireStockSnapshot.insertMany(blocs);
+  }
+
+  session.stockFige = {
+    actif,
+    at: actif ? new Date() : null,
+    par: actif ? req.user._id : null,
+    nbArticles,
+  };
+  await session.save();
+
+  res.json({
+    message: actif
+      ? `Stock figé : ${nbArticles} articles photographiés.`
+      : "Stock défigé : les écarts repartent du stock réel.",
+    stockFige: session.stockFige,
   });
 });
 
@@ -282,6 +387,11 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   await articleCacheService.preload(entreprise).catch(() => {});
   const acache = await articleCacheService.getArticles(entreprise);
 
+  // STOCK FIGÉ : quand une photo existe, le stock théorique vient d'elle et
+  // non du DBF réel (qui bouge pendant l'inventaire). Les métadonnées article
+  // (désignation, fournisseur, prix de revient) restent lues en direct.
+  const fige = await chargerStockFige(session);
+
   const num = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
@@ -300,7 +410,9 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       refer: String(rec.REFER || "").trim(),
       gencod: String(rec.GENCOD || "").trim(),
       fourn,
-      stock: articleCacheService.calculateStockTotal(rec),
+      stock: fige
+        ? fige.get(nart.toUpperCase()) ?? 0
+        : articleCacheService.calculateStockTotal(rec),
       prev: num(rec.PREV),
       qte: 0,
       nonTrouve: false,
@@ -308,7 +420,30 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   };
 
   if (toutLeStock) {
-    for (const idx of acache.articlesEnStock) ajouterArticle(acache.records[idx]);
+    if (fige) {
+      // Périmètre « stock » figé = les articles qui avaient du stock AU MOMENT
+      // de la photo (pas la liste réelle du cache : un article vendu depuis en
+      // sortirait, un arrivage y entrerait — exactement ce qu'on fige).
+      for (const nartFige of fige.keys()) {
+        const idx = articleCacheService.lookupNart(acache, nartFige);
+        if (idx !== undefined) ajouterArticle(acache.records[idx]);
+        else
+          univers.set(nartFige, {
+            nart: nartFige,
+            design: "(article disparu du fichier)",
+            refer: "",
+            gencod: "",
+            fourn: "",
+            stock: fige.get(nartFige) ?? 0,
+            prev: 0,
+            qte: 0,
+            nonTrouve: true,
+          });
+      }
+    } else {
+      for (const idx of acache.articlesEnStock)
+        ajouterArticle(acache.records[idx]);
+    }
   }
 
   for (const [cle, info] of compte) {
@@ -1203,6 +1338,7 @@ export {
   ajouterLigneBipage,
   exportCsv,
   recommencerZone,
+  setStockFige,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,
