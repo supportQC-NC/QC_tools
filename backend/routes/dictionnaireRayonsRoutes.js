@@ -8,6 +8,7 @@ import {
   importDictionnaire,
   telechargerDictionnaire,
   telechargerRayonsSansSousZones,
+  exporterCorrectionGism,
 } from "../controllers/dictionnaireRayonsController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -45,6 +46,15 @@ router.get(
   checkEntrepriseAccess,
   canRead,
   telechargerRayonsSansSousZones,
+);
+
+// Export CSV de correction des gisements de la base article (réimport Stock XL)
+router.get(
+  "/:nomDossierDBF/export-gism",
+  protect,
+  checkEntrepriseAccess,
+  canRead,
+  exporterCorrectionGism,
 );
 
 // Enregistrement (remplace le fichier)

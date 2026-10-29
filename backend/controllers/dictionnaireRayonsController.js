@@ -18,6 +18,8 @@ import {
   normEmplacement,
 } from "../services/dictionnaireRayonsService.js";
 import { generateGisementLabelsPDF } from "../services/gisementLabelService.js";
+import articleCacheService from "../services/articleService.js";
+import { champMasque } from "../middleware/masquerChampsDbf.js";
 
 const trigOf = (e) =>
   (e?.trigramme || e?.nomDossierDBF || "societe").toString().trim();
@@ -266,6 +268,109 @@ export const telechargerRayonsSansSousZones = asyncHandler(async (req, res) => {
   res.send(Buffer.from(buffer));
 });
 
+// Séparateurs CSV autorisés (clé du paramètre ?sep=).
+const SEPARATEURS_CSV = { ";": ";", ",": ",", tab: "\t", "|": "|" };
+
+// Échappe une valeur CSV : guillemets seulement si nécessaire.
+const champCsv = (v, sep) => {
+  const s = (v == null ? "" : String(v)).trim();
+  return s.includes(sep) || s.includes('"') || /[\r\n]/.test(s)
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+};
+
+// @desc    Export CSV de CORRECTION des gisements de la base article, destiné
+//          au réimport dans Stock XL : une ligne par article (NART, GISM1,
+//          GISM2). Le DICTIONNAIRE fait foi pour l'emplacement : un code de la
+//          fiche article reconnu MAGASIN sort en colonne GISM1, reconnu DOCK en
+//          colonne GISM2 — quel que soit le champ où il se trouvait. Un code
+//          absent du dictionnaire, ou présent aux DEUX emplacements (53 codes
+//          chez QC, impossible de trancher), laisse la colonne vide (décision
+//          client du 30/10/2026). Tous les articles sortent, même sans gisement.
+// @route   GET /api/dictionnaire-rayons/:nomDossierDBF/export-gism?sep=;|,|tab||
+// @access  Private (export_gisements_admin, read) + accès entreprise
+export const exporterCorrectionGism = asyncHandler(async (req, res) => {
+  // Fichier de CORRECTION réimporté dans l'ERP : exporter avec une colonne
+  // masquée viderait les gisements à l'import — on refuse plutôt que tronquer.
+  for (const champ of ["NART", "GISM1", "GISM2"]) {
+    if (champMasque(req, champ)) {
+      res.status(403);
+      throw new Error(
+        `Le champ ${champ} vous est masqué : export de correction impossible.`,
+      );
+    }
+  }
+
+  const sep = SEPARATEURS_CSV[String(req.query.sep || ";")] || ";";
+
+  const { rows, exists } = await readDictionnaire(req.entreprise);
+  if (!exists || !rows.length) {
+    res.status(404);
+    throw new Error("Aucun dictionnaire enregistré pour cette société.");
+  }
+
+  // Code (majuscules) -> ensemble des emplacements où il existe. Un code
+  // présent aux deux emplacements est AMBIGU : on ne le classe pas.
+  const emplacementsParCode = new Map();
+  for (const r of rows) {
+    const code = (r.gism1 || "").trim().toUpperCase();
+    if (!code) continue;
+    if (!emplacementsParCode.has(code)) emplacementsParCode.set(code, new Set());
+    emplacementsParCode.get(code).add(normEmplacement(r.emplacement));
+  }
+  const resoudreEmplacement = (code) => {
+    const c = (code || "").trim().toUpperCase();
+    if (!c) return null;
+    let empl = emplacementsParCode.get(c);
+    // Code de SOUS-ZONE (« AU_M_B ») : il hérite de l'emplacement de sa zone.
+    // On ne retire qu'un suffixe de lettres pures (_A, _AB…) — jamais « _1 »
+    // ou « _2d », qui font partie du code de zone lui-même.
+    if (!empl) {
+      const m = /^(.+)_[A-Z]+$/.exec(c);
+      if (m) empl = emplacementsParCode.get(m[1]);
+    }
+    return empl && empl.size === 1 ? [...empl][0] : null;
+  };
+
+  await articleCacheService.preload(req.entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(req.entreprise);
+
+  const lignes = [["NART", "GISM1", "GISM2"].join(sep)];
+  for (const rec of acache.records) {
+    const nart = (rec.NART == null ? "" : String(rec.NART)).trim();
+    if (!nart) continue;
+    const g1 = (rec.GISM1 == null ? "" : String(rec.GISM1)).trim();
+    const g2 = (rec.GISM2 == null ? "" : String(rec.GISM2)).trim();
+    // Reclassement : la colonne de sortie dépend de l'emplacement DICTIONNAIRE
+    // du code, pas du champ d'origine. Priorité au champ déjà bien placé
+    // (GISM1 d'abord pour la colonne magasin, GISM2 d'abord pour le dock).
+    let colMagasin = "";
+    let colDock = "";
+    for (const code of [g1, g2]) {
+      if (!colMagasin && code && resoudreEmplacement(code) === "MAGASIN") {
+        colMagasin = code;
+      }
+    }
+    for (const code of [g2, g1]) {
+      if (!colDock && code && resoudreEmplacement(code) === "DOCK") {
+        colDock = code;
+      }
+    }
+    lignes.push(
+      [champCsv(nart, sep), champCsv(colMagasin, sep), champCsv(colDock, sep)].join(sep),
+    );
+  }
+
+  const trig = trigOf(req.entreprise).toUpperCase();
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${trig}_correction_gism.csv"`,
+  );
+  // BOM UTF-8 pour qu'Excel ouvre le fichier sans casser les accents.
+  res.send("\uFEFF" + lignes.join("\r\n") + "\r\n");
+});
+
 export default {
   getDictionnaire,
   saveDictionnaire,
@@ -273,4 +378,5 @@ export default {
   importDictionnaire,
   telechargerDictionnaire,
   telechargerRayonsSansSousZones,
+  exporterCorrectionGism,
 };

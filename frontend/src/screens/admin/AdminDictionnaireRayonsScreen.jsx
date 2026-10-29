@@ -81,6 +81,7 @@ const AdminDictionnaireRayonsScreen = () => {
   // Mode de l'import Excel : false = fusion (défaut), true = remplacement total.
   const [remplacerImport, setRemplacerImport] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [sepCsv, setSepCsv] = useState(";"); // séparateur de l'export correction GISM
   const [error, setError] = useState("");
   const [info, setInfo] = useState(null);
 
@@ -391,6 +392,39 @@ const AdminDictionnaireRayonsScreen = () => {
     }
   };
 
+  // ── Export CSV de correction des gisements de la base article ────────────────
+  // Une ligne par article (NART;GISM1;GISM2) : le dictionnaire décide la colonne
+  // (code MAGASIN → GISM1, code DOCK → GISM2, inconnu/ambigu → vide). Fichier
+  // destiné au RÉIMPORT dans Stock XL pour corriger les gisements.
+  const telechargerCorrectionGism = async () => {
+    if (!nomDossierDBF) return setError("Sélectionnez une société dans l'en-tête.");
+    setError("");
+    setInfo(null);
+    setDownloading(true);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/dictionnaire-rayons/${nomDossierDBF}/export-gism?sep=${encodeURIComponent(
+          sepCsv === "\t" ? "tab" : sepCsv,
+        )}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw await erreurReponse(res, "Export échoué");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `correction_gism_${nomDossierDBF}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 60000);
+    } catch (err) {
+      setError(err.message || "Impossible d'exporter le fichier de correction.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loadingEntreprises) {
     return (
       <div className="dicr-screen">
@@ -523,6 +557,27 @@ const AdminDictionnaireRayonsScreen = () => {
                           ? ` (${emplFiltre})`
                           : ""
                       }`}
+                </button>
+                <select
+                  className="dicr-select"
+                  value={sepCsv}
+                  onChange={(e) => setSepCsv(e.target.value)}
+                  disabled={downloading}
+                  title="Séparateur du CSV de correction"
+                >
+                  <option value=";">Séparateur ;</option>
+                  <option value=",">Séparateur ,</option>
+                  <option value={"\t"}>Séparateur tabulation</option>
+                  <option value="|">Séparateur |</option>
+                </select>
+                <button
+                  type="button"
+                  className="dicr-btn"
+                  onClick={telechargerCorrectionGism}
+                  disabled={downloading || !exists}
+                  title="CSV de correction des gisements de la base article (une ligne par NART ; code MAGASIN → colonne GISM1, code DOCK → colonne GISM2 selon le dictionnaire, inconnu/ambigu → vide). À réimporter dans Stock XL."
+                >
+                  <HiDownload /> {downloading ? "…" : "Correction GISM (CSV)"}
                 </button>
                 <input
                   ref={fileInputRef}
