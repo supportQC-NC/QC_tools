@@ -195,7 +195,9 @@ const AdminInventaireProgressionScreen = () => {
     const speciaux = (emplacementsSpeciaux?.emplacements || []).map((e) => ({
       code: e.nom,
       type: e.key,
-      libelle: `Entrepôt ${e.key} — import proforma`,
+      // Le NOM de l'entrepôt porte le sens ; le code Sx reste visible entre
+      // parenthèses (c'est lui qui nomme le .dat d'intégration).
+      libelle: `entrepôt ${e.nom} — import proforma`,
     }));
     return [...zones, ...speciaux];
   }, [zones, emplacementsSpeciaux]);

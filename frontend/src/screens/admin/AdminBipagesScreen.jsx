@@ -152,6 +152,20 @@ const AdminBipagesScreen = () => {
   // ── Intégration Stock XL : dépôt cible (S1..S5) par emplacement. ──
   const DEPOTS = ["S1", "S2", "S3", "S4", "S5"];
   const [mapDepots, setMapDepots] = useState({});
+  // Noms des entrepôts (fiche société, onglet Entrepôts) : affichés PARTOUT à
+  // la place des codes bruts S1..S5 — « MECALAC » plutôt que « S3 ».
+  const nomsEntrepots = data?.nomsEntrepots || {};
+  const nomDepot = (d) => {
+    const nom = String(nomsEntrepots[d] || "").trim();
+    return nom && nom.toUpperCase() !== d ? `${nom} (${d})` : d;
+  };
+  // Libellé d'un EMPLACEMENT de zone : S3/S4/S5 prennent leur nom d'entrepôt,
+  // MAGASIN/DOCK et les autres types restent tels quels.
+  const nomEmplacement = (t) => {
+    const up = String(t || "").toUpperCase();
+    if (/^S[1-5]$/.test(up)) return nomDepot(up);
+    return t || "Sans emplacement";
+  };
   // Défauts métier : MAGASIN → S1, DOCK → S2, et un emplacement spécial
   // S3/S4/S5 (zones importées par proforma) part dans SON dépôt.
   const depotPour = (t) => {
@@ -647,18 +661,18 @@ const AdminBipagesScreen = () => {
             </span>
             {types.map((t) => (
               <label key={t || "(sans)"}>
-                {t || "Sans emplacement"} →
+                {nomEmplacement(t)} →
                 <select
                   className="filter-select"
                   value={depotPour(t)}
                   onChange={(e) =>
                     setMapDepots((prev) => ({ ...prev, [t]: e.target.value }))
                   }
-                  title={`Dépôt Stock XL où intégrer le comptage de l'emplacement ${t || "sans emplacement"}`}
+                  title={`Dépôt Stock XL où intégrer le comptage de l'emplacement ${nomEmplacement(t)}`}
                 >
                   {DEPOTS.map((d) => (
                     <option key={d} value={d}>
-                      {d}
+                      {nomDepot(d)}
                     </option>
                   ))}
                 </select>
@@ -689,7 +703,7 @@ const AdminBipagesScreen = () => {
               <option value="">Tous les types</option>
               {types.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {nomEmplacement(t)}
                 </option>
               ))}
             </select>

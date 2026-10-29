@@ -260,6 +260,9 @@ const getBipages = asyncHandler(async (req, res) => {
       // État du stock figé : pilote le bouton Figer/Défiger de l'écran.
       stockFige: session.stockFige || { actif: false },
     },
+    // Noms des entrepôts S1..S5 (fiche société, onglet Entrepôts) : l'écran
+    // affiche ces noms partout plutôt que les codes bruts.
+    nomsEntrepots: entreprise.mappingEntrepots || {},
     zones: zonesMeta.map((z) => z.code), // rétro-compatibilité (liste de codes)
     zonesMeta, // [{ code, type }]
     types, // liste des types distincts présents
@@ -425,15 +428,17 @@ const getEmplacementsSpeciaux = asyncHandler(async (req, res) => {
     }
   }
 
+  // TOUJOURS proposés, même sans stock ni gisement (décision client
+  // 29/10/2026) : un entrepôt qu'on inventorie par proforma peut être à zéro
+  // dans l'ERP tant que rien n'a été intégré — le masquer empêcherait
+  // justement sa première intégration. Les compteurs restent informatifs.
   const noms = entreprise.mappingEntrepots || {};
-  const emplacements = ["S3", "S4", "S5"]
-    .filter((d) => compte[d].stock > 0 || compte[d].gism > 0)
-    .map((d) => ({
-      key: d,
-      nom: String(noms[d] || d).trim() || d,
-      articlesEnStock: compte[d].stock,
-      articlesAvecGisement: compte[d].gism,
-    }));
+  const emplacements = ["S3", "S4", "S5"].map((d) => ({
+    key: d,
+    nom: String(noms[d] || d).trim() || d,
+    articlesEnStock: compte[d].stock,
+    articlesAvecGisement: compte[d].gism,
+  }));
 
   res.json({ emplacements });
 });
