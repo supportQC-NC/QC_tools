@@ -753,6 +753,16 @@ avec sa colonne `Commercial`, feuille GLOBAL seule parsée — ignorer les
 ⚠️ « MAGASIN » y est un pseudo-commercial (comptoir) exclu par défaut des
 comparaisons ; les % du fichier sont des CHAÎNES (« 12.66% », « ↑ 1% »), les
 évolutions sont recalculées depuis N/N-1.
+`analyse_stock_admin` (écran `/admin/analyse-stock`) lit le dossier FTP
+`analyse_stock/` : classeurs mensuels `analyse_stock_<trig>_MM_AAAA.xlsx`
+(même nommage que l'analyse CA mensuelle). Deux feuilles : « Recap stock »
+(répartition par code filtre + évolution 12 mois de 5 indicateurs) et
+« total stock » (une ligne par article, 24 colonnes). ⚠️ `surtock` [sic] est
+une VALEUR en XPF (part excédentaire), `DEPREC` un % de dépréciation,
+`Taux marge` un ratio, et le « code filtre » du récap = PREMIÈRE lettre du
+CODTAR ; la feuille articles (46 k lignes chez QC) n'est jamais renvoyée
+brute — synthèse agrégée côté serveur + explorateur filtré/trié/paginé
+serveur (`analyseStockService.js`).
 `performance_dock_admin`,
 `analyse_reappro_admin`, `collecteurs_admin`, `rapport_tgc` (déclaration fiscale
 mensuelle), `balances_clients`, `derniere_facturation_admin` (dernière facture

@@ -264,6 +264,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Analyse stock (classeurs analyse_stock_<trig>_<MM>_<AAAA>.xlsx du FTPS)
+      analyse_stock_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Performance Dock
       performance_dock_admin: {
         read: { type: Boolean, default: false },

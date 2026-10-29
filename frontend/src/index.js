@@ -101,6 +101,7 @@ import AdminCollecteursMapScreen from "./screens/admin/AdminCollecteursMapScreen
 import AdminAnalyseCaMatriceScreen from "./screens/admin/AdminAnalyseCaMatriceScreen";
 import AdminAnalyseCaMensuelleScreen from "./screens/admin/AdminAnalyseCaMensuelleScreen";
 import AdminStatsCommerciauxScreen from "./screens/admin/AdminStatsCommerciauxScreen";
+import AdminAnalyseStockScreen from "./screens/admin/AdminAnalyseStockScreen";
 import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
 import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
@@ -575,6 +576,14 @@ const router = createBrowserRouter(
         <Route
           path="/admin/stats-commerciaux"
           element={<AdminStatsCommerciauxScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Analyse stock -> module "analyse_stock_admin" */}
+      <Route element={<ModuleRoute module="analyse_stock_admin" />}>
+        <Route
+          path="/admin/analyse-stock"
+          element={<AdminAnalyseStockScreen />}
         />
       </Route>
 

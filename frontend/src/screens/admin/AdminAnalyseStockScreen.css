@@ -1,0 +1,345 @@
+/* AdminAnalyseStockScreen.css — thème sombre admin (variables globales).
+   Même grammaire visuelle que AdminStatsCommerciauxScreen (préfixe ast-). */
+
+.ast-screen {
+  padding: 1.2rem 1.4rem 2rem;
+  color: var(--admin-text);
+}
+
+.ast-entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.ast-titre {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ast-sous-titre {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary);
+}
+
+.ast-info {
+  color: var(--admin-text-secondary);
+  font-size: 0.9rem;
+}
+
+.ast-erreur {
+  color: #fb7185;
+  font-size: 0.9rem;
+}
+
+.ast-select {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* ── KPI ── */
+.ast-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1.4rem;
+}
+
+.ast-kpi {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  box-shadow: var(--admin-shadow);
+}
+
+.ast-kpi-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-secondary);
+}
+
+.ast-kpi-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ast-kpi-sub {
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sections ── */
+.ast-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.6rem 0 0.8rem;
+}
+
+.ast-section-titre {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* ── Cartes graphiques ── */
+.ast-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.ast-chart-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 1rem 1rem 0.5rem;
+  box-shadow: var(--admin-shadow);
+  min-width: 0;
+}
+
+.ast-chart-wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+  .ast-chart-wide {
+    grid-column: span 1;
+  }
+}
+
+.ast-chart-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--admin-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.8rem;
+}
+
+.ast-note {
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+  margin: 0.4rem 0 0.6rem;
+}
+
+/* ── Tableaux ── */
+.ast-table-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.8rem 1rem;
+  box-shadow: var(--admin-shadow);
+  margin-bottom: 1rem;
+}
+
+.ast-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.ast-filtres {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ast-recherche {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  min-width: 240px;
+}
+
+.ast-chip {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.ast-chip.on {
+  background: #4da6ff22;
+  border-color: #4da6ff;
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
+.ast-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+}
+
+.ast-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  color: var(--admin-text);
+  /* Chiffres à largeur fixe : colonnes de montants alignées. */
+  font-variant-numeric: tabular-nums;
+}
+
+.ast-table th {
+  text-align: right;
+  padding: 0.55rem 0.7rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ast-table th.fixe {
+  cursor: default;
+}
+
+.ast-table td {
+  text-align: right;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+
+.ast-table th.gauche,
+.ast-table td.gauche {
+  text-align: left;
+}
+
+.ast-table td.design {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ast-table tbody tr:hover {
+  background: var(--admin-bg-tertiary);
+}
+
+.ast-table .pos,
+.ast-kpi-sub .pos {
+  color: #34d399;
+}
+
+.ast-table .neg,
+.ast-kpi-sub .neg,
+.ast-kpi-value.neg {
+  color: #fb7185;
+}
+
+.ast-table .warn,
+.ast-kpi-value.warn {
+  color: #fbbf24;
+}
+
+/* Lien NART vers la page données article. */
+.ast-nart {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #4da6ff;
+  cursor: pointer;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.ast-nart:hover {
+  text-decoration: underline;
+}
+
+.ast-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 0.45rem;
+  vertical-align: baseline;
+}
+
+/* Pagination de l'explorateur. */
+.ast-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--admin-text-secondary);
+}
+
+.ast-pagination button {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.ast-pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Tooltip recharts ── */
+.ast-tooltip {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.78rem;
+  box-shadow: var(--admin-shadow);
+}
+
+.ast-tooltip-label {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.ast-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ast-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
