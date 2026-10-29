@@ -419,11 +419,25 @@ const AdminArticleInfosScreen = () => {
   const getMonthsData = useMemo(() => {
     const monthNames = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
     const shortMonthNames = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+    // V<n> / RUP<n> = mois CALENDAIRE n (V1 = janvier … V12 = décembre),
+    // fenêtre glissante : les mois APRÈS le mois courant appartiennent à
+    // l'année PRÉCÉDENTE, et le mois courant (en cours, partiel) est inclus.
+    // Vérifié chiffre à chiffre avec le client sur QC 760049 le 30/10/2026.
     const now = new Date();
-    const lastCompleteMonth = (now.getMonth() - 1 + 12) % 12;
+    const moisCourant = now.getMonth(); // 0-based
     return Array.from({ length: 12 }, (_, i) => {
-      const monthIndex = (lastCompleteMonth - (11 - i) + 12) % 12;
-      return { vKey: `V${i + 1}`, rupKey: `RUP${i + 1}`, name: monthNames[monthIndex], shortName: shortMonthNames[monthIndex], monthIndex };
+      // Ordre chronologique : du plus ancien (mois courant - 11) au mois courant.
+      const monthIndex = (moisCourant + 1 + i) % 12;
+      const annee = monthIndex <= moisCourant ? now.getFullYear() : now.getFullYear() - 1;
+      const enCours = monthIndex === moisCourant;
+      return {
+        vKey: `V${monthIndex + 1}`,
+        rupKey: `RUP${monthIndex + 1}`,
+        name: `${monthNames[monthIndex]} ${annee}${enCours ? " (en cours)" : ""}`,
+        shortName: `${shortMonthNames[monthIndex]} ${String(annee).slice(2)}`,
+        monthIndex,
+        enCours,
+      };
     });
   }, []);
 
