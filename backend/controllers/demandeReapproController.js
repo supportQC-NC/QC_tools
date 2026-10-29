@@ -29,6 +29,7 @@ import {
 import { memeCodeBarres } from "../utils/codeBarres.js";
 import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
 import { importerProformasReappro } from "../services/reapproProformaImportService.js";
+import { fmtQteDat } from "../utils/qteDat.js";
 
 const ACTIF = ["en_attente", "en_cours"];
 

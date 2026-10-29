@@ -8,6 +8,7 @@
 import fs from "fs";
 import path from "path";
 import Entreprise from "../models/EntrepriseModel.js";
+import { fmtQteDat } from "../utils/qteDat.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const pad2 = (n) => String(n).padStart(2, "0");

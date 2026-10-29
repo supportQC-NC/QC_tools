@@ -606,6 +606,7 @@ import articleCacheService from "../services/articleService.js";
 import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
+import { fmtQteDat } from "../utils/qteDat.js";
 
 // Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
 // l'unité — même règle que les listes de réappro. Un corps sans quantité vaut

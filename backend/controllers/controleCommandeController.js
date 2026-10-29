@@ -956,6 +956,7 @@ import Entreprise from "../models/EntrepriseModel.js";
 import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
+import { fmtQteDat } from "../utils/qteDat.js";
 
 // Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
 // l'unité. Le .dat, lui, reste en entiers (format Stock XL figé, arrondi au

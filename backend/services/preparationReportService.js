@@ -470,6 +470,7 @@
 import fs from "fs";
 import path from "path";
 import sendEmail from "../utils/sendEmail.js";
+import { fmtQteDat } from "../utils/qteDat.js";
 import {
   buildPrepaCmdDir,
   buildPrepaPdfFileName,
