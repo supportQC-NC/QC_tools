@@ -16,6 +16,7 @@ import os from "os";
 import fs from "fs";
 import zlib from "zlib";
 import ProformaZone from "../models/ProformaZoneModel.js";
+import { fmtQteDat } from "../utils/qteDat.js";
 
 /**
  * Mode « Inventaire Proforma » (admin, lecture seule).
@@ -60,8 +61,9 @@ const genererContenuDat = (lignes) => {
   let contenu = "";
   for (const ligne of lignes) {
     const code = (ligne.nart || "").trim().padEnd(13, " ");
-    const q = Math.max(0, Math.trunc(Number(ligne.quantite) || 0)); // négatif -> 0
-    const quantiteFormatee = q.toString().padStart(8, "0");
+    // Décimales et négatifs désormais acceptés par Stock XL (« - » et « . »
+    // comptent dans les 8 caractères) : plus de troncature ni de négatif -> 0.
+    const quantiteFormatee = fmtQteDat(ligne.quantite);
     contenu += `${code}|${quantiteFormatee}|000\r\n`;
   }
   return contenu;

@@ -321,11 +321,9 @@ const genererContenuFichier = (lignes) => {
     } else {
       code = ligne.nart.trim().padEnd(13, " ");
     }
-    // Format Stock XL figé : quantité ENTIÈRE. Les décimales (articles au
-    // mètre) ne sont arrondies qu'ici, à l'écriture du fichier.
-    const quantiteFormatee = String(
-      Math.round(Number(ligne.quantite) || 0),
-    ).padStart(8, "0");
+    // QTE(8) Stock XL : décimales et négatifs acceptés, « - » et « . »
+    // comptent dans les 8 caractères (utils/qteDat.js).
+    const quantiteFormatee = fmtQteDat(ligne.quantite);
     const suffixe = "000";
     contenu += `${code}|${quantiteFormatee}|${suffixe}\r\n`;
   });

@@ -270,16 +270,15 @@ const traiterFichier = async (
   }
 
   // À partir d'ici : nous sommes le SEUL à traiter ce fichier.
-  const content = fs.readFileSync(workFilePath, "utf8");
-  const lignesDat = parseDat(content);
-  const { rows, stats } = await construireLignes(entreprise, lignesDat);
 
-  // Agent : le .DAT ne porte aucune identité, mais la COLLECTE qui l'a produit
-  // sait quel compte utilisateur a bipé la zone. On reprend son nom/prénom.
-  let agentNom = "";
-  let agentUserId = null;
+  // COLLECTE source du .DAT : elle porte l'agent ET les quantités EXACTES
+  // (décimales des articles vendus au mètre). Le .DAT, lui, est arrondi à
+  // l'entier (format Stock XL figé) : le relire faisait sortir « 2 » sur la
+  // fiche de contrôle et dans le Détail des bipages quand l'agent avait
+  // compté 1,5 (constaté le 29/10/2026).
+  let collecte = null;
   try {
-    const collecte = await InventaireCollecte.findOne({
+    collecte = await InventaireCollecte.findOne({
       entreprise: entreprise._id,
       session: session._id,
       zoneCode,
@@ -288,16 +287,37 @@ const traiterFichier = async (
     })
       .sort({ exportedAt: -1 })
       .populate("user", "nom prenom email");
-    if (collecte?.user) {
-      const u = collecte.user;
-      agentNom =
-        `${(u.prenom || "").trim()} ${(u.nom || "").trim()}`.trim() ||
-        (u.email || "");
-      agentUserId = u._id;
-    }
   } catch {
-    agentNom = "";
+    collecte = null;
   }
+  let agentNom = "";
+  let agentUserId = null;
+  if (collecte?.user) {
+    const u = collecte.user;
+    agentNom =
+      `${(u.prenom || "").trim()} ${(u.nom || "").trim()}`.trim() ||
+      (u.email || "");
+    agentUserId = u._id;
+  }
+
+  // Lignes : depuis la COLLECTE quand elle existe (quantités exactes, même
+  // précédence de code que l'écriture du .DAT : NART d'abord, GENCOD en
+  // repli) ; le .DAT ne sert de source que pour un fichier posé À LA MAIN
+  // sur le partage, sans collecte.
+  let lignesDat;
+  if (collecte?.lignes?.length) {
+    lignesDat = collecte.lignes
+      .map((l) => ({
+        code:
+          (l.nart && String(l.nart).trim()) || String(l.gencod || "").trim(),
+        quantite: Number(l.quantite) || 0,
+      }))
+      .filter((l) => l.code);
+  } else {
+    const content = fs.readFileSync(workFilePath, "utf8");
+    lignesDat = parseDat(content);
+  }
+  const { rows, stats } = await construireLignes(entreprise, lignesDat);
 
   // Persistance des lignes pour l'écran "Détail des bipages"
   // (remplace les lignes éventuelles de ce même fichier).

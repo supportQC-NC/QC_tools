@@ -161,7 +161,9 @@ export const parseDat = (content) => {
     const parts = raw.split("|");
     if (parts.length < 2) continue;
     const code = parts[0].trim();
-    const quantite = parseInt(parts[1], 10) || 0;
+    // parseFloat, pas parseInt : le format officiel est entier (Stock XL) mais
+    // un .dat retouché à la main peut porter des décimales — on les respecte.
+    const quantite = Math.round((parseFloat(parts[1]) || 0) * 1000) / 1000;
     if (!code) continue;
     lignes.push({ code, quantite });
   }
@@ -419,7 +421,12 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
           ? ""
           : r[c.key] === null || r[c.key] === undefined
             ? ""
-            : String(r[c.key]);
+            : // Quantités/stocks décimaux (articles au mètre) : virgule
+              // française, "1.5" imprimé « 1,5 ».
+              (c.key === "qte" || c.key === "stock") &&
+                typeof r[c.key] === "number"
+              ? String(Math.round(r[c.key] * 1000) / 1000).replace(".", ",")
+              : String(r[c.key]);
       const val = fitText(doc, raw, c.w - 4);
       doc
         .fillColor("#000")

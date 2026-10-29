@@ -1006,13 +1006,13 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
     throw new Error("Aucune ligne à transférer.");
   }
 
-  // Contenu : format Stock XL figé — quantité ENTIÈRE, arrondie ici seulement
-  // (les décimales des articles au mètre vivent partout ailleurs).
+  // QTE(8) Stock XL : décimales et négatifs acceptés (utils/qteDat.js) ;
+  // on n'écrit toujours que les quantités réellement prises (> 0).
   let contenu = "";
   lignes.forEach((l) => {
-    const q = Math.round(l.quantite);
+    const q = Math.round((Number(l.quantite) || 0) * 1000) / 1000;
     if (q <= 0) return;
-    contenu += `${l.nart.padEnd(13, " ")}|${String(q).padStart(8, "0")}|000\r\n`;
+    contenu += `${l.nart.padEnd(13, " ")}|${fmtQteDat(q)}|000\r\n`;
   });
   const nbLignes = contenu
     ? contenu.trimEnd().split("\r\n").filter(Boolean).length

@@ -26,6 +26,23 @@ export const fmtNum = (n) => {
   return sign + Math.abs(r).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 };
 
+/**
+ * QUANTITÉS (stock, qté, diff) : les décimales sont CONSERVÉES (3 max, virgule
+ * française) — articles vendus au mètre, « 1,5 » ne doit pas sortir « 2 »
+ * (constaté le 29/10/2026 sur la fiche de contrôle). Un entier s'affiche
+ * exactement comme avec fmtNum ; les montants XPF restent sur fmtNum.
+ */
+export const fmtQteDoc = (n) => {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  const r = Math.round(n * 1000) / 1000;
+  const abs = Math.abs(r);
+  const ent = Math.trunc(abs);
+  const entStr = ent.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const frac = Math.round((abs - ent) * 1000) / 1000;
+  const fracStr = frac ? String(frac).slice(1).replace(".", ",") : "";
+  return (r < 0 ? "-" : "") + entStr + fracStr;
+};
+
 /** Dessine le document d'inventaire (PDF paysage, table groupée). */
 export const dessinerDocInventaire = async ({
   titre,
@@ -141,7 +158,8 @@ export const dessinerDocInventaire = async ({
         let val = r[c.key];
         if (["stock", "qte", "diff", "diffval"].includes(c.key)) {
           const num = r[c.key];
-          val = fmtNum(num);
+          // diffval = XPF (entier) ; les quantités gardent leurs décimales.
+          val = c.key === "diffval" ? fmtNum(num) : fmtQteDoc(num);
           doc.font("Helvetica").fontSize(7.5);
           if ((c.key === "diff" || c.key === "diffval") && Number.isFinite(num)) {
             doc.fillColor(num > 0 ? "#067d06" : num < 0 ? "#c00" : "#000");
@@ -188,7 +206,7 @@ export const dessinerDocInventaire = async ({
             doc.rect(xs, y, c.w, sh).stroke();
             let val = sub[c.key];
             if (["stock", "qte"].includes(c.key)) {
-              val = val === "" ? "" : fmtNum(val);
+              val = val === "" ? "" : fmtQteDoc(val);
             }
             doc.text(fit(val == null ? "" : String(val), c.w), xs + 2, y + 3, {
               width: c.w - 4,
@@ -339,7 +357,10 @@ export const construireClasseurEcarts = async ({
   dcell.value = `Généré le ${new Date().toLocaleString("fr-FR")}`;
   dcell.font = { size: 9, color: { argb: "FF666666" } };
 
-  const numFmt = "#,##0";
+  const numFmt = "#,##0"; // montants XPF (diffval)
+  // Quantités : décimales affichées quand il y en a (articles au mètre),
+  // entiers inchangés.
+  const numFmtQte = "#,##0.###";
   const fontColor = (v) =>
     v > 0
       ? { argb: "FF067D06" }
@@ -403,13 +424,13 @@ export const construireClasseurEcarts = async ({
       row.getCell(7).value = r.fournNom;
       const sc = row.getCell(8);
       sc.value = r.stock;
-      sc.numFmt = numFmt;
+      sc.numFmt = numFmtQte;
       const qc = row.getCell(9);
       qc.value = r.qte;
-      qc.numFmt = numFmt;
+      qc.numFmt = numFmtQte;
       const dc = row.getCell(10);
       dc.value = r.diff;
-      dc.numFmt = numFmt;
+      dc.numFmt = numFmtQte;
       dc.font = { color: fontColor(r.diff) };
       const vc = row.getCell(11);
       vc.value = r.diffval;
@@ -423,7 +444,7 @@ export const construireClasseurEcarts = async ({
           dr.getCell(3).value = `   ↳ ${d.texte ? d.texte + " " : ""}(${d.numfact})`;
           const dq = dr.getCell(9);
           dq.value = d.qte;
-          dq.numFmt = numFmt;
+          dq.numFmt = numFmtQte;
           for (let i = 1; i <= 12; i++) {
             dr.getCell(i).font = {
               italic: true,

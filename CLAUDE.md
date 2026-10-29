@@ -435,7 +435,7 @@ déployées de l'app mobile s'en servaient).
   `POST /mobile/rayon/transfert` écrit le `.dat` dans le
   `cheminExportInventaire` de la société (collect_sec), **nommé comme le
   réappro classique** : `stock.dat <nom du rayon>_<code rayon>` (même
-  sanitisation que `exportReappro`), contenu figé NART(13)|QTE(8 entier)|000.
+  sanitisation que `exportReappro`), contenu figé NART(13)|QTE(8)|000.
   Rien n'apparaît dans les listes ni le suivi.
 - **Où ranger ?** (mode mobile *Réappro ▸ Où ranger ?*) : consultation pure,
   sans état. L'agent choisit sa zone (dock/magasin, bascule rapide en haut
@@ -449,8 +449,12 @@ déployées de l'app mobile s'en servaient).
   (helper `round3`, 3 décimales, dans les contrôleurs réappro/bipage/inventaire/
   contrôle/préparation/réception) ni côté app (helpers `parseQte`/`addQteChar`/
   `cleanQteText`/`fmtQte` de `format.js`, touche « , » sur les NumPad — vider =
-  appui long sur ⌫). **Seule exception : les fichiers `.dat` Stock XL**, au
-  format figé entier — l'arrondi se fait uniquement à leur écriture.
+  appui long sur ⌫). **Les `.dat` Stock XL acceptent AUSSI décimales et
+  négatifs depuis le 29/10/2026** (précision client) : champ QTE(8) complété
+  de zéros à gauche, « - » et « . » comptant dans les 8 caractères
+  (`000001.5`, `00000-52`, `0000-1.5`) — formatage UNIQUE dans
+  `utils/qteDat.js` (`fmtQteDat`), utilisé par les 10 générateurs de `.dat`.
+  Ne plus jamais réintroduire un `Math.round` à l'écriture d'un `.dat`.
 - Cycle : `en_attente` (« À faire ») → `en_cours` → `realisee` (« Terminé », même
   avec des écarts). L'ouverture pose un **verrou** (`operateur.user`) : la liste
   disparaît de l'écran des autres opérateurs jusqu'à ce qu'elle soit terminée ou

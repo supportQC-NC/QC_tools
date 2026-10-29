@@ -842,6 +842,7 @@ const AdminBipagesScreen = () => {
                         <input
                           className="cell-input num"
                           type="number"
+                          step="any"
                           value={l.qteScan ?? ""}
                           onChange={(e) =>
                             updateLocal(l._id, "qteScan", e.target.value)

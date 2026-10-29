@@ -783,7 +783,8 @@ const construireContenuTransfert = (preparation) => {
     const codeSrc = safeTrim(l.nart);
     if (!codeSrc) return;
     const code = codeSrc.padEnd(13, " ");
-    const qte = String(Math.round(q)).padStart(8, "0");
+    // QTE(8) Stock XL : décimales acceptées (utils/qteDat.js).
+    const qte = fmtQteDat(q);
     contenu += `${code}|${qte}|000\r\n`;
   });
   return contenu;

@@ -45,10 +45,11 @@ const libelleTransfert = (demande) => {
 const construireContenu = (lignes) => {
   let contenu = "";
   (lignes || []).forEach((l) => {
-    const q = Math.round(Number(l.quantite) || 0);
+    // QTE(8) Stock XL : décimales acceptées (utils/qteDat.js).
+    const q = Math.round((Number(l.quantite) || 0) * 1000) / 1000;
     if (q <= 0) return;
     const code = safeTrim(l.nart).padEnd(13, " ");
-    contenu += `${code}|${String(q).padStart(8, "0")}|000\r\n`;
+    contenu += `${code}|${fmtQteDat(q)}|000\r\n`;
   });
   return contenu;
 };
