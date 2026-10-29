@@ -157,17 +157,17 @@ export const resoudreZoneImport = async (entrepriseId, zoneCode, emplacement) =>
 
   const candidates = await Zone.find(requete);
   if (candidates.length === 0) {
-    // EMPLACEMENT SPÉCIAL S3/S4/S5 (29/10/2026) : ces dépôts sont inventoriés
-    // par import de proformas SANS zone physique dans le référentiel — on
-    // accepte une zone VIRTUELLE (code = nom choisi à l'écran, type = Sx).
-    // Les lignes bipées porteront ce couple ; l'intégration Stock XL route
-    // le type Sx vers son dépôt.
-    if (/^S[3-5]$/i.test(empl)) {
+    // ZONE VIRTUELLE (29/10/2026) : l'import choisit désormais un GISEMENT lu
+    // dans la FICHE ARTICLE (par emplacement — GISM1..GISM5), qui peut ne pas
+    // exister dans le référentiel de zones ni avoir le moindre bipage. Dès
+    // que le couple code + emplacement est fourni, on l'accepte tel quel :
+    // les lignes bipées porteront ce couple, et l'intégration Stock XL route
+    // l'emplacement vers son dépôt. Sans emplacement, on refuse toujours
+    // (un code libre sans contexte atterrirait n'importe où).
+    if (empl) {
       return { code, type: empl.toUpperCase(), libelle: "", virtuelle: true };
     }
-    throw new Error(
-      `Zone ${code}${empl ? ` (${empl})` : ""} inconnue pour cette société.`,
-    );
+    throw new Error(`Zone ${code} inconnue pour cette société.`);
   }
   if (candidates.length > 1) {
     // Code présent à plusieurs emplacements et aucun n'a été précisé : on ne

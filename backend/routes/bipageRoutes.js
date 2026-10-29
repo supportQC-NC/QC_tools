@@ -12,6 +12,7 @@ import {
   setStockFige,
   genererDatIntegration,
   getEmplacementsSpeciaux,
+  getGisementsEmplacement,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,
@@ -65,6 +66,10 @@ router.get("/:entrepriseId/integration-dat", protect, canReadImport, checkEntrep
 // Emplacements spéciaux S3/S4/S5 (inventoriés par import de proformas) :
 // proposés seulement s'ils existent dans la fiche article.
 router.get("/:entrepriseId/emplacements-speciaux", protect, canReadImport, checkEntrepriseAccess, getEmplacementsSpeciaux);
+
+// Gisements d'un emplacement, lus dans la fiche article (zones proposées à
+// l'import de proformas — indépendantes du référentiel et du bipage).
+router.get("/:entrepriseId/gisements-emplacement", protect, canReadImport, checkEntrepriseAccess, getGisementsEmplacement);
 
 // ─── Import depuis les proformas de l'ERP ─────────────────────────────────
 router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAccess, listProformasBipage);

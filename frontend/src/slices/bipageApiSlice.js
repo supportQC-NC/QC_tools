@@ -97,6 +97,14 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       keepUnusedDataFor: 300,
     }),
 
+    // Gisements d'un emplacement, lus dans la fiche article (zones proposées
+    // à l'import, même sans bipage ni fiche zone).
+    getGisementsEmplacement: builder.query({
+      query: ({ entrepriseId, emplacement }) =>
+        `${BASE}/${entrepriseId}/gisements-emplacement?emplacement=${encodeURIComponent(emplacement)}`,
+      keepUnusedDataFor: 300,
+    }),
+
     // ─── Import depuis les proformas de l'ERP ──────────────────────────────
     getProformasBipage: builder.query({
       query: ({ entrepriseId, dateDebut, dateFin, clients }) => {
@@ -169,6 +177,7 @@ export const {
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
   useGetEmplacementsSpeciauxQuery,
+  useGetGisementsEmplacementQuery,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,
   useImportProformasBipageMutation,

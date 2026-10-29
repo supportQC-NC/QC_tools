@@ -443,6 +443,55 @@ const getEmplacementsSpeciaux = asyncHandler(async (req, res) => {
   res.json({ emplacements });
 });
 
+// Champ gisement de la fiche article correspondant à chaque emplacement.
+const CHAMP_GISM_PAR_EMPLACEMENT = {
+  MAGASIN: "GISM1",
+  DOCK: "GISM2",
+  S3: "GISM3",
+  S4: "GISM4",
+  S5: "GISM5",
+};
+
+/**
+ * @desc    GISEMENTS D'UN EMPLACEMENT, lus dans la FICHE ARTICLE : tous les
+ *          codes distincts du champ GISMx correspondant (GISM1 pour MAGASIN,
+ *          GISM2 pour DOCK, GISM3/4/5 pour S3/S4/S5), avec le nombre
+ *          d'articles. C'est la liste des zones proposées à l'import de
+ *          proformas — indépendante du référentiel de zones ET du bipage :
+ *          un gisement jamais bipé reste sélectionnable.
+ * @route   GET /api/bipages/:entrepriseId/gisements-emplacement?emplacement=MAGASIN
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const getGisementsEmplacement = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const empl = String(req.query.emplacement || "").trim().toUpperCase();
+  const champ = CHAMP_GISM_PAR_EMPLACEMENT[empl];
+  if (!champ) {
+    res.status(400);
+    throw new Error("Emplacement inconnu (MAGASIN, DOCK, S3, S4 ou S5).");
+  }
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(entreprise);
+
+  // Un gisement « réel » contient au moins un alphanumérique ASCII (écarte
+  // les remplissages DOS « ÄÄÄÄÄÄ » présents dans GISM3-5).
+  const parCode = new Map();
+  for (const rec of acache.records) {
+    const brut = String(rec[champ] || "").trim();
+    if (!/[A-Za-z0-9]/.test(brut)) continue;
+    const cle = brut.toUpperCase();
+    const cur = parCode.get(cle) || { code: brut, nbArticles: 0 };
+    cur.nbArticles += 1;
+    parCode.set(cle, cur);
+  }
+  const gisements = [...parCode.values()].sort((a, b) =>
+    a.code.localeCompare(b.code, "fr", { numeric: true }),
+  );
+
+  res.json({ emplacement: empl, champ, gisements });
+});
+
 const genererDatIntegration = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const session = await InventaireZoneSession.findOne({
@@ -1568,6 +1617,7 @@ export {
   setStockFige,
   genererDatIntegration,
   getEmplacementsSpeciaux,
+  getGisementsEmplacement,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,

@@ -181,26 +181,13 @@ const AdminInventaireProgressionScreen = () => {
 
   const zones = useMemo(() => session?.zones || [], [session]);
 
-  // Emplacements spéciaux S3/S4/S5 (inventoriés par import de proformas) :
-  // proposés dans le choix de zone de l'import, en plus des zones de la
-  // session, quand ils existent dans la fiche article de la société. Le code
-  // de la pseudo-zone = le NOM de l'entrepôt (fiche société, onglet
-  // Entrepôts), son emplacement = S3/S4/S5 — l'intégration Stock XL route
-  // ensuite chaque emplacement vers son dépôt.
+  // Noms des entrepôts S3/S4/S5 (fiche société, onglet Entrepôts) : passés au
+  // bloc d'import, qui propose l'EMPLACEMENT puis cherche ses gisements dans
+  // la fiche article — indépendant du référentiel de zones et du bipage.
   const { data: emplacementsSpeciaux } = useGetEmplacementsSpeciauxQuery(
     selectedEntreprise,
     { skip: !selectedEntreprise },
   );
-  const zonesAvecEmplacements = useMemo(() => {
-    const speciaux = (emplacementsSpeciaux?.emplacements || []).map((e) => ({
-      code: e.nom,
-      type: e.key,
-      // Le NOM de l'entrepôt porte le sens ; le code Sx reste visible entre
-      // parenthèses (c'est lui qui nomme le .dat d'intégration).
-      libelle: `entrepôt ${e.nom} — import proforma`,
-    }));
-    return [...zones, ...speciaux];
-  }, [zones, emplacementsSpeciaux]);
 
   // Emplacements réellement présents dans l'inventaire (jamais une liste en
   // dur : chaque société a les siens). Les zones sans emplacement sont
@@ -671,7 +658,8 @@ const AdminInventaireProgressionScreen = () => {
               papillonnage et bipage quand la zone n'avait jamais été comptée. */}
           <ImportComptageZone
             entrepriseId={selectedEntreprise}
-            zones={zonesAvecEmplacements}
+            zones={zones}
+            emplacementsSpeciaux={emplacementsSpeciaux?.emplacements || []}
             filtreProformas={session?.filtreProformas}
             onMessage={(message, tone) =>
               setBipFeedback({ tone: tone === "error" ? "error" : "success", message })

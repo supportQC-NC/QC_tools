@@ -166,6 +166,21 @@ const AdminBipagesScreen = () => {
     if (/^S[1-5]$/.test(up)) return nomDepot(up);
     return t || "Sans emplacement";
   };
+  // La barre Intégration liste TOUS les emplacements (MAGASIN/DOCK/S3/S4/S5 +
+  // tout type présent dans les lignes), même sans bipage : le mapping est
+  // visible et réglable d'avance — un emplacement sans ligne ne produit
+  // simplement aucun fichier.
+  const typesIntegration = (() => {
+    const std = ["MAGASIN", "DOCK", "S3", "S4", "S5"];
+    const vus = new Set(std);
+    const extra = (data?.types || []).filter((t) => {
+      const up = String(t || "").toUpperCase();
+      if (!t || vus.has(up)) return false;
+      vus.add(up);
+      return true;
+    });
+    return [...std, ...extra];
+  })();
   // Défauts métier : MAGASIN → S1, DOCK → S2, et un emplacement spécial
   // S3/S4/S5 (zones importées par proforma) part dans SON dépôt.
   const depotPour = (t) => {
@@ -176,8 +191,10 @@ const AdminBipagesScreen = () => {
     return "S1";
   };
   const genererIntegration = () => {
-    const typesList = data?.types || [];
-    const mapping = typesList
+    // Le mapping envoyé couvre TOUS les emplacements affichés (même sans
+    // ligne : sans effet côté serveur, mais les choix de l'utilisateur
+    // partent toujours).
+    const mapping = typesIntegration
       .map((t) => `${(t || "SANS_EMPLACEMENT").toUpperCase()}:${depotPour(t)}`)
       .join(",");
     window.open(
@@ -659,7 +676,7 @@ const AdminBipagesScreen = () => {
             <span className="ecarts-titre">
               <HiDownload /> Intégration Stock XL
             </span>
-            {types.map((t) => (
+            {typesIntegration.map((t) => (
               <label key={t || "(sans)"}>
                 {nomEmplacement(t)} →
                 <select

@@ -43,6 +43,7 @@ import {
   useApercuImportProformasMutation,
   useImportProformasBipageMutation,
   useImportExcelBipageMutation,
+  useGetGisementsEmplacementQuery,
   getModeleExcelBipageUrl,
 } from "../../slices/bipageApiSlice";
 import { useSetFiltreProformasMutation } from "../../slices/inventaireZoneApiSlice";
@@ -76,10 +77,17 @@ const filtreRenseigne = (f) => !!(f?.dateDebut || f?.dateFin || f?.clients);
 const ImportComptageZone = ({
   entrepriseId,
   zones = [],
+  emplacementsSpeciaux = [],
   filtreProformas,
   onMessage,
 }) => {
   const [ouvert, setOuvert] = useState(false);
+  // Choix en DEUX TEMPS : l'EMPLACEMENT d'abord, puis le GISEMENT, cherché
+  // dans la FICHE ARTICLE (GISM1..GISM5 selon l'emplacement) — indépendant du
+  // référentiel de zones et du bipage : un gisement jamais bipé, voire
+  // inconnu des fiches de zone, reste sélectionnable pour y intégrer une
+  // proforma.
+  const [emplacement, setEmplacement] = useState("");
   const [zoneKey, setZoneKey] = useState("");
   const [mode, setMode] = useState("inventaire");
   const [showProformas, setShowProformas] = useState(false);
@@ -89,9 +97,78 @@ const ImportComptageZone = ({
   const [importExcel, { isLoading: importingExcel }] =
     useImportExcelBipageMutation();
 
+  // Emplacements proposés : MAGASIN et DOCK toujours, S3/S4/S5 avec leur NOM
+  // d'entrepôt (fiche société), plus tout autre type présent dans les zones.
+  const emplacements = useMemo(() => {
+    const nomsSpeciaux = Object.fromEntries(
+      emplacementsSpeciaux.map((e) => [e.key, e.nom]),
+    );
+    const base = [
+      { key: "MAGASIN", nom: "MAGASIN" },
+      { key: "DOCK", nom: "DOCK" },
+      ...["S3", "S4", "S5"].map((k) => ({ key: k, nom: nomsSpeciaux[k] || k })),
+    ];
+    const connus = new Set(base.map((e) => e.key));
+    for (const z of zones) {
+      const t = String(z.type || "").trim();
+      if (t && !connus.has(t.toUpperCase())) {
+        connus.add(t.toUpperCase());
+        base.push({ key: t, nom: t });
+      }
+    }
+    return base;
+  }, [zones, emplacementsSpeciaux]);
+
+  const nomEmplacement = (key) =>
+    emplacements.find((e) => e.key === key)?.nom || key;
+
+  // Gisements de l'emplacement choisi, lus dans la fiche article, fusionnés
+  // avec les zones du référentiel de la session (qui apportent leur libellé).
+  const { data: gisementsData, isFetching: gisementsLoading } =
+    useGetGisementsEmplacementQuery(
+      { entrepriseId, emplacement },
+      { skip: !entrepriseId || !emplacement || !ouvert },
+    );
+  const zonesEmplacement = useMemo(() => {
+    if (!emplacement) return [];
+    const parCode = new Map();
+    for (const g of gisementsData?.gisements || []) {
+      parCode.set(g.code.toUpperCase(), {
+        code: g.code,
+        type: emplacement,
+        libelle: "",
+        nbArticles: g.nbArticles,
+      });
+    }
+    for (const z of zones) {
+      if (String(z.type || "").toUpperCase() !== emplacement.toUpperCase())
+        continue;
+      const cle = String(z.code || "").toUpperCase();
+      const cur = parCode.get(cle);
+      if (cur) cur.libelle = z.libelle || cur.libelle;
+      else parCode.set(cle, { code: z.code, type: emplacement, libelle: z.libelle || "" });
+    }
+    const liste = [...parCode.values()].sort((a, b) =>
+      a.code.localeCompare(b.code, "fr", { numeric: true }),
+    );
+    // Entrepôts S3/S4/S5 : toujours une entrée « tout l'entrepôt » en tête —
+    // ils s'inventorient souvent EN BLOC par proforma, avec ou sans gisement
+    // dans la fiche article (S4 peut n'en avoir aucun).
+    if (/^S[3-5]$/i.test(emplacement)) {
+      const nom = nomEmplacement(emplacement);
+      liste.unshift({
+        code: nom,
+        type: emplacement,
+        libelle: "tout l'entrepôt",
+      });
+    }
+    return liste;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emplacement, gisementsData, zones, emplacements]);
+
   const zoneChoisie = useMemo(
-    () => zones.find((z) => cleZone(z) === zoneKey) || null,
-    [zones, zoneKey],
+    () => zonesEmplacement.find((z) => cleZone(z) === zoneKey) || null,
+    [zonesEmplacement, zoneKey],
   );
 
   const deduction = mode === "deduction";
@@ -139,17 +216,46 @@ const ImportComptageZone = ({
           </p>
 
           <div className="icz-row">
+            <label className="icz-field">
+              <span>Emplacement</span>
+              <select
+                className="icz-select"
+                value={emplacement}
+                onChange={(e) => {
+                  setEmplacement(e.target.value);
+                  setZoneKey("");
+                }}
+              >
+                <option value="">— Choisir —</option>
+                {emplacements.map((e) => (
+                  <option key={e.key} value={e.key}>
+                    {e.nom === e.key ? e.key : `${e.nom} (${e.key})`}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <label className="icz-field icz-grow">
-              <span>Zone</span>
+              <span>Zone / gisement (fiche article)</span>
               <select
                 className="icz-select"
                 value={zoneKey}
                 onChange={(e) => setZoneKey(e.target.value)}
+                disabled={!emplacement || gisementsLoading}
               >
-                <option value="">— Choisir une zone —</option>
-                {zones.map((z) => (
+                <option value="">
+                  {!emplacement
+                    ? "— Choisir d'abord un emplacement —"
+                    : gisementsLoading
+                      ? "Recherche des gisements…"
+                      : zonesEmplacement.length
+                        ? "— Choisir un gisement —"
+                        : "Aucun gisement dans la fiche article"}
+                </option>
+                {zonesEmplacement.map((z) => (
                   <option key={cleZone(z)} value={cleZone(z)}>
                     {libelleZone(z)}
+                    {z.nbArticles ? ` · ${z.nbArticles} art.` : ""}
                   </option>
                 ))}
               </select>
