@@ -11,6 +11,7 @@ import {
   recommencerZone,
   setStockFige,
   genererDatIntegration,
+  getEmplacementsSpeciaux,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,
@@ -60,6 +61,10 @@ router.post("/:entrepriseId/stock-fige", protect, canWriteImport, checkEntrepris
 
 // Fichiers .dat d'intégration Stock XL (un par dépôt S1..S5, ZIP téléchargé).
 router.get("/:entrepriseId/integration-dat", protect, canReadImport, checkEntrepriseAccess, genererDatIntegration);
+
+// Emplacements spéciaux S3/S4/S5 (inventoriés par import de proformas) :
+// proposés seulement s'ils existent dans la fiche article.
+router.get("/:entrepriseId/emplacements-speciaux", protect, canReadImport, checkEntrepriseAccess, getEmplacementsSpeciaux);
 
 // ─── Import depuis les proformas de l'ERP ─────────────────────────────────
 router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAccess, listProformasBipage);

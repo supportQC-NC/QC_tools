@@ -90,6 +90,13 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // Emplacements spéciaux S3/S4/S5 (inventoriés par import de proformas),
+    // proposés seulement s'ils existent dans la fiche article de la société.
+    getEmplacementsSpeciaux: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/emplacements-speciaux`,
+      keepUnusedDataFor: 300,
+    }),
+
     // ─── Import depuis les proformas de l'ERP ──────────────────────────────
     getProformasBipage: builder.query({
       query: ({ entrepriseId, dateDebut, dateFin, clients }) => {
@@ -161,6 +168,7 @@ export const {
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
+  useGetEmplacementsSpeciauxQuery,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,
   useImportProformasBipageMutation,

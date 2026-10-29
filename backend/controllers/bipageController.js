@@ -316,18 +316,22 @@ const setStockFige = asyncHandler(async (req, res) => {
   await InventaireStockSnapshot.deleteMany({ session: session._id });
 
   let nbArticles = 0;
+  let nbCatalogue = 0;
   if (actif) {
     await articleCacheService.preload(entreprise).catch(() => {});
     const acache = await articleCacheService.getArticles(entreprise);
 
     // Photo compacte : seulement les stocks ≠ 0 (négatifs compris — un stock
     // négatif est un écart réel à montrer). NART en MAJUSCULES, la clé de
-    // recherche des écarts.
+    // recherche des écarts. Les articles à stock 0 sont couverts PAR
+    // CONVENTION (absent de la photo = 0) : on compte quand même le catalogue
+    // entier pour l'afficher à l'écran (périmètre réellement couvert).
     const narts = [];
     const stocks = [];
     for (const rec of acache.records) {
       const nart = String(rec.NART || "").trim().toUpperCase();
       if (!nart) continue;
+      nbCatalogue += 1;
       const stock = articleCacheService.calculateStockTotal(rec);
       if (!stock) continue;
       narts.push(nart);
@@ -353,6 +357,7 @@ const setStockFige = asyncHandler(async (req, res) => {
     at: actif ? new Date() : null,
     par: actif ? req.user._id : null,
     nbArticles,
+    nbCatalogue,
   };
   await session.save();
 
@@ -385,6 +390,54 @@ const setStockFige = asyncHandler(async (req, res) => {
  */
 const DEPOTS_STOCK = ["S1", "S2", "S3", "S4", "S5"];
 
+/**
+ * @desc    EMPLACEMENTS SPÉCIAUX S3/S4/S5 d'une société : au-delà de
+ *          MAGASIN (S1) et DOCK (S2), certains dépôts sont inventoriés via
+ *          des proformas. On ne les propose à l'import QUE s'ils existent
+ *          dans la fiche article : du stock Sx quelque part, ou un gisement
+ *          GISMx réellement renseigné (les « ÄÄÄÄÄÄ » de remplissage DOS ne
+ *          comptent pas). Leur NOM vient de la fiche société (onglet
+ *          Entrepôts, `mappingEntrepots`).
+ * @route   GET /api/bipages/:entrepriseId/emplacements-speciaux
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const getEmplacementsSpeciaux = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(entreprise);
+
+  // Une « vraie » valeur de gisement contient au moins un caractère
+  // alphanumérique ASCII (écarte les remplissages DOS type « ÄÄÄÄÄÄ »).
+  const gisementReel = (v) => /[A-Za-z0-9]/.test(String(v || ""));
+
+  const compte = {
+    S3: { stock: 0, gism: 0 },
+    S4: { stock: 0, gism: 0 },
+    S5: { stock: 0, gism: 0 },
+  };
+  for (const rec of acache.records) {
+    for (const d of ["S3", "S4", "S5"]) {
+      if (Number(rec[d]) !== 0 && Number.isFinite(Number(rec[d]))) {
+        compte[d].stock += 1;
+      }
+      if (gisementReel(rec[`GISM${d[1]}`])) compte[d].gism += 1;
+    }
+  }
+
+  const noms = entreprise.mappingEntrepots || {};
+  const emplacements = ["S3", "S4", "S5"]
+    .filter((d) => compte[d].stock > 0 || compte[d].gism > 0)
+    .map((d) => ({
+      key: d,
+      nom: String(noms[d] || d).trim() || d,
+      articlesEnStock: compte[d].stock,
+      articlesAvecGisement: compte[d].gism,
+    }));
+
+  res.json({ emplacements });
+});
+
 const genererDatIntegration = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const session = await InventaireZoneSession.findOne({
@@ -411,6 +464,9 @@ const genererDatIntegration = asyncHandler(async (req, res) => {
     if (mapping.has(t)) return mapping.get(t);
     if (t === "MAGASIN") return "S1";
     if (t === "DOCK") return "S2";
+    // Emplacements spéciaux (zones importées par proforma sur S3/S4/S5) :
+    // chacun part dans SON dépôt — un fichier .dat par emplacement.
+    if (DEPOTS_STOCK.includes(t)) return t;
     return "S1";
   };
 
@@ -1506,6 +1562,7 @@ export {
   recommencerZone,
   setStockFige,
   genererDatIntegration,
+  getEmplacementsSpeciaux,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,

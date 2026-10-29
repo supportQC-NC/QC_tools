@@ -157,6 +157,14 @@ export const resoudreZoneImport = async (entrepriseId, zoneCode, emplacement) =>
 
   const candidates = await Zone.find(requete);
   if (candidates.length === 0) {
+    // EMPLACEMENT SPÉCIAL S3/S4/S5 (29/10/2026) : ces dépôts sont inventoriés
+    // par import de proformas SANS zone physique dans le référentiel — on
+    // accepte une zone VIRTUELLE (code = nom choisi à l'écran, type = Sx).
+    // Les lignes bipées porteront ce couple ; l'intégration Stock XL route
+    // le type Sx vers son dépôt.
+    if (/^S[3-5]$/i.test(empl)) {
+      return { code, type: empl.toUpperCase(), libelle: "", virtuelle: true };
+    }
     throw new Error(
       `Zone ${code}${empl ? ` (${empl})` : ""} inconnue pour cette société.`,
     );

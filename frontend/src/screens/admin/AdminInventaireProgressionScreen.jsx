@@ -24,6 +24,7 @@ import {
   useDeleteZoneSessionMutation,
   useGetAgentsPossiblesQuery,
 } from "../../slices/inventaireZoneApiSlice";
+import { useGetEmplacementsSpeciauxQuery } from "../../slices/bipageApiSlice";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
@@ -179,6 +180,25 @@ const AdminInventaireProgressionScreen = () => {
   const progress = activeData?.progress || null;
 
   const zones = useMemo(() => session?.zones || [], [session]);
+
+  // Emplacements spéciaux S3/S4/S5 (inventoriés par import de proformas) :
+  // proposés dans le choix de zone de l'import, en plus des zones de la
+  // session, quand ils existent dans la fiche article de la société. Le code
+  // de la pseudo-zone = le NOM de l'entrepôt (fiche société, onglet
+  // Entrepôts), son emplacement = S3/S4/S5 — l'intégration Stock XL route
+  // ensuite chaque emplacement vers son dépôt.
+  const { data: emplacementsSpeciaux } = useGetEmplacementsSpeciauxQuery(
+    selectedEntreprise,
+    { skip: !selectedEntreprise },
+  );
+  const zonesAvecEmplacements = useMemo(() => {
+    const speciaux = (emplacementsSpeciaux?.emplacements || []).map((e) => ({
+      code: e.nom,
+      type: e.key,
+      libelle: `Entrepôt ${e.key} — import proforma`,
+    }));
+    return [...zones, ...speciaux];
+  }, [zones, emplacementsSpeciaux]);
 
   // Emplacements réellement présents dans l'inventaire (jamais une liste en
   // dur : chaque société a les siens). Les zones sans emplacement sont
@@ -649,7 +669,7 @@ const AdminInventaireProgressionScreen = () => {
               papillonnage et bipage quand la zone n'avait jamais été comptée. */}
           <ImportComptageZone
             entrepriseId={selectedEntreprise}
-            zones={zones}
+            zones={zonesAvecEmplacements}
             filtreProformas={session?.filtreProformas}
             onMessage={(message, tone) =>
               setBipFeedback({ tone: tone === "error" ? "error" : "success", message })

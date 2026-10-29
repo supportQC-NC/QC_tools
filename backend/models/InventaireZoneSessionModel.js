@@ -76,7 +76,10 @@ const sessionSchema = new mongoose.Schema(
       actif: { type: Boolean, default: false },
       at: { type: Date, default: null },
       par: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      // nbArticles = articles à stock ≠ 0 photographiés ; nbCatalogue = taille
+      // totale du catalogue au gel (les absents de la photo valent stock 0).
       nbArticles: { type: Number, default: 0 },
+      nbCatalogue: { type: Number, default: 0 },
     },
     statut: {
       type: String,

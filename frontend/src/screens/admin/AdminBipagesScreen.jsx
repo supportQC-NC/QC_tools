@@ -152,12 +152,15 @@ const AdminBipagesScreen = () => {
   // ── Intégration Stock XL : dépôt cible (S1..S5) par emplacement. ──
   const DEPOTS = ["S1", "S2", "S3", "S4", "S5"];
   const [mapDepots, setMapDepots] = useState({});
-  // Défauts métier : le rayon MAGASIN vit en S1, la réserve DOCK en S2.
-  const depotPour = (t) =>
-    mapDepots[t] ||
-    (String(t).toUpperCase() === "DOCK"
-      ? "S2"
-      : "S1");
+  // Défauts métier : MAGASIN → S1, DOCK → S2, et un emplacement spécial
+  // S3/S4/S5 (zones importées par proforma) part dans SON dépôt.
+  const depotPour = (t) => {
+    if (mapDepots[t]) return mapDepots[t];
+    const up = String(t).toUpperCase();
+    if (up === "DOCK") return "S2";
+    if (DEPOTS.includes(up)) return up;
+    return "S1";
+  };
   const genererIntegration = () => {
     const typesList = data?.types || [];
     const mapping = typesList
@@ -611,14 +614,19 @@ const AdminBipagesScreen = () => {
                     : "Figer le stock"}
               </button>
               {stockFige?.actif && (
-                <span className="ecarts-fige-info">
-                  Stock figé le{" "}
+                <span
+                  className="ecarts-fige-info"
+                  title="Tout le catalogue est couvert par la photo : les articles sans stock au moment du gel y valent 0."
+                >
+                  Photo du{" "}
                   {new Date(stockFige.at).toLocaleString("fr-FR", {
                     dateStyle: "short",
                     timeStyle: "short",
-                  })}{" "}
-                  ({new Intl.NumberFormat("fr-FR").format(stockFige.nbArticles)}{" "}
-                  articles)
+                  })}
+                  {" — "}
+                  {stockFige.nbCatalogue
+                    ? `${new Intl.NumberFormat("fr-FR").format(stockFige.nbCatalogue)} articles couverts, dont ${new Intl.NumberFormat("fr-FR").format(stockFige.nbArticles)} en stock`
+                    : `${new Intl.NumberFormat("fr-FR").format(stockFige.nbArticles)} articles en stock photographiés`}
                 </span>
               )}
             </div>
