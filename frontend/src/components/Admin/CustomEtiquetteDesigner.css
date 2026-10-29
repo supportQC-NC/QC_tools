@@ -173,7 +173,8 @@
 }
 
 .ced-el--logo,
-.ced-el--barcode {
+.ced-el--barcode,
+.ced-el--photo {
   display: flex;
   align-items: center;
   justify-content: center;

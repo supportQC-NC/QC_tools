@@ -120,9 +120,12 @@ const drawCode39 = (doc, text, x, y, w, h) => {
 };
 
 // ---- Photo article (réplique de la résolution photoController) --------------
+// Exportée : le générateur d'étiquettes custom (etiquetteService) place la
+// photo d'article avec la MÊME résolution (PNG/JPEG seulement — les seuls
+// formats que pdfkit sait embarquer, webp/gif/bmp écartés d'office).
 const PHOTOS_DOSSIER_PAR_TRIGRAMME = { QC: "photos", LD: "photo_LD" };
 const EXTS = ["jpg", "jpeg", "png"];
-const trouverPhoto = (entreprise, nart) => {
+export const trouverPhoto = (entreprise, nart) => {
   try {
     const trig = String(entreprise?.trigramme || "").toUpperCase();
     let base = null;

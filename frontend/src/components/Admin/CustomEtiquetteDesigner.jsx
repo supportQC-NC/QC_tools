@@ -296,6 +296,9 @@ const CustomEtiquetteDesigner = ({
     }
   };
   const addBarcode = () => add({ kind: "barcode", w: 120, h: 50 });
+  // Photo de l'article (fichier <NART>.jpg/png du dossier photos de la société) :
+  // remplie par article à la génération, ratio préservé, vide si pas de photo.
+  const addPhoto = () => add({ kind: "photo", w: 100, h: 100 });
 
   const updateSel = (patch) =>
     setElements((prev) => prev.map((e) => (e.id === selectedId ? { ...e, ...patch } : e)));
@@ -314,7 +317,8 @@ const CustomEtiquetteDesigner = ({
       el.kind === "rect" ||
       el.kind === "logo" ||
       el.kind === "barcode" ||
-      el.kind === "image"
+      el.kind === "image" ||
+      el.kind === "photo"
     )
       return { w: el.w || 0, h: el.h || 0 };
     // text / field : mesuré dans le DOM
@@ -408,6 +412,9 @@ const CustomEtiquetteDesigner = ({
     } else if (el.kind === "barcode") {
       extra = { width: el.w * scale, height: el.h * scale };
       inner = <span className="ced-ph">▮▯▮▯ code-barres</span>;
+    } else if (el.kind === "photo") {
+      extra = { width: el.w * scale, height: el.h * scale };
+      inner = <span className="ced-ph">📷 PHOTO ARTICLE</span>;
     }
     return (
       <div
@@ -500,6 +507,11 @@ const CustomEtiquetteDesigner = ({
         {dataMode && (
           <button type="button" onClick={addBarcode}><HiQrcode /> Code-barres</button>
         )}
+        {dataMode && (
+          <button type="button" onClick={addPhoto} title="Photo de l'article (dossier photos de la société), remplie par article">
+            <HiPhotograph /> Photo article
+          </button>
+        )}
       </div>
 
       {imgMsg && <div className="ced-msg">{imgMsg}</div>}
@@ -534,6 +546,7 @@ const CustomEtiquetteDesigner = ({
                   {selected.kind === "logo" && "Logo"}
                   {selected.kind === "image" && "Image"}
                   {selected.kind === "barcode" && "Code-barres"}
+                  {selected.kind === "photo" && "Photo article"}
                 </span>
                 <button type="button" className="ced-del" onClick={removeSel}><HiTrash /></button>
               </div>
@@ -695,9 +708,17 @@ const CustomEtiquetteDesigner = ({
                 </>
               )}
 
+              {selected.kind === "photo" && (
+                <span className="ced-phint">
+                  Remplie par article à la génération (fichier photo du NART,
+                  dossier photos de la société). Proportions préservées dans le
+                  cadre ; article sans photo = zone vide.
+                </span>
+              )}
               {(selected.kind === "logo" ||
                 selected.kind === "barcode" ||
-                selected.kind === "image") && (
+                selected.kind === "image" ||
+                selected.kind === "photo") && (
                 <div className="ced-prow">
                   <div className="ced-field">
                     <label>Largeur (px)</label>

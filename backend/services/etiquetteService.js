@@ -11,6 +11,7 @@
 // haut, drawString = ligne de base) au-dessus de pdfkit (origine haut-gauche).
 
 import fs from "fs";
+import { trouverPhoto } from "./ficheArticleService.js";
 
 const CM = 28.346456692913385; // 1 cm en points PDF
 const ASCENT = 0.718; // ascender Helvetica (718/1000)
@@ -1170,6 +1171,21 @@ const drawCustomLabel = (rl, layout, cellX, cellBottomY, wpt, hpt, ctx = {}) => 
           /* format non embarquable : élément ignoré */
         }
       }
+    } else if (kind === "photo") {
+      // PHOTO DE L'ARTICLE : fichier <NART>.jpg/png du dossier photos de la
+      // société (résolution partagée avec la fiche article). Ratio préservé
+      // (drawImage = fit centré) ; article sans photo → zone laissée vide.
+      const buf = ctx.photoBuf ? ctx.photoBuf(record) : null;
+      if (buf) {
+        const wPt = (Number(el.w) || 0) * PX;
+        const hPt = (Number(el.h) || 0) * PX;
+        const yBottom = cellBottomY + hpt - eyPt - hPt;
+        try {
+          rl.drawImage(buf, cellX + exPt, yBottom, wPt, hPt);
+        } catch {
+          /* fichier illisible / format non embarquable : élément ignoré */
+        }
+      }
     } else if (kind === "barcode") {
       // `el.field` (facultatif) : colonne importée / champ article source du code ;
       // sinon on retombe sur le GENCOD de l'article.
@@ -1214,6 +1230,26 @@ export const genererEtiquettesCustomPDF = async ({
     : Math.max(1, Math.min(5000, Math.floor(Number(copies) || 1)));
   const logoBuf = resolveLogoBuffer(entreprise);
 
+  // Photos d'articles : résolues par NART (dossier photos de la société) et
+  // mises en cache par génération — un même article peut sortir en plusieurs
+  // exemplaires, et la lecture disque/Rcommun ne doit se payer qu'une fois.
+  const photosParNart = new Map();
+  const photoBuf = (record) => {
+    const nart = String(record?.NART || "").trim();
+    if (!nart) return null;
+    if (!photosParNart.has(nart)) {
+      let buf = null;
+      try {
+        const chemin = trouverPhoto(entreprise, nart);
+        if (chemin) buf = fs.readFileSync(chemin);
+      } catch {
+        buf = null;
+      }
+      photosParNart.set(nart, buf);
+    }
+    return photosParNart.get(nart);
+  };
+
   const PDFDocument = (await import("pdfkit")).default;
   const doc = new PDFDocument({ size: "A4", layout: "portrait", margin: 0 });
   const stream = fs.createWriteStream(outPath);
@@ -1242,7 +1278,11 @@ export const genererEtiquettesCustomPDF = async ({
     const cellTopFromTop = startTop + row * (hpt + gap);
     const cellBottomY = H - cellTopFromTop - hpt;
     const record = hasArticles ? articles[i] : null;
-    drawCustomLabel(rl, layout, cellLeft, cellBottomY, wpt, hpt, { record, logoBuf });
+    drawCustomLabel(rl, layout, cellLeft, cellBottomY, wpt, hpt, {
+      record,
+      logoBuf,
+      photoBuf,
+    });
   }
   rl.save();
 
