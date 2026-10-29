@@ -897,6 +897,16 @@ reste traité par l'agent local, mais plus aucun écran ne le pose.
   `/api/demande-bipage/mobile/*`, `/api/reception-suivi/mobile/*`,
   `/api/inventaires-collecte`, `/api/bipage-collecte`, `/api/collecteurs`,
   `/api/app-release` (`GET /current` est **public** : page d'installation).
+- **Inventaire HORS LIGNE** (29/10/2026) : l'agent télécharge EN LIGNE une
+  image de la base articles (`GET /api/inventaires-collecte/catalogue-offline/
+  :entrepriseId`, texte `NART|GENCOD|GENDOUBL|DESIGN`, ~6 Mo chez QC →
+  SQLite local `offlineInventaire.js`), bipe ses zones sans réseau (écran
+  `InventaireOfflineScreen`, résolution locale zéros de tête tolérés), les
+  dépose SUR LE COLLECTEUR, puis les renvoie à la reconnexion
+  (`POST /api/inventaires-collecte/depot-horsligne`, **idempotent par
+  `offlineId`**) — même chaîne que le dépôt en ligne (cœur partagé
+  `effectuerDepot` : .dat partage + miroir FTP + phase bipage). Après l'envoi
+  complet, l'app PROPOSE d'effacer l'image locale (jamais d'office).
 - **L'app de scan réception est un client RN sur un autre backend** ; le Mongo est
   un Atlas cloud partagé. Le vérifier avant de conclure qu'un correctif ne marche
   pas.

@@ -1578,11 +1578,41 @@ const exportCollecte = asyncHandler(async (req, res) => {
     throw new Error("La zone est vide");
   }
 
+  const resultat = await effectuerDepot(collecte, collecte.entreprise, res, {
+    observation: req.body?.observation,
+    redepot,
+  });
+
+  res.json({
+    message: redepot
+      ? "Zone déjà déposée — fichier réécrit"
+      : "Zone déposée avec succès",
+    collecte: collecteResume(collecte),
+    fichier: resultat,
+  });
+});
+
+/**
+ * CŒUR DU DÉPÔT d'une collecte — partagé par le dépôt EN LIGNE
+ * (`exportCollecte`) et le dépôt HORS LIGNE (`depotHorsLigne`) : écrit le
+ * .DAT sur le partage, pousse le miroir FTP (sans attendre), passe la
+ * collecte en « exporte » et coche la phase bipage de la zone sur la session.
+ * `entreprise` = doc (ou sous-doc peuplé) portant trigramme +
+ * cheminExportInventaire. Lève avec `res.status(400)` posé en cas d'échec
+ * d'écriture (même contrat qu'avant l'extraction).
+ * @returns le bloc `fichier` de la réponse (nom, chemin, dossier, mode…).
+ */
+const effectuerDepot = async (
+  collecte,
+  entreprise,
+  res,
+  { observation, redepot = false } = {},
+) => {
   const contenu = genererContenuFichier(collecte.lignes);
 
   // Dossier de dépôt (en prod : montage ; en dev : session active sinon repli)
   const { dossier: dossierBase, mode, session } = await resoudreDossierDepot(
-    collecte.entreprise,
+    entreprise,
   );
 
   // Dépôt À LA RACINE du dossier de l'inventaire : c'est là que l'équipe ouvre
@@ -1623,7 +1653,7 @@ const exportCollecte = asyncHandler(async (req, res) => {
   // réussi). Le service logge lui-même les échecs et ne rejette jamais.
   if (session && (session.dossierSlug || session.nom)) {
     void deposerFichierInventaireFtp(
-      collecte.entreprise.trigramme,
+      entreprise.trigramme,
       session.dossierSlug || session.nom,
       emplacementDir(collecte.zoneType),
       `stock.dat ${String(collecte.zoneCode || "").trim().replace(/[\\/:*?"<>|]/g, "_")}`,
@@ -1641,8 +1671,8 @@ const exportCollecte = asyncHandler(async (req, res) => {
   if (!redepot || !collecte.exportedAt) collecte.exportedAt = new Date();
   // Observation facultative saisie par l'agent dans la modale de dépôt du
   // collecteur ; elle remonte telle quelle dans l'écran « Suivi bipage ».
-  if (req.body && req.body.observation !== undefined) {
-    collecte.observationAgent = String(req.body.observation || "").trim();
+  if (observation !== undefined) {
+    collecte.observationAgent = String(observation || "").trim();
   }
   if (session) {
     collecte.session = session._id;
@@ -1676,20 +1706,165 @@ const exportCollecte = asyncHandler(async (req, res) => {
     }
   }
 
+  return {
+    nom: nomFichier,
+    chemin: cheminFichier,
+    dossier,
+    mode, // "session" (impression auto) ou "annee" (repli)
+    sessionNom: session ? session.nom : "",
+    lignes: collecte.lignes.length,
+    totalQuantite: collecte.totalQuantite,
+  };
+};
+
+// ===========================================
+// MODE HORS LIGNE (collecteur sans réseau)
+// ===========================================
+
+/**
+ * @desc    CATALOGUE ARTICLES COMPACT pour le mode hors ligne du collecteur :
+ *          une ligne texte par article `NART|GENCOD|GENDOUBL|DESIGN`, importée
+ *          dans la base SQLite locale de l'app (l'image de la base articles
+ *          que l'agent télécharge AVANT de passer hors ligne). ~90 000 lignes
+ *          chez QC ≈ 5 Mo — lu depuis le cache articles, jamais du DBF direct.
+ * @route   GET /api/inventaires-collecte/catalogue-offline/:entrepriseId
+ * @access  Private (collecteur, protect seul comme le reste du routeur mobile)
+ */
+const getCatalogueOffline = asyncHandler(async (req, res) => {
+  const entreprise = await Entreprise.findById(req.params.entrepriseId);
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(entreprise);
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  const morceaux = [];
+  for (const rec of acache.records) {
+    const nart = String(rec.NART || "").trim();
+    if (!nart) continue;
+    // Le « | » est le séparateur : il n'apparaît pas dans ces champs DBF,
+    // mais on nettoie par sécurité (une désignation corrompue ne doit pas
+    // décaler les colonnes de toute la base locale).
+    const champ = (v) => String(v || "").trim().replace(/\|/g, "/");
+    morceaux.push(
+      `${champ(nart)}|${champ(rec.GENCOD)}|${champ(rec.GENDOUBL)}|${champ(rec.DESIGN)}`,
+    );
+  }
+  res.send(morceaux.join("\n"));
+});
+
+/**
+ * @desc    DÉPÔT HORS LIGNE : une zone bipée sans réseau, enregistrée sur le
+ *          collecteur puis renvoyée ici à la reconnexion. Crée la collecte
+ *          (déjà terminée) et effectue le MÊME dépôt que le flux en ligne
+ *          (.DAT partage + miroir FTP + phase bipage cochée). Idempotent par
+ *          `offlineId` (généré par l'app) : un retry réseau du même fichier
+ *          ne crée pas de doublon.
+ * @route   POST /api/inventaires-collecte/depot-horsligne
+ * @body    { entrepriseId, offlineId, zoneCode, zoneType?, observation?,
+ *            lignes: [{ nart, gencod, designation, quantite, isUnknown,
+ *            isRenvoi, scannedAt? }], termineAt? }
+ * @access  Private (collecteur)
+ */
+const depotHorsLigne = asyncHandler(async (req, res) => {
+  const {
+    entrepriseId,
+    offlineId,
+    zoneCode,
+    zoneType = "",
+    observation,
+    lignes,
+  } = req.body || {};
+
+  const entreprise = await Entreprise.findById(entrepriseId).select(
+    "nomDossierDBF trigramme nomComplet cheminExportInventaire",
+  );
+  if (!entreprise) {
+    res.status(404);
+    throw new Error("Entreprise non trouvée");
+  }
+  const code = String(zoneCode || "").trim();
+  if (!code) {
+    res.status(400);
+    throw new Error("Code de zone requis");
+  }
+  if (!Array.isArray(lignes) || lignes.length === 0) {
+    res.status(400);
+    throw new Error("La zone est vide");
+  }
+
+  // Déjà reçu (retry réseau) : on répond succès sans recréer quoi que ce soit.
+  const idOffline = String(offlineId || "").trim();
+  if (idOffline) {
+    const existante = await InventaireCollecte.findOne({
+      entreprise: entreprise._id,
+      offlineId: idOffline,
+    });
+    if (existante) {
+      return res.json({
+        message: "Zone déjà reçue",
+        dejaRecue: true,
+        collecte: collecteResume(existante),
+      });
+    }
+  }
+
+  // Zone du référentiel (libellé + type exact) — recherche tolérante à la
+  // casse, comme le watcher. Une zone inconnue n'est PAS bloquante : le .DAT
+  // partira quand même, le watcher la classera en zone_non_trouvee.
+  const rxCode = new RegExp(`^${escapeRegex(code)}$`, "i");
+  const type = String(zoneType || "").trim();
+  const zone =
+    (type &&
+      (await Zone.findOne({
+        entreprise: entreprise._id,
+        code: rxCode,
+        type: new RegExp(`^${escapeRegex(type)}$`, "i"),
+      }))) ||
+    (await Zone.findOne({ entreprise: entreprise._id, code: rxCode }));
+
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
+  const collecte = new InventaireCollecte({
+    entreprise: entreprise._id,
+    nomDossierDBF: entreprise.nomDossierDBF,
+    user: req.user._id,
+    session: session ? session._id : null,
+    sessionNom: session ? session.nom : "",
+    zoneCode: zone ? zone.code : code,
+    zoneType: zone ? zone.type || "" : type,
+    zoneLibelle: zone ? zone.libelle || "" : "",
+    offlineId: idOffline,
+    lignes: lignes.map((l) => ({
+      // Le schéma exige un nart : pour un article inconnu du catalogue local,
+      // on retombe sur le code scanné (même convention que le flux en ligne).
+      nart: String(l.nart || l.gencod || "").trim(),
+      gencod: String(l.gencod || "").trim(),
+      designation: String(l.designation || "").trim(),
+      quantite: Math.max(0, round3(l.quantite)),
+      isUnknown: !!l.isUnknown,
+      isRenvoi: !!l.isRenvoi,
+      scannedAt: l.scannedAt ? new Date(l.scannedAt) : new Date(),
+    })),
+  });
+  collecte.calculerTotaux();
+  await collecte.save();
+
+  const fichier = await effectuerDepot(collecte, entreprise, res, {
+    observation,
+  });
+
   res.json({
-    message: redepot
-      ? "Zone déjà déposée — fichier réécrit"
-      : "Zone déposée avec succès",
+    message: "Zone hors ligne déposée avec succès",
+    zoneConnue: !!zone,
     collecte: collecteResume(collecte),
-    fichier: {
-      nom: nomFichier,
-      chemin: cheminFichier,
-      dossier,
-      mode, // "session" (impression auto) ou "annee" (repli)
-      sessionNom: session ? session.nom : "",
-      lignes: collecte.lignes.length,
-      totalQuantite: collecte.totalQuantite,
-    },
+    fichier,
   });
 });
 
@@ -2570,4 +2745,6 @@ export {
   getRecapZones,
   getRecapZonePdf,
   deleteCollecte,
+  getCatalogueOffline,
+  depotHorsLigne,
 };

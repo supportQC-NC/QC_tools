@@ -104,6 +104,14 @@ const inventaireCollecteSchema = new mongoose.Schema(
       default: "en_cours",
     },
 
+    // Identifiant CLIENT d'un dépôt HORS LIGNE (généré par le collecteur) :
+    // un même fichier local renvoyé deux fois (retry réseau) ne crée pas de
+    // seconde collecte. Vide pour les collectes en ligne classiques.
+    offlineId: {
+      type: String,
+      default: "",
+    },
+
     lignes: [ligneCollecteSchema],
 
     totalArticles: {
@@ -176,6 +184,11 @@ inventaireCollecteSchema.index({
   status: 1,
 });
 inventaireCollecteSchema.index({ nomDossierDBF: 1 });
+// Dédoublonnage des dépôts hors ligne (retry réseau du même fichier local).
+inventaireCollecteSchema.index(
+  { entreprise: 1, offlineId: 1 },
+  { partialFilterExpression: { offlineId: { $gt: "" } } },
+);
 
 // Recalcul des totaux (nb d'articles distincts + nb d'unités)
 inventaireCollecteSchema.methods.calculerTotaux = function () {

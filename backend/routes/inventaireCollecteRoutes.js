@@ -17,6 +17,8 @@ import {
   getSuiviBipage,
   getAgentsInventaire,
   updateObservationCollecte,
+  getCatalogueOffline,
+  depotHorsLigne,
 } from "../controllers/inventaireCollecteController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -66,6 +68,14 @@ router
     checkModuleAccess("inventaire", "write"),
     updateObservationCollecte,
   );
+// ─── Mode HORS LIGNE du collecteur ─────────────────────────────────────────
+// Catalogue articles compact (image de la base, téléchargée avant de passer
+// hors ligne) + dépôt différé des zones bipées sans réseau.
+router
+  .route("/catalogue-offline/:entrepriseId")
+  .get(protect, getCatalogueOffline);
+router.route("/depot-horsligne").post(protect, depotHorsLigne);
+
 router.route("/").post(protect, createCollecte);
 
 router.route("/:id").get(protect, getCollecteById).delete(protect, deleteCollecte);
