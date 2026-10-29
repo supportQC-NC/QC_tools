@@ -13,7 +13,11 @@ import {
   config,
   getInventaireDirs,
   emplacementDir,
+  sanitizeName,
 } from "../services/ficheControleService.js";
+import { fmtQteDat } from "../utils/qteDat.js";
+import { ZipArchive } from "archiver";
+import { deposerFichierInventaireFtp } from "../services/inventaireFtpService.js";
 import os from "os";
 import fournissCacheService from "../services/fournissCacheService.js";
 import { envoyerClasseur } from "../utils/envoyerClasseur.js";
@@ -197,10 +201,49 @@ const getBipages = asyncHandler(async (req, res) => {
   await backfillZoneType(session);
 
   const filter = buildFilter(session, req.query);
-  const lignes = await LigneBipage.find(filter)
+  let lignes = await LigneBipage.find(filter)
     .sort({ zoneType: 1, zoneCode: 1, datFileName: 1, ordre: 1 })
     .limit(5000)
     .lean();
+
+  // Filtre SUR-COMPTAGE (?surstock=1) : ne garder que les lignes des articles
+  // dont la somme bipée sur TOUTE la session (toutes zones confondues — un
+  // article compté dans 3 rayons se cumule) dépasse le stock théorique.
+  // Stock théorique = la photo du stock figé quand elle existe, sinon le
+  // stock réel du cache — même référence que la feuille d'écarts.
+  if (req.query.surstock === "1" && lignes.length) {
+    const toutes = await LigneBipage.find({ session: session._id })
+      .select("nart eanArticle qteScan")
+      .lean();
+    const sommes = new Map();
+    for (const l of toutes) {
+      const cle = String(l.nart || l.eanArticle || "").trim().toUpperCase();
+      if (!cle) continue;
+      sommes.set(cle, (sommes.get(cle) || 0) + (Number(l.qteScan) || 0));
+    }
+
+    const fige = await chargerStockFige(session);
+    let acache = null;
+    if (!fige) {
+      await articleCacheService.preload(entreprise).catch(() => {});
+      acache = await articleCacheService.getArticles(entreprise);
+    }
+    const stockDe = (cle) => {
+      if (fige) return fige.get(cle) ?? 0;
+      const idx = articleCacheService.lookupNart(acache, cle);
+      return idx !== undefined
+        ? articleCacheService.calculateStockTotal(acache.records[idx])
+        : 0; // article inconnu : tout comptage est un sur-comptage
+    };
+
+    const enSurstock = new Set();
+    for (const [cle, somme] of sommes) {
+      if (somme > stockDe(cle)) enSurstock.add(cle);
+    }
+    lignes = lignes.filter((l) =>
+      enSurstock.has(String(l.nart || l.eanArticle || "").trim().toUpperCase()),
+    );
+  }
 
   // Rattrapage des lignes bipées AVANT l'ajout du champ `gencod` : on le
   // résout depuis le cache articles pour l'affichage, sans réécrire en base
@@ -319,6 +362,129 @@ const setStockFige = asyncHandler(async (req, res) => {
       : "Stock défigé : les écarts repartent du stock réel.",
     stockFige: session.stockFige,
   });
+});
+
+/**
+ * @desc    FICHIERS .DAT D'INTÉGRATION Stock XL de l'inventaire : UN fichier
+ *          par DÉPÔT (S1..S5), construit depuis TOUS les bipages de la session
+ *          active. Un article compté dans plusieurs rayons d'un même
+ *          emplacement est SOMMÉ : une seule ligne par article et par dépôt.
+ *
+ *          `mapping` associe chaque emplacement (zoneType : MAGASIN, DOCK…) au
+ *          dépôt Stock XL où intégrer son comptage — "MAGASIN:S1,DOCK:S2"
+ *          (défauts : MAGASIN→S1, DOCK→S2, autres→S1). Deux emplacements
+ *          mappés sur le même dépôt sont fusionnés dans le même fichier.
+ *
+ *          Nom des fichiers : `stock.dat <DÉPÔT>_inventaire_<AAAA-MM-JJ>`.
+ *          Réponse : un ZIP téléchargé par le navigateur (les fichiers ne sont
+ *          PAS posés dans le dossier d'inventaire du partage, que le watcher
+ *          prendrait pour des dépôts de zone) + copie miroir best-effort sur
+ *          le FTP (inventaire/<TRIG>/<slug>/integration/).
+ * @route   GET /api/bipages/:entrepriseId/integration-dat?mapping=MAGASIN:S1,DOCK:S2
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const DEPOTS_STOCK = ["S1", "S2", "S3", "S4", "S5"];
+
+const genererDatIntegration = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  // Mapping emplacement -> dépôt, saisi à l'écran (défauts métier : le rayon
+  // MAGASIN vit en S1, la réserve DOCK en S2 — GISM1/GISM2).
+  const mapping = new Map();
+  for (const part of String(req.query.mapping || "").split(",")) {
+    const [empl, depot] = part.split(":").map((s) => String(s || "").trim());
+    if (empl && DEPOTS_STOCK.includes(depot)) {
+      mapping.set(empl.toUpperCase(), depot);
+    }
+  }
+  const depotDe = (zoneType) => {
+    // Type vide = « sans emplacement » : même clé que l'écran.
+    const t = String(zoneType || "").trim().toUpperCase() || "SANS_EMPLACEMENT";
+    if (mapping.has(t)) return mapping.get(t);
+    if (t === "MAGASIN") return "S1";
+    if (t === "DOCK") return "S2";
+    return "S1";
+  };
+
+  const toutes = await LigneBipage.find({ session: session._id })
+    .select("nart eanArticle qteScan zoneType")
+    .lean();
+  if (!toutes.length) {
+    res.status(400);
+    throw new Error("Aucun bipage dans l'inventaire actif.");
+  }
+
+  // Cumul par dépôt puis par article (clé NART résolu, repli code scanné —
+  // même convention que la feuille d'écarts).
+  const parDepot = new Map();
+  for (const l of toutes) {
+    const code = String(l.nart || l.eanArticle || "").trim();
+    if (!code) continue;
+    const depot = depotDe(l.zoneType);
+    let articles = parDepot.get(depot);
+    if (!articles) {
+      articles = new Map();
+      parDepot.set(depot, articles);
+    }
+    const cle = code.toUpperCase();
+    const cur = articles.get(cle) || { code, qte: 0 };
+    cur.qte = Math.round((cur.qte + (Number(l.qteScan) || 0)) * 1000) / 1000;
+    articles.set(cle, cur);
+  }
+
+  const dateJour = new Date().toISOString().slice(0, 10); // AAAA-MM-JJ
+  const fichiers = [...parDepot.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([depot, articles]) => {
+      let contenu = "";
+      for (const { code, qte } of [...articles.values()].sort((a, b) =>
+        a.code.localeCompare(b.code),
+      )) {
+        contenu += `${code.padEnd(13, " ")}|${fmtQteDat(qte)}|000\r\n`;
+      }
+      return {
+        nom: `stock.dat ${depot}_inventaire_${dateJour}`,
+        contenu: Buffer.from(contenu, "utf8"),
+        lignes: articles.size,
+      };
+    });
+
+  // Copie miroir FTP (référence), SANS attendre — jamais bloquant.
+  const slugFtp = session.dossierSlug || session.nom;
+  if (slugFtp) {
+    for (const f of fichiers) {
+      void deposerFichierInventaireFtp(
+        entreprise.trigramme,
+        slugFtp,
+        "integration",
+        f.nom,
+        f.contenu,
+      );
+    }
+  }
+
+  const nomZip = `${sanitizeName(`integration_inventaire_${entreprise.trigramme || ""}_${dateJour}`)}.zip`;
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${encodeURIComponent(nomZip)}"`,
+  );
+  const archive = new ZipArchive({ zlib: { level: 6 } });
+  archive.on("error", (err) => {
+    console.error(`[Bipage] ZIP intégration : ${err.message}`);
+    res.destroy(err);
+  });
+  archive.pipe(res);
+  for (const f of fichiers) archive.append(f.contenu, { name: f.nom });
+  await archive.finalize();
 });
 
 /**
@@ -1339,6 +1505,7 @@ export {
   exportCsv,
   recommencerZone,
   setStockFige,
+  genererDatIntegration,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,

@@ -22,12 +22,14 @@ export const getBipagesCsvUrl = (
 export const bipageApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getBipages: builder.query({
-      query: ({ entrepriseId, zone, type, search, marque }) => {
+      query: ({ entrepriseId, zone, type, search, marque, surstock }) => {
         const params = new URLSearchParams();
         if (zone) params.set("zone", zone);
         if (type) params.set("type", type);
         if (search) params.set("search", search);
         if (marque) params.set("marque", marque);
+        // Sur-comptage : somme bipée par article > stock théorique.
+        if (surstock) params.set("surstock", "1");
         const qs = params.toString();
         return `${BASE}/${entrepriseId}${qs ? `?${qs}` : ""}`;
       },

@@ -69,6 +69,8 @@ const AdminBipagesScreen = () => {
   // Répond à la question de fin d'inventaire : « qu'est-ce qui n'est pas brut
   // de collecteur ? » — c'est ce qu'un contrôleur veut relire en priorité.
   const [marque, setMarque] = useState("");
+  // Sur-comptage : somme bipée par article (toutes zones) > stock théorique.
+  const [surstock, setSurstock] = useState(false);
   const [search, setSearch] = useState("");
   const [msg, setMsg] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -129,7 +131,14 @@ const AdminBipagesScreen = () => {
 
   const { data, isLoading, isFetching, error: queryError, refetch } =
     useGetBipagesQuery(
-      { entrepriseId: selectedEntreprise, zone, type, search, marque },
+      {
+        entrepriseId: selectedEntreprise,
+        zone,
+        type,
+        search,
+        marque,
+        surstock: surstock ? "1" : "",
+      },
       { skip: !selectedEntreprise },
     );
 
@@ -139,6 +148,26 @@ const AdminBipagesScreen = () => {
   const [recommencerZone, { isLoading: recommencing }] =
     useRecommencerZoneMutation();
   const [setStockFige, { isLoading: figeEnCours }] = useSetStockFigeMutation();
+
+  // ── Intégration Stock XL : dépôt cible (S1..S5) par emplacement. ──
+  const DEPOTS = ["S1", "S2", "S3", "S4", "S5"];
+  const [mapDepots, setMapDepots] = useState({});
+  // Défauts métier : le rayon MAGASIN vit en S1, la réserve DOCK en S2.
+  const depotPour = (t) =>
+    mapDepots[t] ||
+    (String(t).toUpperCase() === "DOCK"
+      ? "S2"
+      : "S1");
+  const genererIntegration = () => {
+    const typesList = data?.types || [];
+    const mapping = typesList
+      .map((t) => `${(t || "SANS_EMPLACEMENT").toUpperCase()}:${depotPour(t)}`)
+      .join(",");
+    window.open(
+      `/api/bipages/${selectedEntreprise}/integration-dat?mapping=${encodeURIComponent(mapping)}`,
+      "_blank",
+    );
+  };
 
   // Figer / défiger le stock (photo de la base article pour les écarts).
   const stockFige = data?.session?.stockFige;
@@ -600,6 +629,49 @@ const AdminBipagesScreen = () => {
             </span>
           </div>
 
+          {/* ── Fichiers .dat d'intégration Stock XL ──
+              Un fichier par DÉPÔT (S1..S5) : tous les bipages de la session,
+              sommés par article (une ligne par article et par dépôt). Chaque
+              emplacement est associé au dépôt où intégrer son comptage. */}
+          <div className="ecarts-bar integration-bar">
+            <span className="ecarts-titre">
+              <HiDownload /> Intégration Stock XL
+            </span>
+            {types.map((t) => (
+              <label key={t || "(sans)"}>
+                {t || "Sans emplacement"} →
+                <select
+                  className="filter-select"
+                  value={depotPour(t)}
+                  onChange={(e) =>
+                    setMapDepots((prev) => ({ ...prev, [t]: e.target.value }))
+                  }
+                  title={`Dépôt Stock XL où intégrer le comptage de l'emplacement ${t || "sans emplacement"}`}
+                >
+                  {DEPOTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            <button
+              className="btn-primary"
+              onClick={genererIntegration}
+              disabled={!types.length}
+              title="Télécharge un ZIP : un fichier stock.dat <dépôt>_inventaire_<date> par dépôt, une ligne par article (quantités sommées sur toutes les zones)"
+            >
+              <HiDownload /> Générer les .dat (ZIP)
+            </button>
+            <span className="ecarts-hint">
+              Un fichier par dépôt, nommé «&nbsp;stock.dat
+              S1_inventaire_&lt;date&gt;&nbsp;» ; un article compté dans
+              plusieurs rayons est sommé (une seule ligne). Copie aussi déposée
+              sur le FTP (dossier integration de l'inventaire).
+            </span>
+          </div>
+
           <div className="bipages-toolbar">
             <select
               className="filter-select"
@@ -640,6 +712,21 @@ const AdminBipagesScreen = () => {
               <option value="modifiees">Modifiées</option>
               <option value="touchees">Ajoutées + modifiées</option>
             </select>
+
+            {/* Sur-comptage : articles dont la SOMME bipée (toutes zones de la
+                session confondues) dépasse le stock théorique — figé si la
+                photo est active, réel sinon. */}
+            <label
+              className="surstock-filtre"
+              title="N'afficher que les articles dont le total bipé (toutes zones confondues) dépasse le stock théorique (photo figée si active)"
+            >
+              <input
+                type="checkbox"
+                checked={surstock}
+                onChange={(e) => setSurstock(e.target.checked)}
+              />
+              Qté bipée &gt; stock
+            </label>
 
             <div className="search-box">
               <HiSearch />

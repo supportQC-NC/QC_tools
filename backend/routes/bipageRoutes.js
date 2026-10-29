@@ -10,6 +10,7 @@ import {
   exportCsv,
   recommencerZone,
   setStockFige,
+  genererDatIntegration,
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,
@@ -56,6 +57,9 @@ router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAcce
 // Figer / défiger le stock (photo de la base article pour la feuille d'écarts).
 // Même double-droit que la feuille d'écarts (l'action vit à côté d'elle).
 router.post("/:entrepriseId/stock-fige", protect, canWriteImport, checkEntrepriseAccess, setStockFige);
+
+// Fichiers .dat d'intégration Stock XL (un par dépôt S1..S5, ZIP téléchargé).
+router.get("/:entrepriseId/integration-dat", protect, canReadImport, checkEntrepriseAccess, genererDatIntegration);
 
 // ─── Import depuis les proformas de l'ERP ─────────────────────────────────
 router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAccess, listProformasBipage);
