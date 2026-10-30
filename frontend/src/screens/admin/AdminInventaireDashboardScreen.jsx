@@ -52,7 +52,10 @@ import {
   useGetSuiviBipageQuery,
   useGetRecapZonesResumeQuery,
 } from "../../slices/inventaireCollecteApiSlice";
-import { useGetStatsZonesRetoucheesQuery } from "../../slices/bipageApiSlice";
+import {
+  useGetStatsZonesRetoucheesQuery,
+  useGetStatsProformasZonesQuery,
+} from "../../slices/bipageApiSlice";
 import "./AdminInventaireDashboardScreen.css";
 
 const PHASES = [
@@ -202,6 +205,8 @@ const AdminInventaireDashboardScreen = () => {
   // Agrégat à part : c'est un $group Mongo sur les lignes bipées, pas un
   // recoupement des autres réponses.
   const retouches = useGetStatsZonesRetoucheesQuery({ entrepriseId }, skip);
+  // Proformas intégrées par zone (comptages sans collecteur).
+  const proformas = useGetStatsProformasZonesQuery({ entrepriseId }, skip);
   // La plus lourde des requêtes : chaque ligne bipée est comparée au stock du
   // DBF. Elle a son propre état de chargement, le reste de la page n'attend pas.
   const ecarts = useGetRecapZonesResumeQuery(entrepriseId, skip);
@@ -211,6 +216,7 @@ const AdminInventaireDashboardScreen = () => {
     agents.refetch();
     bipage.refetch();
     retouches.refetch();
+    proformas.refetch();
     ecarts.refetch();
   };
 
@@ -402,11 +408,15 @@ const AdminInventaireDashboardScreen = () => {
   const zonesEcart = ecarts.data?.zones || [];
   const tEcarts = ecarts.data?.totaux;
 
+  const tProformas = proformas.data?.totaux;
+  const zonesProformas = proformas.data?.zones || [];
+
   const enCours =
     session.isFetching ||
     agents.isFetching ||
     bipage.isFetching ||
     retouches.isFetching ||
+    proformas.isFetching ||
     ecarts.isFetching;
 
   return (
@@ -473,6 +483,12 @@ const AdminInventaireDashboardScreen = () => {
           ton={tRetouches?.touchees ? "warn" : ""}
           icone={<HiPencilAlt />}
           aide="Lignes ajoutées ou corrigées à la main depuis l'écran des bipages."
+        />
+        <Kpi
+          label="Proformas intégrées"
+          valeur={fmtInt(tProformas?.nbProformas)}
+          icone={<HiClipboardList />}
+          aide="Documents de l'ERP intégrés comme comptage (zones comptées sans collecteur)."
         />
         <Kpi
           label="Temps effectif"
@@ -682,6 +698,98 @@ const AdminInventaireDashboardScreen = () => {
             Voir le suivi du bipage <HiArrowRight />
           </Link>
         </section>
+        {/* ── Proformas intégrées par zone ──────────────────────────────────
+            Les zones comptées SANS collecteur (papier → proforma ERP → import).
+            Une zone qui n'apparaît qu'ici n'a jamais vu de douchette : bon à
+            savoir au moment de juger ses écarts. */}
+        <section className="invd-carte">
+          <h2>Proformas intégrées par zone</h2>
+          <p className="invd-carte-aide">
+            Comptages importés depuis une proforma de l'ERP (zones comptées sans
+            collecteur). Les déductions comptent en négatif dans les unités.
+          </p>
+          {proformas.isLoading ? (
+            <p className="invd-attente">Chargement…</p>
+          ) : !zonesProformas.length ? (
+            <p className="invd-attente">
+              Aucune proforma intégrée sur cet inventaire pour l'instant.
+            </p>
+          ) : (
+            <>
+              <div className="invd-repartition">
+                <div className="invd-rep">
+                  <span className="invd-rep-val">
+                    {fmtInt(tProformas?.nbProformas)}
+                  </span>
+                  <span className="invd-rep-lbl">Proformas</span>
+                </div>
+                <div className="invd-rep">
+                  <span className="invd-rep-val">
+                    {fmtInt(tProformas?.nbZones)}
+                  </span>
+                  <span className="invd-rep-lbl">Zones servies</span>
+                </div>
+                <div className="invd-rep">
+                  <span className="invd-rep-val">
+                    {fmtInt(tProformas?.unites)}
+                  </span>
+                  <span className="invd-rep-lbl">Unités (net)</span>
+                </div>
+              </div>
+              <table className="invd-table">
+                <thead>
+                  <tr>
+                    <th>Zone</th>
+                    <th className="invd-num">Proformas</th>
+                    <th className="invd-num">Lignes</th>
+                    <th className="invd-num">Unités</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zonesProformas.slice(0, 8).map((z) => (
+                    <tr key={`${z.zoneCode}-${z.zoneType}`}>
+                      <td>
+                        <span className="invd-zone-code">{z.zoneCode}</span>
+                        {z.zoneType && (
+                          <span className="invd-zone-lib">{z.zoneType}</span>
+                        )}
+                      </td>
+                      <td
+                        className="invd-num"
+                        title={
+                          z.numfacts?.length
+                            ? `N° : ${z.numfacts.join(", ")}`
+                            : undefined
+                        }
+                      >
+                        {fmtInt(z.nbProformas)}
+                      </td>
+                      <td className="invd-num">{fmtInt(z.lignes)}</td>
+                      <td
+                        className={`invd-num${z.unites < 0 ? " invd-ec-moins" : ""}`}
+                      >
+                        {Number(z.unites).toLocaleString("fr-FR", {
+                          maximumFractionDigits: 3,
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {zonesProformas.length > 8 && (
+                <p className="invd-empl-reste">
+                  + {fmtInt(zonesProformas.length - 8)} autre
+                  {zonesProformas.length - 8 > 1 ? "s" : ""} zone
+                  {zonesProformas.length - 8 > 1 ? "s" : ""}
+                </p>
+              )}
+            </>
+          )}
+          <Link className="invd-lien" to="/admin/inventaire-progression">
+            Importer une proforma (Progression) <HiArrowRight />
+          </Link>
+        </section>
+
         {/* ── Zones les plus retouchées ─────────────────────────────────────
             Ce que l'écran cherche : où le comptage a demandé le plus de
             reprises à la main. Beaucoup d'ajouts ou de corrections sur une

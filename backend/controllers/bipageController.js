@@ -1663,9 +1663,72 @@ const getStatsZonesRetouchees = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Proformas intégrées PAR ZONE sur l'inventaire actif : combien de
+ *          documents, de lignes et d'unités chaque zone a reçus par import de
+ *          proforma. Alimente la carte dédiée du tableau de bord inventaire.
+ *          Dérivé des LigneBipage (source="proforma"), rien de stocké en plus —
+ *          mêmes conséquences qu'ailleurs : « recommencer » une zone ou
+ *          réinitialiser l'inventaire vide ce classement.
+ * @route   GET /api/bipages/:entrepriseId/stats-proformas-zones
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const getStatsProformasZones = asyncHandler(async (req, res) => {
+  const session = await InventaireZoneSession.findOne({
+    entreprise: req.entreprise._id,
+    statut: "actif",
+  }).select("_id");
+  if (!session) {
+    return res.json({ active: false, zones: [], totaux: null });
+  }
+
+  const aggs = await LigneBipage.aggregate([
+    { $match: { session: session._id, source: "proforma" } },
+    {
+      $group: {
+        _id: { code: "$zoneCode", type: "$zoneType" },
+        proformas: { $addToSet: "$sourceRef" },
+        lignes: { $sum: 1 },
+        unites: { $sum: "$qteScan" },
+        dernierAt: { $max: "$createdAt" },
+      },
+    },
+  ]);
+
+  const zones = aggs
+    .map((a) => ({
+      zoneCode: a._id.code || "",
+      zoneType: a._id.type || "",
+      nbProformas: a.proformas.length,
+      numfacts: [...a.proformas].sort(),
+      lignes: a.lignes,
+      // Les déductions sont en négatif : la somme est le NET intégré.
+      unites: Math.round((a.unites || 0) * 1000) / 1000,
+      dernierAt: a.dernierAt || null,
+    }))
+    .sort((x, y) => y.nbProformas - x.nbProformas || y.lignes - x.lignes);
+
+  // Total de DOCUMENTS distincts : une proforma répartie sur deux zones ne
+  // compte qu'une fois ici (elle compte dans chacune des deux zones).
+  const documents = new Set();
+  for (const a of aggs) for (const n of a.proformas) documents.add(n);
+
+  res.json({
+    active: true,
+    totaux: {
+      nbProformas: documents.size,
+      nbZones: zones.length,
+      lignes: zones.reduce((s, z) => s + z.lignes, 0),
+      unites: zones.reduce((s, z) => s + z.unites, 0),
+    },
+    zones,
+  });
+});
+
 export {
   getBipages,
   getStatsZonesRetouchees,
+  getStatsProformasZones,
   exportEcartsBipage,
   updateBipage,
   ajouterLigneBipage,

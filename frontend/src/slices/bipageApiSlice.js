@@ -46,6 +46,12 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Bipage"],
     }),
 
+    // Proformas intégrées par zone sur l'inventaire actif (tableau de bord).
+    getStatsProformasZones: builder.query({
+      query: ({ entrepriseId }) => `${BASE}/${entrepriseId}/stats-proformas-zones`,
+      providesTags: ["Bipage"],
+    }),
+
     updateBipage: builder.mutation({
       query: ({ entrepriseId, id, body }) => ({
         url: `${BASE}/${entrepriseId}/${id}`,
@@ -172,6 +178,7 @@ export const getModeleExcelBipageUrl = (entrepriseId) =>
 export const {
   useGetBipagesQuery,
   useGetStatsZonesRetoucheesQuery,
+  useGetStatsProformasZonesQuery,
   useUpdateBipageMutation,
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,

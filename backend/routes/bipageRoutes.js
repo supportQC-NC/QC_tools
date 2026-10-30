@@ -4,6 +4,7 @@ import multer from "multer";
 import {
   getBipages,
   getStatsZonesRetouchees,
+  getStatsProformasZones,
   exportEcartsBipage,
   updateBipage,
   ajouterLigneBipage,
@@ -48,6 +49,10 @@ const uploadExcel = multer({
 // AVANT "/:entrepriseId" n'est pas necessaire (chemin plus long), mais on la
 // garde avec les autres routes nommees pour la lisibilite.
 router.get("/:entrepriseId/stats-zones", protect, canRead, checkEntrepriseAccess, getStatsZonesRetouchees);
+
+// Proformas intégrées par zone (tableau de bord inventaire) — même double
+// droit que les imports : l'écran relève du module `inventaire`.
+router.get("/:entrepriseId/stats-proformas-zones", protect, canReadImport, checkEntrepriseAccess, getStatsProformasZones);
 
 router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exportCsv);
 
