@@ -584,3 +584,37 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Onglets À imprimer / Imprimées ── */
+.fiches-onglets {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0.6rem;
+  flex-wrap: wrap;
+}
+
+.fiches-onglet {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--admin-radius) var(--admin-radius) 0 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.fiches-onglet.actif {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+  font-weight: 600;
+  border-bottom-color: #4da6ff;
+}
+
+.fiches-marquer {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}

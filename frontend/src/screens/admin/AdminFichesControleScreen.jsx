@@ -18,6 +18,7 @@ import {
   useGetFichesQuery,
   useScanFichesMutation,
   useDeleteFicheMutation,
+  useMarquerImprimeesMutation,
   useGetWatchStatusQuery,
   useStartWatchMutation,
   useStopWatchMutation,
@@ -92,6 +93,12 @@ const AdminFichesControleScreen = () => {
   // client du 30/10/2026. Filtrage local : la liste est déjà en mémoire.
   const [recherche, setRecherche] = useState("");
   const [filtreOrigine, setFiltreOrigine] = useState("");
+  // Onglets « À imprimer » / « Imprimées » : les fiches cochées puis marquées
+  // imprimées quittent la liste de travail sans disparaître (réimpression
+  // toujours possible depuis l'onglet Imprimées).
+  const [onglet, setOnglet] = useState("a_imprimer"); // a_imprimer | imprimees
+  const [selection, setSelection] = useState([]); // ids cochés (onglet courant)
+  const [marquer, { isLoading: marquage }] = useMarquerImprimeesMutation();
 
   const nbParOrigine = useMemo(() => {
     const n = { dat: 0, proforma: 0, excel: 0 };
@@ -115,6 +122,42 @@ const AdminFichesControleScreen = () => {
     }
     return liste;
   }, [fiches, filtreOrigine, recherche]);
+
+  const aImprimer = useMemo(
+    () => fichesVisibles.filter((f) => !f.printed),
+    [fichesVisibles],
+  );
+  const imprimees = useMemo(
+    () => fichesVisibles.filter((f) => f.printed),
+    [fichesVisibles],
+  );
+  const fichesOnglet = onglet === "imprimees" ? imprimees : aImprimer;
+
+  const toutCoche =
+    fichesOnglet.length > 0 &&
+    fichesOnglet.every((f) => selection.includes(f._id));
+
+  const basculerSelection = (id) =>
+    setSelection((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  const changerOnglet = (o) => {
+    setOnglet(o);
+    setSelection([]); // ne jamais agir sur des fiches devenues invisibles
+  };
+
+  const appliquerMarquage = async (printed) => {
+    if (!selection.length) return;
+    try {
+      await marquer({
+        entrepriseId: selectedEntreprise,
+        ids: selection,
+        printed,
+      }).unwrap();
+      setSelection([]);
+    } catch {
+      /* le poll rafraîchira l'état réel */
+    }
+  };
 
   const formatDate = (d) =>
     d
@@ -317,15 +360,60 @@ const AdminFichesControleScreen = () => {
               ))}
             </div>
             <span className="fiches-compteur">
-              {fichesVisibles.length} fiche{fichesVisibles.length > 1 ? "s" : ""}{" "}
-              affichée{fichesVisibles.length > 1 ? "s" : ""}
+              {fichesOnglet.length} fiche{fichesOnglet.length > 1 ? "s" : ""}{" "}
+              affichée{fichesOnglet.length > 1 ? "s" : ""}
             </span>
+          </div>
+
+          {/* ── Onglets À imprimer / Imprimées + action sur la sélection ── */}
+          <div className="fiches-onglets">
+            <button
+              type="button"
+              className={`fiches-onglet ${onglet === "a_imprimer" ? "actif" : ""}`}
+              onClick={() => changerOnglet("a_imprimer")}
+            >
+              À imprimer ({aImprimer.length})
+            </button>
+            <button
+              type="button"
+              className={`fiches-onglet ${onglet === "imprimees" ? "actif" : ""}`}
+              onClick={() => changerOnglet("imprimees")}
+            >
+              Imprimées ({imprimees.length})
+            </button>
+            {selection.length > 0 && (
+              <button
+                type="button"
+                className="btn-primary fiches-marquer"
+                disabled={marquage}
+                onClick={() => appliquerMarquage(onglet === "a_imprimer")}
+              >
+                <HiCheckCircle />{" "}
+                {marquage
+                  ? "…"
+                  : onglet === "a_imprimer"
+                    ? `Marquer imprimée${selection.length > 1 ? "s" : ""} (${selection.length})`
+                    : `Repasser à imprimer (${selection.length})`}
+              </button>
+            )}
           </div>
 
           <div className="admin-fiches-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      checked={toutCoche}
+                      title="Tout cocher"
+                      onChange={() =>
+                        setSelection(
+                          toutCoche ? [] : fichesOnglet.map((f) => f._id),
+                        )
+                      }
+                    />
+                  </th>
                   <th>Zone</th>
                   <th>Origine</th>
                   <th>Date</th>
@@ -336,17 +424,26 @@ const AdminFichesControleScreen = () => {
                 </tr>
               </thead>
               <tbody>
-                {fichesVisibles.length === 0 ? (
+                {fichesOnglet.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="no-data">
+                    <td colSpan={8} className="no-data">
                       {fiches.length === 0
                         ? "Aucune fiche pour l'instant. Les .DAT déposés dans le dossier de l'inventaire seront traités automatiquement."
-                        : "Aucune fiche ne correspond à la recherche ou au filtre."}
+                        : onglet === "imprimees"
+                          ? "Aucune fiche imprimée sur cette sélection."
+                          : "Aucune fiche à imprimer sur cette sélection."}
                     </td>
                   </tr>
                 ) : (
-                  fichesVisibles.map((f) => (
+                  fichesOnglet.map((f) => (
                     <tr key={f._id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selection.includes(f._id)}
+                          onChange={() => basculerSelection(f._id)}
+                        />
+                      </td>
                       <td>
                         <span className="zone-code">{f.zoneCode || "—"}</span>
                         {f.zoneLibelle && (

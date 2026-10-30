@@ -27,6 +27,7 @@ import {
   sanitizeName,
 } from "./ficheControleService.js";
 import { deposerFichierInventaireFtp } from "./inventaireFtpService.js";
+import { enteteFicheImport } from "./bipageImportService.js";
 
 let isRunning = false;
 let intervalHandle = null;
@@ -502,8 +503,14 @@ const traiterReimpressions = async (report) => {
       const entreprise = entreprises.get(cle);
       if (entreprise) {
         try {
+          // En-tête enrichi pour les imports de proforma (observation +
+          // client) — même rendu que l'aperçu web.
           // eslint-disable-next-line no-await-in-loop
-          const regen = await assurerPdfFiche(fiche, entreprise);
+          const surcharge = await enteteFicheImport(entreprise, fiche).catch(
+            () => null,
+          );
+          // eslint-disable-next-line no-await-in-loop
+          const regen = await assurerPdfFiche(fiche, entreprise, surcharge);
           pdfPath = regen.chemin;
           temporaire = regen.temporaire;
         } catch (err) {

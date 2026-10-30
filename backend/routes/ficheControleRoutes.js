@@ -9,6 +9,7 @@ import {
   reimprimer,
   telechargerPdf,
   supprimerFiche,
+  marquerImprimees,
 } from "../controllers/ficheControleController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -30,6 +31,9 @@ router.post("/watch/stop", protect, canWrite, arreterSurveillance);
 router.get("/:entrepriseId", protect, canRead, checkEntrepriseAccess, getFiches);
 
 router.post("/:entrepriseId/scan", protect, canWrite, checkEntrepriseAccess, scanMaintenant);
+
+// Marquer des fiches imprimées / à imprimer (rangement de l'écran).
+router.post("/:entrepriseId/marquer-imprimees", protect, canWrite, checkEntrepriseAccess, marquerImprimees);
 
 router.post("/:entrepriseId/:id/reprint", protect, canWrite, checkEntrepriseAccess, reimprimer);
 

@@ -64,6 +64,16 @@ export const ficheControleApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["FicheControle"],
     }),
 
+    // Marquer des fiches imprimées (ou l'inverse) — rangement des onglets.
+    marquerImprimees: builder.mutation({
+      query: ({ entrepriseId, ids, printed = true }) => ({
+        url: `${BASE}/${entrepriseId}/marquer-imprimees`,
+        method: "POST",
+        body: { ids, printed },
+      }),
+      invalidatesTags: ["FicheControle"],
+    }),
+
     deleteFiche: builder.mutation({
       query: ({ entrepriseId, id }) => ({
         url: `${BASE}/${entrepriseId}/${id}`,
@@ -94,6 +104,7 @@ export const {
   useGetFichesQuery,
   useScanFichesMutation,
   useReprintFicheMutation,
+  useMarquerImprimeesMutation,
   useDeleteFicheMutation,
   useGetWatchStatusQuery,
   useStartWatchMutation,

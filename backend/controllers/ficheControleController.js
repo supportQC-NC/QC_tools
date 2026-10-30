@@ -17,6 +17,7 @@ import {
 import {
   importsProformaParSession,
   detailsProformas,
+  enteteFicheImport,
 } from "../services/bipageImportService.js";
 
 /**
@@ -70,9 +71,9 @@ const getFiches = asyncHandler(async (req, res) => {
           datFileName: imp.reference,
           zoneCode: imp.zoneCode,
           zoneType: imp.zoneType,
-          zoneLibelle: `Proforma ${imp.numfact} (import${
-            imp.mode === "deduction" ? " déduction" : ""
-          })`,
+          zoneLibelle: `Proforma ${imp.numfact}${
+            imp.mode === "deduction" ? " (déduction)" : ""
+          }`,
           date: imp.at || new Date(),
           stats: { total: imp.lignes },
           printed: false,
@@ -224,7 +225,12 @@ const telechargerPdf = asyncHandler(async (req, res) => {
     throw new Error("Fiche non trouvée");
   }
 
-  const { chemin, temporaire } = await assurerPdfFiche(fiche, entreprise);
+  // Fiche d'IMPORT de proforma : en-tête enrichi (observation après la zone,
+  // client après le libellé). Best-effort — sans résolution on garde l'en-tête
+  // stocké.
+  const surcharge = await enteteFicheImport(entreprise, fiche).catch(() => null);
+
+  const { chemin, temporaire } = await assurerPdfFiche(fiche, entreprise, surcharge);
   if (!chemin) {
     res.status(404);
     throw new Error(
@@ -294,6 +300,46 @@ const supprimerFiche = asyncHandler(async (req, res) => {
   res.json({ message: "Fiche supprimée" });
 });
 
+/**
+ * @desc    Marquer des fiches « imprimées » (ou l'inverse) — rangement de
+ *          l'écran : les fiches cochées passent dans l'onglet « Imprimées »
+ *          (demande client du 30/10/2026). Marquer imprimée annule aussi une
+ *          demande d'impression en attente (l'agent n'a plus à la sortir).
+ * @route   POST /api/fiches-controle/:entrepriseId/marquer-imprimees
+ * @body    { ids: [..], printed?: true }
+ * @access  Private (fiches_controle_admin, write)
+ */
+const marquerImprimees = asyncHandler(async (req, res) => {
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter(Boolean);
+  if (!ids.length) {
+    res.status(400);
+    throw new Error("Aucune fiche sélectionnée.");
+  }
+  const printed = req.body?.printed !== false;
+
+  const maj = printed
+    ? {
+        printed: true,
+        printedAt: new Date(),
+        printError: "",
+        reprintRequested: false,
+        reprintRequestedAt: null,
+      }
+    : { printed: false, printedAt: null };
+
+  const r = await FicheControle.updateMany(
+    { _id: { $in: ids }, entreprise: req.entreprise._id },
+    { $set: maj },
+  );
+
+  res.json({
+    message: `${r.modifiedCount} fiche(s) ${
+      printed ? "marquée(s) imprimée(s)" : "repassée(s) à imprimer"
+    }.`,
+    modifiees: r.modifiedCount,
+  });
+});
+
 export {
   getFiches,
   scanMaintenant,
@@ -303,4 +349,5 @@ export {
   reimprimer,
   telechargerPdf,
   supprimerFiche,
+  marquerImprimees,
 };

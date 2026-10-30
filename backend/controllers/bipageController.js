@@ -1774,7 +1774,8 @@ const ficheProformaImportee = asyncHandler(async (req, res) => {
   }));
   const { rows } = await construireLignes(req.entreprise, lignesDat);
 
-  // En-tête : la ou les zones servies par cette proforma.
+  // En-tête : la ou les zones servies, puis l'OBSERVATION du document ; le
+  // CLIENT après le libellé (demande client du 30/10/2026).
   const zones = [
     ...new Set(
       lignes.map(
@@ -1782,14 +1783,17 @@ const ficheProformaImportee = asyncHandler(async (req, res) => {
       ),
     ),
   ];
+  const d = (await detailsProformas(req.entreprise, [numfact])).get(numfact);
+  const observation = d?.observation || "";
+  const client = `${d?.tiers ?? ""} ${d?.nomClient || ""}`.trim();
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fiche-proforma-"));
   const outPath = path.join(tmpDir, `fiche_proforma_${sanitizeName(numfact)}.pdf`);
   await ecrirePDF({
     header: {
-      zoneCode: zones.join(", "),
+      zoneCode: `${zones.join(", ")}${observation ? ` — ${observation}` : ""}`,
       zoneType: "",
-      zoneLibelle: `Proforma ${numfact} (import)`,
+      zoneLibelle: `Proforma ${numfact}${client ? ` — ${client}` : ""}`,
       date: new Date(),
     },
     rows,

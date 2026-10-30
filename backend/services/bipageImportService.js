@@ -400,6 +400,31 @@ export const importsProformaParSession = async (sessionId) => {
 };
 
 /**
+ * En-tête ENRICHI de la fiche de contrôle d'un import de proforma (demande
+ * client du 30/10/2026) : l'OBSERVATION du document après le nom de la zone,
+ * le CLIENT (n° + nom) après le libellé — et plus de « (import) », qui mangeait
+ * la place. Renvoie null si la fiche n'est pas un import de proforma ou si le
+ * document n'est plus résolvable (l'appelant garde alors l'en-tête stocké).
+ */
+export const enteteFicheImport = async (entreprise, fiche) => {
+  const m = /^(?:deduction )?proforma (\S+)/.exec(String(fiche?.datFileName || ""));
+  if (!m) return null;
+  const numfact = m[1];
+  const d = (await detailsProformas(entreprise, [numfact])).get(numfact);
+  if (!d || d.raison === "Proforma introuvable dans l'ERP") return null;
+  const deduction = /^deduction /.test(String(fiche.datFileName));
+  const client = `${d.tiers ?? ""} ${d.nomClient || ""}`.trim();
+  return {
+    zoneCode: `${trim(fiche.zoneCode)}${d.observation ? ` — ${d.observation}` : ""}`,
+    zoneType: trim(fiche.zoneType),
+    zoneLibelle: `Proforma ${numfact}${deduction ? " (déduction)" : ""}${
+      client ? ` — ${client}` : ""
+    }`,
+    date: fiche.date || fiche.createdAt || new Date(),
+  };
+};
+
+/**
  * Lignes de bipage d'UNE proforma importée sur la session (fiche de contrôle),
  * avec la même tolérance aux lignes historiques sans champ source.
  */
@@ -883,7 +908,7 @@ export const importerProformas = async (
       reference,
       zoneCode,
       zoneType: emplacement,
-      libelle: `Proforma ${numfact} (import${deduction ? " déduction" : ""})`,
+      libelle: `Proforma ${numfact}${deduction ? " (déduction)" : ""}`,
       stats,
     });
 
@@ -1099,7 +1124,7 @@ export const importerExcelBipage = async (
     reference,
     zoneCode,
     zoneType: emplacement,
-    libelle: `Excel ${trim(nomFichier)} (import${deduction ? " déduction" : ""})`,
+    libelle: `Excel ${trim(nomFichier)}${deduction ? " (déduction)" : ""}`,
     stats,
   });
 

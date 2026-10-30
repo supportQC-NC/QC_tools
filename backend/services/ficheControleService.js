@@ -546,9 +546,14 @@ const retrouverLignesDat = async (fiche) => {
  * L'appelant doit supprimer le fichier quand `temporaire` est vrai.
  * @returns {Promise<{chemin: string, temporaire: boolean, origine: string}>}
  */
-export const assurerPdfFiche = async (fiche, entreprise) => {
-  const existant = resoudreCheminPdf(fiche);
-  if (existant) return { chemin: existant, temporaire: false, origine: "disque" };
+export const assurerPdfFiche = async (fiche, entreprise, surchargeEntete = null) => {
+  // ⚠️ Avec une surcharge d'en-tête (fiches d'IMPORT : observation/client de
+  // la proforma), on régénère TOUJOURS — le PDF du disque, s'il existait,
+  // porterait l'ancien en-tête.
+  if (!surchargeEntete) {
+    const existant = resoudreCheminPdf(fiche);
+    if (existant) return { chemin: existant, temporaire: false, origine: "disque" };
+  }
 
   const { lignes, origine } = await retrouverLignesDat(fiche);
   if (!lignes.length) return { chemin: "", temporaire: false, origine: "" };
@@ -560,10 +565,11 @@ export const assurerPdfFiche = async (fiche, entreprise) => {
   );
   await ecrirePDF({
     header: {
-      zoneCode: fiche.zoneCode || "",
-      zoneLibelle: fiche.zoneLibelle || "",
-      zoneType: fiche.zoneType || "",
-      date: fiche.date || fiche.createdAt || new Date(),
+      zoneCode: surchargeEntete?.zoneCode ?? (fiche.zoneCode || ""),
+      zoneLibelle: surchargeEntete?.zoneLibelle ?? (fiche.zoneLibelle || ""),
+      zoneType: surchargeEntete?.zoneType ?? (fiche.zoneType || ""),
+      date:
+        surchargeEntete?.date ?? (fiche.date || fiche.createdAt || new Date()),
     },
     rows,
     outPath,
