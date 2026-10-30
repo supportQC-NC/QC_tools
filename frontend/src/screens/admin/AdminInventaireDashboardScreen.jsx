@@ -31,6 +31,19 @@ import {
   HiPencilAlt,
   HiScale,
 } from "react-icons/hi";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+} from "recharts";
 import { useSelector } from "react-redux";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
@@ -47,6 +60,73 @@ const PHASES = [
   { cle: "bipage", label: "Comptage", couleur: "#8b5cf6" },
   { cle: "controle", label: "Contrôle", couleur: "#22c55e" },
 ];
+
+// Couleurs des graphiques — validées contre le fond sombre (#12121a) avec le
+// validateur data-viz le 30/10/2026 :
+//  · le trio de phases ci-dessus passe la séparation daltonisme (ΔE 31,8) ;
+//  · états de zone : complète = BLEU, entamée = AMBRE (ΔE 29,9), pas
+//    commencée = GRIS neutre — l'ancien vert/orange/rouge confondait vert et
+//    orange en vision protan (ΔE 5,7), et une zone pas commencée n'est pas une
+//    erreur, elle n'a pas à crier en rouge ;
+//  · écarts : divergent manquant = ROUGE / excédent = BLEU (ΔE 19,2), jamais
+//    vert/rouge.
+const CH = {
+  grille: "#2a2a3a",
+  axe: "#a7a7b8",
+  bleu: "#3987e5",
+  complete: "#3987e5",
+  entamee: "#f59e0b",
+  vierge: "#55556b",
+  manquant: "#e66767",
+  excedent: "#3987e5",
+};
+
+const ETATS_ZONE = [
+  { cle: "completes", label: "Complètes", couleur: CH.complete },
+  { cle: "entamees", label: "Entamées", couleur: CH.entamee },
+  { cle: "vierges", label: "Pas commencées", couleur: CH.vierge },
+];
+
+// Axe : milliers compactés pour rester lisible (12 400 → « 12,4 k »).
+const fmtCompact = (n) => {
+  if (typeof n !== "number") return "";
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return `${(n / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
+  if (abs >= 1e3) return `${(n / 1e3).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} k`;
+  return String(n);
+};
+
+const fmtJourCourt = (iso) => {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+// Tooltip commun : fond carte sombre, une ligne par série, valeurs formatées
+// selon l'unité portée par la série (`xpf`, `nb` par défaut).
+const InvdTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="invd-tooltip">
+      {label != null && <div className="invd-tooltip-label">{label}</div>}
+      {payload
+        .filter((p) => p.value !== null && p.value !== undefined)
+        .map((p) => (
+          <div key={p.dataKey || p.name} className="invd-tooltip-row">
+            <span
+              className="invd-tooltip-dot"
+              style={{ background: p.color || p.stroke || p.payload?.fill }}
+            />
+            {p.name} :{" "}
+            <strong>
+              {p.unit === "xpf"
+                ? `${Math.round(p.value).toLocaleString("fr-FR")} F`
+                : fmtInt(p.value)}
+            </strong>
+          </div>
+        ))}
+    </div>
+  );
+};
 
 const fmtInt = (v) =>
   Number.isFinite(Number(v)) ? Math.round(Number(v)).toLocaleString("fr-FR") : "—";
@@ -180,6 +260,99 @@ const AdminInventaireDashboardScreen = () => {
   // Top 5 : le serveur trie déjà par production décroissante.
   const topAgents = (agents.data?.agents || []).slice(0, 5);
 
+  // ── Progression CUMULÉE dans le temps ──
+  // Chaque phase faite porte son horodatage (`zone.<phase>.at`) : on en tire,
+  // jour par jour depuis le début de l'inventaire, le nombre cumulé de zones
+  // ayant franchi chaque phase. C'est la courbe « avance-t-on assez vite ? ».
+  const serieCumulative = useMemo(() => {
+    if (!zones.length) return [];
+    const jour = (d) => new Date(d).toISOString().slice(0, 10);
+    const evenements = { papillonnage: new Map(), bipage: new Map(), controle: new Map() };
+    let premier = doc?.createdAt ? jour(doc.createdAt) : null;
+    for (const z of zones) {
+      for (const p of PHASES) {
+        const at = z[p.cle]?.fait && z[p.cle]?.at;
+        if (!at) continue;
+        const j = jour(at);
+        evenements[p.cle].set(j, (evenements[p.cle].get(j) || 0) + 1);
+        if (!premier || j < premier) premier = j;
+      }
+    }
+    if (!premier) return [];
+    const points = [];
+    const cumuls = { papillonnage: 0, bipage: 0, controle: 0 };
+    const fin = jour(new Date());
+    // Un point par jour calendaire, du début à aujourd'hui (90 j de garde-fou).
+    for (
+      let d = new Date(`${premier}T00:00:00`), n = 0;
+      jour(d) <= fin && n < 90;
+      d.setDate(d.getDate() + 1), n++
+    ) {
+      const j = jour(d);
+      const point = { jour: fmtJourCourt(j) };
+      for (const p of PHASES) {
+        cumuls[p.cle] += evenements[p.cle].get(j) || 0;
+        point[p.label] = cumuls[p.cle];
+      }
+      points.push(point);
+    }
+    return points;
+  }, [zones, doc]);
+
+  // ── Activité de comptage par jour ──
+  // Unités comptées par jour de dépôt (ou d'ouverture si pas encore déposé) :
+  // le rythme réel du terrain, pas seulement le total.
+  const activiteParJour = useMemo(() => {
+    const parJour = new Map();
+    for (const b of bipage.data?.bipages || []) {
+      const at = b.finAt || b.debutAt;
+      if (!at) continue;
+      const j = new Date(at).toISOString().slice(0, 10);
+      const cur = parJour.get(j) || { jour: j, unites: 0, articles: 0, zones: 0 };
+      cur.unites += b.totalQuantite || 0;
+      cur.articles += b.totalArticles || 0;
+      cur.zones += 1;
+      parJour.set(j, cur);
+    }
+    return [...parJour.values()]
+      .sort((a, b) => a.jour.localeCompare(b.jour))
+      .map((x) => ({ ...x, label: fmtJourCourt(x.jour) }));
+  }, [bipage.data]);
+
+  // ── Avancement par emplacement (MAGASIN / DOCK / entrepôts) ──
+  const parEmplacement = useMemo(() => {
+    const groupes = new Map();
+    for (const z of zones) {
+      const t = String(z.type || "").trim().toUpperCase() || "—";
+      const g = groupes.get(t) || { emplacement: t, completes: 0, entamees: 0, vierges: 0, total: 0 };
+      let n = 0;
+      for (const p of PHASES) if (z[p.cle]?.fait) n += 1;
+      if (n === PHASES.length) g.completes += 1;
+      else if (n > 0) g.entamees += 1;
+      else g.vierges += 1;
+      g.total += 1;
+      groupes.set(t, g);
+    }
+    return [...groupes.values()].sort((a, b) => b.total - a.total);
+  }, [zones]);
+
+  // ── Écarts : top des zones par montant d'écart (valeur absolue) ──
+  // Divergent : la barre part de zéro, manquant à gauche, excédent à droite —
+  // deux séries empilées sur la même bande (l'une des deux est toujours nulle),
+  // pour garder le coin arrondi côté donnée et carré côté axe.
+  const ecartsChart = useMemo(() => {
+    const zonesEc = ecarts.data?.zones || [];
+    return [...zonesEc]
+      .filter((z) => Number(z.totalEcartXpf) !== 0)
+      .sort((a, b) => Math.abs(b.totalEcartXpf) - Math.abs(a.totalEcartXpf))
+      .slice(0, 12)
+      .map((z) => ({
+        label: `${z.zoneCode}${z.zoneType ? ` · ${z.zoneType}` : ""}`,
+        excedent: z.totalEcartXpf > 0 ? z.totalEcartXpf : null,
+        manquant: z.totalEcartXpf < 0 ? z.totalEcartXpf : null,
+      }));
+  }, [ecarts.data]);
+
   if (!entrepriseId) {
     return (
       <div className="invd-screen">
@@ -310,6 +483,49 @@ const AdminInventaireDashboardScreen = () => {
       </div>
 
       <div className="invd-grille">
+        {/* ── Progression dans le temps ─────────────────────────────────────
+            La question du pilotage : avance-t-on, et à quel rythme ? Trois
+            courbes cumulées (une par phase), un point par jour. Un plateau se
+            voit immédiatement ; l'écart entre les courbes dit quelle phase
+            prend du retard sur les autres. */}
+        {serieCumulative.length > 1 && (
+          <section className="invd-carte invd-carte-large">
+            <h2>Progression dans le temps</h2>
+            <p className="invd-carte-aide">
+              Nombre cumulé de zones ayant franchi chaque phase, jour par jour
+              (sur {fmtInt(stats.total)} zones).
+            </p>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={serieCumulative} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={CH.grille} vertical={false} />
+                <XAxis dataKey="jour" fontSize={11} stroke={CH.axe} tickLine={false} />
+                <YAxis
+                  fontSize={11}
+                  stroke={CH.axe}
+                  tickFormatter={fmtCompact}
+                  width={44}
+                  tickLine={false}
+                  domain={[0, stats.total || "auto"]}
+                />
+                <Tooltip content={<InvdTooltip />} />
+                <Legend wrapperStyle={{ fontSize: "11px" }} />
+                {/* Repère : le total de zones à atteindre. */}
+                <ReferenceLine y={stats.total} stroke={CH.axe} strokeOpacity={0.5} />
+                {PHASES.map((p) => (
+                  <Line
+                    key={p.cle}
+                    type="monotone"
+                    dataKey={p.label}
+                    stroke={p.couleur}
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </section>
+        )}
+
         {/* ── Avancement par phase ──────────────────────────────────────── */}
         <section className="invd-carte">
           <h2>Avancement par phase</h2>
@@ -348,42 +564,71 @@ const AdminInventaireDashboardScreen = () => {
             Une zone est <b>complète</b> quand ses trois phases sont faites.
           </p>
           <div className="invd-repartition">
-            <div className="invd-rep">
-              <span className="invd-rep-val" style={{ color: "#22c55e" }}>
-                {fmtInt(stats.completes)}
-              </span>
-              <span className="invd-rep-lbl">Complètes</span>
-            </div>
-            <div className="invd-rep">
-              <span className="invd-rep-val" style={{ color: "#f59e0b" }}>
-                {fmtInt(stats.entamees)}
-              </span>
-              <span className="invd-rep-lbl">Entamées</span>
-            </div>
-            <div className="invd-rep">
-              <span className="invd-rep-val" style={{ color: "#ef4444" }}>
-                {fmtInt(stats.vierges)}
-              </span>
-              <span className="invd-rep-lbl">Pas commencées</span>
-            </div>
+            {ETATS_ZONE.map((e) => (
+              <div key={e.cle} className="invd-rep">
+                <span className="invd-rep-val" style={{ color: e.couleur }}>
+                  {fmtInt(stats[e.cle])}
+                </span>
+                <span className="invd-rep-lbl">{e.label}</span>
+              </div>
+            ))}
           </div>
-          {/* Barre empilée : la proportion se lit mieux que trois nombres. */}
+          {/* Barre empilée : la proportion se lit mieux que trois nombres.
+              Le gris « pas commencée » reste volontairement discret : c'est de
+              l'absence de progrès, pas une alerte. */}
           <span className="invd-bar invd-bar-empilee">
-            {[
-              { n: stats.completes, c: "#22c55e" },
-              { n: stats.entamees, c: "#f59e0b" },
-              { n: stats.vierges, c: "#ef4444" },
-            ].map((seg, i) => (
+            {ETATS_ZONE.map((e) => (
               <span
-                key={i}
+                key={e.cle}
                 className="invd-bar-fill"
                 style={{
-                  width: stats.total ? `${(seg.n / stats.total) * 100}%` : "0%",
-                  background: seg.c,
+                  width: stats.total ? `${(stats[e.cle] / stats.total) * 100}%` : "0%",
+                  background: e.couleur,
                 }}
               />
             ))}
           </span>
+
+          {/* Même lecture, détaillée par emplacement : où le retard se niche. */}
+          {parEmplacement.length > 1 && (
+            <ResponsiveContainer
+              width="100%"
+              height={Math.max(96, parEmplacement.length * 34 + 56)}
+            >
+              <BarChart
+                data={parEmplacement}
+                layout="vertical"
+                margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                barCategoryGap="30%"
+              >
+                <CartesianGrid stroke={CH.grille} horizontal={false} />
+                <XAxis type="number" fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} tickLine={false} />
+                <YAxis
+                  type="category"
+                  dataKey="emplacement"
+                  width={76}
+                  fontSize={10}
+                  stroke={CH.axe}
+                  tickLine={false}
+                />
+                <Tooltip content={<InvdTooltip />} />
+                <Legend wrapperStyle={{ fontSize: "10px" }} />
+                {ETATS_ZONE.map((e, i) => (
+                  <Bar
+                    key={e.cle}
+                    dataKey={e.cle}
+                    name={e.label}
+                    stackId="z"
+                    fill={e.couleur}
+                    maxBarSize={18}
+                    stroke="var(--admin-bg-secondary)"
+                    strokeWidth={1}
+                    radius={i === ETATS_ZONE.length - 1 ? [0, 4, 4, 0] : 0}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          )}
           <Link className="invd-lien" to="/admin/recap-zones">
             Voir le récap par zone <HiArrowRight />
           </Link>
@@ -419,6 +664,19 @@ const AdminInventaireDashboardScreen = () => {
                 <span className="invd-rep-lbl">Temps de comptage</span>
               </div>
             </div>
+          )}
+          {/* Rythme : unités comptées par jour de dépôt. Une seule série, donc
+              une seule couleur et pas de légende — le titre dit tout. */}
+          {activiteParJour.length > 1 && (
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={activiteParJour} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke={CH.grille} vertical={false} />
+                <XAxis dataKey="label" fontSize={10} stroke={CH.axe} tickLine={false} />
+                <YAxis fontSize={10} stroke={CH.axe} tickFormatter={fmtCompact} width={40} tickLine={false} />
+                <Tooltip content={<InvdTooltip />} />
+                <Bar dataKey="unites" name="Unités comptées" fill={CH.bleu} maxBarSize={24} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           )}
           <Link className="invd-lien" to="/admin/suivi-bipage">
             Voir le suivi du bipage <HiArrowRight />
@@ -592,6 +850,62 @@ const AdminInventaireDashboardScreen = () => {
                   <span className="invd-rep-lbl">Zones déposées</span>
                 </div>
               </div>
+
+              {/* Divergent : manquant à gauche en rouge, excédent à droite en
+                  bleu (jamais vert/rouge : illisible en vision daltonienne),
+                  zéro au centre. Classement par montant, signe ignoré. */}
+              {ecartsChart.length > 0 && (
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(140, ecartsChart.length * 30 + 56)}
+                >
+                  <BarChart
+                    data={ecartsChart}
+                    layout="vertical"
+                    margin={{ top: 4, right: 24, left: 8, bottom: 0 }}
+                    stackOffset="sign"
+                    barCategoryGap="25%"
+                  >
+                    <CartesianGrid stroke={CH.grille} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      fontSize={10}
+                      stroke={CH.axe}
+                      tickFormatter={fmtCompact}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="label"
+                      width={118}
+                      fontSize={10}
+                      stroke={CH.axe}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<InvdTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: "10px" }} />
+                    <ReferenceLine x={0} stroke={CH.axe} strokeOpacity={0.6} />
+                    <Bar
+                      dataKey="manquant"
+                      name="Manquant"
+                      stackId="e"
+                      fill={CH.manquant}
+                      maxBarSize={16}
+                      radius={[4, 0, 0, 4]}
+                      unit="xpf"
+                    />
+                    <Bar
+                      dataKey="excedent"
+                      name="Excédent"
+                      stackId="e"
+                      fill={CH.excedent}
+                      maxBarSize={16}
+                      radius={[0, 4, 4, 0]}
+                      unit="xpf"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
 
               <table className="invd-table invd-ec-table">
                 <thead>

@@ -209,6 +209,44 @@
 
 .invd-bar-empilee {
   margin-top: 12px;
+  /* Espace de SURFACE entre les segments : c'est le blanc qui sépare, pas un
+     trait — les segments voisins restent lisibles même à teintes proches. */
+  gap: 2px;
+  background: transparent;
+}
+
+.invd-bar-empilee .invd-bar-fill {
+  border-radius: 999px;
+}
+
+/* ── Tooltip des graphiques recharts ─────────────────────────────────────── */
+.invd-tooltip {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.5rem 0.7rem;
+  font-size: 0.78rem;
+  box-shadow: var(--admin-shadow);
+}
+
+.invd-tooltip-label {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.invd-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.invd-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
 }
 
 /* ── Répartitions ────────────────────────────────────────────────────────── */
