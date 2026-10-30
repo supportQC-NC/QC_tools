@@ -482,3 +482,86 @@
 .admin-fiches .fiches-erreur span {
   flex: 1;
 }
+
+/* ── Recherche + filtres d'origine (collecteur / proforma / Excel) ── */
+.fiches-filtres {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.8rem 0;
+}
+
+.fiches-recherche {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.6rem;
+  color: var(--admin-text-secondary);
+  min-width: 280px;
+}
+
+.fiches-recherche input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--admin-text);
+  font-size: 0.85rem;
+  width: 100%;
+}
+
+.fiches-chips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.fiches-chip {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.fiches-chip.on {
+  background: #4da6ff22;
+  border-color: #4da6ff;
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
+.fiches-compteur {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+}
+
+/* Badge d'origine de la fiche. */
+.fiches-origine {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.fiches-origine.proforma {
+  border-color: #8b5cf6;
+  color: #b79df8;
+}
+
+.fiches-origine.excel {
+  border-color: #f59e0b;
+  color: #f7bc55;
+}
+
+.fiches-origine.dat {
+  color: var(--admin-text-secondary);
+}

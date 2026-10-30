@@ -1,5 +1,5 @@
 // src/screens/admin/AdminFichesControleScreen.jsx
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   HiDocumentReport,
   HiRefresh,
@@ -11,6 +11,7 @@ import {
   HiClock,
   HiPlay,
   HiStop,
+  HiSearch,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import {
@@ -27,6 +28,23 @@ import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import "./AdminFichesControleScreen.css";
 
 const POLL = 5000;
+
+// Origine d'une fiche, lue dans sa référence (datFileName) : les imports
+// portent un préfixe (« proforma … », « deduction proforma … », « excel … »,
+// « deduction <fichier> ») ; tout le reste est un .DAT du collecteur.
+const origineFiche = (f) => {
+  const ref = String(f?.datFileName || "");
+  if (/^(deduction )?proforma /.test(ref)) return "proforma";
+  if (/^(excel |deduction )/.test(ref)) return "excel";
+  return "dat";
+};
+
+const FILTRES_ORIGINE = [
+  { cle: "", label: "Toutes" },
+  { cle: "dat", label: "Collecteur (.DAT)" },
+  { cle: "proforma", label: "Proformas importées" },
+  { cle: "excel", label: "Excel importés" },
+];
 
 const AdminFichesControleScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
@@ -67,8 +85,35 @@ const AdminFichesControleScreen = () => {
   };
 
   const active = data?.active;
-  const fiches = data?.fiches || [];
+  const fiches = useMemo(() => data?.fiches || [], [data]);
   const session = data?.session;
+
+  // Recherche + filtre d'origine (collecteur / proforma / Excel) — demande
+  // client du 30/10/2026. Filtrage local : la liste est déjà en mémoire.
+  const [recherche, setRecherche] = useState("");
+  const [filtreOrigine, setFiltreOrigine] = useState("");
+
+  const nbParOrigine = useMemo(() => {
+    const n = { dat: 0, proforma: 0, excel: 0 };
+    for (const f of fiches) n[origineFiche(f)] += 1;
+    return n;
+  }, [fiches]);
+
+  const fichesVisibles = useMemo(() => {
+    let liste = fiches;
+    if (filtreOrigine) {
+      liste = liste.filter((f) => origineFiche(f) === filtreOrigine);
+    }
+    const mots = recherche.toLowerCase().split(/\s+/).filter(Boolean);
+    if (mots.length) {
+      liste = liste.filter((f) => {
+        const txt =
+          `${f.zoneCode} ${f.zoneLibelle} ${f.zoneType} ${f.datFileName}`.toLowerCase();
+        return mots.every((m) => txt.includes(m));
+      });
+    }
+    return liste;
+  }, [fiches, filtreOrigine, recherche]);
 
   const formatDate = (d) =>
     d
@@ -246,11 +291,42 @@ const AdminFichesControleScreen = () => {
             </div>
           )}
 
+          {/* ── Recherche + filtre d'origine ── */}
+          <div className="fiches-filtres">
+            <div className="fiches-recherche">
+              <HiSearch />
+              <input
+                type="search"
+                placeholder="Rechercher une zone, un libellé, un n° de proforma…"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+              />
+            </div>
+            <div className="fiches-chips">
+              {FILTRES_ORIGINE.map((fo) => (
+                <button
+                  key={fo.cle || "toutes"}
+                  type="button"
+                  className={`fiches-chip ${filtreOrigine === fo.cle ? "on" : ""}`}
+                  onClick={() => setFiltreOrigine(fo.cle)}
+                >
+                  {fo.label} (
+                  {fo.cle ? nbParOrigine[fo.cle] : fiches.length})
+                </button>
+              ))}
+            </div>
+            <span className="fiches-compteur">
+              {fichesVisibles.length} fiche{fichesVisibles.length > 1 ? "s" : ""}{" "}
+              affichée{fichesVisibles.length > 1 ? "s" : ""}
+            </span>
+          </div>
+
           <div className="admin-fiches-table-container">
             <table className="admin-table">
               <thead>
                 <tr>
                   <th>Zone</th>
+                  <th>Origine</th>
                   <th>Date</th>
                   <th>Lignes</th>
                   <th>Anomalies</th>
@@ -259,20 +335,30 @@ const AdminFichesControleScreen = () => {
                 </tr>
               </thead>
               <tbody>
-                {fiches.length === 0 ? (
+                {fichesVisibles.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="no-data">
-                      Aucune fiche pour l'instant. Les .DAT déposés dans le
-                      dossier de l'inventaire seront traités automatiquement.
+                    <td colSpan={7} className="no-data">
+                      {fiches.length === 0
+                        ? "Aucune fiche pour l'instant. Les .DAT déposés dans le dossier de l'inventaire seront traités automatiquement."
+                        : "Aucune fiche ne correspond à la recherche ou au filtre."}
                     </td>
                   </tr>
                 ) : (
-                  fiches.map((f) => (
+                  fichesVisibles.map((f) => (
                     <tr key={f._id}>
                       <td>
                         <span className="zone-code">{f.zoneCode || "—"}</span>
                         {f.zoneLibelle && (
                           <span className="zone-lib">{f.zoneLibelle}</span>
+                        )}
+                      </td>
+                      <td>
+                        {origineFiche(f) === "proforma" ? (
+                          <span className="fiches-origine proforma">Proforma</span>
+                        ) : origineFiche(f) === "excel" ? (
+                          <span className="fiches-origine excel">Excel</span>
+                        ) : (
+                          <span className="fiches-origine dat">Collecteur</span>
                         )}
                       </td>
                       <td>{formatDate(f.date)}</td>
@@ -315,6 +401,13 @@ const AdminFichesControleScreen = () => {
                         ) : f.printError ? (
                           <span className="print-err" title={f.printError}>
                             <HiExclamationCircle /> Erreur
+                          </span>
+                        ) : f.reprintRequested ? (
+                          <span
+                            className="print-wait"
+                            title="Impression demandée : c'est l'agent local (poste imprimante) qui l'exécute à son prochain passage. Si ce statut persiste, vérifier que l'agent tourne et qu'il est à jour."
+                          >
+                            <HiClock /> Envoi imprimante…
                           </span>
                         ) : (
                           <span className="print-wait">
