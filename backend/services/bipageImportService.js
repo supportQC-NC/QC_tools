@@ -325,6 +325,77 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
 };
 
 /**
+ * Référence d'import (`datFileName`) d'une ligne proforma :
+ * « proforma <NUMFACT> <zone>[_EMPL] » (format actuel) ou, pour les lignes
+ * d'AOÛT 2026, « proforma <NUMFACT> » tout court (la zone n'était pas encore
+ * dans la référence) — d'où l'absence d'espace obligatoire après le numfact.
+ * Sert à RETROUVER le numfact des lignes HISTORIQUES : les champs
+ * source/sourceRef n'existent que depuis le 09/09/2026, les imports faits
+ * avant (inventaires démarrés en juillet/août) n'en portent pas — constaté en
+ * production le 30/10/2026 : la carte « proformas intégrées » et l'onglet
+ * « Déjà importées » sortaient vides alors que les imports étaient bien là.
+ */
+const RE_REFERENCE_PROFORMA = /^(?:deduction )?proforma (\S+)/;
+
+/**
+ * Tous les imports de proformas d'une session, agrégés par (référence, zone),
+ * TOLÉRANT aux lignes historiques sans champ `source` (repérées par leur
+ * datFileName). Renvoie [{ numfact, zoneCode, zoneType, mode, lignes, unites,
+ * at }] — une entrée par proforma × zone × mode.
+ */
+export const importsProformaParSession = async (sessionId) => {
+  const rows = await LigneBipage.aggregate([
+    {
+      $match: {
+        session: sessionId,
+        $or: [
+          { source: "proforma" },
+          // Lignes d'avant le champ source : il est absent (ou vide), mais la
+          // référence d'import les identifie sans ambiguïté. Les .DAT du
+          // collecteur ont un nom de fichier, jamais ce préfixe.
+          {
+            source: { $in: [null, ""] },
+            datFileName: { $regex: /^(deduction )?proforma / },
+          },
+        ],
+      },
+    },
+    {
+      $group: {
+        _id: {
+          ref: "$datFileName",
+          sourceRef: "$sourceRef",
+          code: "$zoneCode",
+          type: "$zoneType",
+          mode: "$modeImport",
+        },
+        lignes: { $sum: 1 },
+        unites: { $sum: "$qteScan" },
+        at: { $max: "$createdAt" },
+      },
+    },
+  ]);
+
+  const imports = [];
+  for (const r of rows) {
+    const ref = trim(r._id.ref);
+    const numfact = trim(r._id.sourceRef) || (RE_REFERENCE_PROFORMA.exec(ref) || [])[1] || "";
+    if (!numfact) continue;
+    imports.push({
+      numfact,
+      zoneCode: trim(r._id.code),
+      zoneType: trim(r._id.type),
+      mode:
+        r._id.mode || (/^deduction /.test(ref) ? "deduction" : "inventaire"),
+      lignes: r.lignes,
+      unites: r.unites || 0,
+      at: r.at || null,
+    });
+  }
+  return imports;
+};
+
+/**
  * Détails minimaux de proformas par NUMFACT, pour l'onglet « Déjà importées » :
  * une proforma intégrée doit rester visible même quand elle SORT du filtre
  * dates/clients de l'inventaire (filtre modifié après coup). Une proforma

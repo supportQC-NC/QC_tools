@@ -30,6 +30,7 @@ import {
 import {
   getProformasEligibles,
   detailsProformas,
+  importsProformaParSession,
   importerProformas,
   previsualiserImportProformas,
   genererModeleExcelBipage,
@@ -1262,35 +1263,35 @@ const listProformasBipage = asyncHandler(async (req, res) => {
     clients: listeClients,
   });
 
-  // Marquage « déjà importée » (demande client du 30/10/2026) : les lignes de
-  // bipage de l'inventaire ACTIF portent source="proforma" + sourceRef=NUMFACT,
-  // on en déduit les proformas déjà intégrées — sans rien stocker de plus.
+  // Marquage « déjà importée » (demande client du 30/10/2026) : dérivé des
+  // lignes de bipage de l'inventaire ACTIF — sans rien stocker de plus.
   // « Recommencer » une zone ou réinitialiser l'inventaire les supprime, et la
-  // proforma redevient naturellement importable.
+  // proforma redevient naturellement importable. ⚠️ Tolérant aux lignes
+  // HISTORIQUES sans champ source (imports d'avant le 09/09/2026) : voir
+  // `importsProformaParSession`.
   const session = await InventaireZoneSession.findOne({
     entreprise: req.entreprise._id,
     statut: "actif",
   }).select("_id");
   const importees = new Map(); // numfact -> { zones: [...], at }
   if (session) {
-    const aggs = await LigneBipage.aggregate([
-      { $match: { session: session._id, source: "proforma" } },
-      {
-        $group: {
-          _id: "$sourceRef",
-          zones: {
-            $addToSet: {
-              code: "$zoneCode",
-              type: "$zoneType",
-              mode: "$modeImport",
-            },
-          },
-          at: { $max: "$createdAt" },
-        },
-      },
-    ]);
-    for (const a of aggs) {
-      importees.set(String(a._id), { zones: a.zones || [], at: a.at || null });
+    for (const imp of await importsProformaParSession(session._id)) {
+      let m = importees.get(imp.numfact);
+      if (!m) {
+        m = { zones: [], at: null };
+        importees.set(imp.numfact, m);
+      }
+      if (
+        !m.zones.some(
+          (z) =>
+            z.code === imp.zoneCode &&
+            z.type === imp.zoneType &&
+            z.mode === imp.mode,
+        )
+      ) {
+        m.zones.push({ code: imp.zoneCode, type: imp.zoneType, mode: imp.mode });
+      }
+      if (imp.at && (!m.at || imp.at > m.at)) m.at = imp.at;
     }
   }
   const proformas = data.proformas.map((p) => ({
@@ -1682,36 +1683,47 @@ const getStatsProformasZones = asyncHandler(async (req, res) => {
     return res.json({ active: false, zones: [], totaux: null });
   }
 
-  const aggs = await LigneBipage.aggregate([
-    { $match: { session: session._id, source: "proforma" } },
-    {
-      $group: {
-        _id: { code: "$zoneCode", type: "$zoneType" },
-        proformas: { $addToSet: "$sourceRef" },
-        lignes: { $sum: 1 },
-        unites: { $sum: "$qteScan" },
-        dernierAt: { $max: "$createdAt" },
-      },
-    },
-  ]);
+  // ⚠️ Tolérant aux lignes HISTORIQUES sans champ source (imports d'avant le
+  // 09/09/2026) : voir `importsProformaParSession`.
+  const imports = await importsProformaParSession(session._id);
 
-  const zones = aggs
-    .map((a) => ({
-      zoneCode: a._id.code || "",
-      zoneType: a._id.type || "",
-      nbProformas: a.proformas.length,
-      numfacts: [...a.proformas].sort(),
-      lignes: a.lignes,
+  const parZone = new Map();
+  for (const imp of imports) {
+    const cle = `${imp.zoneCode}|${imp.zoneType}`;
+    let z = parZone.get(cle);
+    if (!z) {
+      z = {
+        zoneCode: imp.zoneCode,
+        zoneType: imp.zoneType,
+        numfacts: new Set(),
+        lignes: 0,
+        unites: 0,
+        dernierAt: null,
+      };
+      parZone.set(cle, z);
+    }
+    z.numfacts.add(imp.numfact);
+    z.lignes += imp.lignes;
+    z.unites += imp.unites;
+    if (imp.at && (!z.dernierAt || imp.at > z.dernierAt)) z.dernierAt = imp.at;
+  }
+
+  const zones = [...parZone.values()]
+    .map((z) => ({
+      zoneCode: z.zoneCode,
+      zoneType: z.zoneType,
+      nbProformas: z.numfacts.size,
+      numfacts: [...z.numfacts].sort(),
+      lignes: z.lignes,
       // Les déductions sont en négatif : la somme est le NET intégré.
-      unites: Math.round((a.unites || 0) * 1000) / 1000,
-      dernierAt: a.dernierAt || null,
+      unites: Math.round(z.unites * 1000) / 1000,
+      dernierAt: z.dernierAt,
     }))
     .sort((x, y) => y.nbProformas - x.nbProformas || y.lignes - x.lignes);
 
   // Total de DOCUMENTS distincts : une proforma répartie sur deux zones ne
   // compte qu'une fois ici (elle compte dans chacune des deux zones).
-  const documents = new Set();
-  for (const a of aggs) for (const n of a.proformas) documents.add(n);
+  const documents = new Set(imports.map((i) => i.numfact));
 
   res.json({
     active: true,
