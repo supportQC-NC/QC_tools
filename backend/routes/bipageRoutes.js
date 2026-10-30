@@ -17,6 +17,7 @@ import {
   listProformasBipage,
   apercuImportProformas,
   importProformasBipage,
+  ficheProformaImportee,
   modeleExcelBipage,
   importExcelBipage,
 } from "../controllers/bipageController.js";
@@ -81,6 +82,8 @@ router.get("/:entrepriseId/proformas", protect, canReadImport, checkEntrepriseAc
 // Aperçu AVANT écriture : impact article par article + état des phases de la zone.
 router.post("/:entrepriseId/proformas/apercu", protect, canReadImport, checkEntrepriseAccess, apercuImportProformas);
 router.post("/:entrepriseId/import-proformas", protect, canWriteImport, checkEntrepriseAccess, importProformasBipage);
+// Fiche de contrôle PDF d'une proforma déjà importée (ouverte dans un onglet).
+router.get("/:entrepriseId/proformas/:numfact/fiche-pdf", protect, canReadImport, checkEntrepriseAccess, ficheProformaImportee);
 
 // ─── Import depuis un fichier Excel ───────────────────────────────────────
 router.get("/:entrepriseId/modele-excel", protect, canReadImport, checkEntrepriseAccess, modeleExcelBipage);

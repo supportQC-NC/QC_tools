@@ -980,6 +980,7 @@ import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import Zone from "../models/ZoneModel.js";
+import LigneBipage from "../models/LigneBipageModel.js";
 import articleCacheService from "../services/articleService.js";
 import {
   construireLignes,
@@ -1997,6 +1998,87 @@ const getRecapZones = asyncHandler(async (req, res) => {
           articleTrouve: trouve,
           isRenvoi: !!ligne.isRenvoi,
           isUnknown: !!ligne.isUnknown,
+        });
+      }
+    }
+  }
+
+  // ── Lignes IMPORTÉES (proforma ERP / fichier Excel) ─────────────────────
+  // Un comptage peut arriver SANS collecteur : import d'une proforma ou d'un
+  // Excel depuis l'écran Progression. Ces lignes n'existent que dans
+  // LigneBipage — sans ce complément, une zone comptée uniquement par
+  // proforma n'apparaissait PAS DU TOUT dans les écarts (constaté en prod,
+  // demande client du 30/10/2026). Les lignes des .DAT du collecteur sont
+  // EXCLUES : elles sont déjà portées par les collectes ci-dessus. Les lignes
+  // historiques sans champ `source` (avant le 09/09/2026) sont reconnues par
+  // leur référence d'import (« proforma … », « excel … », « deduction … ») —
+  // un nom de fichier .DAT ne commence jamais ainsi.
+  if (session) {
+    const lignesImport = await LigneBipage.find({
+      session: session._id,
+      $or: [
+        { source: { $in: ["proforma", "excel"] } },
+        {
+          source: { $in: [null, ""] },
+          datFileName: { $regex: /^(?:deduction |excel |proforma )/ },
+        },
+      ],
+    })
+      .select("zoneCode zoneType nart gencod eanArticle designation qteScan found")
+      .lean();
+
+    // Libellés : les LigneBipage n'en portent pas, le snapshot de session oui.
+    const libelles = new Map(
+      (session.zones || []).map((z) => [
+        `${z.code}|${String(z.type || "").trim()}`,
+        z.libelle || "",
+      ]),
+    );
+
+    for (const ligne of lignesImport) {
+      const code = ligne.zoneCode || "(sans zone)";
+      const type = String(ligne.zoneType || "").trim();
+      const cle = `${code}|${type}`;
+      if (!zonesMap.has(cle)) {
+        zonesMap.set(cle, {
+          zoneCode: code,
+          zoneLibelle: libelles.get(cle) || "",
+          zoneType: type,
+          lignes: [],
+        });
+      }
+      const zoneEntry = zonesMap.get(cle);
+
+      const nart = String(ligne.nart || "").trim();
+      const gencod = String(ligne.gencod || "").trim();
+      const { stock, prixAchat, fourn, trouve } = await getInfosArticle(
+        nart,
+        gencod || ligne.eanArticle,
+      );
+      // Les déductions sont stockées en négatif : le cumul donne le NET.
+      const qteBipee = parseFloat(ligne.qteScan) || 0;
+
+      const existante = zoneEntry.lignes.find(
+        (l) => String(l.nart || "").trim() === nart && (l.gencod || "") === gencod,
+      );
+      if (existante) {
+        existante.qteBipee += qteBipee;
+        existante.ecart = existante.qteBipee - existante.stockTheorique;
+        existante.ecartXpf = existante.ecart * existante.prixAchat;
+      } else {
+        zoneEntry.lignes.push({
+          nart,
+          gencod,
+          designation: ligne.designation || "",
+          qteBipee,
+          stockTheorique: stock,
+          ecart: qteBipee - stock,
+          prixAchat,
+          ecartXpf: (qteBipee - stock) * prixAchat,
+          fourn,
+          articleTrouve: trouve,
+          isRenvoi: false,
+          isUnknown: !ligne.found,
         });
       }
     }

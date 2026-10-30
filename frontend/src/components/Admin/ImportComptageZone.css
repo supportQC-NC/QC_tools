@@ -539,3 +539,12 @@
   font-size: 0.72rem;
   white-space: nowrap;
 }
+
+/* Bouton fiche de contrôle d'une proforma importée. */
+.icz-fiche-btn {
+  margin-left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}

@@ -396,6 +396,28 @@ export const importsProformaParSession = async (sessionId) => {
 };
 
 /**
+ * Lignes de bipage d'UNE proforma importée sur la session (fiche de contrôle),
+ * avec la même tolérance aux lignes historiques sans champ source.
+ */
+export const lignesImportProforma = async (sessionId, numfact) => {
+  const n = trim(numfact);
+  if (!n) return [];
+  const echappe = n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return LigneBipage.find({
+    session: sessionId,
+    $or: [
+      { source: "proforma", sourceRef: n },
+      {
+        source: { $in: [null, ""] },
+        datFileName: { $regex: new RegExp(`^(?:deduction )?proforma ${echappe}( |$)`) },
+      },
+    ],
+  })
+    .sort({ zoneCode: 1, ordre: 1 })
+    .lean();
+};
+
+/**
  * Détails minimaux de proformas par NUMFACT, pour l'onglet « Déjà importées » :
  * une proforma intégrée doit rester visible même quand elle SORT du filtre
  * dates/clients de l'inventaire (filtre modifié après coup). Une proforma

@@ -14,6 +14,8 @@ import {
   getInventaireDirs,
   emplacementDir,
   sanitizeName,
+  construireLignes,
+  ecrirePDF,
 } from "../services/ficheControleService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
 import { ZipArchive } from "archiver";
@@ -31,6 +33,7 @@ import {
   getProformasEligibles,
   detailsProformas,
   importsProformaParSession,
+  lignesImportProforma,
   importerProformas,
   previsualiserImportProformas,
   genererModeleExcelBipage,
@@ -1737,10 +1740,79 @@ const getStatsProformasZones = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Fiche de contrôle PDF d'UNE proforma importée sur l'inventaire
+ *          actif : mêmes colonnes et même rendu que les fiches de contrôle du
+ *          watcher (construireLignes + ecrirePDF), mais les lignes viennent des
+ *          LigneBipage de la proforma (déductions en négatif). Imprimable
+ *          depuis l'onglet « Déjà importées » de la fenêtre d'import.
+ * @route   GET /api/bipages/:entrepriseId/proformas/:numfact/fiche-pdf
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const ficheProformaImportee = asyncHandler(async (req, res) => {
+  const numfact = String(req.params.numfact || "").trim();
+  if (!numfact) {
+    res.status(400);
+    throw new Error("Numéro de proforma requis.");
+  }
+
+  const session = await sessionActiveOuErreur(req.entreprise, res);
+  const lignes = await lignesImportProforma(session._id, numfact);
+  if (!lignes.length) {
+    res.status(404);
+    throw new Error(
+      `Aucune ligne importée pour la proforma ${numfact} sur cet inventaire.`,
+    );
+  }
+
+  await articleCacheService.preload(req.entreprise).catch(() => {});
+
+  // Même format d'entrée que les .DAT : code (gencod sinon NART) + quantité.
+  const lignesDat = lignes.map((l) => ({
+    code: (l.gencod || l.nart || l.eanArticle || "").trim(),
+    quantite: parseFloat(l.qteScan) || 0,
+  }));
+  const { rows } = await construireLignes(req.entreprise, lignesDat);
+
+  // En-tête : la ou les zones servies par cette proforma.
+  const zones = [
+    ...new Set(
+      lignes.map(
+        (l) => `${l.zoneCode || "?"}${l.zoneType ? ` (${l.zoneType})` : ""}`,
+      ),
+    ),
+  ];
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fiche-proforma-"));
+  const outPath = path.join(tmpDir, `fiche_proforma_${sanitizeName(numfact)}.pdf`);
+  await ecrirePDF({
+    header: {
+      zoneCode: zones.join(", "),
+      zoneType: "",
+      zoneLibelle: `Proforma ${numfact} (import)`,
+      date: new Date(),
+    },
+    rows,
+    outPath,
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="fiche_proforma_${sanitizeName(numfact)}.pdf"`,
+  );
+  const stream = fs.createReadStream(outPath);
+  stream.pipe(res);
+  stream.on("close", () => {
+    fs.rm(tmpDir, { recursive: true, force: true }, () => {});
+  });
+});
+
 export {
   getBipages,
   getStatsZonesRetouchees,
   getStatsProformasZones,
+  ficheProformaImportee,
   exportEcartsBipage,
   updateBipage,
   ajouterLigneBipage,

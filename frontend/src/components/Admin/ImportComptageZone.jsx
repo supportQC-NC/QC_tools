@@ -37,6 +37,7 @@ import {
   HiChevronRight,
   HiPencilAlt,
   HiExclamationCircle,
+  HiPrinter,
 } from "react-icons/hi";
 import {
   useLazyGetProformasBipageQuery,
@@ -805,6 +806,21 @@ const ProformasModal = ({
                             {z.mode === "deduction" ? " −" : ""}
                           </span>
                         ))}
+                        {/* Fiche de contrôle PDF des lignes intégrées (même
+                            rendu que les fiches du watcher), nouvel onglet. */}
+                        <button
+                          type="button"
+                          className="btn-icon icz-fiche-btn"
+                          title="Imprimer la fiche de contrôle de cette proforma"
+                          onClick={() =>
+                            window.open(
+                              `${BASE_URL}/api/bipages/${entrepriseId}/proformas/${encodeURIComponent(p.numfact)}/fiche-pdf`,
+                              "_blank",
+                            )
+                          }
+                        >
+                          <HiPrinter /> Fiche
+                        </button>
                       </td>
                     )}
                   </tr>
