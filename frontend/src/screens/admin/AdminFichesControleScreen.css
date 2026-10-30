@@ -565,3 +565,22 @@
 .fiches-origine.dat {
   color: var(--admin-text-secondary);
 }
+
+/* Client + observation d'une fiche issue d'une proforma. */
+.admin-fiches .zone-client {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--admin-text);
+  margin-top: 0.15rem;
+}
+
+.admin-fiches .zone-obs {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--admin-text-secondary);
+  font-style: italic;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

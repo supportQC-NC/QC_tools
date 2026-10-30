@@ -107,8 +107,9 @@ const AdminFichesControleScreen = () => {
     const mots = recherche.toLowerCase().split(/\s+/).filter(Boolean);
     if (mots.length) {
       liste = liste.filter((f) => {
+        const p = f.proforma || {};
         const txt =
-          `${f.zoneCode} ${f.zoneLibelle} ${f.zoneType} ${f.datFileName}`.toLowerCase();
+          `${f.zoneCode} ${f.zoneLibelle} ${f.zoneType} ${f.datFileName} ${p.tiers ?? ""} ${p.nomClient ?? ""} ${p.observation ?? ""}`.toLowerCase();
         return mots.every((m) => txt.includes(m));
       });
     }
@@ -350,6 +351,26 @@ const AdminFichesControleScreen = () => {
                         <span className="zone-code">{f.zoneCode || "—"}</span>
                         {f.zoneLibelle && (
                           <span className="zone-lib">{f.zoneLibelle}</span>
+                        )}
+                        {/* Fiche issue d'une proforma : client et observation
+                            du document ERP, résolus par le serveur. */}
+                        {f.proforma && (
+                          <>
+                            <span className="zone-client">
+                              Client {f.proforma.tiers ?? "?"}
+                              {f.proforma.nomClient
+                                ? ` — ${f.proforma.nomClient}`
+                                : ""}
+                            </span>
+                            {f.proforma.observation && (
+                              <span
+                                className="zone-obs"
+                                title={f.proforma.observation}
+                              >
+                                « {f.proforma.observation} »
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
                       <td>

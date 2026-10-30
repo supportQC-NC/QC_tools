@@ -14,7 +14,10 @@ import {
   startInventaireWatcher,
   stopInventaireWatcher,
 } from "../services/inventaireWatchService.js";
-import { importsProformaParSession } from "../services/bipageImportService.js";
+import {
+  importsProformaParSession,
+  detailsProformas,
+} from "../services/bipageImportService.js";
 
 /**
  * @desc    Liste des fiches de l'inventaire actif
@@ -80,9 +83,44 @@ const getFiches = asyncHandler(async (req, res) => {
     console.error("[fiches-controle] rattrapage imports :", e.message);
   }
 
-  const fiches = await FicheControle.find({ session: session._id }).sort({
-    date: -1,
-  });
+  const fiches = await FicheControle.find({ session: session._id })
+    .sort({ date: -1 })
+    .lean();
+
+  // ── Enrichissement des fiches PROFORMA ──
+  // L'écran doit montrer, en plus du numéro, le CLIENT (n° + nom) et
+  // l'OBSERVATION du document (demande client du 30/10/2026). Résolu à la
+  // lecture dans le cache proforma (TTL) : rien de plus à stocker, et les
+  // fiches déjà créées en profitent aussi. Best-effort — cache indisponible =
+  // fiches sans enrichissement, jamais d'écran vide. L'écran "polle" toutes
+  // les 5 s : après le premier chargement le cache est chaud, le coût est nul.
+  const RE_NUMFACT = /^(?:deduction )?proforma (\S+)/;
+  try {
+    const numfacts = [
+      ...new Set(
+        fiches
+          .map((f) => (RE_NUMFACT.exec(String(f.datFileName || "")) || [])[1])
+          .filter(Boolean),
+      ),
+    ];
+    if (numfacts.length) {
+      const details = await detailsProformas(entreprise, numfacts);
+      for (const f of fiches) {
+        const numfact = (RE_NUMFACT.exec(String(f.datFileName || "")) || [])[1];
+        const d = numfact ? details.get(numfact) : null;
+        if (d) {
+          f.proforma = {
+            numfact: d.numfact,
+            tiers: d.tiers,
+            nomClient: d.nomClient,
+            observation: d.observation,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[fiches-controle] enrichissement proformas :", e.message);
+  }
 
   res.json({
     active: true,
