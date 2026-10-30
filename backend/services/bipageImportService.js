@@ -325,6 +325,57 @@ export const getProformasEligibles = async (entreprise, options = {}) => {
 };
 
 /**
+ * Détails minimaux de proformas par NUMFACT, pour l'onglet « Déjà importées » :
+ * une proforma intégrée doit rester visible même quand elle SORT du filtre
+ * dates/clients de l'inventaire (filtre modifié après coup). Une proforma
+ * disparue de l'ERP renvoie une entrée minimale (numfact seul, introuvable).
+ */
+export const detailsProformas = async (entreprise, numfacts) => {
+  const resultat = new Map();
+  if (!numfacts?.length) return resultat;
+  const cache = await proformaCacheService.getProformas(entreprise);
+  for (const brut of numfacts) {
+    const numfact = trim(brut);
+    if (!numfact) continue;
+    const idx = cache.indexByNumfact.get(numfact);
+    const p = idx !== undefined ? cache.proformaRecords[idx] : null;
+    if (!p) {
+      resultat.set(numfact, {
+        numfact,
+        datfact: null,
+        tiers: null,
+        nomClient: "",
+        etat: null,
+        observation: "",
+        montant: 0,
+        nbLignes: 0,
+        agentCode: "",
+        agentNom: "",
+        eligible: false,
+        raison: "Proforma introuvable dans l'ERP",
+      });
+      continue;
+    }
+    const lignes = lignesArticles(cache, numfact);
+    resultat.set(numfact, {
+      numfact,
+      datfact: p.DATFACT || null,
+      tiers: p.TIERS ?? null,
+      nomClient: trim(p.NOM),
+      etat: p.ETAT ?? null,
+      observation: trim(p[CHAMP_OBSERVATION]),
+      montant: p.MONTANT ?? 0,
+      nbLignes: lignes.length,
+      agentCode: trim(p.REPRES),
+      agentNom: nomAgent(entreprise, p.REPRES),
+      eligible: lignes.length > 0,
+      raison: lignes.length === 0 ? "Proforma sans ligne article" : "",
+    });
+  }
+  return resultat;
+};
+
+/**
  * État des phases d'une zone dans la session, pour prévenir AVANT d'importer.
  * Une zone déjà contrôlée est le cas sensible : le contrôle a porté sur un
  * comptage donné, le modifier après coup invalide ce contrôle.

@@ -29,6 +29,7 @@ import {
 } from "../services/ecartsInventaireService.js";
 import {
   getProformasEligibles,
+  detailsProformas,
   importerProformas,
   previsualiserImportProformas,
   genererModeleExcelBipage,
@@ -1260,7 +1261,63 @@ const listProformasBipage = asyncHandler(async (req, res) => {
     dateFin,
     clients: listeClients,
   });
-  res.json(data);
+
+  // Marquage « déjà importée » (demande client du 30/10/2026) : les lignes de
+  // bipage de l'inventaire ACTIF portent source="proforma" + sourceRef=NUMFACT,
+  // on en déduit les proformas déjà intégrées — sans rien stocker de plus.
+  // « Recommencer » une zone ou réinitialiser l'inventaire les supprime, et la
+  // proforma redevient naturellement importable.
+  const session = await InventaireZoneSession.findOne({
+    entreprise: req.entreprise._id,
+    statut: "actif",
+  }).select("_id");
+  const importees = new Map(); // numfact -> { zones: [...], at }
+  if (session) {
+    const aggs = await LigneBipage.aggregate([
+      { $match: { session: session._id, source: "proforma" } },
+      {
+        $group: {
+          _id: "$sourceRef",
+          zones: {
+            $addToSet: {
+              code: "$zoneCode",
+              type: "$zoneType",
+              mode: "$modeImport",
+            },
+          },
+          at: { $max: "$createdAt" },
+        },
+      },
+    ]);
+    for (const a of aggs) {
+      importees.set(String(a._id), { zones: a.zones || [], at: a.at || null });
+    }
+  }
+  const proformas = data.proformas.map((p) => ({
+    ...p,
+    dejaImportee: importees.get(p.numfact) || null,
+  }));
+
+  // Onglet « Déjà importées » : TOUT ce qui a été intégré sur l'inventaire,
+  // même hors du filtre dates/clients courant (filtre modifié après coup) —
+  // sinon une proforma intégrée peut devenir invisible partout.
+  const parNumfact = new Map(proformas.map((p) => [p.numfact, p]));
+  const horsFiltre = [...importees.keys()].filter((n) => !parNumfact.has(n));
+  const complements = await detailsProformas(req.entreprise, horsFiltre);
+  const proformasImportees = [...importees.entries()]
+    .map(([numfact, marque]) => ({
+      ...(parNumfact.get(numfact) ||
+        complements.get(numfact) || { numfact, eligible: false }),
+      dejaImportee: marque,
+    }))
+    .sort((a, b) => new Date(b.dejaImportee.at || 0) - new Date(a.dejaImportee.at || 0));
+
+  res.json({
+    ...data,
+    proformas,
+    proformasImportees,
+    nbImportees: proformasImportees.length,
+  });
 });
 
 /**

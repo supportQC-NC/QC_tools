@@ -494,3 +494,48 @@
 .icz-row-neg td {
   background: rgba(239, 68, 68, 0.06);
 }
+
+/* ── Onglets « À importer » / « Déjà importées » de la modale proformas ── */
+.icz-onglets {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0.4rem;
+  flex-wrap: wrap;
+}
+
+.icz-onglet {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-bottom: 2px solid transparent;
+  border-radius: var(--admin-radius) var(--admin-radius) 0 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.icz-onglet.actif {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+  font-weight: 600;
+  border-bottom-color: #4da6ff;
+}
+
+.icz-resultats-inline {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+}
+
+/* Badge zone/date d'une proforma déjà importée. */
+.icz-badge-zone {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}

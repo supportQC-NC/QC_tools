@@ -515,6 +515,10 @@ const ProformasModal = ({
 }) => {
   const [selection, setSelection] = useState([]); // [numfact]
   const [erreur, setErreur] = useState("");
+  // Les proformas DÉJÀ intégrées sur cet inventaire sont séparées dans leur
+  // propre onglet (demande client du 30/10/2026) : la liste de travail ne
+  // montre que ce qui reste à importer, sans risque de double intégration.
+  const [onglet, setOnglet] = useState("a_importer"); // a_importer | importees
   // Aperçu d'impact : rien n'est écrit tant qu'il n'est pas confirmé.
   const [apercu, setApercu] = useState(null);
 
@@ -525,7 +529,12 @@ const ProformasModal = ({
     useImportProformasBipageMutation();
 
   const proformas = data?.proformas || [];
-  const integrables = proformas.filter((p) => p.eligible);
+  const nonImportees = proformas.filter((p) => !p.dejaImportee);
+  // Liste serveur COMPLÈTE des proformas intégrées sur l'inventaire — y compris
+  // celles sorties du filtre dates/clients courant.
+  const dejaImportees = data?.proformasImportees || [];
+  const affichees = onglet === "importees" ? dejaImportees : nonImportees;
+  const integrables = affichees.filter((p) => p.eligible);
   const deduction = mode === "deduction";
   const filtreOk = filtreRenseigne(filtre);
   const toutCoche =
@@ -657,11 +666,40 @@ const ProformasModal = ({
         {erreur && <div className="icz-msg err">{erreur}</div>}
 
         {data && (
-          <div className="icz-resultats">
-            <span>
+          <div className="icz-onglets">
+            <button
+              type="button"
+              className={`icz-onglet ${onglet === "a_importer" ? "actif" : ""}`}
+              onClick={() => {
+                setOnglet("a_importer");
+                setSelection([]);
+              }}
+            >
+              À importer ({nonImportees.length})
+            </button>
+            <button
+              type="button"
+              className={`icz-onglet ${onglet === "importees" ? "actif" : ""}`}
+              onClick={() => {
+                setOnglet("importees");
+                setSelection([]);
+              }}
+            >
+              Déjà importées ({dejaImportees.length})
+            </button>
+            <span className="icz-resultats-inline">
               {data.total} proforma(s) trouvée(s), dont{" "}
               <b>{data.nbEligibles}</b> intégrable(s).
             </span>
+          </div>
+        )}
+
+        {onglet === "importees" && dejaImportees.length > 0 && (
+          <div className="icz-msg attention">
+            Ces proformas ont déjà été intégrées sur cet inventaire. Ne les
+            réimportez que volontairement (ex. déduction après comptage) :
+            réimporter sur la même zone et le même mode <b>remplace</b> les
+            lignes précédentes, sur une autre zone les <b>ajoute</b>.
           </div>
         )}
 
@@ -687,36 +725,41 @@ const ProformasModal = ({
                 <th>Observation</th>
                 <th>Vendeur</th>
                 <th>Lignes</th>
+                {onglet === "importees" && <th>Importée</th>}
               </tr>
             </thead>
             <tbody>
               {!filtreOk ? (
                 <tr>
-                  <td colSpan={7} className="no-data">
+                  <td colSpan={8} className="no-data">
                     Définissez d'abord la plage de dates et les clients de cet
                     inventaire : c'est la seule fois où on vous les demande.
                   </td>
                 </tr>
               ) : isFetching && !data ? (
                 <tr>
-                  <td colSpan={7} className="no-data">
+                  <td colSpan={8} className="no-data">
                     Recherche des proformas…
                   </td>
                 </tr>
               ) : !data ? (
                 <tr>
-                  <td colSpan={7} className="no-data">
+                  <td colSpan={8} className="no-data">
                     Aucune donnée.
                   </td>
                 </tr>
-              ) : proformas.length === 0 ? (
+              ) : affichees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="no-data">
-                    Aucune proforma sur cette sélection.
+                  <td colSpan={8} className="no-data">
+                    {onglet === "importees"
+                      ? "Aucune proforma importée sur cet inventaire pour cette sélection."
+                      : dejaImportees.length
+                        ? "Tout est importé : les proformas de cette sélection sont dans l'onglet « Déjà importées »."
+                        : "Aucune proforma sur cette sélection."}
                   </td>
                 </tr>
               ) : (
-                proformas.map((p) => (
+                affichees.map((p) => (
                   <tr key={p.numfact} className={p.eligible ? "" : "icz-row-ko"}>
                     <td>
                       {p.eligible && (
@@ -746,6 +789,24 @@ const ProformasModal = ({
                       {p.agentNom || (p.agentCode ? `Code ${p.agentCode}` : "—")}
                     </td>
                     <td className="num-cell">{p.nbLignes}</td>
+                    {onglet === "importees" && (
+                      <td className="desig-cell">
+                        {p.dejaImportee?.at
+                          ? `le ${new Date(p.dejaImportee.at).toLocaleDateString("fr-FR")}`
+                          : ""}
+                        {(p.dejaImportee?.zones || []).map((z) => (
+                          <span
+                            key={`${z.code}|${z.type}|${z.mode}`}
+                            className="icz-badge-zone"
+                            title={z.mode === "deduction" ? "Importée en déduction" : "Importée en comptage"}
+                          >
+                            {z.code}
+                            {z.type ? ` (${z.type})` : ""}
+                            {z.mode === "deduction" ? " −" : ""}
+                          </span>
+                        ))}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
