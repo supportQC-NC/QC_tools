@@ -23,6 +23,7 @@ import {
   estFichierDat,
   getInventaireDirs,
   resoudreCheminPdf,
+  assurerPdfFiche,
   sanitizeName,
 } from "./ficheControleService.js";
 import { deposerFichierInventaireFtp } from "./inventaireFtpService.js";
@@ -480,11 +481,39 @@ const traiterReimpressions = async (report) => {
   if (!config.autoprint) return; // machine sans imprimante (ex. VPS) : on ignore
 
   const fiches = await FicheControle.find({ reprintRequested: true });
+  const entreprises = new Map(); // cache par id, le temps du passage
   for (const fiche of fiches) {
     const rr = { fiche: fiche.datFileName, ok: false, message: "" };
-    const pdfPath = resoudreCheminPdf(fiche);
+    let pdfPath = resoudreCheminPdf(fiche);
+    let temporaire = false;
+
+    // Fiche d'IMPORT (proforma / Excel) : aucun fichier n'existe sur le
+    // partage — l'import pose le drapeau à la création et c'est ICI que la
+    // fiche s'imprime, comme un .DAT (demande client du 30/10/2026). Le PDF
+    // est régénéré depuis les LigneBipage (même chemin que l'aperçu web).
+    // Couvre aussi la réimpression d'une fiche .DAT dont les fichiers ont
+    // disparu du partage.
     if (!pdfPath) {
-      rr.message = "PDF introuvable sur le disque";
+      const cle = String(fiche.entreprise);
+      if (!entreprises.has(cle)) {
+        // eslint-disable-next-line no-await-in-loop
+        entreprises.set(cle, await Entreprise.findById(fiche.entreprise));
+      }
+      const entreprise = entreprises.get(cle);
+      if (entreprise) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const regen = await assurerPdfFiche(fiche, entreprise);
+          pdfPath = regen.chemin;
+          temporaire = regen.temporaire;
+        } catch (err) {
+          rr.message = `Régénération échouée : ${err.message}`;
+        }
+      }
+    }
+
+    if (!pdfPath) {
+      if (!rr.message) rr.message = "PDF introuvable sur le disque";
       // On laisse le drapeau : un prochain passage retentera (ex. partage revenu).
       report.reimpressions.push(rr);
       continue;
@@ -500,12 +529,20 @@ const traiterReimpressions = async (report) => {
       // eslint-disable-next-line no-await-in-loop
       await fiche.save();
       rr.ok = true;
-      rr.message = "réimprimée";
+      rr.message = "imprimée";
     } catch (err) {
       fiche.printError = `Réimpression échouée : ${err.message}`;
       // eslint-disable-next-line no-await-in-loop
       await fiche.save();
       rr.message = fiche.printError;
+    } finally {
+      if (temporaire && pdfPath) {
+        try {
+          fs.rmSync(pdfPath, { force: true });
+        } catch {
+          /* fichier temporaire : tant pis */
+        }
+      }
     }
     report.reimpressions.push(rr);
   }

@@ -24,6 +24,7 @@ import proformaCacheService from "./proformaCacheService.js";
 import { construireLignes } from "./ficheControleService.js";
 import Zone from "../models/ZoneModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
+import FicheControle from "../models/FicheControleModel.js";
 import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 
@@ -383,6 +384,9 @@ export const importsProformaParSession = async (sessionId) => {
     if (!numfact) continue;
     imports.push({
       numfact,
+      // Référence EXACTE portée par les lignes (datFileName) : c'est la clé
+      // qui relie fiche de contrôle et lignes (assurerPdfFiche, repli base).
+      reference: ref,
       zoneCode: trim(r._id.code),
       zoneType: trim(r._id.type),
       mode:
@@ -501,6 +505,62 @@ const referenceProforma = (numfact, zoneCode, emplacement, deduction) =>
   `${deduction ? "deduction proforma" : "proforma"} ${numfact} ${zoneCode}${
     emplacement ? `_${emplacement}` : ""
   }`;
+
+/**
+ * Enregistre (upsert) la FICHE DE CONTRÔLE d'un import (proforma / Excel) :
+ * sans elle, un comptage importé n'apparaissait pas dans l'écran « Fiches de
+ * contrôle » (constaté en prod, demande client du 30/10/2026). Aucun PDF n'est
+ * écrit sur le partage : l'aperçu/téléchargement le régénère depuis les
+ * LigneBipage (`assurerPdfFiche`, repli « base » — la référence d'import sert
+ * de datFileName, c'est la même clé que les lignes). Réimporter le même trio
+ * remet la fiche à jour au lieu d'en créer une deuxième ; « recommencer » la
+ * zone la supprime avec les lignes.
+ *
+ * IMPRESSION (demande client du 30/10/2026) : même principe que les .DAT du
+ * collecteur — la fiche doit SORTIR DE L'IMPRIMANTE à l'intégration. Le
+ * backend (VPS) ne peut pas imprimer : on pose `reprintRequested`, et c'est
+ * l'agent local (watcher, poste imprimante) qui régénère le PDF depuis les
+ * lignes et l'imprime au passage suivant (`traiterReimpressions`), puis passe
+ * `printed` à true.
+ */
+const enregistrerFicheImport = async ({
+  entreprise,
+  session,
+  reference,
+  zoneCode,
+  zoneType,
+  libelle,
+  stats,
+}) => {
+  try {
+    await FicheControle.findOneAndUpdate(
+      { session: session._id, datFileName: reference },
+      {
+        $set: {
+          entreprise: entreprise._id,
+          inventaireNom: session.nom || "",
+          inventaireSlug: session.dossierSlug || session.nom || "",
+          zoneCode,
+          zoneType,
+          zoneLibelle: libelle,
+          date: new Date(),
+          stats: stats || {},
+          printed: false,
+          // Impression par l'agent local au prochain passage (voir ci-dessus).
+          reprintRequested: true,
+          reprintRequestedAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+  } catch (e) {
+    // Best-effort : le suivi ne doit jamais faire échouer l'import lui-même.
+    console.error(
+      `[bipage-import] fiche de contrôle non enregistrée (${reference}) :`,
+      e.message,
+    );
+  }
+};
 
 /**
  * Ce qui est DÉJÀ compté sur une zone, article par article, toutes sources
@@ -781,7 +841,7 @@ export const importerProformas = async (
       continue;
     }
 
-    const { rows } = await construireLignes(entreprise, aCompter);
+    const { rows, stats } = await construireLignes(entreprise, aCompter);
     // Référence distincte par mode : une même proforma peut être intégrée en
     // comptage PUIS en déduction sans que l'un écrase l'autre (comme l'Excel).
     const reference = referenceProforma(numfact, zoneCode, emplacement, deduction);
@@ -815,6 +875,17 @@ export const importerProformas = async (
         agentNom,
       })),
     );
+
+    // La fiche de contrôle de cet import, visible dans l'écran dédié.
+    await enregistrerFicheImport({
+      entreprise,
+      session,
+      reference,
+      zoneCode,
+      zoneType: emplacement,
+      libelle: `Proforma ${numfact} (import${deduction ? " déduction" : ""})`,
+      stats,
+    });
 
     totalLignes += rows.length;
     totalUnites += unites;
@@ -989,7 +1060,7 @@ export const importerExcelBipage = async (
     throw new Error("Aucune ligne exploitable (colonnes CODE et QUANTITE).");
   }
 
-  const { rows } = await construireLignes(entreprise, aCompter);
+  const { rows, stats } = await construireLignes(entreprise, aCompter);
   // La référence identifie l'import : mode + fichier + zone. Deux modes, deux
   // fichiers ou deux zones ne s'écrasent donc jamais ; le même trio, si.
   const reference = `${deduction ? "deduction" : "excel"} ${trim(nomFichier)} ${zoneCode}${
@@ -1020,6 +1091,17 @@ export const importerExcelBipage = async (
       agentNom: trim(agent.nom) || nomAgent(entreprise, agent.code),
     })),
   );
+
+  // La fiche de contrôle de cet import, visible dans l'écran dédié.
+  await enregistrerFicheImport({
+    entreprise,
+    session,
+    reference,
+    zoneCode,
+    zoneType: emplacement,
+    libelle: `Excel ${trim(nomFichier)} (import${deduction ? " déduction" : ""})`,
+    stats,
+  });
 
   // Premier comptage de la zone : papillonnage et bipage passent à « fait ».
   const phasesMarquees = premierComptage

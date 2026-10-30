@@ -14,6 +14,7 @@ import {
   startInventaireWatcher,
   stopInventaireWatcher,
 } from "../services/inventaireWatchService.js";
+import { importsProformaParSession } from "../services/bipageImportService.js";
 
 /**
  * @desc    Liste des fiches de l'inventaire actif
@@ -30,6 +31,53 @@ const getFiches = asyncHandler(async (req, res) => {
 
   if (!session) {
     return res.json({ active: false, fiches: [] });
+  }
+
+  // ── Rattrapage des imports de proformas ──
+  // Les fiches des imports sont créées à l'import depuis le 30/10/2026 ; les
+  // proformas intégrées AVANT n'en ont pas — on les crée ici à la volée, une
+  // fois (clé = la référence d'import portée par les lignes, c'est elle que
+  // l'aperçu PDF utilise pour retrouver les LigneBipage). Best-effort : un
+  // échec n'empêche pas la liste de s'afficher.
+  try {
+    const imports = await importsProformaParSession(session._id);
+    if (imports.length) {
+      const existantes = new Set(
+        (
+          await FicheControle.find({ session: session._id })
+            .select("datFileName")
+            .lean()
+        ).map((f) => f.datFileName),
+      );
+      const faites = new Set();
+      for (const imp of imports) {
+        if (
+          !imp.reference ||
+          existantes.has(imp.reference) ||
+          faites.has(imp.reference)
+        ) {
+          continue;
+        }
+        faites.add(imp.reference);
+        await FicheControle.create({
+          entreprise: entreprise._id,
+          session: session._id,
+          inventaireNom: session.nom || "",
+          inventaireSlug: session.dossierSlug || session.nom || "",
+          datFileName: imp.reference,
+          zoneCode: imp.zoneCode,
+          zoneType: imp.zoneType,
+          zoneLibelle: `Proforma ${imp.numfact} (import${
+            imp.mode === "deduction" ? " déduction" : ""
+          })`,
+          date: imp.at || new Date(),
+          stats: { total: imp.lignes },
+          printed: false,
+        }).catch(() => {}); // doublon (course) : déjà créée par un autre passage
+      }
+    }
+  } catch (e) {
+    console.error("[fiches-controle] rattrapage imports :", e.message);
   }
 
   const fiches = await FicheControle.find({ session: session._id }).sort({
