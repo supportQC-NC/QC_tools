@@ -93,6 +93,7 @@ import derniereFacturationRoutes from "./routes/derniereFacturationRoutes.js";
        import bipageCollecteRoutes from "./routes/bipageCollecteRoutes.js";
 
        import factureAnalyseRoutes from "./routes/factureAnalyseRoutes.js";
+import proformaAnalyseRoutes from "./routes/proformaAnalyseRoutes.js";
 import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
 import topArticlesRoutes from "./routes/topArticlesRoutes.js";
 import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
@@ -272,6 +273,7 @@ app.use("/api/derniere-facturation", derniereFacturationRoutes);
     app.use("/api/bipage-collecte", bipageCollecteRoutes);
 
     app.use("/api/facture-analyse", factureAnalyseRoutes);
+app.use("/api/proforma-analyse", proformaAnalyseRoutes);
 app.use("/api/journal-caisse", journalCaisseRoutes);
 app.use("/api/top-articles", topArticlesRoutes);
 app.use("/api/analyse-reappro", analyseReapproRoutes);

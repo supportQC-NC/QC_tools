@@ -70,6 +70,7 @@ export const PERMISSION_MODULES = [
   { key: "analyse_stock_admin", label: "Analyse stock", group: "analyse" },
   { key: "performance_dock_admin", label: "Performance réappro magasin", group: "analyse" },
   { key: "facture_analyse_admin", label: "Analyse Facturation", group: "analyse" },
+  { key: "analyse_proforma_admin", label: "Analyse Proforma", group: "analyse" },
   { key: "journal_caisse_admin", label: "Journal de Caisse", group: "analyse" },
   { key: "top_articles_admin", label: "Top Articles", group: "analyse" },
   { key: "analyse_reappro_admin", label: "Analyse Réappro", group: "analyse" },

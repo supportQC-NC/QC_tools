@@ -103,6 +103,7 @@ import AdminAnalyseCaMensuelleScreen from "./screens/admin/AdminAnalyseCaMensuel
 import AdminStatsCommerciauxScreen from "./screens/admin/AdminStatsCommerciauxScreen";
 import AdminAnalyseStockScreen from "./screens/admin/AdminAnalyseStockScreen";
 import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
+import AdminProformaAnalyseScreen from "./screens/admin/AdminProformaAnalyseScreen";
 import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
@@ -609,6 +610,14 @@ const router = createBrowserRouter(
         <Route
           path="/admin/facture-analyse"
           element={<AdminFactureAnalyseScreen />}
+        />
+      </Route>
+
+      {/* Analyse · Proforma -> module "analyse_proforma_admin" */}
+      <Route element={<ModuleRoute module="analyse_proforma_admin" />}>
+        <Route
+          path="/admin/analyse-proforma"
+          element={<AdminProformaAnalyseScreen />}
         />
       </Route>
 

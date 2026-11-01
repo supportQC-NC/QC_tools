@@ -588,7 +588,9 @@ const buildProformaIndex = async (entreprise) => {
   return rows;
 };
 
-const getIndexProformas = async (entreprise) => {
+// Exporté : l'Analyse proforma (proformaAnalyseService) lit le MÊME index
+// d'entêtes — même cache TTL, même préchauffage par le warmer commercial.
+export const getIndexProformas = async (entreprise) => {
   const dossier = entreprise.nomDossierDBF;
   const hit = proIndexCache.get(dossier);
   if (hit && Date.now() - hit.loadedAt < RESA_INDEX_TTL) return hit.rows;

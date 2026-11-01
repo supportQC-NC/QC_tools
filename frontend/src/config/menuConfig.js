@@ -108,6 +108,7 @@ export const adminMenuStructure = [
       { label: "Stats commerciaux", path: "/admin/stats-commerciaux", icon: HiUserGroup },
       { label: "Analyse stock", path: "/admin/analyse-stock", icon: HiChartBar },
       { label: "Analyse Facturation", path: "/admin/facture-analyse", icon: HiDocumentReport },
+      { label: "Analyse Proforma", path: "/admin/analyse-proforma", icon: HiDocumentReport },
       { label: "Journal de Caisse", path: "/admin/journal-caisse", icon: HiCurrencyDollar },
       { label: "Rapports TGC", path: "/admin/rapport-tgc", icon: HiCurrencyDollar },
       { label: "Balances clients", path: "/admin/balances-clients", icon: HiCurrencyDollar },
@@ -737,6 +738,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/analyse-stock":
     "Analyse mensuelle du stock : valeur, surstock, dépréciation, rotation, stock dormant, tops fournisseurs et articles.",
   "/admin/facture-analyse": "Analyse de la facturation.",
+  "/admin/analyse-proforma":
+    "Entêtes de proforma par plage de dates et code vendeur, export Excel.",
   "/admin/journal-caisse": "Journal de caisse.",
   "/admin/rapport-tgc":
     "Déclaration TGC mensuelle (base HT & TGC par taux) + alertes.",
