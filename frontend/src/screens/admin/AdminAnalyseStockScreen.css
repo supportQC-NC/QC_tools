@@ -142,6 +142,55 @@
   margin: 0.4rem 0 0.6rem;
 }
 
+/* ── Évolution 12 mois : petits multiples (un panneau par indicateur, chacun
+   avec sa propre échelle — voir EvolutionIndicateur dans le JSX). ── */
+.ast-evo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.4rem;
+}
+
+.ast-evo-panel {
+  background: var(--admin-bg-tertiary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.65rem 0.7rem 0.2rem;
+  min-width: 0;
+}
+
+.ast-evo-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--admin-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ast-evo-valeur {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.25rem;
+}
+
+.ast-evo-delta {
+  font-size: 0.74rem;
+  color: var(--admin-text-secondary);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0.3rem;
+}
+
+.ast-evo-delta.pos {
+  color: #34d399;
+}
+
+.ast-evo-delta.neg {
+  color: #fb7185;
+}
+
 /* ── Tableaux ── */
 .ast-table-card {
   background: var(--admin-bg-secondary);

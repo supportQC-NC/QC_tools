@@ -32,8 +32,9 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  LineChart,
   Line,
+  AreaChart,
+  Area,
   ComposedChart,
   XAxis,
   YAxis,
@@ -139,6 +140,103 @@ const AstTooltip = ({ active, payload, label }) => {
           </strong>
         </div>
       ))}
+    </div>
+  );
+};
+
+// ── Évolution 12 mois : PETITS MULTIPLES — un panneau par indicateur, chacun
+// avec sa propre échelle. Sur un axe commun la valeur du stock (centaines de
+// millions) écrasait surstock/dépréciation/déstockage au ras du zéro ; et sans
+// point visible, un indicateur à relevé unique n'apparaissait pas du tout. ──
+const EvolutionIndicateur = ({ indicateur, mois, idx }) => {
+  const couleur = couleurIndicateur(indicateur.label);
+  const points = mois.map((m, i) => ({
+    mois: labelMoisCourt(m),
+    valeur: indicateur.valeurs[i],
+  }));
+  const releves = points.filter((p) => p.valeur != null);
+  const dernier = releves[releves.length - 1] || null;
+  const precedent = releves.length > 1 ? releves[releves.length - 2] : null;
+  const delta =
+    dernier && precedent && precedent.valeur !== 0
+      ? ((dernier.valeur - precedent.valeur) / Math.abs(precedent.valeur)) * 100
+      : null;
+  // Surstock / dépréciation : une hausse est une MAUVAISE nouvelle.
+  const hausseMauvaise = /surstock|d[ée]pr[ée]c/i.test(indicateur.label);
+  const classeDelta =
+    delta == null || Math.abs(delta) < 0.05
+      ? ""
+      : (delta > 0) === hausseMauvaise
+        ? "neg"
+        : "pos";
+  const gradId = `ast-evo-grad-${idx}`;
+
+  return (
+    <div className="ast-evo-panel">
+      <div className="ast-evo-label" title={indicateur.label}>
+        <span className="ast-dot" style={{ background: couleur }} />
+        {indicateur.label}
+      </div>
+      <div className="ast-evo-valeur">
+        {dernier ? fmtXPF(dernier.valeur) : "—"}
+      </div>
+      <div className={`ast-evo-delta ${classeDelta}`}>
+        {delta == null
+          ? releves.length === 1
+            ? "premier relevé"
+            : "—"
+          : `${delta > 0 ? "+" : ""}${delta.toFixed(1)} % vs ${precedent.mois}`}
+      </div>
+      <ResponsiveContainer width="100%" height={140}>
+        <AreaChart
+          data={points}
+          margin={{ top: 6, right: 8, left: 0, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={couleur} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={couleur} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={CH.grille}
+            vertical={false}
+          />
+          <XAxis
+            dataKey="mois"
+            fontSize={9}
+            stroke={CH.axe}
+            tickLine={false}
+            minTickGap={24}
+            interval="preserveStartEnd"
+          />
+          {/* Échelle PROPRE à l'indicateur, calée sur ses min/max : on voit la
+              variation, pas un trait plat en haut du cadre. */}
+          <YAxis
+            fontSize={9}
+            stroke={CH.axe}
+            tickFormatter={fmtCompact}
+            width={42}
+            domain={["auto", "auto"]}
+            tickLine={false}
+            axisLine={false}
+            tickCount={4}
+          />
+          <Tooltip content={<AstTooltip />} />
+          <Area
+            type="monotone"
+            dataKey="valeur"
+            name={indicateur.label}
+            stroke={couleur}
+            strokeWidth={2}
+            fill={`url(#${gradId})`}
+            connectNulls
+            dot={{ r: 2.5, fill: couleur, strokeWidth: 0 }}
+            activeDot={{ r: 4 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 };
@@ -470,18 +568,8 @@ const AdminAnalyseStockScreen = () => {
     [recap],
   );
 
-  // Évolution 12 mois : une clé par indicateur, ordre chronologique.
+  // Évolution 12 mois : rendue en petits multiples (voir EvolutionIndicateur).
   const evolution = recap?.evolution;
-  const chartEvolution = useMemo(() => {
-    if (!evolution) return [];
-    return evolution.mois.map((m, i) => {
-      const point = { mois: labelMoisCourt(m) };
-      for (const ind of evolution.indicateurs) {
-        point[ind.label] = ind.valeurs[i];
-      }
-      return point;
-    });
-  }, [evolution]);
   const nbMoisReleves = useMemo(() => {
     if (!evolution) return 0;
     const ref = evolution.indicateurs[0];
@@ -716,35 +804,21 @@ const AdminAnalyseStockScreen = () => {
                 <h3 className="ast-chart-title">
                   Évolution sur 12 mois glissants
                 </h3>
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={chartEvolution}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={CH.grille} />
-                    <XAxis dataKey="mois" fontSize={10} stroke={CH.axe} />
-                    <YAxis
-                      fontSize={10}
-                      stroke={CH.axe}
-                      tickFormatter={fmtCompact}
-                      width={52}
+                <div className="ast-evo-grid">
+                  {evolution.indicateurs.map((ind, i) => (
+                    <EvolutionIndicateur
+                      key={ind.label}
+                      indicateur={ind}
+                      mois={evolution.mois}
+                      idx={i}
                     />
-                    <Tooltip content={<AstTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: "11px" }} />
-                    {evolution.indicateurs.map((ind) => (
-                      <Line
-                        key={ind.label}
-                        type="monotone"
-                        dataKey={ind.label}
-                        name={ind.label}
-                        stroke={couleurIndicateur(ind.label)}
-                        strokeWidth={2}
-                        connectNulls
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+                  ))}
+                </div>
                 <p className="ast-note">
                   {nbMoisReleves} mois relevé{nbMoisReleves > 1 ? "s" : ""} sur
                   12 — l'historique se remplit au fil des générations
-                  mensuelles du robot.
+                  mensuelles du robot. Chaque indicateur a sa propre échelle :
+                  comparer les tendances, pas les hauteurs de courbe.
                 </p>
               </div>
             </section>
