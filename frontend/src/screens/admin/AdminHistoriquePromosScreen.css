@@ -1,0 +1,221 @@
+/* AdminHistoriquePromosScreen.css — thème sombre admin (variables globales). */
+
+.hpr-screen {
+  padding: 1.2rem 1.4rem 2rem;
+  color: var(--admin-text);
+}
+
+.hpr-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.hpr-titre {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.hpr-sous-titre {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary);
+  max-width: 48rem;
+}
+
+.hpr-chargement {
+  color: var(--admin-text-secondary);
+  font-size: 0.8rem;
+}
+
+.hpr-info {
+  color: var(--admin-text-secondary);
+  font-size: 0.9rem;
+}
+
+.hpr-erreur {
+  color: #fb7185;
+  font-size: 0.9rem;
+}
+
+/* ---- Sélecteur de mois ---- */
+
+.hpr-periodes {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.hpr-periode {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.hpr-periode:hover {
+  border-color: #4da6ff;
+}
+
+.hpr-periode.actif {
+  background: rgba(77, 166, 255, 0.18);
+  border-color: #4da6ff;
+  color: #4da6ff;
+  font-weight: 600;
+}
+
+/* ---- KPI ---- */
+
+.hpr-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+
+.hpr-kpi {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.hpr-kpi-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-secondary);
+}
+
+.hpr-kpi-valeur {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hpr-kpi-date {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.hpr-kpi-detail {
+  font-size: 0.78rem;
+  color: var(--admin-text-secondary);
+}
+
+.hpr-vert {
+  color: #34d399;
+}
+
+/* ---- Cartes ---- */
+
+.hpr-card {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.9rem 1rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.hpr-card-titre {
+  margin: 0 0 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* ---- Tables ---- */
+
+.hpr-table-wrap {
+  overflow-x: auto;
+}
+
+.hpr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.hpr-table th {
+  text-align: right;
+  padding: 0.5rem 0.7rem;
+  color: var(--admin-text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.hpr-table td {
+  text-align: right;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+
+.hpr-table th.gauche,
+.hpr-table td.gauche {
+  text-align: left;
+}
+
+.hpr-table tbody tr:hover {
+  background: var(--admin-bg-tertiary);
+}
+
+.hpr-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* La table de l'historique sert aussi de sélecteur de mois. */
+.hpr-table tbody tr {
+  cursor: default;
+}
+
+.hpr-card:last-child .hpr-table tbody tr {
+  cursor: pointer;
+}
+
+.hpr-ligne-active {
+  background: rgba(77, 166, 255, 0.1);
+}
+
+.hpr-medaille {
+  font-size: 1.05rem;
+}
+
+.hpr-nart {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #4da6ff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  margin-right: 0.55rem;
+}
+
+.hpr-nart:hover {
+  text-decoration: underline;
+}
+
+.hpr-designation {
+  white-space: normal;
+}
+
+.hpr-periode-promo {
+  color: var(--admin-text-secondary);
+  font-size: 0.8rem;
+}
