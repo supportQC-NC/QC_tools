@@ -308,6 +308,7 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
     userCompta: "",
     cheminLogoEtiquettes: "",
     dossierFtpDocuments: "",
+    modeDepotDat: "rcommun",
     couleurPrimaire: DEFAULT_PRIMAIRE,
     couleurSecondaire: DEFAULT_SECONDAIRE,
     logo: "",
@@ -410,6 +411,7 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
         userCompta: entreprise.userCompta?._id || entreprise.userCompta || "",
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
         dossierFtpDocuments: entreprise.dossierFtpDocuments || "",
+        modeDepotDat: entreprise.modeDepotDat || "rcommun",
         couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
         couleurSecondaire: entreprise.couleurSecondaire || DEFAULT_SECONDAIRE,
         logo: entreprise.logo || "",
@@ -1098,7 +1100,28 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
 
             <div className="form-group">
               <label>
-                <HiFolder /> Dossier FTP documents (optionnel)
+                <HiFolder /> Destination des fichiers .dat
+              </label>
+              <select
+                name="modeDepotDat"
+                value={formData.modeDepotDat}
+                onChange={handleChange}
+              >
+                <option value="rcommun">RCOMMUN (collect_sec)</option>
+                <option value="ftp">FTP robot-documents</option>
+              </select>
+              <span className="input-hint">
+                RCOMMUN = dépôt dans le chemin d'export ci-dessus (défaut). FTP
+                = les .dat (réappro, bipage, préparation, régul réception) sont
+                déposés sur le FTP robot-documents dans le dossier ci-dessous —
+                plus AUCUNE écriture dans collect_sec. Les .dat d'inventaire
+                restent sur le partage STOCK (chaîne du watcher).
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiFolder /> Dossier FTP documents
               </label>
               <input
                 type="text"
@@ -1108,10 +1131,11 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
                 placeholder="ex : SEDQ"
               />
               <span className="input-hint">
-                Dossier racine sur le FTP robot-documents où ARCHIVER en copie
-                les documents générés (.dat collecteurs, rapports, fiches de
-                contrôle). Vide = pas d'archivage FTP. Le flux Rcommun/collect
-                reste inchangé.
+                Dossier racine de la société sur le FTP robot-documents.
+                OBLIGATOIRE en mode FTP (sans lui, le dépôt retombe en
+                RCOMMUN). En mode RCOMMUN, le renseigner active une simple
+                copie d'archive FTP des documents générés. Consultation :
+                écran Documents FTP.
               </span>
             </div>
 

@@ -9,7 +9,11 @@ import fs from "fs";
 import path from "path";
 import Entreprise from "../models/EntrepriseModel.js";
 import { fmtQteDat } from "../utils/qteDat.js";
-import { deposerDocumentFtp } from "./documentsFtpService.js";
+import {
+  deposerDocumentFtp,
+  deposerDatFtp,
+  modeDepotFtp,
+} from "./documentsFtpService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -65,17 +69,28 @@ export const ecrireTransfertBipage = async (demande, lignes) => {
     "stock.dat bipage " +
     sanitizeFileName(`${demande.entreprise}_${ref}_${stamp}`);
 
-  const dir = dossierCollectSec(entreprise);
   const chemins = [];
-  try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const p1 = path.join(dir, nomTsf);
-    fs.writeFileSync(p1, contenu, "utf8");
-    chemins.push(p1);
-    // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
-    deposerDocumentFtp(entreprise, "bipage", nomTsf, p1).catch(() => {});
-  } catch (e) {
-    console.error("[DEMANDE bipage transfert] écriture impossible:", e.message);
+  if (modeDepotFtp(entreprise)) {
+    // Mode FTP (ex. DQ → SEDQ) : le FTP EST la destination, pas de collect_sec.
+    const r = await deposerDatFtp(
+      entreprise,
+      "bipage",
+      nomTsf,
+      Buffer.from(contenu, "utf8"),
+    );
+    chemins.push(`FTP:${r.chemin}`);
+  } else {
+    const dir = dossierCollectSec(entreprise);
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const p1 = path.join(dir, nomTsf);
+      fs.writeFileSync(p1, contenu, "utf8");
+      chemins.push(p1);
+      // Copie d'archive FTP si la société en a une (best-effort).
+      deposerDocumentFtp(entreprise, "bipage", nomTsf, p1).catch(() => {});
+    } catch (e) {
+      console.error("[DEMANDE bipage transfert] écriture impossible:", e.message);
+    }
   }
 
   return { fileName: nomTsf, chemins, lignes: nbLignes };

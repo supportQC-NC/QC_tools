@@ -142,6 +142,7 @@ const createEntreprise = asyncHandler(async (req, res) => {
     logo,
     vendeurs,
     dossierFtpDocuments,
+    modeDepotDat,
   } = req.body;
 
   // Vérifier si le dossier DBF existe déjà
@@ -180,9 +181,13 @@ const createEntreprise = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   };
 
-  // Miroir FTP des documents générés (vide = désactivé)
+  // Dépôt des documents générés : dossier FTP + mode (rcommun | ftp)
   if (dossierFtpDocuments !== undefined) {
     entrepriseData.dossierFtpDocuments = String(dossierFtpDocuments || "").trim();
+  }
+  if (modeDepotDat !== undefined) {
+    entrepriseData.modeDepotDat =
+      modeDepotDat === "ftp" ? "ftp" : "rcommun";
   }
 
   // Champs réception (rapport de contrôle commande)
@@ -279,6 +284,7 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     logo,
     vendeurs,
     dossierFtpDocuments,
+    modeDepotDat,
   } = req.body;
 
   // Vérifier unicité du dossier DBF si modifié
@@ -349,9 +355,12 @@ const updateEntreprise = asyncHandler(async (req, res) => {
 
   entreprise.isActive = isActive !== undefined ? isActive : entreprise.isActive;
 
-  // Miroir FTP des documents générés (vide = désactivé)
+  // Dépôt des documents générés : dossier FTP + mode (rcommun | ftp)
   if (dossierFtpDocuments !== undefined) {
     entreprise.dossierFtpDocuments = String(dossierFtpDocuments || "").trim();
+  }
+  if (modeDepotDat !== undefined) {
+    entreprise.modeDepotDat = modeDepotDat === "ftp" ? "ftp" : "rcommun";
   }
 
   // Champs réception (rapport de contrôle commande)

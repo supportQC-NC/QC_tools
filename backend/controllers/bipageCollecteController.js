@@ -10,6 +10,11 @@ import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 import { fmtQteDat } from "../utils/qteDat.js";
+import {
+  deposerDocumentFtp,
+  deposerDatFtp,
+  modeDepotFtp,
+} from "../services/documentsFtpService.js";
 
 // Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
 // l'unité. Le .dat, lui, reste en entiers (format Stock XL figé, arrondi au
@@ -381,7 +386,7 @@ const exportBipage = asyncHandler(async (req, res) => {
 
   const bipage = await BipageCollecte.findById(req.params.id).populate(
     "entreprise",
-    "nomDossierDBF trigramme nomComplet cheminExportInventaire",
+    "nomDossierDBF trigramme nomComplet cheminExportInventaire modeDepotDat dossierFtpDocuments",
   );
   if (!bipage) {
     res.status(404);
@@ -404,23 +409,44 @@ const exportBipage = asyncHandler(async (req, res) => {
     cheminDestination?.trim() ||
     "/mnt/rcommun/STOCK/collect_sec";
 
-  try {
-    if (!fs.existsSync(cheminExport)) {
-      fs.mkdirSync(cheminExport, { recursive: true });
+  let cheminFichier;
+  if (modeDepotFtp(bipage.entreprise)) {
+    // Mode FTP (ex. DQ → SEDQ) : le FTP EST la destination, pas de collect_sec.
+    try {
+      const r = await deposerDatFtp(
+        bipage.entreprise,
+        "bipage",
+        nomFichier,
+        Buffer.from(contenu, "utf8"),
+      );
+      cheminFichier = `FTP:${r.chemin}`;
+    } catch (error) {
+      res.status(502);
+      throw new Error(error.message);
     }
-  } catch (error) {
-    res.status(400);
-    throw new Error(
-      `Impossible d'accéder au chemin: ${cheminExport}. Vérifiez les droits d'accès. (${error.message})`,
-    );
-  }
+  } else {
+    try {
+      if (!fs.existsSync(cheminExport)) {
+        fs.mkdirSync(cheminExport, { recursive: true });
+      }
+    } catch (error) {
+      res.status(400);
+      throw new Error(
+        `Impossible d'accéder au chemin: ${cheminExport}. Vérifiez les droits d'accès. (${error.message})`,
+      );
+    }
 
-  const cheminFichier = path.join(cheminExport, nomFichier);
-  try {
-    fs.writeFileSync(cheminFichier, contenu, "utf8");
-  } catch (error) {
-    res.status(400);
-    throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
+    cheminFichier = path.join(cheminExport, nomFichier);
+    try {
+      fs.writeFileSync(cheminFichier, contenu, "utf8");
+    } catch (error) {
+      res.status(400);
+      throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
+    }
+
+    // Copie d'archive FTP si la société en a une (best-effort).
+    deposerDocumentFtp(bipage.entreprise, "bipage", nomFichier, cheminFichier)
+      .catch(() => {});
   }
 
   bipage.nom = nomBipage.trim();

@@ -31,6 +31,7 @@
 import fs from "fs";
 import path from "path";
 import { buildControleCmdDir } from "../utils/receptionPaths.js";
+import { deposerDatFtp, modeDepotFtp } from "./documentsFtpService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 
@@ -173,7 +174,7 @@ const csvRenvoi = (lignes) => {
  * @param {object} entreprise Document Entreprise (getters chemins)
  * @returns {{dossierExport, dossierCollecteur, regul, renvoi}}
  */
-export const genererFichiersStockXL = (reception, entreprise) => {
+export const genererFichiersStockXL = async (reception, entreprise) => {
   const dossierExport = resoudreDossierCollectSec(entreprise); // collect_sec
 
   // Dossier de la commande (PDF + photos). Best-effort : si indisponible, on
@@ -189,11 +190,22 @@ export const genererFichiersStockXL = (reception, entreprise) => {
   const numcde = sanitizeFileSegment(reception.numcde);
   const resultat = { dossierExport, dossierCollecteur, regul: null, renvoi: null };
 
-  // Dépose un fichier dans collect_sec + copie dans le dossier collecteur.
-  const deposer = (fichier, contenu) => {
+  // Dépose un fichier : collect_sec (ou le FTP si la société est en mode
+  // dépôt FTP, ex. DQ → SEDQ) + copie dans le dossier collecteur.
+  const deposer = async (fichier, contenu) => {
     const chemins = [];
-    // 1) collect_sec (principal)
-    chemins.push(ecrireFichier(dossierExport, fichier, contenu));
+    // 1) destination principale
+    if (modeDepotFtp(entreprise)) {
+      const r = await deposerDatFtp(
+        entreprise,
+        "reception",
+        fichier,
+        Buffer.from(contenu, "utf8"),
+      );
+      chemins.push(`FTP:${r.chemin}`);
+    } else {
+      chemins.push(ecrireFichier(dossierExport, fichier, contenu));
+    }
     // 2) copie dans le dossier de la commande (PDF/photos)
     if (dossierCollecteur) {
       try {
@@ -212,7 +224,7 @@ export const genererFichiersStockXL = (reception, entreprise) => {
   try {
     const lignesRegul = construireLignesRegul(reception);
     if (lignesRegul.length > 0) {
-      const chemins = deposer(`regul_${numcde}.csv`, csvRegul(lignesRegul));
+      const chemins = await deposer(`regul_${numcde}.csv`, csvRegul(lignesRegul));
       resultat.regul = { chemins, lignes: lignesRegul.length };
     } else {
       resultat.regul = { chemins: [], lignes: 0 }; // rien à régulariser
@@ -226,7 +238,7 @@ export const genererFichiersStockXL = (reception, entreprise) => {
   try {
     const lignesRenvoi = construireLignesRenvoi(reception);
     if (lignesRenvoi.length > 0) {
-      const chemins = deposer(`renvoi_${numcde}.csv`, csvRenvoi(lignesRenvoi));
+      const chemins = await deposer(`renvoi_${numcde}.csv`, csvRenvoi(lignesRenvoi));
       resultat.renvoi = { chemins, lignes: lignesRenvoi.length };
     } else {
       resultat.renvoi = { chemins: [], lignes: 0 }; // aucun renvoi

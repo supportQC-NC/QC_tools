@@ -28,7 +28,11 @@ import {
 } from "../services/dictionnaireRayonsService.js";
 import { memeCodeBarres } from "../utils/codeBarres.js";
 import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
-import { deposerDocumentFtp } from "../services/documentsFtpService.js";
+import {
+  deposerDocumentFtp,
+  deposerDatFtp,
+  modeDepotFtp,
+} from "../services/documentsFtpService.js";
 import { importerProformasReappro } from "../services/reapproProformaImportService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
 
@@ -1035,6 +1039,23 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
   const dir =
     String(entreprise.cheminExportInventaire || "").trim() ||
     "/mnt/rcommun/STOCK/collect_sec";
+  if (modeDepotFtp(entreprise)) {
+    // Mode FTP (ex. DQ → SEDQ) : le FTP EST la destination, pas de collect_sec.
+    try {
+      await deposerDatFtp(
+        entreprise,
+        "reappro",
+        nomFichier,
+        Buffer.from(contenu, "utf8"),
+      );
+    } catch (error) {
+      res.status(502);
+      throw new Error(error.message);
+    }
+    res.json({ fileName: nomFichier, lignes: nbLignes, destination: "ftp" });
+    return;
+  }
+
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, nomFichier), contenu, "utf8");
@@ -1043,7 +1064,7 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
     throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
   }
 
-  // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
+  // Copie d'archive FTP si la société en a une (best-effort).
   deposerDocumentFtp(
     entreprise,
     "reappro",

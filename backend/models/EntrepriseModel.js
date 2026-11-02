@@ -176,15 +176,28 @@ const entrepriseSchema = new mongoose.Schema(
       default: DEFAULT_BASE_COLLECTEUR,
       get: (v) => traduireCheminExport(v),
     },
-    // Dossier RACINE sur le FTPS robot-documents où MIROITER les documents
-    // générés pour CETTE société (.dat collecteurs, rapports de réception/
-    // préparation, fiches de contrôle) — ex. « SEDQ » pour DQ. VIDE = miroir
-    // désactivé (cas général). Copies BEST-EFFORT : le flux opérationnel
-    // (collect_sec / partage STOCK) reste inchangé et prioritaire.
+    // Dossier RACINE sur le FTPS robot-documents pour les documents générés de
+    // CETTE société (.dat collecteurs, rapports, fiches) — ex. « SEDQ » pour
+    // DQ. VIDE = aucun dépôt FTP. Son rôle dépend de `modeDepotDat` :
+    //  - mode "rcommun" : simple COPIE D'ARCHIVE best-effort en plus du flux
+    //    collect_sec (qui reste le canal opérationnel) ;
+    //  - mode "ftp"     : le FTP devient LA destination des .dat (plus aucune
+    //    écriture collect_sec), un échec FTP fait échouer le dépôt.
     dossierFtpDocuments: {
       type: String,
       default: "",
       trim: true,
+    },
+    // Destination des fichiers .dat générés (réappro, bipage, préparation) :
+    // "rcommun" = collect_sec (défaut historique) ; "ftp" = dépôt direct sur
+    // le FTPS robot-documents dans `dossierFtpDocuments` (décision client du
+    // 02/11/2026 pour DQ/SEDQ). ⚠️ "ftp" exige `dossierFtpDocuments` rempli,
+    // sinon le dépôt retombe en mode rcommun. Les .dat d'INVENTAIRE ne sont
+    // pas concernés : ils restent sur le partage STOCK (chaîne du watcher).
+    modeDepotDat: {
+      type: String,
+      enum: ["rcommun", "ftp"],
+      default: "rcommun",
     },
     // Destinataires de l'EMAIL D'ALERTE du rapport de réception (réservé à ce rapport).
     // Liste d'adresses email (service Achats, chef de dépôt, ...).

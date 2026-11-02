@@ -8,7 +8,11 @@ import fs from "fs";
 import path from "path";
 import Entreprise from "../models/EntrepriseModel.js";
 import { fmtQteDat } from "../utils/qteDat.js";
-import { deposerDocumentFtp } from "./documentsFtpService.js";
+import {
+  deposerDocumentFtp,
+  deposerDatFtp,
+  modeDepotFtp,
+} from "./documentsFtpService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -83,20 +87,32 @@ export const ecrireTransfertMagasin = async (demande, lignes) => {
       `tsf_reappro_mag_${demande.entreprise}_${libelle}_${stamp}`,
     ) + ".dat";
 
-  const dir = dossierCollectSec(entreprise);
   const chemins = [];
-  try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const p1 = path.join(dir, nomTsf);
-    fs.writeFileSync(p1, contenu, "utf8");
-    chemins.push(p1);
-    // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
-    deposerDocumentFtp(entreprise, "reappro", nomTsf, p1).catch(() => {});
-  } catch (e) {
-    console.error(
-      "[DEMANDE transfert collect_sec] écriture impossible:",
-      e.message,
+  if (modeDepotFtp(entreprise)) {
+    // Mode FTP (ex. DQ → SEDQ) : le FTP EST la destination, pas de collect_sec.
+    // Un échec LÈVE — le fichier n'existerait nulle part.
+    const r = await deposerDatFtp(
+      entreprise,
+      "reappro",
+      nomTsf,
+      Buffer.from(contenu, "utf8"),
     );
+    chemins.push(`FTP:${r.chemin}`);
+  } else {
+    const dir = dossierCollectSec(entreprise);
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const p1 = path.join(dir, nomTsf);
+      fs.writeFileSync(p1, contenu, "utf8");
+      chemins.push(p1);
+      // Copie d'archive FTP si la société en a une (best-effort).
+      deposerDocumentFtp(entreprise, "reappro", nomTsf, p1).catch(() => {});
+    } catch (e) {
+      console.error(
+        "[DEMANDE transfert collect_sec] écriture impossible:",
+        e.message,
+      );
+    }
   }
 
   return { fileName: nomTsf, chemins, lignes: nbLignes };

@@ -3033,7 +3033,7 @@ const genererRapport = asyncHandler(async (req, res) => {
   // collect_sec. Ne bloque jamais la clôture de la réception si l'écriture échoue.
   let fichiersStockXL = null;
   try {
-    fichiersStockXL = receptionExportService.genererFichiersStockXL(
+    fichiersStockXL = await receptionExportService.genererFichiersStockXL(
       reception,
       entreprise,
     );

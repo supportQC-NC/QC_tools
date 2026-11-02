@@ -607,7 +607,11 @@ import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 import { fmtQteDat } from "../utils/qteDat.js";
-import { deposerDocumentFtp } from "../services/documentsFtpService.js";
+import {
+  deposerDocumentFtp,
+  deposerDatFtp,
+  modeDepotFtp,
+} from "../services/documentsFtpService.js";
 
 // Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
 // l'unité — même règle que les listes de réappro. Un corps sans quantité vaut
@@ -1165,7 +1169,7 @@ const exportReappro = asyncHandler(async (req, res) => {
 
   const reappro = await Reappro.findById(req.params.id).populate(
     "entreprise",
-    "nomDossierDBF trigramme nomComplet cheminExportInventaire",
+    "nomDossierDBF trigramme nomComplet cheminExportInventaire modeDepotDat dossierFtpDocuments",
   );
 
   if (!reappro) {
@@ -1195,31 +1199,48 @@ const exportReappro = asyncHandler(async (req, res) => {
     cheminDestination?.trim() ||
     "/mnt/rcommun/STOCK/collect_sec";
 
-  // Vérifier et créer le dossier
-  try {
-    if (!fs.existsSync(cheminExport)) {
-      fs.mkdirSync(cheminExport, { recursive: true });
+  let cheminFichier;
+  if (modeDepotFtp(reappro.entreprise)) {
+    // Mode FTP (ex. DQ → SEDQ) : le FTP EST la destination, pas de collect_sec.
+    try {
+      const r = await deposerDatFtp(
+        reappro.entreprise,
+        "reappro",
+        nomFichier,
+        Buffer.from(contenu, "utf8"),
+      );
+      cheminFichier = `FTP:${r.chemin}`;
+    } catch (error) {
+      res.status(502);
+      throw new Error(error.message);
     }
-  } catch (error) {
-    res.status(400);
-    throw new Error(
-      `Impossible d'accéder au chemin: ${cheminExport}. Vérifiez les droits d'accès. (${error.message})`,
-    );
+  } else {
+    // Vérifier et créer le dossier
+    try {
+      if (!fs.existsSync(cheminExport)) {
+        fs.mkdirSync(cheminExport, { recursive: true });
+      }
+    } catch (error) {
+      res.status(400);
+      throw new Error(
+        `Impossible d'accéder au chemin: ${cheminExport}. Vérifiez les droits d'accès. (${error.message})`,
+      );
+    }
+
+    cheminFichier = path.join(cheminExport, nomFichier);
+
+    // Écrire le fichier
+    try {
+      fs.writeFileSync(cheminFichier, contenu, "utf8");
+    } catch (error) {
+      res.status(400);
+      throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
+    }
+
+    // Copie d'archive FTP si la société en a une (best-effort).
+    deposerDocumentFtp(reappro.entreprise, "reappro", nomFichier, cheminFichier)
+      .catch(() => {});
   }
-
-  const cheminFichier = path.join(cheminExport, nomFichier);
-
-  // Écrire le fichier
-  try {
-    fs.writeFileSync(cheminFichier, contenu, "utf8");
-  } catch (error) {
-    res.status(400);
-    throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
-  }
-
-  // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
-  deposerDocumentFtp(reappro.entreprise, "reappro", nomFichier, cheminFichier)
-    .catch(() => {});
 
   // Mettre à jour le réappro
   reappro.nom = nomReappro.trim();

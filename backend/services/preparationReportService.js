@@ -471,7 +471,11 @@ import fs from "fs";
 import path from "path";
 import sendEmail from "../utils/sendEmail.js";
 import { fmtQteDat } from "../utils/qteDat.js";
-import { deposerDocumentFtp } from "./documentsFtpService.js";
+import {
+  deposerDocumentFtp,
+  deposerDatFtp,
+  modeDepotFtp,
+} from "./documentsFtpService.js";
 import {
   buildPrepaCmdDir,
   buildPrepaPdfFileName,
@@ -892,19 +896,30 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
         sanitizeFileName(`tsf_prepa_${header.client}_${header.numpro}`) + ".dat";
       const chemins = [];
 
-      // a) collect_sec (destination principale pour Stock XL)
-      try {
-        const dir = dossierCollectSec(entreprise);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        const p1 = path.join(dir, nomTsf);
-        fs.writeFileSync(p1, contenu, "utf8");
-        chemins.push(p1);
-        // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
-        deposerDocumentFtp(entreprise, "preparation", nomTsf, p1).catch(
-          () => {},
+      // a) destination principale pour Stock XL : collect_sec, OU le FTP si la
+      //    société est en mode dépôt FTP (ex. DQ → SEDQ).
+      if (modeDepotFtp(entreprise)) {
+        const r = await deposerDatFtp(
+          entreprise,
+          "preparation",
+          nomTsf,
+          Buffer.from(contenu, "utf8"),
         );
-      } catch (e) {
-        console.error("[PREPA transfert collect_sec] écriture impossible:", e.message);
+        chemins.push(`FTP:${r.chemin}`);
+      } else {
+        try {
+          const dir = dossierCollectSec(entreprise);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          const p1 = path.join(dir, nomTsf);
+          fs.writeFileSync(p1, contenu, "utf8");
+          chemins.push(p1);
+          // Copie d'archive FTP si la société en a une (best-effort).
+          deposerDocumentFtp(entreprise, "preparation", nomTsf, p1).catch(
+            () => {},
+          );
+        } catch (e) {
+          console.error("[PREPA transfert collect_sec] écriture impossible:", e.message);
+        }
       }
 
       // b) copie dans le dossier prepa_cmd (à côté du PDF)

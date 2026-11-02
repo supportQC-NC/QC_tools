@@ -39,6 +39,31 @@ const sanitizeSegment = (s) =>
 export const miroirDocumentsActif = (entreprise) =>
   !!safeTrim(entreprise?.dossierFtpDocuments);
 
+/**
+ * La société dépose-t-elle ses .dat SUR LE FTP au lieu de collect_sec ?
+ * (`modeDepotDat: "ftp"` + dossier racine renseigné — sans dossier, on
+ * retombe en rcommun plutôt que de perdre les fichiers.)
+ */
+export const modeDepotFtp = (entreprise) =>
+  safeTrim(entreprise?.modeDepotDat) === "ftp" &&
+  miroirDocumentsActif(entreprise);
+
+/**
+ * Dépôt OPÉRATIONNEL d'un .dat en mode FTP : contrairement au miroir
+ * d'archive, un échec LÈVE — le fichier n'existerait nulle part ailleurs,
+ * l'opérateur doit le savoir immédiatement.
+ * @returns {Promise<{ok:true, chemin:string}>}
+ */
+export async function deposerDatFtp(entreprise, categorie, nomFichier, contenu) {
+  const r = await deposerDocumentFtp(entreprise, categorie, nomFichier, contenu);
+  if (!r.ok) {
+    throw new Error(
+      `Dépôt FTP impossible (${r.erreur}). Le fichier n'a PAS été déposé.`,
+    );
+  }
+  return r;
+}
+
 /** Racine FTP de la société (ex. « SEDQ »), "" si miroir inactif. */
 export const racineDocumentsFtp = (entreprise) =>
   sanitizeSegment(entreprise?.dossierFtpDocuments);
