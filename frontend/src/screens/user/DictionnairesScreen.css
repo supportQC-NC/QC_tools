@@ -127,12 +127,26 @@
 }
 
 .dict-section-titre {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.85rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--admin-text-secondary);
   margin: 0 0 0.4rem;
+}
+
+.dict-section-count {
+  background: #4da6ff22;
+  border: 1px solid #4da6ff55;
+  color: #4da6ff;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .dict-table-wrap {
@@ -175,6 +189,69 @@
 
 .dict-table td.nom {
   font-weight: 600;
+}
+
+/* ── Table de CONSULTATION : grille FIXE, identique pour toutes les sections
+   (sans table-layout:fixed chaque table s'auto-dimensionnait sur son contenu
+   et les colonnes « sautaient » d'un service à l'autre). ── */
+.dict-table.vue {
+  table-layout: fixed;
+}
+
+.dict-table.vue .col-nom {
+  width: 22%;
+}
+
+.dict-table.vue .col-poste {
+  width: 10%;
+}
+
+.dict-table.vue .col-tel {
+  width: 15%;
+}
+
+.dict-table.vue .col-email {
+  width: 38%;
+}
+
+.dict-table.vue th.centre,
+.dict-table.vue td.centre {
+  text-align: center;
+}
+
+.dict-table.vue td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dict-table.vue tbody tr:nth-child(even) {
+  background: var(--admin-bg-tertiary);
+}
+
+.dict-table.vue tbody tr:hover {
+  background: #4da6ff14;
+}
+
+.dict-table.vue td.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* N° de poste : pastille, le repère le plus utilisé du répertoire. */
+.dict-poste {
+  display: inline-block;
+  min-width: 2.1em;
+  background: #4da6ff1a;
+  border: 1px solid #4da6ff44;
+  border-radius: 6px;
+  padding: 0.05rem 0.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Champ vide : tiret discret, la grille reste lisible sans attirer l'œil. */
+.dict-vide {
+  color: var(--admin-text-secondary);
+  opacity: 0.45;
 }
 
 .dict-table tbody tr:hover {

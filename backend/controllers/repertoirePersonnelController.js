@@ -91,7 +91,7 @@ const upsertRepertoire = asyncHandler(async (req, res) => {
 // @route   GET /api/repertoire-personnel/:entrepriseId/pdf
 const getRepertoirePdf = asyncHandler(async (req, res) => {
   const entreprise = await Entreprise.findById(req.params.entrepriseId).select(
-    "trigramme nomComplet",
+    "trigramme nomComplet couleurPrimaire",
   );
   if (!entreprise) {
     res.status(404);
@@ -117,6 +117,7 @@ const getRepertoirePdf = asyncHandler(async (req, res) => {
     note: repertoire.note,
     entrees: repertoire.entrees,
     majLe: repertoire.updatedAt,
+    couleur: entreprise.couleurPrimaire,
   });
 });
 

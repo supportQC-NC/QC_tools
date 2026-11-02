@@ -37,6 +37,10 @@ const ligneVide = () => ({
   email: "",
 });
 
+// Champ vide : tiret discret, pour que l'œil suive la grille sans que la
+// colonne paraisse « sauter » d'une ligne à l'autre.
+const ou = (v) => (v ? v : <span className="dict-vide">—</span>);
+
 const fmtMaj = (iso) =>
   iso
     ? new Date(iso).toLocaleDateString("fr-FR", {
@@ -207,30 +211,53 @@ const DictionnairesScreen = () => {
           ) : (
             sections.map((sec) => (
               <div key={sec.service} className="dict-section">
-                <h3 className="dict-section-titre">{sec.service}</h3>
+                <h3 className="dict-section-titre">
+                  {sec.service}
+                  <span className="dict-section-count">
+                    {sec.entrees.length}
+                  </span>
+                </h3>
                 <div className="dict-table-wrap">
-                  <table className="dict-table">
+                  {/* table-layout FIXE + colgroup partagé : les colonnes sont
+                      identiques d'une section à l'autre, et un champ vide ne
+                      décale jamais la grille. */}
+                  <table className="dict-table vue">
+                    <colgroup>
+                      <col className="col-nom" />
+                      <col className="col-poste" />
+                      <col className="col-tel" />
+                      <col className="col-tel" />
+                      <col className="col-email" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th className="gauche">Nom</th>
-                        <th>Poste</th>
-                        <th>Tél. ext.</th>
-                        <th>Portable</th>
+                        <th className="centre">Poste</th>
+                        <th className="centre">Tél. ext.</th>
+                        <th className="centre">Portable</th>
                         <th className="gauche">Email</th>
                       </tr>
                     </thead>
                     <tbody>
                       {sec.entrees.map((e, i) => (
                         <tr key={`${e.nom}-${i}`}>
-                          <td className="gauche nom">{e.nom}</td>
-                          <td>{e.poste || "—"}</td>
-                          <td>{e.telExterieur || "—"}</td>
-                          <td>{e.portable || "—"}</td>
-                          <td className="gauche">
+                          <td className="gauche nom" title={e.nom}>
+                            {e.nom}
+                          </td>
+                          <td className="centre poste">
+                            {e.poste ? (
+                              <span className="dict-poste">{e.poste}</span>
+                            ) : (
+                              <span className="dict-vide">—</span>
+                            )}
+                          </td>
+                          <td className="centre num">{ou(e.telExterieur)}</td>
+                          <td className="centre num">{ou(e.portable)}</td>
+                          <td className="gauche email" title={e.email}>
                             {e.email ? (
                               <a href={`mailto:${e.email}`}>{e.email}</a>
                             ) : (
-                              "—"
+                              <span className="dict-vide">—</span>
                             )}
                           </td>
                         </tr>
