@@ -244,6 +244,130 @@
   font-weight: 600;
 }
 
+/* ── Liste déroulante avec moteur de recherche (fournisseurs) ── */
+.ast-combo {
+  position: relative;
+}
+
+.ast-combo-valeur {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.ast-combo-valeur.actif {
+  color: var(--admin-text);
+  border-color: #4da6ff;
+}
+
+.ast-combo-texte {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ast-combo-fleche {
+  font-size: 0.7rem;
+  color: var(--admin-text-secondary);
+}
+
+.ast-combo-liste {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 280px;
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  box-shadow: var(--admin-shadow);
+  padding: 0.4rem;
+}
+
+.ast-combo-recherche {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.ast-combo-options {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.ast-combo-option {
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--admin-text);
+  padding: 0.32rem 0.5rem;
+  font-size: 0.84rem;
+  border-radius: var(--admin-radius);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ast-combo-option:hover {
+  background: var(--admin-bg-tertiary);
+}
+
+.ast-combo-option.on {
+  background: #4da6ff22;
+  color: #4da6ff;
+  font-weight: 600;
+}
+
+.ast-combo-option.tous {
+  color: var(--admin-text-secondary);
+  font-style: italic;
+}
+
+.ast-combo-note {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--admin-text-secondary);
+}
+
+/* Bouton d'export Excel de l'explorateur. */
+.ast-btn-export {
+  background: #4da6ff22;
+  color: var(--admin-text);
+  border: 1px solid #4da6ff;
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ast-btn-export:hover {
+  background: #4da6ff33;
+}
+
+.ast-btn-export:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .ast-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--admin-border);

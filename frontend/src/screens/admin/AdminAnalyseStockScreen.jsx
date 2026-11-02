@@ -21,7 +21,7 @@
 // La société suit la sélection GLOBALE du header. Montants : fmtMontant
 // (entiers, espaces larges — préférence client du 29/10/2026).
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -299,6 +299,106 @@ const TopArticles = ({ titre, lignes, champ, libelleChamp, dossier }) => (
   </div>
 );
 
+// ── Liste déroulante AVEC MOTEUR DE RECHERCHE : les fournisseurs se comptent
+// en centaines chez QC, un <select> natif est impraticable. Sans dépendance :
+// bouton-valeur + panneau (champ de recherche sans accents/casse + options),
+// fermé au clic extérieur ou sur Échap. ──
+const normaliser = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+const MAX_OPTIONS_VISIBLES = 150;
+
+const SelectRecherche = ({ valeur, options, onChange, placeholder, titre }) => {
+  const [ouvert, setOuvert] = useState(false);
+  const [filtre, setFiltre] = useState("");
+  const boite = useRef(null);
+
+  useEffect(() => {
+    if (!ouvert) return undefined;
+    const fermer = (e) => {
+      if (boite.current && !boite.current.contains(e.target)) setOuvert(false);
+    };
+    document.addEventListener("mousedown", fermer);
+    return () => document.removeEventListener("mousedown", fermer);
+  }, [ouvert]);
+
+  const visibles = useMemo(() => {
+    const f = normaliser(filtre);
+    const liste = f
+      ? (options || []).filter((o) => normaliser(o).includes(f))
+      : options || [];
+    return liste.slice(0, MAX_OPTIONS_VISIBLES);
+  }, [options, filtre]);
+
+  const choisir = (v) => {
+    onChange(v);
+    setOuvert(false);
+    setFiltre("");
+  };
+
+  return (
+    <div className="ast-combo" ref={boite} title={titre}>
+      <button
+        type="button"
+        className={`ast-combo-valeur ${valeur ? "actif" : ""}`}
+        onClick={() => setOuvert((o) => !o)}
+      >
+        <span className="ast-combo-texte">{valeur || placeholder}</span>
+        <span className="ast-combo-fleche">▾</span>
+      </button>
+      {ouvert && (
+        <div className="ast-combo-liste">
+          <input
+            autoFocus
+            type="search"
+            className="ast-combo-recherche"
+            placeholder="Rechercher…"
+            value={filtre}
+            onChange={(e) => setFiltre(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setOuvert(false);
+              if (e.key === "Enter" && visibles.length === 1) {
+                choisir(visibles[0]);
+              }
+            }}
+          />
+          <div className="ast-combo-options">
+            <button
+              type="button"
+              className={`ast-combo-option tous ${!valeur ? "on" : ""}`}
+              onClick={() => choisir("")}
+            >
+              {placeholder}
+            </button>
+            {visibles.map((o) => (
+              <button
+                key={o}
+                type="button"
+                className={`ast-combo-option ${o === valeur ? "on" : ""}`}
+                onClick={() => choisir(o)}
+              >
+                {o}
+              </button>
+            ))}
+            {(options || []).length > visibles.length && (
+              <div className="ast-combo-note">
+                {fmtMontant((options || []).length - visibles.length)} autres —
+                affinez la recherche.
+              </div>
+            )}
+            {visibles.length === 0 && (
+              <div className="ast-combo-note">Aucun résultat.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Explorateur d'articles (section 5) : tout est côté serveur. ──
 
 const COLONNES_EXPLORATEUR = [
@@ -385,6 +485,25 @@ const ExplorateurArticles = ({ dossier, periode, filtres }) => {
   const taille = data?.taille ?? 50;
   const nbPages = Math.max(1, Math.ceil(total / taille));
 
+  // Export Excel : MÊMES filtres et tri que l'écran, sans pagination
+  // (le serveur streame le classeur — voir analyseStockExcelService).
+  const exporterExcel = () => {
+    const params = new URLSearchParams({
+      periode,
+      q: rechercheDebounce,
+      codeFiltre,
+      fournisseur,
+      groupe,
+      flag,
+      tri: tri.col,
+      dir: tri.desc ? "desc" : "asc",
+    });
+    window.open(
+      `${BASE_URL}/api/analyse-stock/societe/${dossier}/articles/export?${params.toString()}`,
+      "_blank",
+    );
+  };
+
   return (
     <section className="ast-table-card">
       <div className="ast-table-head">
@@ -412,18 +531,13 @@ const ExplorateurArticles = ({ dossier, periode, filtres }) => {
               </option>
             ))}
           </select>
-          <select
-            className="ast-select"
-            value={fournisseur}
-            onChange={(e) => setFournisseur(e.target.value)}
-          >
-            <option value="">Tous fournisseurs</option>
-            {(filtres?.fournisseurs || []).map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
+          <SelectRecherche
+            valeur={fournisseur}
+            options={filtres?.fournisseurs || []}
+            onChange={setFournisseur}
+            placeholder="Tous fournisseurs"
+            titre="Filtrer par fournisseur (tapez pour rechercher)"
+          />
           <select
             className="ast-select"
             value={groupe}
@@ -436,6 +550,15 @@ const ExplorateurArticles = ({ dossier, periode, filtres }) => {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="ast-btn-export"
+            onClick={exporterExcel}
+            disabled={total === 0}
+            title="Exporter en Excel les articles filtrés (tout, pas seulement la page)"
+          >
+            ⬇ Excel ({fmtNb(total)})
+          </button>
         </div>
       </div>
 

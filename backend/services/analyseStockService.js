@@ -488,12 +488,13 @@ const FLAGS = {
 };
 
 /**
- * Filtre + trie + pagine la liste des articles (46 000 lignes chez QC :
- * tout se fait ici, le front ne reçoit qu'une page).
+ * Filtre + tri de l'explorateur, SANS pagination. Partagé entre la liste
+ * paginée (filtrerArticles) et l'export Excel (mêmes filtres exactement :
+ * ce que l'utilisateur voit est ce qu'il exporte).
  */
-export function filtrerArticles(
+function appliquerFiltresEtTri(
   data,
-  { q = "", codeFiltre = "", fournisseur = "", groupe = "", flag = "", tri = "valeurStock", dir = "desc", page = 1, taille = 50 } = {},
+  { q = "", codeFiltre = "", fournisseur = "", groupe = "", flag = "", tri = "valeurStock", dir = "desc" } = {},
 ) {
   let lignes = data.articles;
 
@@ -516,7 +517,7 @@ export function filtrerArticles(
   const cle = TRIS.has(tri) ? tri : "valeurStock";
   const sens = dir === "asc" ? 1 : -1;
   const texte = cle === "nart" || cle === "design" || cle === "fournisseur" || cle === "groupe";
-  lignes = [...lignes].sort((a, b) => {
+  return [...lignes].sort((a, b) => {
     const va = a[cle];
     const vb = b[cle];
     if (texte) return sens * String(va || "").localeCompare(String(vb || ""));
@@ -528,6 +529,15 @@ export function filtrerArticles(
     }
     return sens * (na - nb);
   });
+}
+
+/**
+ * Filtre + trie + pagine la liste des articles (46 000 lignes chez QC :
+ * tout se fait ici, le front ne reçoit qu'une page).
+ */
+export function filtrerArticles(data, opts = {}) {
+  const lignes = appliquerFiltresEtTri(data, opts);
+  const { page = 1, taille = 50 } = opts;
 
   const total = lignes.length;
   const parPage = Math.min(Math.max(Number(taille) || 50, 10), 200);
@@ -540,6 +550,11 @@ export function filtrerArticles(
     taille: parPage,
     articles: lignes.slice(debut, debut + parPage),
   };
+}
+
+/** Liste COMPLÈTE filtrée/triée — export Excel de l'explorateur. */
+export function filtrerArticlesTous(data, opts = {}) {
+  return appliquerFiltresEtTri(data, opts);
 }
 
 /**
@@ -569,5 +584,6 @@ export default {
   lireAnalyse,
   construireSynthese,
   filtrerArticles,
+  filtrerArticlesTous,
   listerFiltres,
 };

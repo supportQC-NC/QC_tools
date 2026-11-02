@@ -13,8 +13,10 @@ import {
   lireAnalyse,
   construireSynthese,
   filtrerArticles,
+  filtrerArticlesTous,
   listerFiltres,
 } from "../services/analyseStockService.js";
+import { ecrireExportArticles } from "../services/analyseStockExcelService.js";
 
 // Périodes "AAAA-MM" d'une source, la plus récente d'abord.
 const periodesDesc = (parPeriode) => [...parPeriode.keys()].sort().reverse();
@@ -107,4 +109,38 @@ const getArticles = asyncHandler(async (req, res) => {
   });
 });
 
-export { listerSources, getSynthese, getArticles };
+// GET /api/analyse-stock/societe/:nomDossierDBF/articles/export
+//     ?periode&q&codeFiltre&fournisseur&groupe&flag&tri&dir
+// Export Excel de l'explorateur : EXACTEMENT les filtres et le tri de
+// l'écran, mais SANS pagination (classeur streamé, jusqu'à 46 k lignes).
+const exportArticles = asyncHandler(async (req, res) => {
+  const { chemin, periode } = await classeurPourEntreprise(req, res);
+  const data = await lireAnalyse(chemin);
+
+  const filtres = {
+    q: String(req.query.q || ""),
+    codeFiltre: String(req.query.codeFiltre || ""),
+    fournisseur: String(req.query.fournisseur || ""),
+    groupe: String(req.query.groupe || ""),
+    flag: String(req.query.flag || ""),
+    tri: String(req.query.tri || "valeurStock"),
+    dir: String(req.query.dir || "desc"),
+  };
+  const articles = filtrerArticlesTous(data, filtres);
+
+  const nom = `analyse_stock_${req.entreprise.nomDossierDBF}_${periode}_articles.xlsx`;
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="${nom}"`);
+
+  await ecrireExportArticles(res, {
+    societe: req.entreprise.trigramme || req.entreprise.nomDossierDBF,
+    periode,
+    filtres,
+    articles,
+  });
+});
+
+export { listerSources, getSynthese, getArticles, exportArticles };

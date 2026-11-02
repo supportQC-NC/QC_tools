@@ -8,6 +8,7 @@ import {
   listerSources,
   getSynthese,
   getArticles,
+  exportArticles,
 } from "../controllers/analyseStockController.js";
 import { protect } from "../middleware/authMiddleware.js";
 import {
@@ -38,6 +39,15 @@ router.get(
   canRead,
   checkEntrepriseAccess,
   getArticles,
+);
+
+// Export Excel de l'explorateur (mêmes filtres, sans pagination, streamé).
+router.get(
+  "/societe/:nomDossierDBF/articles/export",
+  protect,
+  canRead,
+  checkEntrepriseAccess,
+  exportArticles,
 );
 
 export default router;
