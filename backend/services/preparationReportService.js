@@ -471,6 +471,7 @@ import fs from "fs";
 import path from "path";
 import sendEmail from "../utils/sendEmail.js";
 import { fmtQteDat } from "../utils/qteDat.js";
+import { deposerDocumentFtp } from "./documentsFtpService.js";
 import {
   buildPrepaCmdDir,
   buildPrepaPdfFileName,
@@ -874,6 +875,11 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     stats,
   };
 
+  // Miroir FTP documents de la société : le PDF du rapport (best-effort).
+  deposerDocumentFtp(entreprise, "preparation", fileName, filePath).catch(
+    () => {},
+  );
+
   // ---- 2) Fichier de transfert dock : collect_sec (Stock XL) + copie dans prepa_cmd ----
   let transfert = { fileName: "", filePath: "", chemins: [], lignes: 0 };
   try {
@@ -893,6 +899,10 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
         const p1 = path.join(dir, nomTsf);
         fs.writeFileSync(p1, contenu, "utf8");
         chemins.push(p1);
+        // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
+        deposerDocumentFtp(entreprise, "preparation", nomTsf, p1).catch(
+          () => {},
+        );
       } catch (e) {
         console.error("[PREPA transfert collect_sec] écriture impossible:", e.message);
       }

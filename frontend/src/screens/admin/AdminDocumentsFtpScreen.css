@@ -1,0 +1,129 @@
+/* AdminDocumentsFtpScreen.css — thème sombre admin (variables globales). */
+
+.dftp-screen {
+  padding: 1.2rem 1.4rem 2rem;
+  color: var(--admin-text);
+}
+
+.dftp-titre {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.dftp-sous-titre {
+  margin: 0.25rem 0 1rem;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary);
+}
+
+.dftp-info {
+  color: var(--admin-text-secondary);
+  font-size: 0.9rem;
+}
+
+.dftp-erreur {
+  color: #fb7185;
+  font-size: 0.9rem;
+}
+
+.dftp-ariane {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+  font-size: 0.88rem;
+}
+
+.dftp-ariane button {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  color: #4da6ff;
+  border-radius: var(--admin-radius);
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.dftp-sep {
+  color: var(--admin-text-secondary);
+}
+
+.dftp-chargement {
+  color: var(--admin-text-secondary);
+  font-size: 0.8rem;
+  margin-left: 0.5rem;
+}
+
+.dftp-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.dftp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dftp-table th {
+  text-align: right;
+  padding: 0.55rem 0.8rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.dftp-table td {
+  text-align: right;
+  padding: 0.45rem 0.8rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+
+.dftp-table th.gauche,
+.dftp-table td.gauche {
+  text-align: left;
+}
+
+.dftp-table td.vide {
+  color: var(--admin-text-secondary);
+}
+
+.dftp-table tbody tr:hover {
+  background: var(--admin-bg-tertiary);
+}
+
+.dftp-dossier {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #4da6ff;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dftp-dossier:hover {
+  text-decoration: underline;
+}
+
+.dftp-btn {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.dftp-btn:hover {
+  border-color: #4da6ff;
+}

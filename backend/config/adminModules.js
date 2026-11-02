@@ -71,6 +71,8 @@ export const PERMISSION_MODULES = [
   { key: "performance_dock_admin", label: "Performance réappro magasin", group: "analyse" },
   { key: "facture_analyse_admin", label: "Analyse Facturation", group: "analyse" },
   { key: "analyse_proforma_admin", label: "Analyse Proforma", group: "analyse" },
+  { key: "documents_ftp_admin", label: "Documents FTP", group: "analyse" },
+  { key: "dictionnaires", label: "Dictionnaires (répertoires)", group: "gestion" },
   { key: "journal_caisse_admin", label: "Journal de Caisse", group: "analyse" },
   { key: "top_articles_admin", label: "Top Articles", group: "analyse" },
   { key: "analyse_reappro_admin", label: "Analyse Réappro", group: "analyse" },

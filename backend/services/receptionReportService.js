@@ -2,6 +2,7 @@
 import fs from "fs";
 import path from "path";
 import sendEmail from "../utils/sendEmail.js";
+import { deposerDocumentFtp } from "./documentsFtpService.js";
 import {
   buildControleCmdDir,
   buildPdfFileName,
@@ -624,6 +625,11 @@ export const genererEtEnvoyerRapport = async (
     signalements,
     outPath: filePath,
   });
+
+  // Miroir FTP documents de la société : le PDF du rapport (best-effort).
+  deposerDocumentFtp(entreprise, "reception", fileName, filePath).catch(
+    () => {},
+  );
 
   // ---- Email d'alerte avec PDF + photos de signalement en pièces jointes ----
   const destinataires = (entreprise.emailsRapportReception || []).filter(

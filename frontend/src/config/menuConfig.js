@@ -84,6 +84,8 @@ export const adminMenuStructure = [
       { label: "Gisements & Groupes", path: "/admin/export-gisements", icon: HiDownload },
       { label: "Dictionnaire des rayons", path: "/admin/dictionnaire-rayons", icon: HiTag },
       { label: "Exécutables", path: "/admin/executables", icon: HiDownload },
+      { label: "Documents FTP", path: "/admin/documents-ftp", icon: HiFolder },
+      { label: "Dictionnaires", path: "/dictionnaires", icon: HiUsers },
     ],
   },
   {
@@ -740,6 +742,10 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/facture-analyse": "Analyse de la facturation.",
   "/admin/analyse-proforma":
     "Entêtes de proforma par plage de dates et code vendeur, export Excel.",
+  "/admin/documents-ftp":
+    "Documents générés par l'application (fichiers .dat, rapports, fiches) archivés sur le FTP, par société.",
+  "/dictionnaires":
+    "Répertoires du personnel de toutes les sociétés (postes, téléphones, emails), PDF téléchargeable.",
   "/admin/journal-caisse": "Journal de caisse.",
   "/admin/rapport-tgc":
     "Déclaration TGC mensuelle (base HT & TGC par taux) + alertes.",

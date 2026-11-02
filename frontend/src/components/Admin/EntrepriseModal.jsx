@@ -307,6 +307,7 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
     nomCompta: "",
     userCompta: "",
     cheminLogoEtiquettes: "",
+    dossierFtpDocuments: "",
     couleurPrimaire: DEFAULT_PRIMAIRE,
     couleurSecondaire: DEFAULT_SECONDAIRE,
     logo: "",
@@ -408,6 +409,7 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
         nomCompta: entreprise.nomCompta || "",
         userCompta: entreprise.userCompta?._id || entreprise.userCompta || "",
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
+        dossierFtpDocuments: entreprise.dossierFtpDocuments || "",
         couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
         couleurSecondaire: entreprise.couleurSecondaire || DEFAULT_SECONDAIRE,
         logo: entreprise.logo || "",
@@ -1091,6 +1093,25 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
               />
               <span className="input-hint">
                 Dossier où seront déposés les fichiers .dat d'inventaire
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label>
+                <HiFolder /> Dossier FTP documents (optionnel)
+              </label>
+              <input
+                type="text"
+                name="dossierFtpDocuments"
+                value={formData.dossierFtpDocuments}
+                onChange={handleChange}
+                placeholder="ex : SEDQ"
+              />
+              <span className="input-hint">
+                Dossier racine sur le FTP robot-documents où ARCHIVER en copie
+                les documents générés (.dat collecteurs, rapports, fiches de
+                contrôle). Vide = pas d'archivage FTP. Le flux Rcommun/collect
+                reste inchangé.
               </span>
             </div>
 

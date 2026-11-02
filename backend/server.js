@@ -94,6 +94,8 @@ import derniereFacturationRoutes from "./routes/derniereFacturationRoutes.js";
 
        import factureAnalyseRoutes from "./routes/factureAnalyseRoutes.js";
 import proformaAnalyseRoutes from "./routes/proformaAnalyseRoutes.js";
+import documentsFtpRoutes from "./routes/documentsFtpRoutes.js";
+import repertoirePersonnelRoutes from "./routes/repertoirePersonnelRoutes.js";
 import journalCaisseRoutes from "./routes/journalCaisseRoutes.js";
 import topArticlesRoutes from "./routes/topArticlesRoutes.js";
 import analyseReapproRoutes from "./routes/analyseReapproRoutes.js";
@@ -274,6 +276,8 @@ app.use("/api/derniere-facturation", derniereFacturationRoutes);
 
     app.use("/api/facture-analyse", factureAnalyseRoutes);
 app.use("/api/proforma-analyse", proformaAnalyseRoutes);
+app.use("/api/documents-ftp", documentsFtpRoutes);
+app.use("/api/repertoire-personnel", repertoirePersonnelRoutes);
 app.use("/api/journal-caisse", journalCaisseRoutes);
 app.use("/api/top-articles", topArticlesRoutes);
 app.use("/api/analyse-reappro", analyseReapproRoutes);

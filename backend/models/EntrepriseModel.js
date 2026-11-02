@@ -176,6 +176,16 @@ const entrepriseSchema = new mongoose.Schema(
       default: DEFAULT_BASE_COLLECTEUR,
       get: (v) => traduireCheminExport(v),
     },
+    // Dossier RACINE sur le FTPS robot-documents où MIROITER les documents
+    // générés pour CETTE société (.dat collecteurs, rapports de réception/
+    // préparation, fiches de contrôle) — ex. « SEDQ » pour DQ. VIDE = miroir
+    // désactivé (cas général). Copies BEST-EFFORT : le flux opérationnel
+    // (collect_sec / partage STOCK) reste inchangé et prioritaire.
+    dossierFtpDocuments: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     // Destinataires de l'EMAIL D'ALERTE du rapport de réception (réservé à ce rapport).
     // Liste d'adresses email (service Achats, chef de dépôt, ...).
     emailsRapportReception: {

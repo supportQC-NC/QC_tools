@@ -607,6 +607,7 @@ import path from "path";
 import fs from "fs";
 import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 import { fmtQteDat } from "../utils/qteDat.js";
+import { deposerDocumentFtp } from "../services/documentsFtpService.js";
 
 // Quantités à 3 décimales (articles vendus au mètre), jamais arrondies à
 // l'unité — même règle que les listes de réappro. Un corps sans quantité vaut
@@ -1215,6 +1216,10 @@ const exportReappro = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
   }
+
+  // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
+  deposerDocumentFtp(reappro.entreprise, "reappro", nomFichier, cheminFichier)
+    .catch(() => {});
 
   // Mettre à jour le réappro
   reappro.nom = nomReappro.trim();

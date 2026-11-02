@@ -276,6 +276,18 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Documents FTP (miroir des .dat / rapports / fiches sur robot-documents)
+      documents_ftp_admin: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
+      // Dictionnaires (répertoires du personnel — transverse, sans scoping société)
+      dictionnaires: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Performance Dock
       performance_dock_admin: {
         read: { type: Boolean, default: false },

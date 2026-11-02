@@ -28,6 +28,7 @@ import {
 } from "../services/dictionnaireRayonsService.js";
 import { memeCodeBarres } from "../utils/codeBarres.js";
 import { ecrireTransfertMagasin } from "../services/demandeReapproTransfertService.js";
+import { deposerDocumentFtp } from "../services/documentsFtpService.js";
 import { importerProformasReappro } from "../services/reapproProformaImportService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
 
@@ -1041,6 +1042,14 @@ const transfertRayonMobile = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error(`Impossible d'écrire le fichier: ${error.message}`);
   }
+
+  // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
+  deposerDocumentFtp(
+    entreprise,
+    "reappro",
+    nomFichier,
+    path.join(dir, nomFichier),
+  ).catch(() => {});
 
   res.json({ fileName: nomFichier, lignes: nbLignes });
 });

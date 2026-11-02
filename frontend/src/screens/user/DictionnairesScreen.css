@@ -1,0 +1,239 @@
+/* DictionnairesScreen.css — répertoires du personnel (thème sombre admin). */
+
+.dict-screen {
+  padding: 1.2rem 1.4rem 2rem;
+  color: var(--admin-text);
+}
+
+.dict-entete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.dict-titre {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.dict-sous-titre {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  color: var(--admin-text-secondary);
+}
+
+.dict-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dict-btn {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.dict-btn:hover {
+  border-color: #4da6ff;
+}
+
+.dict-btn.primary {
+  background: #4da6ff22;
+  border-color: #4da6ff;
+  font-weight: 600;
+}
+
+.dict-btn.danger {
+  color: #fb7185;
+  padding: 0.25rem 0.55rem;
+}
+
+.dict-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dict-info {
+  color: var(--admin-text-secondary);
+  font-size: 0.88rem;
+}
+
+.dict-erreur {
+  color: #fb7185;
+  font-size: 0.9rem;
+}
+
+.dict-message {
+  color: #34d399;
+  font-size: 0.88rem;
+}
+
+/* Onglets sociétés */
+.dict-onglets {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.dict-onglet {
+  background: var(--admin-bg-secondary);
+  color: var(--admin-text-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dict-onglet.on {
+  background: #4da6ff22;
+  border-color: #4da6ff;
+  color: var(--admin-text);
+}
+
+.dict-onglet-vide {
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+/* En-tête standard / note */
+.dict-standard {
+  background: var(--admin-bg-secondary);
+  border: 1px solid var(--admin-border);
+  border-left: 3px solid #4da6ff;
+  border-radius: var(--admin-radius);
+  padding: 0.6rem 0.9rem;
+  font-size: 0.88rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* Sections par service */
+.dict-section {
+  margin-bottom: 1.1rem;
+}
+
+.dict-section-titre {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-text-secondary);
+  margin: 0 0 0.4rem;
+}
+
+.dict-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.dict-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dict-table th {
+  text-align: right;
+  padding: 0.5rem 0.8rem;
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+
+.dict-table td {
+  text-align: right;
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid var(--admin-border);
+  white-space: nowrap;
+}
+
+.dict-table th.gauche,
+.dict-table td.gauche {
+  text-align: left;
+}
+
+.dict-table td.nom {
+  font-weight: 600;
+}
+
+.dict-table tbody tr:hover {
+  background: var(--admin-bg-tertiary);
+}
+
+.dict-table a {
+  color: #4da6ff;
+  text-decoration: none;
+}
+
+.dict-table a:hover {
+  text-decoration: underline;
+}
+
+.dict-maj {
+  margin-top: 0.8rem;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--admin-text-secondary);
+}
+
+/* Éditeur */
+.dict-champs-entete {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.dict-champs-entete label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--admin-text-secondary);
+}
+
+.dict-champs-entete input,
+.dict-table.edition input {
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.85rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dict-table.edition td {
+  padding: 0.25rem 0.35rem;
+  min-width: 90px;
+}
+
+.dict-table.edition td.large {
+  min-width: 170px;
+}
+
+.dict-editeur > .dict-btn {
+  margin-top: 0.6rem;
+}

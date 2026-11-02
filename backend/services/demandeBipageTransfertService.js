@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import Entreprise from "../models/EntrepriseModel.js";
 import { fmtQteDat } from "../utils/qteDat.js";
+import { deposerDocumentFtp } from "./documentsFtpService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -71,6 +72,8 @@ export const ecrireTransfertBipage = async (demande, lignes) => {
     const p1 = path.join(dir, nomTsf);
     fs.writeFileSync(p1, contenu, "utf8");
     chemins.push(p1);
+    // Miroir FTP documents de la société (best-effort, ex. DQ → SEDQ).
+    deposerDocumentFtp(entreprise, "bipage", nomTsf, p1).catch(() => {});
   } catch (e) {
     console.error("[DEMANDE bipage transfert] écriture impossible:", e.message);
   }

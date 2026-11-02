@@ -104,6 +104,8 @@ import AdminStatsCommerciauxScreen from "./screens/admin/AdminStatsCommerciauxSc
 import AdminAnalyseStockScreen from "./screens/admin/AdminAnalyseStockScreen";
 import AdminFactureAnalyseScreen from "./screens/admin/AdminFactureAnalyseScreen";
 import AdminProformaAnalyseScreen from "./screens/admin/AdminProformaAnalyseScreen";
+import AdminDocumentsFtpScreen from "./screens/admin/AdminDocumentsFtpScreen";
+import DictionnairesScreen from "./screens/user/DictionnairesScreen";
 import AdminJournalCaisseScreen from "./screens/admin/AdminJournalCaisseScreen";
 import AdminTopArticlesScreen from "./screens/admin/AdminTopArticlesScreen";
 import AdminAnalyseReapproScreen from "./screens/admin/AdminAnalyseReapproScreen";
@@ -619,6 +621,20 @@ const router = createBrowserRouter(
           path="/admin/analyse-proforma"
           element={<AdminProformaAnalyseScreen />}
         />
+      </Route>
+
+      {/* Données · Documents FTP -> module "documents_ftp_admin" */}
+      <Route element={<ModuleRoute module="documents_ftp_admin" />}>
+        <Route
+          path="/admin/documents-ftp"
+          element={<AdminDocumentsFtpScreen />}
+        />
+      </Route>
+
+      {/* Dictionnaires (répertoires du personnel) -> module "dictionnaires".
+          Transverse : pas de scoping société (décision client 02/11/2026). */}
+      <Route element={<ModuleRoute module="dictionnaires" />}>
+        <Route path="/dictionnaires" element={<DictionnairesScreen />} />
       </Route>
 
       {/* Analyse · Journal de Caisse -> module "journal_caisse_admin" */}

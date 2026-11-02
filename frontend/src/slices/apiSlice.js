@@ -10,6 +10,7 @@ export const apiSlice = createApi({
   tagTypes: [
     "User",
     "Entreprise",
+    "RepertoirePersonnel",
     "Article",
     "Inventaire",
     "Zone",

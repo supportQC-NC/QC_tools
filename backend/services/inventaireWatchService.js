@@ -27,6 +27,7 @@ import {
   sanitizeName,
 } from "./ficheControleService.js";
 import { deposerFichierInventaireFtp } from "./inventaireFtpService.js";
+import { deposerDocumentFtp } from "./documentsFtpService.js";
 import { enteteFicheImport } from "./bipageImportService.js";
 
 let isRunning = false;
@@ -457,6 +458,13 @@ const traiterFichier = async (
       workPath,
     );
   }
+
+  // Miroir FTP DOCUMENTS de la société (ex. DQ → SEDQ) : la fiche de contrôle
+  // PDF + le .DAT final, en plus du miroir inventaire ci-dessus. Best-effort.
+  deposerDocumentFtp(entreprise, "fiches_controle", pdfFileName, workPath)
+    .catch(() => {});
+  deposerDocumentFtp(entreprise, "fiches_controle", nomFinal, workFilePath)
+    .catch(() => {});
 
   return {
     status: "traite",
