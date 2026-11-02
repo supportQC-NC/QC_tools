@@ -51,6 +51,17 @@ const C_BANDEAU_DEFAUT = "#1f2937";
 const couleurBande = (c) =>
   /^#[0-9a-fA-F]{6}$/.test(safeTrim(c)) ? safeTrim(c) : C_BANDEAU_DEFAUT;
 
+// Couleur du TEXTE posé sur un bandeau : NOIR sur fond clair (jaune, pastel…),
+// BLANC sur fond foncé — sinon illisible (constaté client sur une société à
+// couleur primaire jaune). Luminance perçue (pondération Rec. 601).
+const texteSurBande = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#111827" : "#ffffff";
+};
+
 // Tronque pour tenir dans `largeur` avec la police COURANTE du doc.
 const fit = (doc, texte, largeur) => {
   const brut = safeTrim(texte);
@@ -70,6 +81,7 @@ const fit = (doc, texte, largeur) => {
 export function ecrirePdfRepertoire(res, opts) {
   const { societe, standard, note, entrees = [], majLe, couleur } = opts;
   const brand = couleurBande(couleur);
+  const encreBande = texteSurBande(brand);
   const maj = (majLe ? new Date(majLe) : new Date()).toLocaleDateString(
     "fr-FR",
     { day: "numeric", month: "long", year: "numeric" },
@@ -119,7 +131,7 @@ export function ecrirePdfRepertoire(res, opts) {
     doc
       .font("Helvetica-Bold")
       .fontSize(9.5)
-      .fillColor("#ffffff")
+      .fillColor(encreBande)
       .text(libelle.toUpperCase(), MARGE + 7, y + 5.5, {
         width: LARGEUR_UTILE - 60,
         lineBreak: false,
@@ -127,7 +139,7 @@ export function ecrirePdfRepertoire(res, opts) {
     doc
       .font("Helvetica")
       .fontSize(8)
-      .fillColor("#ffffff")
+      .fillColor(encreBande)
       .text(`${nb}`, MARGE + LARGEUR_UTILE - 40, y + 6.5, {
         width: 33,
         align: "right",
@@ -146,12 +158,12 @@ export function ecrirePdfRepertoire(res, opts) {
   doc
     .font("Helvetica-Bold")
     .fontSize(17)
-    .fillColor("#ffffff")
+    .fillColor(encreBande)
     .text("RÉPERTOIRE DU PERSONNEL", MARGE + 14, y + 11, { lineBreak: false });
   doc
     .font("Helvetica")
     .fontSize(10.5)
-    .fillColor("#ffffff")
+    .fillColor(encreBande)
     .opacity(0.9)
     .text(safeTrim(societe), MARGE + 14, y + 33, { lineBreak: false });
   doc.opacity(1);
