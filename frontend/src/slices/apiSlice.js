@@ -125,6 +125,8 @@ export const apiSlice = createApi({
     // ========== TAGS MÉDIATHÈQUE (images/HTML pour signatures mail) ==========
     "Media",
     "MediaDossier",
+    // ========== TAGS DOCUMENTS FTP (miroir robot-documents) ==========
+    "DocumentsFtp",
   ],
   endpoints: (builder) => ({}),
 });

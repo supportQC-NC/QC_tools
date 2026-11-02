@@ -163,10 +163,48 @@ export async function telechargerDocumentFtp(entreprise, cheminRelatif, writable
   }
 }
 
+/**
+ * Téléverse UN fichier dans un dossier du miroir (bouton « Ajouter » de
+ * l'écran Documents FTP). Action utilisateur, pas un dépôt d'archive :
+ * un échec LÈVE — l'utilisateur doit savoir que son fichier n'est pas parti.
+ * @returns {Promise<{chemin:string}>}
+ */
+export async function televerserDocumentFtp(entreprise, cheminRelatif, nomFichier, buffer) {
+  const { chemin } = resoudreChemin(entreprise, cheminRelatif);
+  const nom = sanitizeSegment(nomFichier);
+  if (!nom) throw new Error("Nom de fichier invalide.");
+  const client = await ouvrirConnexionFtp();
+  try {
+    await client.ensureDir(`/${chemin}`); // laisse le cwd dans le dossier
+    await client.uploadFrom(Readable.from(buffer), nom);
+    return { chemin: `${chemin}/${nom}` };
+  } finally {
+    client.close();
+  }
+}
+
+/**
+ * Supprime UN fichier du miroir (écran Documents FTP). Fichiers seulement :
+ * les dossiers (catégories, mois) ne se suppriment pas depuis l'écran.
+ * LÈVE en cas d'échec.
+ */
+export async function supprimerDocumentFtp(entreprise, cheminRelatif) {
+  const { racine, chemin } = resoudreChemin(entreprise, cheminRelatif);
+  if (chemin === racine) throw new Error("Chemin de fichier requis.");
+  const client = await ouvrirConnexionFtp();
+  try {
+    await client.remove(`/${chemin}`);
+  } finally {
+    client.close();
+  }
+}
+
 export default {
   miroirDocumentsActif,
   racineDocumentsFtp,
   deposerDocumentFtp,
   listerDocumentsFtp,
   telechargerDocumentFtp,
+  televerserDocumentFtp,
+  supprimerDocumentFtp,
 };

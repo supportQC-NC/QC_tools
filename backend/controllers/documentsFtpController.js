@@ -9,10 +9,11 @@ import {
   racineDocumentsFtp,
   listerDocumentsFtp,
   telechargerDocumentFtp,
+  televerserDocumentFtp,
+  supprimerDocumentFtp,
 } from "../services/documentsFtpService.js";
 
-// GET /api/documents-ftp/:nomDossierDBF?chemin=reappro/2026-11
-const listerDocuments = asyncHandler(async (req, res) => {
+const exigerMiroir = (req, res) => {
   if (!miroirDocumentsActif(req.entreprise)) {
     res.status(400);
     throw new Error(
@@ -20,6 +21,11 @@ const listerDocuments = asyncHandler(async (req, res) => {
         "(champ « Dossier FTP documents » de la fiche société).",
     );
   }
+};
+
+// GET /api/documents-ftp/:nomDossierDBF?chemin=reappro/2026-11
+const listerDocuments = asyncHandler(async (req, res) => {
+  exigerMiroir(req, res);
   const chemin = String(req.query.chemin || "");
   const entrees = await listerDocumentsFtp(req.entreprise, chemin);
   res.json({
@@ -31,10 +37,7 @@ const listerDocuments = asyncHandler(async (req, res) => {
 
 // GET /api/documents-ftp/:nomDossierDBF/telecharger?chemin=reappro/2026-11/x.dat
 const telechargerDocument = asyncHandler(async (req, res) => {
-  if (!miroirDocumentsActif(req.entreprise)) {
-    res.status(400);
-    throw new Error("Miroir FTP non configuré pour cette société.");
-  }
+  exigerMiroir(req, res);
   const chemin = String(req.query.chemin || "").trim();
   if (!chemin) {
     res.status(400);
@@ -58,4 +61,41 @@ const telechargerDocument = asyncHandler(async (req, res) => {
   await telechargerDocumentFtp(req.entreprise, chemin, res);
 });
 
-export { listerDocuments, telechargerDocument };
+// POST /api/documents-ftp/:nomDossierDBF/televerser — multipart, champ
+// « fichiers » (plusieurs possibles), body.chemin = dossier de destination.
+const televerserDocuments = asyncHandler(async (req, res) => {
+  exigerMiroir(req, res);
+  const chemin = String(req.body?.chemin || "");
+  const fichiers = req.files || [];
+  if (!fichiers.length) {
+    res.status(400);
+    throw new Error("Aucun fichier reçu.");
+  }
+  const deposes = [];
+  for (const f of fichiers) {
+    // multer livre originalname en latin1 : rétablir l'UTF-8 (accents).
+    const nom = Buffer.from(f.originalname, "latin1").toString("utf8");
+    const r = await televerserDocumentFtp(req.entreprise, chemin, nom, f.buffer);
+    deposes.push(r.chemin);
+  }
+  res.status(201).json({ deposes });
+});
+
+// DELETE /api/documents-ftp/:nomDossierDBF?chemin=reappro/2026-11/x.dat
+const supprimerDocument = asyncHandler(async (req, res) => {
+  exigerMiroir(req, res);
+  const chemin = String(req.query.chemin || "").trim();
+  if (!chemin) {
+    res.status(400);
+    throw new Error("Paramètre « chemin » requis.");
+  }
+  await supprimerDocumentFtp(req.entreprise, chemin);
+  res.json({ message: "Document supprimé." });
+});
+
+export {
+  listerDocuments,
+  telechargerDocument,
+  televerserDocuments,
+  supprimerDocument,
+};
