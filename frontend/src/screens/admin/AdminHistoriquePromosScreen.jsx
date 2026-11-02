@@ -3,12 +3,16 @@
 // HISTORIQUE PROMOS : restitution des fichiers `<trig>.json` du FTPS
 // robot-documents (dossier historique_promos/), un bloc par mois et par
 // société, historisés par le robot : CA promo, marge promo, nombre
-// d'articles vendus en promo et top 3 des articles du mois.
+// d'articles vendus en promo et top des articles du mois (jusqu'à 10 depuis
+// le 03/11/2026, 3 sur les mois historisés avant ; une société qui n'a vendu
+// que 5 articles en promo n'en a que 5). Le backend normalise les trois
+// écritures du robot (`top` / `top10` / `top3`) en un champ `top` : l'écran
+// affiche « Top N » sur ce qu'il reçoit, jamais 10 en dur.
 //
 // La société suit la sélection GLOBALE du header. Trois étages :
 //   1. sélecteur de mois (pastilles, du plus récent au plus ancien)
-//   2. KPI du mois choisi + podium top 3 (NART cliquable vers la page
-//      données article, comme l'analyse stock)
+//   2. KPI du mois choisi + top des articles, médailles sur le podium
+//      (NART cliquable vers la page données article, comme l'analyse stock)
 //   3. historique : évolution CA/marge par mois (graphique dès 2 mois)
 //      + table récapitulative de tous les mois
 //
@@ -120,7 +124,7 @@ const AdminHistoriquePromosScreen = () => {
           <p className="hpr-sous-titre">
             Bilan mensuel des promotions historisé par le robot : chiffre
             d'affaires et marge réalisés sur les articles en promotion, et top
-            3 des articles du mois.
+            des articles du mois (jusqu'à 10).
           </p>
         </div>
         {isFetching && <span className="hpr-chargement">chargement…</span>}
@@ -184,12 +188,13 @@ const AdminHistoriquePromosScreen = () => {
             </div>
           </div>
 
-          {/* Top 3 du mois */}
+          {/* Top des articles du mois (10, ou 3 sur les anciens mois) */}
           <div className="hpr-card">
             <h3 className="hpr-card-titre">
-              Top 3 des articles en promotion — {moisActif.libelle}
+              Top {moisActif.top.length} des articles en promotion —{" "}
+              {moisActif.libelle}
             </h3>
-            {moisActif.top3.length === 0 ? (
+            {moisActif.top.length === 0 ? (
               <p className="hpr-info">Aucune vente en promotion ce mois-ci.</p>
             ) : (
               <div className="hpr-table-wrap">
@@ -207,7 +212,7 @@ const AdminHistoriquePromosScreen = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {moisActif.top3.map((t, i) => (
+                    {moisActif.top.map((t, i) => (
                       <tr key={t.nart || i}>
                         <td className="gauche hpr-medaille">
                           {MEDAILLES[t.rang - 1] || t.rang}
@@ -312,7 +317,7 @@ const AdminHistoriquePromosScreen = () => {
                       <td>{fmtPct(m.tauxMarge)}</td>
                       <td>{fmtMontant(m.nbArticlesVendus)}</td>
                       <td className="gauche hpr-designation">
-                        {m.top3[0]?.designation || "—"}
+                        {m.top[0]?.designation || "—"}
                       </td>
                     </tr>
                   ))}

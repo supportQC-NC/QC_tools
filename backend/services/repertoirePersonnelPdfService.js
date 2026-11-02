@@ -1,6 +1,7 @@
 // backend/services/repertoirePersonnelPdfService.js
 //
-// PDF du RÉPERTOIRE DU PERSONNEL (module Dictionnaires) — A4 portrait.
+// PDF de l'ANNUAIRE DU PERSONNEL (module Annuaires, clé technique
+// « dictionnaires ») — A4 portrait.
 //
 // La mise en page est une GRILLE À POSITIONS FIXES, tenue par un curseur `y`
 // géré à la main : chaque cellule est dessinée à son x/largeur de colonne,
@@ -75,7 +76,7 @@ const fit = (doc, texte, largeur) => {
 };
 
 /**
- * Écrit le PDF du répertoire dans un flux Writable (réponse HTTP).
+ * Écrit le PDF de l'annuaire dans un flux Writable (réponse HTTP).
  * @param {object} opts { societe, standard, note, entrees, majLe, couleur }
  */
 export function ecrirePdfRepertoire(res, opts) {
@@ -159,7 +160,7 @@ export function ecrirePdfRepertoire(res, opts) {
     .font("Helvetica-Bold")
     .fontSize(17)
     .fillColor(encreBande)
-    .text("RÉPERTOIRE DU PERSONNEL", MARGE + 14, y + 11, { lineBreak: false });
+    .text("ANNUAIRE DU PERSONNEL", MARGE + 14, y + 11, { lineBreak: false });
   doc
     .font("Helvetica")
     .fontSize(10.5)
@@ -283,7 +284,7 @@ export function ecrirePdfRepertoire(res, opts) {
       .font("Helvetica")
       .fontSize(7.5)
       .fillColor(C_TEXTE_DOUX)
-      .text(`Répertoire du personnel — ${safeTrim(societe)}`, MARGE, yPied, {
+      .text(`Annuaire du personnel — ${safeTrim(societe)}`, MARGE, yPied, {
         lineBreak: false,
       });
     doc.text(`Mise à jour au ${maj}`, MARGE, yPied, {

@@ -1,7 +1,8 @@
 // backend/controllers/historiquePromosController.js
 //
 // HISTORIQUE PROMOS : fichiers JSON `<trig>.json` du FTPS robot-documents
-// (dossier historique_promos/), un bloc par mois et par société. Scoping
+// (dossier historique_promos/), un bloc par mois et par société (top 10
+// des articles, repli top 3 sur les mois historisés à l'ancien format). Scoping
 // société classique (module + checkEntrepriseAccess), fichier retrouvé par
 // TRIGRAMME — même convention que l'analyse stock.
 

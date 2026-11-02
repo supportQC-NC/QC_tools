@@ -4,11 +4,19 @@
 // « robot-documents » (dossier historique_promos/), un par société, nommés
 // `<trigramme>.json` (trigramme en minuscules : qc, sit, pb…). Le robot y
 // AJOUTE un bloc par mois (clé "AAAA-MM" sous `mois`) : CA promo, marge
-// promo, nombre d'articles vendus en promo et top 3 des articles (NART,
+// promo, nombre d'articles vendus en promo et top des articles (NART,
 // désignation, période de la promo, CA, marge, taux, quantité, nb factures).
 // Constaté le 03/11/2026 : 15 fichiers, un seul mois (2026-10) pour l'instant
 // — l'historique s'étoffe au fil des mois, côté FTP cette fois (le fichier
 // entier est réécrit), le cache local n'a donc rien à accumuler lui-même.
+//
+// Le top est passé de 3 à 10 articles (demande client du 03/11/2026, script
+// robot modifié en parallèle). ⚠️ Le robot a renommé la clé `top3` en **`top`**
+// à cette occasion : on lit `top`, puis `top10`, puis `top3` — les trois
+// écritures peuvent coexister (fichiers régénérés vs mois déjà historisés),
+// et le nombre d'articles n'est PAS garanti égal à 10 (une société qui n'a
+// vendu que 5 articles en promo n'en a que 5). D'où l'affichage « Top N »
+// calculé sur ce qui arrive, jamais « Top 10 » en dur.
 //
 // Les fichiers sont minuscules (≈ 1,3 Ko par société et par mois) : pas de
 // cache mémoire, on relit le JSON du cache FTP à chaque requête.
@@ -47,7 +55,7 @@ export async function scannerSources() {
  * Lit et normalise le fichier d'une société : mois triés du plus récent au
  * plus ancien, clés en camelCase, taux de marge mensuel recalculé.
  * @returns {{nom: string, mois: Array<{periode, libelle, caPromo, margePromo,
- *   tauxMarge, nbArticlesVendus, enregistreLe, top3: Array}>}}
+ *   tauxMarge, nbArticlesVendus, enregistreLe, top: Array}>}}
  */
 export function lireHistorique(chemin) {
   const brut = JSON.parse(fs.readFileSync(chemin, "utf8"));
@@ -55,6 +63,9 @@ export function lireHistorique(chemin) {
     .map(([periode, m]) => {
       const caPromo = num(m.ca_promo);
       const margePromo = num(m.marge_promo);
+      // `top` (format courant) > `top10` > `top3` (mois historisés avant le
+      // passage au top 10) — le premier tableau présent gagne.
+      const brutTop = [m.top, m.top10, m.top3].find(Array.isArray) || [];
       return {
         periode,
         libelle: m.libelle || periode,
@@ -63,7 +74,7 @@ export function lireHistorique(chemin) {
         tauxMarge: caPromo > 0 ? Math.round((margePromo / caPromo) * 1000) / 10 : null,
         nbArticlesVendus: num(m.nb_articles_vendus),
         enregistreLe: m.enregistre_le || null,
-        top3: (m.top3 || []).map((t) => ({
+        top: brutTop.slice(0, 10).map((t) => ({
           rang: num(t.rang),
           nart: String(t.nart || ""),
           designation: String(t.designation || ""),

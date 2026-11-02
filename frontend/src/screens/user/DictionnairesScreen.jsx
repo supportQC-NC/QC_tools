@@ -1,10 +1,11 @@
 // src/screens/user/DictionnairesScreen.jsx
 //
-// MODULE DICTIONNAIRES — répertoires du personnel de TOUTES les sociétés
-// (décision client du 02/11/2026 : aucun scoping société, chaque utilisateur
-// ayant le module voit tous les répertoires). Version applicative du
-// répertoire papier affiché en magasin : une entrée par personne (nom,
-// service, poste interne, tél. extérieur, portable, email) + en-tête standard.
+// MODULE ANNUAIRES (clé technique « dictionnaires », renommé à l'affichage le
+// 03/11/2026) — annuaires du personnel de TOUTES les sociétés (décision
+// client du 02/11/2026 : aucun scoping société, chaque utilisateur ayant le
+// module voit tous les annuaires). Version applicative de l'annuaire papier
+// affiché en magasin : une entrée par personne (nom, service, poste interne,
+// tél. extérieur, portable, email) + en-tête standard.
 //
 // Consultation groupée par service, PDF téléchargeable (reproduction du
 // papier), édition en place pour qui a le droit « écriture » (le backend
@@ -113,7 +114,7 @@ const DictionnairesScreen = () => {
         entrees: brouillon.entrees.map((e, i) => ({ ...e, ordre: i })),
       }).unwrap();
       setEdition(false);
-      setMessage("Répertoire enregistré.");
+      setMessage("Annuaire enregistré.");
     } catch (e) {
       setMessage(e?.data?.message || "Enregistrement refusé.");
     }
@@ -130,7 +131,7 @@ const DictionnairesScreen = () => {
     <div className="dict-screen">
       <div className="dict-entete">
         <div>
-          <h1 className="dict-titre">Dictionnaires — Répertoire du personnel</h1>
+          <h1 className="dict-titre">Annuaires du personnel</h1>
           <p className="dict-sous-titre">
             Postes, lignes directes et emails, toutes sociétés confondues.
           </p>
@@ -165,7 +166,7 @@ const DictionnairesScreen = () => {
 
       {error && (
         <p className="dict-erreur">
-          {error?.data?.message || "Répertoires indisponibles."}
+          {error?.data?.message || "Annuaires indisponibles."}
         </p>
       )}
       {isLoading && <p className="dict-info">Chargement…</p>}
@@ -205,7 +206,7 @@ const DictionnairesScreen = () => {
 
           {sections.length === 0 ? (
             <p className="dict-info">
-              Aucun répertoire renseigné pour {courant.entreprise.trigramme} —
+              Aucun annuaire renseigné pour {courant.entreprise.trigramme} —
               « Modifier » pour le créer.
             </p>
           ) : (

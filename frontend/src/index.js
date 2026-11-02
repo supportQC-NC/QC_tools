@@ -640,7 +640,8 @@ const router = createBrowserRouter(
         />
       </Route>
 
-      {/* Dictionnaires (répertoires du personnel) -> module "dictionnaires".
+      {/* Annuaires du personnel -> module "dictionnaires" (clé et URL gardées
+          telles quelles au renommage du 03/11/2026 : droits déjà accordés).
           Transverse : pas de scoping société (décision client 02/11/2026). */}
       <Route element={<ModuleRoute module="dictionnaires" />}>
         <Route path="/dictionnaires" element={<DictionnairesScreen />} />

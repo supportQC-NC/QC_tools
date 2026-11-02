@@ -85,7 +85,7 @@ export const adminMenuStructure = [
       { label: "Dictionnaire des rayons", path: "/admin/dictionnaire-rayons", icon: HiTag },
       { label: "Exécutables", path: "/admin/executables", icon: HiDownload },
       { label: "Documents FTP", path: "/admin/documents-ftp", icon: HiFolder },
-      { label: "Dictionnaires", path: "/dictionnaires", icon: HiUsers },
+      { label: "Annuaires", path: "/dictionnaires", icon: HiUsers },
     ],
   },
   {
@@ -737,7 +737,7 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/analyse-ca-mensuelle":
     "Analyse CA mensuelle détaillée : types de client, clients, fournisseurs, classes, familles, rayons…",
   "/admin/historique-promos":
-    "Bilan mensuel des promotions : CA et marge sur les articles en promo, top 3 des articles du mois.",
+    "Bilan mensuel des promotions : CA et marge sur les articles en promo, top des articles du mois.",
   "/admin/stats-commerciaux":
     "Performance des commerciaux : portefeuille clients, CA/marge N vs N-1, top clients, nouveaux/perdus, concentration.",
   "/admin/analyse-stock":
@@ -748,7 +748,7 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/documents-ftp":
     "Documents générés par l'application (fichiers .dat, rapports, fiches) archivés sur le FTP, par société.",
   "/dictionnaires":
-    "Répertoires du personnel de toutes les sociétés (postes, téléphones, emails), PDF téléchargeable.",
+    "Annuaires du personnel de toutes les sociétés (postes, téléphones, emails), PDF téléchargeable.",
   "/admin/journal-caisse": "Journal de caisse.",
   "/admin/rapport-tgc":
     "Déclaration TGC mensuelle (base HT & TGC par taux) + alertes.",

@@ -1,6 +1,6 @@
 // backend/controllers/repertoirePersonnelController.js
 //
-// Module « Dictionnaires » — répertoires du personnel.
+// Module « Annuaires » (clé technique « dictionnaires ») — annuaires du personnel.
 // ⚠️ PAS de checkEntrepriseAccess ici, c'est VOULU (décision client du
 // 02/11/2026) : tout utilisateur ayant le module voit et télécharge les
 // répertoires de TOUTES les sociétés, le scoping société ne s'applique pas.
@@ -87,7 +87,7 @@ const upsertRepertoire = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    PDF du répertoire (reproduction du répertoire papier)
+// @desc    PDF de l'annuaire (reproduction de l'annuaire papier)
 // @route   GET /api/repertoire-personnel/:entrepriseId/pdf
 const getRepertoirePdf = asyncHandler(async (req, res) => {
   const entreprise = await Entreprise.findById(req.params.entrepriseId).select(
@@ -102,10 +102,10 @@ const getRepertoirePdf = asyncHandler(async (req, res) => {
   });
   if (!repertoire || repertoire.entrees.length === 0) {
     res.status(404);
-    throw new Error("Aucun répertoire renseigné pour cette société.");
+    throw new Error("Aucun annuaire renseigné pour cette société.");
   }
 
-  const nom = `repertoire_personnel_${entreprise.trigramme}.pdf`;
+  const nom = `annuaire_personnel_${entreprise.trigramme}.pdf`;
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
