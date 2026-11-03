@@ -59,6 +59,39 @@ const resumeCorrection = (l) => {
   return `${quoi}${qui}`;
 };
 
+/**
+ * Cellule « Gencode » : le code-barres du CATALOGUE quand l'article est
+ * résolu, et À DÉFAUT le CODE BRUT BIPÉ (`eanArticle`).
+ *
+ * ⚠️ Sans ce repli, une ligne « article inconnu » sortait « — » : le code
+ * réellement bipé n'était visible NULLE PART à l'écran (il n'est que dans la
+ * colonne CODE_SCANNE du CSV), alors que c'est la seule prise pour retrouver
+ * l'article et corriger le NART. La fiche de contrôle générée, elle, porte
+ * toujours le code bipé dans sa colonne CODE — demande client du 03/11/2026
+ * d'aligner l'écran sur la fiche.
+ *
+ * Le code bipé est marqué (style + infobulle) pour qu'on ne le prenne pas
+ * pour un code-barres du catalogue : ce n'en est pas un, et c'est souvent un
+ * NART quand l'article n'a pas de code-barres.
+ */
+const CelluleGencode = ({ ligne }) => {
+  if (ligne.gencod) return ligne.gencod;
+  const scanne = (ligne.eanArticle || "").trim();
+  if (!scanne) return "—";
+  return (
+    <span
+      className="code-scanne"
+      title={
+        ligne.found
+          ? "Code bipé — l'article du catalogue n'a pas de code-barres"
+          : "Code bipé — aucun article du catalogue ne porte ce code"
+      }
+    >
+      {scanne}
+    </span>
+  );
+};
+
 const AdminBipagesScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
@@ -907,7 +940,7 @@ const AdminBipagesScreen = () => {
                   <th className="marq-col" aria-label="Repères" />
                   <th>Zone</th>
                   <th>Emplacement</th>
-                  <th title="Code-barres de l'article dans le catalogue, re-résolu quand le NART change">
+                  <th title="Code-barres de l'article dans le catalogue, re-résolu quand le NART change. À défaut (article inconnu, article sans code-barres) : le code réellement bipé, en italique.">
                     Gencode
                   </th>
                   <th>Qté scan</th>
@@ -961,7 +994,7 @@ const AdminBipagesScreen = () => {
                         {enResolution.has(l._id) ? (
                           <PointsChargement />
                         ) : (
-                          l.gencod || "—"
+                          <CelluleGencode ligne={l} />
                         )}
                       </td>
                       <td>
