@@ -242,6 +242,14 @@ export const moduleMenuStructure = [
         path: "/admin/suivi-reappro",
         icon: HiClock,
       },
+      {
+        // Réappro depuis un entrepôt (S2..S5) vers le rayon : analyse,
+        // ajustement à l'écran puis fichier .dat pour Stock XL.
+        moduleKey: "reapro",
+        label: "Réappro Mécalac",
+        path: "/reappro-mecalac",
+        icon: HiTruck,
+      },
     ],
   },
   {
@@ -761,6 +769,8 @@ export const DEFAULT_MENU_HINTS = {
     "Listes de réappro à préparer : urgence, avancement et création manuelle.",
   "/admin/suivi-reappro":
     "Réappros en cours et terminés au collecteur : listes ET réappros libres.",
+  "/reappro-mecalac":
+    "Articles à descendre d'un entrepôt (S2..S5) vers le rayon, puis fichier .dat pour Stock XL.",
   "/admin/debit-comptant": "Répartition débit / comptant.",
   "/admin/gencod-doublons": "Détection des doublons de gencode.",
   "/admin/derniere-facturation":
@@ -917,6 +927,7 @@ const DOSSIER_TERRAIN = [
     items: [
       "/demandes-reappro",
       "/admin/suivi-reappro",
+      "/reappro-mecalac",
       "/admin/analyse-reappro",
       "/admin/reappro-local",
     ],

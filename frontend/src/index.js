@@ -64,6 +64,7 @@ import AdminInventaireDashboardScreen from "./screens/admin/AdminInventaireDashb
 import AdminZonesRetoucheesScreen from "./screens/admin/AdminZonesRetoucheesScreen";
 import AdminEcartsZonesScreen from "./screens/admin/AdminEcartsZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
+import AdminReapproMecalacScreen from "./screens/admin/AdminReapproMecalacScreen";
 import AdminArticleInfosScreen from "./screens/admin/AdminArticleInfosScreen";
 import AdminCommandesScreen from "./screens/admin/AdminCommandesScreen";
 import AdminCommandeDetailScreen from "./screens/admin/AdminCommandeDetailsScreen";
@@ -501,6 +502,12 @@ const router = createBrowserRouter(
       {/* Données · Réappros (admin) -> module "reapro" */}
       <Route element={<ModuleRoute module="reapro" />}>
         <Route path="/admin/reappros" element={<AdminReapprosScreen />} />
+        {/* Terrain · Réappro Mécalac : descendre au rayon ce qui dort dans un
+            entrepôt S2..S5. Même module de permission que le réappro. */}
+        <Route
+          path="/reappro-mecalac"
+          element={<AdminReapproMecalacScreen />}
+        />
       </Route>
 
       {/* Gestion · Envoi Commande Fournisseur -> module "envoi_cde_fournisseur" */}

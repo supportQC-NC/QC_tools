@@ -504,6 +504,41 @@ touchée**. Bouton « Importer les proformas » sur l'écran web pour forcer un 
 - La quantité demandée **n'est pas bornée au stock** (la disponibilité n'est pas
   contrôlée au dock) ; le stock reste affiché à titre indicatif.
 
+## Réappro Mécalac (entrepôt → rayon)
+
+Écran web `/reappro-mecalac` (menu **Terrain ▸ Réappro**), API
+`/api/reappro-mecalac`, permission **`reapro`** (le même métier et le même
+fichier de sortie que le réappro classique — aucun nouveau module de
+permission). Le nom vient du client (l'entrepôt MECALAC de QC) ; le module est
+**générique** : l'utilisateur choisit l'entrepôt source parmi **S2 à S5**,
+nommés dans la fiche société (`mappingEntrepots`).
+
+Parcours : choisir l'entrepôt → **Analyser** → retoucher la liste (quantités,
+suppressions, ajout manuel par code-barres / NART / référence) → **Générer le
+fichier**.
+
+- **SANS ÉTAT** : rien en Mongo, comme le « réappro rayon » du collecteur. La
+  liste vit dans la page et n'existe plus après la génération.
+- **Critère de sélection = la règle maison**, simplement restreinte à l'entrepôt
+  choisi : `S1 = 0` **et** `Sx > 0`, mêmes exclusions que
+  `estAReapprovisionner` (articles techniques NART < 100000, renvois GENDOUBL,
+  gisements hors rayon SAV/DOCK/STOP chez QC). Ne pas le faire diverger : la
+  liste « rayon vide », l'indicateur de `performanceReapproService` et cet écran
+  répondent à la même question.
+- **Quantité proposée** : `min(stock Sx, max(1, ceil(vteMoyMois)))` — la formule
+  du réappro magasin (couvrir ~1 mois de ventes sans promettre plus que ce que
+  l'entrepôt contient). Décimales conservées (articles au mètre).
+- Tri **meilleures ventes d'abord** (Σ|V1..V12|), limite 2 000 lignes par défaut
+  (5 000 max) ; `tronque` dit au front que la liste est coupée.
+- **Fichier** : `stock.dat reappro_<nom entrepôt>_<nom choisi>` (demande
+  client — le réappro classique écrit « stock.dat reappro <nom> »), déposé dans
+  le `cheminExportInventaire` de la société (collect_sec) ou sur le FTP quand la
+  société est en `modeDepotDat = ftp`. Contenu figé `NART(13)|QTE(8)|000`, via
+  `utils/qteDat.js` comme tous les autres `.dat`.
+
+Services : `backend/services/reapproMecalacService.js` (sélection, formules,
+contenu du `.dat`) ; le contrôleur ne fait que le dépôt et le nommage.
+
 ## Fiches papier : contrôle réception et préparation manuelle
 
 Deux modules jumeaux, même forme (liste DBF → aperçu → PDF A4 paysage → suivi
@@ -666,7 +701,8 @@ Repères pour situer un écran / un routeur. Les préfixes API sont sous `/api/`
 
 **Gestion (terrain)** — `stock` (recherche article), `inventaire` (zones,
 progression, récap, suivi bipage, agents de l'inventaire, fiches de contrôle), `reapro`,
-`demande_reappro`, `proforma`, `ctr_commande`, `reception` + `reception_manuelle`,
+`demande_reappro` (+ `reapro` pour **Réappro Mécalac**, entrepôt → rayon),
+`proforma`, `ctr_commande`, `reception` + `reception_manuelle`,
 `prep_commande` + `prep_commande_manuelle`, `envoi_cde_fournisseur`,
 `ctrl_info_produit`, `releve`, `etiquettes`, `changement_prix`,
 `historique_pachat`, `edition_promo`.

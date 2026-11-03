@@ -148,6 +148,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/demandes-bipage", key: "bipage" },
   { path: "/admin/suivi-demandes-bipage", key: "bipage" },
   { path: "/admin/reappros", key: "reapro" },
+  { path: "/reappro-mecalac", key: "reapro" },
   { path: "/admin/envoi-cde-fournisseur", key: "envoi_cde_fournisseur" },
   // Commerciaux (accès global unique)
   { path: "/admin/top-ventes", key: "commerciaux_outils" },

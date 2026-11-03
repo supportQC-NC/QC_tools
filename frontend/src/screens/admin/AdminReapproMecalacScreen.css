@@ -1,0 +1,495 @@
+/* src/screens/admin/AdminReapproMecalacScreen.css
+   Réappro Mécalac — tout est scopé sous .rmec (la classe .info-card globale et
+   les styles de tableau des autres écrans ne doivent pas déborder ici). */
+
+.rmec {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── En-tête ─────────────────────────────────────────────────────────────── */
+.rmec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rmec-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rmec-header h1 svg {
+  color: #38bdf8;
+}
+
+.rmec-societe {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Placeholder ─────────────────────────────────────────────────────────── */
+.rmec-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.rmec-placeholder svg {
+  font-size: 40px;
+  color: #38bdf8;
+  opacity: 0.6;
+}
+
+/* ── Cartes ──────────────────────────────────────────────────────────────── */
+.rmec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.rmec-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rmec-card-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rmec-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rmec-loading {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.rmec-regle {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  background: rgba(56, 189, 248, 0.07);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+/* ── Choix de l'entrepôt ─────────────────────────────────────────────────── */
+.rmec-depots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.rmec-depot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rmec-depot:hover {
+  border-color: #38bdf8;
+}
+
+.rmec-depot.on {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.rmec-depot-nom {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rmec-depot-code {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #38bdf8;
+}
+
+.rmec-depot-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Lignes de formulaire ────────────────────────────────────────────────── */
+.rmec-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rmec-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rmec-grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.rmec-select,
+.rmec-input {
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 200px;
+}
+
+.rmec-input-qte {
+  min-width: 90px;
+  width: 90px;
+}
+
+.rmec-select:focus,
+.rmec-input:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.rmec-resume {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Barre d'outils du tableau ───────────────────────────────────────────── */
+.rmec-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rmec-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 240px;
+  padding: 7px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.rmec-search svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.rmec-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.rmec-compte {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Tableau ─────────────────────────────────────────────────────────────── */
+.rmec-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.rmec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.rmec-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 9px 10px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.rmec-table td {
+  padding: 7px 10px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.rmec-table tbody tr:hover {
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.rmec-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rmec-table .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.rmec-table tr.ignoree td {
+  opacity: 0.45;
+}
+
+.rmec-table tr.manuelle td {
+  background: rgba(132, 204, 22, 0.06);
+}
+
+.rmec-vide {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px 0;
+}
+
+.rmec-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #84cc16;
+  background: rgba(132, 204, 22, 0.14);
+}
+
+.rmec-gis {
+  display: inline-block;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.rmec-gis-lib {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.rmec-sans {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.rmec-qte {
+  width: 86px;
+  padding: 5px 7px;
+  text-align: right;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rmec-qte:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.rmec-del {
+  display: inline-flex;
+  padding: 5px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.rmec-del:hover {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+/* ── Ajout manuel ────────────────────────────────────────────────────────── */
+.rmec-ajout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.rmec-ajout-titre {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rmec-ajout-titre svg {
+  color: #84cc16;
+}
+
+/* ── Aperçu du fichier ───────────────────────────────────────────────────── */
+.rmec-apercu {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rmec-apercu svg {
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.rmec-apercu code,
+.rmec-feedback code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+/* ── Messages ────────────────────────────────────────────────────────────── */
+.rmec-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.rmec-feedback svg {
+  flex-shrink: 0;
+  font-size: 18px;
+}
+
+.rmec-feedback.success {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.28);
+}
+
+.rmec-feedback.warning {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
+.rmec-feedback.error {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.28);
+}
+
+/* ── Boutons (locaux : les classes globales varient d'un écran à l'autre) ─── */
+.rmec .btn-primary,
+.rmec .btn-secondary,
+.rmec .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.rmec .btn-primary {
+  background: #38bdf8;
+  color: #06283a;
+}
+
+.rmec .btn-primary:hover:not(:disabled) {
+  background: #22a7e0;
+}
+
+.rmec .btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.rmec .btn-secondary:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: #38bdf8;
+}
+
+.rmec .btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.rmec .btn-danger:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.rmec .btn-primary:disabled,
+.rmec .btn-secondary:disabled,
+.rmec .btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
