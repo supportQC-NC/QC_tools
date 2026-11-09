@@ -303,16 +303,28 @@ const traiterFichier = async (
     agentUserId = u._id;
   }
 
-  // Lignes : depuis la COLLECTE quand elle existe (quantités exactes, même
-  // précédence de code que l'écriture du .DAT : NART d'abord, GENCOD en
-  // repli) ; le .DAT ne sert de source que pour un fichier posé À LA MAIN
-  // sur le partage, sans collecte.
+  // Lignes : depuis la COLLECTE quand elle existe (quantités exactes) ; le
+  // .DAT ne sert de source que pour un fichier posé À LA MAIN sur le partage,
+  // sans collecte.
+  //
+  // ⚠️ La colonne CODE de la fiche porte LE CODE RÉELLEMENT BIPÉ
+  // (`codeScanne`), pas le NART résolu (demande client du 09/11/2026) : le
+  // contrôleur relit l'étiquette en rayon et doit retrouver le même nombre.
+  // Avant, cette ligne prenait le NART d'abord — « même précédence que le
+  // .DAT » — et un article à code américain s'affichait avec sa référence
+  // interne, impossible à rapprocher du code-barres du produit.
+  // Le .DAT, lui, reste sur le NART : il est écrit par
+  // `inventaireCollecteController.genererContenuFichier`, pas ici.
+  // Repli NART puis GENCOD pour les collectes antérieures à ce champ et les
+  // versions de l'app qui ne l'envoient pas encore.
   let lignesDat;
   if (collecte?.lignes?.length) {
     lignesDat = collecte.lignes
       .map((l) => ({
         code:
-          (l.nart && String(l.nart).trim()) || String(l.gencod || "").trim(),
+          (l.codeScanne && String(l.codeScanne).trim()) ||
+          (l.nart && String(l.nart).trim()) ||
+          String(l.gencod || "").trim(),
         quantite: Number(l.quantite) || 0,
       }))
       .filter((l) => l.code);

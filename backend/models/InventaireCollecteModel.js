@@ -22,6 +22,18 @@ const ligneCollecteSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  // ⚠️ Le code EXACTEMENT tel que la douchette l'a envoyé, avant toute
+  // résolution. Distinct de `gencod`, qui est le code-barres du CATALOGUE :
+  // l'ERP écrit le même code sous plusieurs formes (UPC-A « 088381121774 » /
+  // EAN-13 « 0088381121774 »), et `findByCode` rapproche les deux. Sans ce
+  // champ, la colonne CODE de la fiche de contrôle affichait le NART résolu
+  // — le contrôleur ne pouvait pas vérifier ce qui avait réellement été bipé
+  // (demande client du 09/11/2026). N'entre PAS dans le .dat Stock XL, qui
+  // reste sur le NART.
+  codeScanne: {
+    type: String,
+    default: "",
+  },
   designation: {
     type: String,
     default: "",

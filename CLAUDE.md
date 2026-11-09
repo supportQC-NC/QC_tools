@@ -116,6 +116,20 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   toujours bien formé, toujours unique, 6 caractères suivis de 7 espaces. Le
   GENCOD ne reste qu'un repli pour une ligne sans NART (scan d'un code inconnu
   du catalogue).
+- **La FICHE DE CONTRÔLE, elle, affiche le code RÉELLEMENT BIPÉ** — ne pas
+  confondre avec la règle du `.dat` ci-dessus (demande client du 09/11/2026).
+  Le contrôleur relit l'étiquette en rayon : il doit retrouver le même nombre,
+  pas la référence interne. `InventaireCollecte.lignes[].codeScanne` porte le
+  code tel que la douchette l'a envoyé, avant toute résolution — distinct de
+  `gencod` (l'écriture du catalogue) et de `nart` (la référence ERP). Il est
+  renvoyé par `POST /inventaires-collecte/:id/scan` dans `articleInfo`,
+  reposté par l'app à l'ajout de la ligne, et `inventaireWatchService` le
+  préfère au NART pour la colonne CODE. Le `.dat` reste sur le NART : il est
+  écrit par `genererContenuFichier`, pas par le watcher — les deux ne doivent
+  jamais être réalignés. Repli NART puis GENCOD pour les collectes antérieures
+  au champ et les versions de l'app qui ne l'envoient pas encore ; `findByCode`
+  résout indifféremment un code-barres ou un NART, et `dupKey` reste bâti sur
+  le NART résolu, donc la détection de doublons (`ATT = D`) est inchangée.
 - Les tables de l'ERP **ne sont jamais purgées** : tout compteur « en cours » doit
   être borné par une fenêtre glissante explicite, sinon on remonte à 2019.
 

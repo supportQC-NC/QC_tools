@@ -1390,9 +1390,17 @@ const scanArticleCollecte = asyncHandler(async (req, res) => {
     "article.dbf",
   );
 
+  // ⚠️ `codeScanne` est renvoyé à l'app pour qu'elle le REPOSTE au moment
+  // d'ajouter la ligne : c'est la seule façon de conserver ce qui a été
+  // réellement bipé jusqu'à la fiche de contrôle. Le code brut n'existe que
+  // le temps de cette requête — ni `nart` ni `gencod` ne le portent, l'un
+  // étant la référence interne et l'autre l'écriture du catalogue.
+  const codeScanne = String(code || "").trim();
+
   let articleInfo = {
     nart: code,
     gencod: "",
+    codeScanne,
     designation: "Article inconnu",
     isUnknown: true,
     isRenvoi: false,
@@ -1415,6 +1423,7 @@ const scanArticleCollecte = asyncHandler(async (req, res) => {
         articleInfo = {
           nart: articleFinal.NART ? articleFinal.NART.trim() : code,
           gencod: articleFinal.GENCOD ? articleFinal.GENCOD.trim() : "",
+          codeScanne,
           designation: articleFinal.DESIGN ? articleFinal.DESIGN.trim() : "",
           isUnknown: false,
           isRenvoi: resultatRenvoi.isRenvoi,
@@ -1447,6 +1456,7 @@ const addLigneCollecte = asyncHandler(async (req, res) => {
   const {
     nart,
     gencod,
+    codeScanne,
     designation,
     quantite,
     isUnknown,
@@ -1464,6 +1474,11 @@ const addLigneCollecte = asyncHandler(async (req, res) => {
     throw new Error("Cette zone est déjà déposée");
   }
 
+  // Code réellement bipé, repli sur le gencod puis le NART pour les versions
+  // de l'app déployées qui ne l'envoient pas encore (le champ reste vide
+  // plutôt que de mentir, la fiche retombe alors sur l'ancien comportement).
+  const brutScanne = String(codeScanne || "").trim();
+
   // Cumul si l'article est déjà présent dans la zone
   const ligneExistante = collecte.lignes.find(
     (l) =>
@@ -1475,10 +1490,17 @@ const addLigneCollecte = asyncHandler(async (req, res) => {
   if (ligneExistante) {
     ligneExistante.quantite = round3(ligneExistante.quantite + round3(quantite));
     ligneExistante.scannedAt = new Date();
+    // On garde le PREMIER code bipé de la ligne : les écritures équivalentes
+    // désignent le même article, et le réécrire ferait varier la fiche selon
+    // l'ordre des bips. On ne le renseigne que s'il manquait.
+    if (!ligneExistante.codeScanne && brutScanne) {
+      ligneExistante.codeScanne = brutScanne;
+    }
   } else {
     collecte.lignes.push({
       nart,
       gencod: gencod || "",
+      codeScanne: brutScanne,
       designation: designation || "",
       quantite: round3(quantite),
       isUnknown: isUnknown || false,
@@ -1766,8 +1788,8 @@ const getCatalogueOffline = asyncHandler(async (req, res) => {
  *          ne crée pas de doublon.
  * @route   POST /api/inventaires-collecte/depot-horsligne
  * @body    { entrepriseId, offlineId, zoneCode, zoneType?, observation?,
- *            lignes: [{ nart, gencod, designation, quantite, isUnknown,
- *            isRenvoi, scannedAt? }], termineAt? }
+ *            lignes: [{ nart, gencod, codeScanne?, designation, quantite,
+ *            isUnknown, isRenvoi, scannedAt? }], termineAt? }
  * @access  Private (collecteur)
  */
 const depotHorsLigne = asyncHandler(async (req, res) => {
@@ -1847,6 +1869,9 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
       // on retombe sur le code scanné (même convention que le flux en ligne).
       nart: String(l.nart || l.gencod || "").trim(),
       gencod: String(l.gencod || "").trim(),
+      // Code réellement bipé, résolu en local par l'app hors ligne. Vide pour
+      // les versions déployées qui ne l'envoient pas encore.
+      codeScanne: String(l.codeScanne || "").trim(),
       designation: String(l.designation || "").trim(),
       quantite: Math.max(0, round3(l.quantite)),
       isUnknown: !!l.isUnknown,
