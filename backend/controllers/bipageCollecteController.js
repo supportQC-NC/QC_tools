@@ -318,15 +318,37 @@ const deleteLigneBipage = asyncHandler(async (req, res) => {
 });
 
 // Contenu .dat (identique reappro/inventaire) : code(13)|qté(8)|000 CRLF
+//
+// ⚠️ LE CODE ÉCRIT EST LE NART, pas le GENCOD (corrigé le 09/11/2026).
+// Stock XL relit ce champ comme une référence interne. Ce générateur et
+// `demandeBipageTransfertService` étaient les DEUX SEULS sur 7 à écrire
+// `gencod || nart` ; les cinq autres (inventaire, inventaire-collecte,
+// inventaire-proforma, réappro, demande-réappro) écrivent le NART. Le même
+// article bipé par deux modules produisait donc deux lignes différentes.
+//
+// Mesuré sur article.dbf de QC (100 601 fiches, 86 038 gencods) : la voie
+// GENCOD écrivait un code inexploitable pour 3 214 articles —
+//   1 414 gencods de 12 chiffres (UPC-A : Makita « 088381121774 », Coleman
+//     « 076501207828 »…) complétés par un ESPACE là où la forme ERP porte un
+//     zéro de tête ;
+//     878 de 9 à 11 chiffres, aucun format de code-barres existant ;
+//      71 de 1 à 7 chiffres, indiscernables d'un NART C(6) — « NART 122041 /
+//     GENCOD 935377 » résolvait sur un AUTRE article ;
+//      57 non numériques, champ ERP pollué (« + », « °°°°°°°°°°°°° »,
+//     « utre mot de p ») : ligne de pur déchet ;
+//     170 articles sous 85 gencods en doublon, donc ambigus.
+// Le NART est un C(6) : toujours bien formé, toujours unique, 6 caractères
+// suivis de 7 espaces. Ne pas revenir au gencod.
 const genererContenuFichier = (lignes) => {
   let contenu = "";
   lignes.forEach((ligne) => {
-    let code = "";
-    if (ligne.gencod && ligne.gencod.trim()) {
-      code = ligne.gencod.trim().padEnd(13, " ");
-    } else {
-      code = ligne.nart.trim().padEnd(13, " ");
-    }
+    // NART d'abord ; le GENCOD ne sert plus que de repli pour une ligne sans
+    // NART (scan d'un code inconnu du catalogue).
+    const brut =
+      ligne.nart && ligne.nart.trim()
+        ? ligne.nart.trim()
+        : (ligne.gencod || "").trim();
+    const code = brut.padEnd(13, " ");
     // QTE(8) Stock XL : décimales et négatifs acceptés, « - » et « . »
     // comptent dans les 8 caractères (utils/qteDat.js).
     const quantiteFormatee = fmtQteDat(ligne.quantite);

@@ -2,9 +2,15 @@
 //
 // Génère le fichier .dat d'une demande de BIPAGE réalisée, au même format que
 // l'export du module Bipage (bipageCollecteController.genererContenuFichier) :
-// CODE(13) | QTE(8, zéros à gauche) | 000 + CRLF, où CODE = GENCOD si présent,
-// sinon NART. Déposé dans "collect_sec" (cheminExportInventaire de l'entreprise).
-// (Calque de demandeReapproTransfertService, mais code = gencod||nart.)
+// CODE(13) | QTE(8, zéros à gauche) | 000 + CRLF, où CODE = le NART (le GENCOD
+// ne sert que de repli pour une ligne sans NART). Déposé dans "collect_sec"
+// (cheminExportInventaire de l'entreprise).
+// (Calque exact de demandeReapproTransfertService — plus aucune divergence.)
+//
+// ⚠️ Écrivait `gencod || nart` jusqu'au 09/11/2026 : voir l'en-tête de
+// `bipageCollecteController.genererContenuFichier` pour le détail mesuré
+// (3 214 articles de QC produisaient un code inexploitable par Stock XL, dont
+// les 1 414 UPC-A à 12 chiffres et 71 gencods indiscernables d'un NART).
 import fs from "fs";
 import path from "path";
 import Entreprise from "../models/EntrepriseModel.js";
@@ -28,14 +34,14 @@ const dossierCollectSec = (entreprise) =>
   safeTrim(entreprise?.cheminExportInventaire) ||
   "/mnt/rcommun/STOCK/collect_sec";
 
-// CODE(13, gencod||nart, espaces à droite) | QTE(8, zéros) | 000
+// CODE(13, NART puis gencod en repli, espaces à droite) | QTE(8, zéros) | 000
 const construireContenu = (lignes) => {
   let contenu = "";
   (lignes || []).forEach((l) => {
     // QTE(8) Stock XL : décimales acceptées (utils/qteDat.js).
     const q = Math.round((Number(l.quantite) || 0) * 1000) / 1000;
     if (q <= 0) return;
-    const brut = safeTrim(l.gencod) || safeTrim(l.nart);
+    const brut = safeTrim(l.nart) || safeTrim(l.gencod);
     if (!brut) return;
     const code = brut.padEnd(13, " ");
     contenu += `${code}|${fmtQteDat(q)}|000\r\n`;

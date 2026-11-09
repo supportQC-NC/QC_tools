@@ -101,6 +101,21 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   `0765012078287` = code-barres inexistant, illisible au rescan). Corrigé dans
   les trois copies de `ean13Bits` (`etiquetteService`, `ficheArticleService`,
   `utils/ean13.js`) via `cleModulo10`.
+- **Le champ `CODE(13)` d'un `.dat` Stock XL porte le NART, JAMAIS le GENCOD**
+  (aligné le 09/11/2026). Stock XL relit ce champ comme une référence interne,
+  et le GENCOD est un champ libre que l'ERP a laissé polluer : la voie
+  `gencod || nart`, que seuls `bipageCollecteController` et
+  `demandeBipageTransfertService` suivaient (contre cinq générateurs en NART),
+  écrivait un code inexploitable pour **3 214 articles de QC** — 1 414 UPC-A à
+  12 chiffres complétés par un ESPACE là où la forme ERP porte un zéro de tête,
+  878 codes de 9 à 11 chiffres, **71 de 1 à 7 chiffres indiscernables d'un NART
+  `C(6)`** (« NART 122041 / GENCOD 935377 » résolvait sur un AUTRE article),
+  57 non numériques (`+`, `°°°°°°°°°°°°°`, `utre mot de p` : champ ERP
+  corrompu) et 170 articles sous 85 gencods en doublon. Le même article bipé par
+  deux modules produisait deux lignes différentes. Le NART est un `C(6)` :
+  toujours bien formé, toujours unique, 6 caractères suivis de 7 espaces. Le
+  GENCOD ne reste qu'un repli pour une ligne sans NART (scan d'un code inconnu
+  du catalogue).
 - Les tables de l'ERP **ne sont jamais purgées** : tout compteur « en cours » doit
   être borné par une fenêtre glissante explicite, sinon on remonte à 2019.
 
