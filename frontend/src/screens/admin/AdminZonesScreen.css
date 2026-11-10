@@ -269,6 +269,19 @@
   border: 1px solid rgba(255, 107, 107, 0.25);
 }
 
+/* État du dictionnaire de la société (disponible / absent / illisible) */
+.import-feedback.info {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.import-feedback.warn {
+  color: var(--warning);
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
 .import-time {
   color: var(--text-muted);
   font-size: 11px;

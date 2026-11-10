@@ -11,6 +11,7 @@ import {
   deleteZone,
   deleteAllZones,
   genererZonesDepuisDictionnaire,
+  getDictionnaireStatut,
   genererFichesPDF,
 } from "../controllers/zoneController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -64,6 +65,15 @@ router.post(
 // ==========================================
 // CRUD — routes les plus spécifiques d'abord
 // ==========================================
+
+// État du dictionnaire de la société (préfixe statique : AVANT /:id)
+router.get(
+  "/:entrepriseId/dictionnaire",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("inventaire", "read"),
+  getDictionnaireStatut,
+);
 
 // Fiches PDF imprimables (préfixe statique /fiches-pdf : AVANT /:id)
 router.post(

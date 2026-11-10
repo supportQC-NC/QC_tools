@@ -3,7 +3,14 @@
 // Génère les fiches rayons (Zones d'inventaire) et leur PDF imprimable À PARTIR du
 // dictionnaire des rayons — alternative à l'import CSV du programme externe.
 //
-//   - Une fiche = un rayon (ligne « zone » du dictionnaire), JAMAIS une sous-zone.
+//   - Le dictionnaire lu est celui de la SOCIÉTÉ sélectionnée
+//     (« <TRIG>_dictionnaire_rayons.xlsx ») : le dossier « collecteur » est commun
+//     à toutes les sociétés, et l'absence de fichier au trigramme est une erreur
+//     404 « aucun dictionnaire disponible » — jamais un repli sur une autre
+//     société (voir dictionnaireRayonsService.findDictionnaireFile).
+//   - Une fiche = un rayon PARENT, JAMAIS une sous-zone (« <CODE>_A ») : le
+//     filtrage est fait par readDictionnaire (colonne « type », ou détection
+//     structurelle quand le fichier ne la renseigne pas).
 //   - Les 3 EAN de phase (papillonnage/bipage/contrôle) sont MINTÉS (EAN-13 internes
 //     déterministes préfixe « 2 »).
 //   - Le code « principal » (identité de la zone) = le code rayon lui-même, imprimé
@@ -21,10 +28,14 @@ const safe = (v) => (v == null ? "" : String(v)).trim();
 //   absent/vide. Les codes en double dans le dictionnaire sont DÉDOUBLONNÉS (dernier
 //   gagne, comme l'import CSV) — l'index unique { entreprise, code } l'exige.
 export const construireZonesDepuisDictionnaire = async (entreprise) => {
-  const { fichier, exists, rows } = await readDictionnaire(entreprise);
+  const { fichier, nomFichier, trigramme, exists, rows, sousZonesIgnorees } =
+    await readDictionnaire(entreprise);
   if (!exists) {
+    // Pas de « <TRIG>_dictionnaire_rayons.xlsx » sur le partage : la société n'a
+    // pas de dictionnaire. Surtout pas de repli sur celui d'une autre société
+    // (le dossier « collecteur » est commun) — voir findDictionnaireFile.
     const e = new Error(
-      "Aucun dictionnaire des rayons pour cette société. Renseignez-le d'abord dans « Dictionnaire des rayons ».",
+      `Aucun dictionnaire disponible pour cette entreprise (fichier « ${nomFichier} » introuvable). Renseignez-le d'abord dans « Dictionnaire des rayons ».`,
     );
     e.statusCode = 404;
     throw e;
@@ -63,7 +74,14 @@ export const construireZonesDepuisDictionnaire = async (entreprise) => {
   }
 
   const zones = ordre.map((c) => parCle.get(c));
-  return { fichier, zones, doublons };
+  return {
+    fichier,
+    nomFichier,
+    trigramme,
+    zones,
+    doublons,
+    sousZonesIgnorees: sousZonesIgnorees || 0,
+  };
 };
 
 // ── Rendu QR (réplique locale de gisementLabelService.drawQrCode, pdfkit natif) ──

@@ -61,20 +61,142 @@ export const letterSuffix = (n) => {
   return s;
 };
 
-// Chemin du fichier dictionnaire pour l'entreprise (convention par trigramme).
-export const resolveDictionnaireFile = (entreprise) => {
-  const base = deriveCollecteurBase(entreprise?.cheminRapportReception);
-  const trig = safeTrim(entreprise?.trigramme).toUpperCase() || "XXX";
-  return path.join(base, `${trig}_dictionnaire_rayons.xlsx`);
+/**
+ * Le nom de fichier est-il le dictionnaire de la société `trig` ?
+ *   « <TRIG>[ _-]dictionnaire[ _-]rayons….xls[x] », casse indifférente.
+ * Écrit sans RegExp : le trigramme vient de la base, l'échapper serait un piège
+ * de plus pour une comparaison aussi simple.
+ */
+const nomEstDictionnaire = (nom, trig) => {
+  const n = safeTrim(nom).toLowerCase();
+  const t = safeTrim(trig).toLowerCase();
+  if (!t || !n.startsWith(t)) return false;
+  if (n.startsWith("~$")) return false; // temporaire Excel (fichier ouvert)
+  if (!n.endsWith(".xlsx") && !n.endsWith(".xls")) return false;
+  const reste = n.slice(t.length).replace(/^[\s_-]+/, "");
+  return reste.startsWith("dictionnaire") && reste.includes("rayons");
 };
 
-// Analyse une feuille de calcul et renvoie { rows, hasSous, hasType }.
-// Ne renvoie QUE les lignes de ZONE (les lignes de sous-zone — type=sous — sont
-// dérivées, donc ignorées). Chaque row = { gism1, libelle, metrage, priorite,
-// emplacement }. Les champs priorite/emplacement absents du fichier valent
-// null / "MAGASIN". En-têtes tolérants (casse/accents/espaces).
+// Nom canonique du dictionnaire d'une société : « <TRIG>_dictionnaire_rayons.xlsx ».
+export const nomDictionnaireCanonique = (trigramme) =>
+  `${safeTrim(trigramme).toUpperCase() || "XXX"}_dictionnaire_rayons.xlsx`;
+
+/**
+ * Localise le dictionnaire des rayons d'UNE société.
+ *
+ * ⚠️ Toutes les sociétés partagent le MÊME dossier « collecteur » : leurs
+ * dictionnaires n'y sont distingués que par le PRÉFIXE trigramme
+ * (QC_dictionnaire_rayons.xlsx, DQ_dictionnaire_rayons.xlsx, FMB_…). Aucun
+ * fichier commençant par le trigramme = la société n'a PAS de dictionnaire, et
+ * il ne faut surtout pas retomber sur celui d'une autre société : les fiches
+ * d'inventaire générées porteraient les rayons du mauvais magasin.
+ *
+ * Le nom canonique gagne toujours ; le repli préfère le nom le plus court, parce
+ * que des copies de travail cohabitent sur le partage
+ * (QC_dictionnaire_rayons_old.xlsx, _oldss.xlsx) et ne doivent jamais être lues
+ * à la place du fichier courant.
+ *
+ * Renvoie { base, trigramme, nomFichier, fichier, exists }.
+ */
+export const findDictionnaireFile = (entreprise) => {
+  const base = deriveCollecteurBase(entreprise?.cheminRapportReception);
+  const trigramme = safeTrim(entreprise?.trigramme).toUpperCase() || "XXX";
+  const canonique = path.join(base, nomDictionnaireCanonique(trigramme));
+  const resultat = (fichier, exists) => ({
+    base,
+    trigramme,
+    nomFichier: path.basename(fichier),
+    fichier,
+    exists,
+  });
+
+  if (fs.existsSync(canonique)) return resultat(canonique, true);
+
+  let noms = [];
+  try {
+    noms = fs.readdirSync(base);
+  } catch {
+    noms = []; // partage injoignable ou dossier « collecteur » absent
+  }
+  const candidats = noms
+    .filter((n) => nomEstDictionnaire(n, trigramme))
+    .sort((a, b) => a.length - b.length || a.localeCompare(b));
+
+  // Aucun candidat : on renvoie quand même le chemin canonique, qui est la cible
+  // d'écriture de writeDictionnaire (création du dictionnaire de la société).
+  if (candidats.length === 0) return resultat(canonique, false);
+  return resultat(path.join(base, candidats[0]), true);
+};
+
+// Chemin du fichier dictionnaire pour l'entreprise : le fichier RÉELLEMENT
+// présent pour son trigramme s'il y en a un, sinon le chemin canonique (cible
+// d'écriture). Voir findDictionnaireFile.
+export const resolveDictionnaireFile = (entreprise) =>
+  findDictionnaireFile(entreprise).fichier;
+
+/**
+ * Retire les lignes de SOUS-ZONE d'un dictionnaire qui n'a pas de colonne
+ * « type » pour les déclarer.
+ *
+ * Les sous-zones sont DÉRIVÉES du métrage (« <CODE>_A », « _B », … écrites par
+ * writeDictionnaire) : ce ne sont jamais des entrées du dictionnaire. Les
+ * fichiers récents les marquent `type = sous` et sont filtrés sur ce champ ;
+ * certains fichiers du partage ont perdu la colonne (DQ : 1 240 lignes « _A » sur
+ * 1 741 remontaient comme autant de rayons, donc autant de fiches d'inventaire
+ * fantômes).
+ *
+ * Les TROIS conditions sont exigées ensemble, sinon on supprime de vrais rayons :
+ * chez QC 22 rayons se terminent par « _V » (vitrine : D_7_V « Batterie Bosch »
+ * sous D_7 « BOSCH ») et doivent rester.
+ *   1. suffixe de lettres pures après le dernier « _ » (base 26 de letterSuffix) ;
+ *   2. la zone parente existe dans le fichier, au MÊME emplacement ;
+ *   3. le libellé est celui de la zone parente (les sous-zones l'héritent).
+ */
+export const retirerSousZonesDerivees = (rows) => {
+  const liste = Array.isArray(rows) ? rows : [];
+  const cleOf = (code, empl) =>
+    `${safeTrim(code).toUpperCase()}|${normEmplacement(empl)}`;
+  const parents = new Map();
+  for (const r of liste) {
+    const cle = cleOf(r?.gism1, r?.emplacement);
+    if (safeTrim(r?.gism1) && !parents.has(cle)) parents.set(cle, r);
+  }
+
+  const zones = [];
+  let sousZonesIgnorees = 0;
+  for (const r of liste) {
+    const code = safeTrim(r?.gism1);
+    if (!code) continue;
+    const sep = code.lastIndexOf("_");
+    if (sep > 0 && /^[A-Za-z]+$/.test(code.slice(sep + 1))) {
+      const parent = parents.get(cleOf(code.slice(0, sep), r?.emplacement));
+      const memeLibelle =
+        !!parent &&
+        safeTrim(parent.libelle).toUpperCase() ===
+          safeTrim(r?.libelle).toUpperCase();
+      if (memeLibelle) {
+        sousZonesIgnorees += 1;
+        continue;
+      }
+    }
+    zones.push(r);
+  }
+  return { zones, sousZonesIgnorees };
+};
+
+// Analyse une feuille de calcul et renvoie
+// { rows, hasSous, hasType, sousZonesIgnorees }.
+// Ne renvoie QUE les lignes de ZONE PARENTE — jamais une sous-zone, qui est
+// dérivée du métrage. Deux filtres, dans cet ordre :
+//   1. la colonne « type » quand le fichier la renseigne (`sous` → ignorée) ;
+//   2. à défaut SEULEMENT (fichier sans colonne type, ou colonne vide — cas du
+//      dictionnaire DQ), la détection structurelle de retirerSousZonesDerivees.
+// Chaque row = { gism1, libelle, metrage, priorite, emplacement }. Les champs
+// priorite/emplacement absents du fichier valent null / "MAGASIN". En-têtes
+// tolérants (casse/accents/espaces).
 const parseWorksheetZones = (ws) => {
-  if (!ws) return { rows: [], hasSous: false, hasType: false };
+  if (!ws)
+    return { rows: [], hasSous: false, hasType: false, sousZonesIgnorees: 0 };
 
   // Repérage des colonnes via la 1re ligne.
   const colIdx = {};
@@ -90,10 +212,12 @@ const parseWorksheetZones = (ws) => {
       colIdx.emplacement = col;
     else if (["TYPE", "TYPEZONE", "TYPELIGNE"].includes(h)) colIdx.type = col;
   });
-  if (!colIdx.gism1) return { rows: [], hasSous: false, hasType: false };
+  if (!colIdx.gism1)
+    return { rows: [], hasSous: false, hasType: false, sousZonesIgnorees: 0 };
 
   const rows = [];
   let hasSous = false;
+  let hasZone = false;
   ws.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // en-tête
     const cellVal = (col) => (col ? row.getCell(col).text ?? row.getCell(col).value : "");
@@ -105,6 +229,7 @@ const parseWorksheetZones = (ws) => {
       hasSous = true;
       return;
     }
+    if (type === "ZONE") hasZone = true;
     const metrageRaw = safeTrim(cellVal(colIdx.metrage));
     const metrageNum = Number(metrageRaw.replace(",", "."));
     rows.push({
@@ -116,30 +241,59 @@ const parseWorksheetZones = (ws) => {
     });
   });
 
-  return { rows, hasSous, hasType: colIdx.type !== undefined };
+  // Le fichier déclare-t-il ses lignes ? Si oui on lui fait confiance (chez QC
+  // 22 vrais rayons « _V » seraient pris pour des sous-zones) ; sinon on retombe
+  // sur la détection structurelle.
+  if (hasSous || hasZone) {
+    return { rows, hasSous, hasType: colIdx.type !== undefined, sousZonesIgnorees: 0 };
+  }
+  const { zones, sousZonesIgnorees } = retirerSousZonesDerivees(rows);
+  return {
+    rows: zones,
+    hasSous,
+    hasType: colIdx.type !== undefined,
+    sousZonesIgnorees,
+  };
 };
 
-// Lit le dictionnaire depuis le fichier de l'entreprise.
-// Renvoie { fichier, exists, rows:[{ gism1, libelle, metrage, priorite,
-//   emplacement }], materialized }.
-//   materialized = true si le fichier contient déjà les sous-zones matérialisées
-//   (colonne « type » présente + au moins une ligne « sous »).
+// Lit le dictionnaire de l'entreprise — celui de SON trigramme, voir
+// findDictionnaireFile (le dossier « collecteur » est commun à toutes les
+// sociétés). `exists: false` = cette société n'a pas de dictionnaire.
+// Renvoie { fichier, nomFichier, trigramme, exists, rows:[{ gism1, libelle,
+//   metrage, priorite, emplacement }], materialized, sousZonesIgnorees }.
+//   rows            = les ZONES PARENTES seules (jamais les sous-zones).
+//   materialized    = le fichier contient déjà les sous-zones matérialisées
+//                     (colonne « type » présente + au moins une ligne « sous »).
+//   sousZonesIgnorées = sous-zones écartées par détection structurelle (fichier
+//                     sans colonne « type » renseignée).
 export const readDictionnaire = async (entreprise) => {
-  const fichier = resolveDictionnaireFile(entreprise);
-  if (!fs.existsSync(fichier)) {
-    return { fichier, exists: false, rows: [], materialized: false };
+  const { fichier, nomFichier, trigramme, exists } =
+    findDictionnaireFile(entreprise);
+  if (!exists) {
+    return {
+      fichier,
+      nomFichier,
+      trigramme,
+      exists: false,
+      rows: [],
+      materialized: false,
+      sousZonesIgnorees: 0,
+    };
   }
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(fichier);
   const ws = wb.getWorksheet("Rayons") || wb.worksheets[0];
-  const { rows, hasSous, hasType } = parseWorksheetZones(ws);
+  const { rows, hasSous, hasType, sousZonesIgnorees } = parseWorksheetZones(ws);
 
   return {
     fichier,
+    nomFichier,
+    trigramme,
     exists: true,
     rows,
     materialized: hasType && hasSous,
+    sousZonesIgnorees,
   };
 };
 
@@ -476,6 +630,9 @@ export const expandSubZones = (rows, filtre = null, sousZones = true) => {
 
 export default {
   resolveDictionnaireFile,
+  findDictionnaireFile,
+  nomDictionnaireCanonique,
+  retirerSousZonesDerivees,
   readDictionnaire,
   writeDictionnaire,
   parseWorkbookRows,

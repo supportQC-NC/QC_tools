@@ -18,6 +18,7 @@ import {
   useGetZonesQuery,
   useImportZonesMutation,
   useGenererZonesDepuisDictionnaireMutation,
+  useGetZonesDictionnaireQuery,
   useDeleteAllZonesMutation,
 } from "../../slices/zoneApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
@@ -47,6 +48,16 @@ const AdminZonesScreen = () => {
     { entrepriseId: selectedEntreprise },
     { skip: !selectedEntreprise },
   );
+
+  // État du dictionnaire de la société : le dossier « collecteur » est commun à
+  // toutes les sociétés, seul le préfixe trigramme distingue leurs fichiers
+  // (QC_dictionnaire_rayons.xlsx, DQ_...). Sans fichier au trigramme, on l'annonce
+  // ici plutôt que de laisser l'utilisateur buter sur un 404 à la génération.
+  const { data: dico, isFetching: fetchingDico } = useGetZonesDictionnaireQuery(
+    { entrepriseId: selectedEntreprise },
+    { skip: !selectedEntreprise },
+  );
+  const dicoDisponible = !!dico?.disponible;
 
   const [importZones, { isLoading: importing }] = useImportZonesMutation();
   const [genererDepuisDico, { isLoading: generatingDico }] =
@@ -266,6 +277,8 @@ const AdminZonesScreen = () => {
                     `, ${importResult.resume.doublonsFusionnes} doublon(s) fusionné(s)`}
                   {importResult.resume?.lignesIgnorees > 0 &&
                     `, ${importResult.resume.lignesIgnorees} ligne(s) ignorée(s)`}
+                  {importResult.resume?.sousZonesIgnorees > 0 &&
+                    `, ${importResult.resume.sousZonesIgnorees} sous-zone(s) écartée(s)`}
                   .{" "}
                   {importResult._queryTime && (
                     <span className="import-time">
@@ -287,17 +300,56 @@ const AdminZonesScreen = () => {
 
             <p className="import-warning">
               <HiExclamationCircle />
-              Alternative au CSV : crée une fiche par rayon du{" "}
-              <strong>dictionnaire des rayons</strong> (jamais les sous-zones) et{" "}
+              Alternative au CSV : crée une fiche par <strong>rayon</strong> du{" "}
+              <strong>dictionnaire de cette société</strong> —{" "}
+              <strong>jamais les sous-zones</strong> (« CODE_A », « CODE_B »…) — et{" "}
               <strong>remplace la totalité</strong> des zones existantes. Les 3 EAN
               (papillonnage / bipage / contrôle) sont <strong>générés</strong> ; le
               code principal est un <strong>QR code</strong>.
             </p>
 
+            {/* État du dictionnaire au trigramme de la société */}
+            {fetchingDico ? (
+              <div className="import-feedback info">
+                <HiBookOpen /> Vérification du dictionnaire…
+              </div>
+            ) : dicoDisponible ? (
+              <div className="import-feedback info">
+                <HiBookOpen />
+                <div>
+                  Dictionnaire <strong>{dico.nomFichier}</strong> —{" "}
+                  <strong>{dico.rayons}</strong> rayon(s) :{" "}
+                  {dico.parEmplacement?.MAGASIN ?? 0} magasin,{" "}
+                  {dico.parEmplacement?.DOCK ?? 0} dock.
+                  {dico.sousZonesIgnorees > 0 &&
+                    ` ${dico.sousZonesIgnorees} sous-zone(s) écartée(s).`}
+                </div>
+              </div>
+            ) : (
+              <div className="import-feedback warn">
+                <HiExclamationCircle />
+                <div>
+                  {dico?.message ||
+                    "Aucun dictionnaire disponible pour cette entreprise."}{" "}
+                  {dico?.lisible !== false && (
+                    <>
+                      Renseignez-le dans <strong>Dictionnaire des rayons</strong>{" "}
+                      avant de générer les fiches.
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="import-row">
               <button
                 className="btn-primary"
-                disabled={!selectedEntreprise || generatingDico}
+                disabled={!selectedEntreprise || generatingDico || !dicoDisponible}
+                title={
+                  dicoDisponible
+                    ? "Générer une fiche par rayon du dictionnaire de cette société"
+                    : "Aucun dictionnaire disponible pour cette entreprise"
+                }
                 onClick={() => setConfirm("generateDico")}
               >
                 <HiBookOpen />{" "}
@@ -441,8 +493,9 @@ const AdminZonesScreen = () => {
                   La génération va{" "}
                   <strong>supprimer toutes les zones existantes</strong> de{" "}
                   <strong>{entrepriseObj?.trigramme}</strong> puis créer une fiche
-                  par rayon du <strong>dictionnaire des rayons</strong> (EAN générés,
-                  principal en QR). Continuer ?
+                  par rayon de son dictionnaire{" "}
+                  <strong>{dico?.nomFichier}</strong> — {dico?.rayons} rayon(s),
+                  sous-zones exclues (EAN générés, principal en QR). Continuer ?
                 </p>
               ) : (
                 <p>

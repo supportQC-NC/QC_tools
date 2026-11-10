@@ -29,6 +29,14 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Zone"],
     }),
 
+    // État du dictionnaire des rayons de la société (disponible ? combien de
+    // rayons parents ?) — sert à annoncer « aucun dictionnaire disponible pour
+    // cette entreprise » avant que l'utilisateur ne tente la génération.
+    getZonesDictionnaire: builder.query({
+      query: ({ entrepriseId }) => `${ZONES_URL}/${entrepriseId}/dictionnaire`,
+      providesTags: ["Zone"],
+    }),
+
     // Liste des zones d'une entreprise (recherche serveur optionnelle via ?search=)
     getZones: builder.query({
       query: ({ entrepriseId, search }) => ({
@@ -83,6 +91,7 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
 export const {
   useImportZonesMutation,
   useGenererZonesDepuisDictionnaireMutation,
+  useGetZonesDictionnaireQuery,
   useGetZonesQuery,
   useLazyGetZonesQuery,
   useGetZoneByCodeQuery,
