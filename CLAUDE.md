@@ -116,20 +116,24 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   toujours bien formé, toujours unique, 6 caractères suivis de 7 espaces. Le
   GENCOD ne reste qu'un repli pour une ligne sans NART (scan d'un code inconnu
   du catalogue).
-- **La FICHE DE CONTRÔLE, elle, affiche le code RÉELLEMENT BIPÉ** — ne pas
-  confondre avec la règle du `.dat` ci-dessus (demande client du 09/11/2026).
-  Le contrôleur relit l'étiquette en rayon : il doit retrouver le même nombre,
-  pas la référence interne. `InventaireCollecte.lignes[].codeScanne` porte le
-  code tel que la douchette l'a envoyé, avant toute résolution — distinct de
-  `gencod` (l'écriture du catalogue) et de `nart` (la référence ERP). Il est
-  renvoyé par `POST /inventaires-collecte/:id/scan` dans `articleInfo`,
-  reposté par l'app à l'ajout de la ligne, et `inventaireWatchService` le
-  préfère au NART pour la colonne CODE. Le `.dat` reste sur le NART : il est
-  écrit par `genererContenuFichier`, pas par le watcher — les deux ne doivent
-  jamais être réalignés. Repli NART puis GENCOD pour les collectes antérieures
-  au champ et les versions de l'app qui ne l'envoient pas encore ; `findByCode`
-  résout indifféremment un code-barres ou un NART, et `dupKey` reste bâti sur
-  le NART résolu, donc la détection de doublons (`ATT = D`) est inchangée.
+- **La colonne CODE de la FICHE DE CONTRÔLE porte le GENCOD DU CATALOGUE**
+  (demande client du 10/11/2026, qui remplace celle du 09/11/2026 « le code
+  réellement bipé »). Le contrôleur relit l'étiquette en rayon : il lui faut un
+  code-barres, pas une référence interne — et le NART a déjà sa propre colonne.
+  Un seul endroit décide : `ficheControleService.construireLignes`
+  (`code: e.gencod || e.code`), donc **toutes** les fiches suivent (watcher,
+  réimpression `assurerPdfFiche`, récap zone, fiches d'import proforma/Excel) et
+  `LigneBipage.eanArticle` devient un vrai EAN. Repli sur le code bipé quand
+  l'article n'a pas de gencod ou reste introuvable : une colonne vide ne donnerait
+  rien à contrôler.
+  ⚠️ Trois codes à ne pas confondre : le `.dat` reste sur le **NART** (écrit par
+  `genererContenuFichier`, jamais réaligné sur la fiche) ; la **résolution** de
+  l'article part du code **bipé** (`InventaireCollecte.lignes[].codeScanne`,
+  renvoyé par `POST /inventaires-collecte/:id/scan` puis reposté par l'app —
+  tolérant aux zéros de tête via `findByCode`), conservé en base et exposé en
+  `row.codeScanne` pour le diagnostic ; l'**affichage** prend le gencod.
+  `dupKey` reste bâti sur le NART résolu : la détection de doublons (`ATT = D`)
+  est inchangée.
 - **UNE ZONE D'INVENTAIRE PEUT ÊTRE RE-BIPÉE, ET LE .DAT PORTE LE CUMUL**
   (10/11/2026). L'agent a oublié des références, un second agent vient « biper
   la suite » : il rebipe le QR du rayon, l'app avertit « zone déjà bipée —

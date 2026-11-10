@@ -177,6 +177,14 @@ export const parseDat = (content) => {
  * @returns { rows, stats }
  * row = { n, code, nart, att, designation, reference, qte, stock, rouge, nonTrouve }
  * ATT : D = doublon dans le fichier, XX = qté > stock, A = stock > qté OU article non trouvé
+ *
+ * ⚠️ La colonne CODE de la fiche porte le **GENCOD du catalogue** (demande
+ * client du 10/11/2026), PAS le code brut bipé ni le NART — ce dernier a sa
+ * propre colonne, l'afficher deux fois ne servait à rien. Le code bipé reste la
+ * clé de RECHERCHE (`l.code`, résolu par findByCode, tolérant aux zéros de
+ * tête) ; il ne sert plus qu'à l'affichage de SECOURS, quand l'article n'a pas
+ * de gencod ou n'a pas été retrouvé — une colonne vide ne donnerait rien à
+ * contrôler. Le `.dat`, lui, reste sur le NART (format Stock XL figé).
  */
 export const construireLignes = async (entreprise, lignesDat) => {
   // 1) Résolution article par article
@@ -250,9 +258,14 @@ export const construireLignes = async (entreprise, lignesDat) => {
 
     return {
       n: i + 1,
-      code: e.code,
+      // CODE = le code-barres du CATALOGUE ; repli sur le code bipé quand
+      // l'article n'a pas de gencod (ou est inconnu). Voir l'en-tête.
+      code: e.gencod || e.code,
       nart: e.nart,
       gencod: e.gencod || "",
+      // Code réellement bipé, conservé pour le diagnostic (écrans web) — il
+      // n'apparaît plus dans le PDF.
+      codeScanne: e.code,
       att: flags.join(" "),
       designation: e.designation,
       reference: e.reference,
@@ -280,7 +293,11 @@ export const construireLignes = async (entreprise, lignesDat) => {
 // ===========================================
 const COLS = [
   { key: "n", label: "N°", w: 26, align: "center" },
-  { key: "code", label: "CODE", w: 88, align: "left" },
+  // Intitulé « GENCODE » et pas « CODE » (demande client du 10/11/2026) : la
+  // colonne porte le code-barres du catalogue, le contrôleur doit savoir qu'il
+  // compare à l'étiquette du rayon et pas à une référence interne (NART, colonne
+  // suivante). 37,9 pt de large pour 88 pt de colonne : l'en-tête tient.
+  { key: "code", label: "GENCODE", w: 88, align: "left" },
   { key: "nart", label: "NART", w: 50, align: "left" },
   { key: "att", label: "ATT", w: 30, align: "center" },
   { key: "designation", label: "DÉSIGNATION", w: 168, align: "left" },
