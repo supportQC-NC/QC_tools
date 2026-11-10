@@ -130,6 +130,24 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   au champ et les versions de l'app qui ne l'envoient pas encore ; `findByCode`
   résout indifféremment un code-barres ou un NART, et `dupKey` reste bâti sur
   le NART résolu, donc la détection de doublons (`ATT = D`) est inchangée.
+- **UNE ZONE D'INVENTAIRE PEUT ÊTRE RE-BIPÉE, ET LE .DAT PORTE LE CUMUL**
+  (10/11/2026). L'agent a oublié des références, un second agent vient « biper
+  la suite » : il rebipe le QR du rayon, l'app avertit « zone déjà bipée —
+  continuer ? » (`resoudreZone` renvoie `dejaBipee`), et s'il accepte ses
+  bipages **S'AJOUTENT**. La collecte déposée n'est **jamais réouverte** : la
+  reprise crée une collecte de PLUS (`estComplement`), pour que le suivi bipage
+  crédite chaque agent de SON travail. C'est au dépôt que la zone est
+  recomposée — `services/inventaireCumulService.js` fusionne **toutes** les
+  collectes déposées de la zone (code + emplacement, session courante),
+  quantités additionnées par article avec la même tolérance d'écriture ERP que
+  `addLigneCollecte`. Le `.dat` écrase le précédent (même nom `stock.dat
+  <zone>`) avec le TOTAL, et `inventaireWatchService` relit le même cumul :
+  la fiche de contrôle complète est régénérée et réimprimée, `LigneBipage`
+  porte l'agent **par ligne**. ⚠️ « Recommencer la zone » reste une table rase :
+  elle marque les collectes `annulee`, exclues du cumul, du récap et des écarts
+  — sans ce drapeau le bipage suivant ferait ressusciter les lignes jetées.
+  Le verrou du **coupon** bipage (re-bipage refusé si la fiche est imprimée,
+  `inventaireZoneController.biperZone`) est un autre sujet : il n'est pas touché.
 - Les tables de l'ERP **ne sont jamais purgées** : tout compteur « en cours » doit
   être borné par une fenêtre glissante explicite, sinon on remonte à 2019.
 

@@ -412,3 +412,29 @@
 .suivi-bipage-lien-agents span {
   flex: 1;
 }
+
+/* Zone bipée en plusieurs fois (re-bipage) : « + » = ce comptage s'est AJOUTÉ à
+   un bipage déjà déposé ; « annulé » = comptage jeté par « Recommencer la zone ».
+   Le .dat et la fiche de contrôle portent le cumul de la zone. */
+.badge-complement,
+.badge-annulee {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.badge-complement {
+  color: var(--success);
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.badge-annulee {
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+}

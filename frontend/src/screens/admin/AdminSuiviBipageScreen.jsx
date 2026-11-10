@@ -140,6 +140,8 @@ const AdminSuiviBipageScreen = () => {
       Emplacement: b.zoneType || "",
       Agent: b.agent?.nom || "",
       Statut: b.status === "exporte" ? "Terminé" : "En cours",
+      "Complément": b.estComplement ? "Oui" : "",
+      "Annulé": b.annulee ? "Oui" : "",
       Début: fmtDateHeure(b.debutAt),
       "Premier scan": fmtDateHeure(b.premierScanAt),
       Fin: fmtDateHeure(b.finAt),
@@ -333,7 +335,28 @@ const AdminSuiviBipageScreen = () => {
                   bipages.map((b) => (
                     <tr key={b._id} className={b.status === "en_cours" ? "en-cours" : ""}>
                       <td>
-                        <div className="zone-code">{b.zoneCode}</div>
+                        <div className="zone-code">
+                          {b.zoneCode}
+                          {/* Zone bipée en plusieurs fois : ce comptage s'est
+                              AJOUTÉ à un bipage déjà déposé (le .dat et la fiche
+                              de contrôle portent le cumul de la zone). */}
+                          {b.estComplement && (
+                            <span
+                              className="badge-complement"
+                              title="Complément : ces bipages se sont ajoutés à un comptage déjà déposé pour cette zone"
+                            >
+                              +
+                            </span>
+                          )}
+                          {b.annulee && (
+                            <span
+                              className="badge-annulee"
+                              title="Comptage jeté par « Recommencer la zone » : il n'alimente plus ni la fiche ni les écarts"
+                            >
+                              annulé
+                            </span>
+                          )}
+                        </div>
                         <div className="zone-lbl">
                           {b.zoneLibelle}
                           {b.zoneType ? ` · ${b.zoneType}` : ""}

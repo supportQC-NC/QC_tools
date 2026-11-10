@@ -5,6 +5,7 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import LigneBipage from "../models/LigneBipageModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
 import FicheControle from "../models/FicheControleModel.js";
+import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import InventaireStockSnapshot, {
   TAILLE_BLOC_SNAPSHOT,
 } from "../models/InventaireStockSnapshotModel.js";
@@ -1210,6 +1211,24 @@ const recommencerZone = asyncHandler(async (req, res) => {
     zoneCode: code,
   });
 
+  // 2 bis) Collectes du collecteur : marquées ANNULÉES, pas supprimées — le
+  // suivi bipage et les statistiques gardent la trace du travail fait, mais ce
+  // comptage ne doit plus rien alimenter. Indispensable depuis que le dépôt
+  // CUMULE les collectes d'une zone (re-bipage, cf. inventaireCumulService) :
+  // sans ce drapeau, le prochain bipage de la zone ferait ressusciter les
+  // lignes que « Recommencer » vient de jeter.
+  const collectesAnnulees = await InventaireCollecte.updateMany(
+    {
+      entreprise: entreprise._id,
+      session: session._id,
+      zoneCode: code,
+      annulee: { $ne: true },
+    },
+    {
+      $set: { annulee: true, annuleeAt: new Date(), annuleePar: req.user._id },
+    },
+  );
+
   // 3) Réinitialiser la phase bipage de la zone (papillonnage/contrôle inchangés).
   const zone = session.zones.find((z) => z.code === code);
   if (zone) {
@@ -1223,6 +1242,7 @@ const recommencerZone = asyncHandler(async (req, res) => {
     zoneCode: code,
     lignesSupprimees: lignesSupprimees.deletedCount || 0,
     fichesSupprimees: fichesSupprimees.deletedCount || 0,
+    collectesAnnulees: collectesAnnulees.modifiedCount || 0,
     fichiersSupprimes,
     avertissements,
   });

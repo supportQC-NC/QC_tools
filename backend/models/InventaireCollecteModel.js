@@ -116,6 +116,43 @@ const inventaireCollecteSchema = new mongoose.Schema(
       default: "en_cours",
     },
 
+    // ── RE-BIPAGE D'UNE ZONE DÉJÀ BIPÉE ─────────────────────────
+    // Une zone peut être re-bipée : l'agent a oublié des références, un second
+    // agent vient « biper la suite » (demande client du 10/11/2026). On ne
+    // touche PAS à la collecte déjà déposée — l'historique et le crédit du
+    // travail par agent doivent rester intacts : la reprise crée une collecte
+    // de PLUS, marquée ici, et le .DAT déposé est le CUMUL de toutes les
+    // collectes de la zone (voir services/inventaireCumulService.js).
+    estComplement: {
+      type: Boolean,
+      default: false,
+    },
+    // Première collecte de la zone que celle-ci complète (traçabilité).
+    complementDe: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InventaireCollecte",
+      default: null,
+    },
+
+    // « Recommencer la zone » (écran Détail des bipages) = table rase : les
+    // collectes de la zone sont marquées ANNULÉES plutôt que supprimées (le
+    // suivi bipage garde la trace du travail fait). Elles sont exclues du cumul
+    // et du récap des écarts — sans ce drapeau, un re-bipage après
+    // « Recommencer » ferait ressusciter les lignes jetées.
+    annulee: {
+      type: Boolean,
+      default: false,
+    },
+    annuleeAt: {
+      type: Date,
+      default: null,
+    },
+    annuleePar: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
     // Identifiant CLIENT d'un dépôt HORS LIGNE (généré par le collecteur) :
     // un même fichier local renvoyé deux fois (retry réseau) ne crée pas de
     // seconde collecte. Vide pour les collectes en ligne classiques.
@@ -196,6 +233,14 @@ inventaireCollecteSchema.index({
   status: 1,
 });
 inventaireCollecteSchema.index({ nomDossierDBF: 1 });
+// Cumul d'une zone (re-bipage) : toutes les collectes déposées d'une zone dans
+// une session, quel que soit l'agent.
+inventaireCollecteSchema.index({
+  session: 1,
+  zoneCode: 1,
+  zoneType: 1,
+  status: 1,
+});
 // Dédoublonnage des dépôts hors ligne (retry réseau du même fichier local).
 inventaireCollecteSchema.index(
   { entreprise: 1, offlineId: 1 },

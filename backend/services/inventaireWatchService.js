@@ -27,6 +27,7 @@ import {
   sanitizeName,
 } from "./ficheControleService.js";
 import { deposerFichierInventaireFtp } from "./inventaireFtpService.js";
+import { fusionnerLignesCollectes } from "./inventaireCumulService.js";
 import { deposerDocumentFtp } from "./documentsFtpService.js";
 import { enteteFicheImport } from "./bipageImportService.js";
 
@@ -279,20 +280,32 @@ const traiterFichier = async (
   // l'entier (format Stock XL figé) : le relire faisait sortir « 2 » sur la
   // fiche de contrôle et dans le Détail des bipages quand l'agent avait
   // compté 1,5 (constaté le 29/10/2026).
-  let collecte = null;
+  //
+  // ⚠️ TOUTES les collectes déposées de la zone sont relues, pas seulement la
+  // dernière : une zone peut être bipée en PLUSIEURS FOIS (l'agent a oublié des
+  // références, un second agent vient « biper la suite » — demande client du
+  // 10/11/2026). Les lignes sont fusionnées par article, exactement comme le
+  // .DAT que vient d'écrire `effectuerDepot` : la fiche régénérée est la fiche
+  // COMPLÈTE de la zone. Les collectes annulées par « Recommencer la zone »
+  // sont exclues (leur comptage a été jeté).
+  let collectes = [];
   try {
-    collecte = await InventaireCollecte.findOne({
+    collectes = await InventaireCollecte.find({
       entreprise: entreprise._id,
       session: session._id,
       zoneCode,
       zoneType: zone.type || "",
       status: "exporte",
+      annulee: { $ne: true },
     })
-      .sort({ exportedAt: -1 })
+      .sort({ exportedAt: 1, createdAt: 1 })
       .populate("user", "nom prenom email");
   } catch {
-    collecte = null;
+    collectes = [];
   }
+  // Dernière collecte déposée : c'est elle qui porte l'horodatage le plus
+  // récent (compat des traitements en aval qui attendaient « la » collecte).
+  const collecte = collectes.length ? collectes[collectes.length - 1] : null;
   let agentNom = "";
   let agentUserId = null;
   if (collecte?.user) {
@@ -302,6 +315,7 @@ const traiterFichier = async (
       (u.email || "");
     agentUserId = u._id;
   }
+  const cumul = fusionnerLignesCollectes(collectes);
 
   // Lignes : depuis la COLLECTE quand elle existe (quantités exactes) ; le
   // .DAT ne sert de source que pour un fichier posé À LA MAIN sur le partage,
@@ -317,17 +331,21 @@ const traiterFichier = async (
   // `inventaireCollecteController.genererContenuFichier`, pas ici.
   // Repli NART puis GENCOD pour les collectes antérieures à ce champ et les
   // versions de l'app qui ne l'envoient pas encore.
-  let lignesDat;
-  if (collecte?.lignes?.length) {
-    lignesDat = collecte.lignes
-      .map((l) => ({
-        code:
-          (l.codeScanne && String(l.codeScanne).trim()) ||
-          (l.nart && String(l.nart).trim()) ||
-          String(l.gencod || "").trim(),
-        quantite: Number(l.quantite) || 0,
-      }))
-      .filter((l) => l.code);
+  let lignesDat = [];
+  // Lignes du cumul alignées sur `lignesDat` (même filtrage, même ordre) : elles
+  // portent l'agent de chaque ligne. `construireLignes` conserve l'ordre
+  // d'entrée et numérote `n = index + 1`, d'où le rapprochement plus bas.
+  const lignesSource = [];
+  if (cumul.lignes.length) {
+    for (const l of cumul.lignes) {
+      const code =
+        (l.codeScanne && String(l.codeScanne).trim()) ||
+        (l.nart && String(l.nart).trim()) ||
+        String(l.gencod || "").trim();
+      if (!code) continue;
+      lignesSource.push(l);
+      lignesDat.push({ code, quantite: Number(l.quantite) || 0 });
+    }
   } else {
     const content = fs.readFileSync(workFilePath, "utf8");
     lignesDat = parseDat(content);
@@ -359,7 +377,10 @@ const traiterFichier = async (
         found: !r.nonTrouve,
         source: "dat",
         sourceRef: nomFinal,
-        agentNom,
+        // Agent PAR LIGNE : une zone complétée par un second agent ne doit pas
+        // créditer tout le comptage au premier. `lignesSource` suit l'ordre de
+        // `rows` (construireLignes conserve l'ordre d'entrée).
+        agentNom: lignesSource[r.n - 1]?.agentNom || agentNom,
       })),
     );
   }

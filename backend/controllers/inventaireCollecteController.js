@@ -989,6 +989,11 @@ import {
   emplacementDir,
 } from "../services/ficheControleService.js";
 import { deposerFichierInventaireFtp } from "../services/inventaireFtpService.js";
+import {
+  chargerCumulZone,
+  etatZoneDejaBipee,
+  fusionnerLignesCollectes,
+} from "../services/inventaireCumulService.js";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -1160,6 +1165,9 @@ const collecteResume = (c) => ({
   zoneLibelle: c.zoneLibelle,
   zoneType: c.zoneType,
   status: c.status,
+  // Reprise d'une zone déjà déposée : l'app l'affiche, et le .DAT déposé sera
+  // le cumul de la zone (voir inventaireCumulService).
+  estComplement: !!c.estComplement,
   totalArticles: c.totalArticles,
   totalQuantite: c.totalQuantite,
   updatedAt: c.updatedAt,
@@ -1213,6 +1221,13 @@ const resoudreZone = asyncHandler(async (req, res) => {
     return res.json({ found: false, message: "Aucune zone ne correspond à ce code" });
   }
 
+  // Session active : elle borne le « déjà bipée » ci-dessous (même convention
+  // que le récap par zone — session active, ou collectes hors session).
+  const sessionActive = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
   // Pour chaque zone (emplacement) : collecte en cours éventuelle de l'agent,
   // clé par (code + type) pour ne pas confondre MAGASIN et DOCK.
   const zones = [];
@@ -1225,18 +1240,38 @@ const resoudreZone = asyncHandler(async (req, res) => {
       zoneType: z.type,
       status: "en_cours",
     });
+    // La zone a-t-elle DÉJÀ été déposée (par n'importe quel agent) ? L'app
+    // avertit alors « zone déjà bipée, voulez-vous continuer ? » : si l'agent
+    // accepte, ses bipages S'AJOUTENT à l'existant (demande client 10/11/2026).
+    // ⚠️ Distinct de `enCours`, qui est la reprise d'une collecte NON déposée
+    // de l'agent lui-même.
+    // eslint-disable-next-line no-await-in-loop
+    const dejaBipee = await etatZoneDejaBipee({
+      entrepriseId: entreprise._id,
+      sessionId: sessionActive ? sessionActive._id : null,
+      zoneCode: z.code,
+      zoneType: z.type,
+    });
     zones.push({
       code: z.code,
       libelle: z.libelle,
       type: z.type,
       eanPrincipal: z.eanPrincipal,
       enCours: enCours ? collecteResume(enCours) : null,
+      dejaBipee,
     });
   }
 
   // `zones` = toutes les correspondances (l'app demande MAGASIN/DOCK si > 1).
   // `zone`/`enCours` = 1re correspondance (compat rétro).
-  res.json({ found: true, viaEan, zones, zone: zones[0], enCours: zones[0].enCours });
+  res.json({
+    found: true,
+    viaEan,
+    zones,
+    zone: zones[0],
+    enCours: zones[0].enCours,
+    dejaBipee: zones[0].dejaBipee,
+  });
 });
 
 // ===========================================
@@ -1293,8 +1328,21 @@ const createCollecte = asyncHandler(async (req, res) => {
     statut: "actif",
   });
 
+  // RE-BIPAGE : la zone a-t-elle déjà été déposée ? On ne refuse PAS (l'app a
+  // déjà demandé confirmation à l'agent au scan du QR) : on ouvre une collecte
+  // de PLUS, marquée « complément ». Le travail déjà déposé reste intact et
+  // crédité à son agent ; au dépôt, le .DAT portera le CUMUL de la zone.
+  const deja = await etatZoneDejaBipee({
+    entrepriseId: entreprise._id,
+    sessionId: session ? session._id : null,
+    zoneCode: zone.code,
+    zoneType: zone.type,
+  });
+
   const collecte = await InventaireCollecte.create({
     entreprise: entreprise._id,
+    estComplement: !!deja,
+    complementDe: deja ? deja.premiereId : null,
     nomDossierDBF: entreprise.nomDossierDBF,
     user: req.user._id,
     session: session ? session._id : null,
@@ -1311,7 +1359,9 @@ const createCollecte = asyncHandler(async (req, res) => {
     console.error("Erreur préchargement cache:", err);
   });
 
-  res.status(201).json(collecte);
+  // `dejaBipee` est renvoyé à l'app pour qu'elle rappelle le contexte pendant
+  // le comptage (« complète un bipage existant »).
+  res.status(201).json({ ...collecte.toObject(), dejaBipee: deja });
 });
 
 // ===========================================
@@ -1606,10 +1656,16 @@ const exportCollecte = asyncHandler(async (req, res) => {
     redepot,
   });
 
+  // Message : un complément (zone déjà bipée) doit être annoncé comme tel —
+  // l'agent doit voir que son comptage s'est AJOUTÉ et non substitué.
+  const ajoute = !redepot && (resultat.cumul?.anterieures || 0) > 0;
   res.json({
     message: redepot
       ? "Zone déjà déposée — fichier réécrit"
-      : "Zone déposée avec succès",
+      : ajoute
+        ? `Bipages ajoutés à la zone (${resultat.cumul.lignes} article(s) au total)`
+        : "Zone déposée avec succès",
+    ajoute,
     collecte: collecteResume(collecte),
     fichier: resultat,
   });
@@ -1631,12 +1687,26 @@ const effectuerDepot = async (
   res,
   { observation, redepot = false } = {},
 ) => {
-  const contenu = genererContenuFichier(collecte.lignes);
-
   // Dossier de dépôt (en prod : montage ; en dev : session active sinon repli)
   const { dossier: dossierBase, mode, session } = await resoudreDossierDepot(
     entreprise,
   );
+
+  // CUMUL DE LA ZONE : le .DAT déposé porte TOUT ce qui a été bipé dans cette
+  // zone — les collectes déjà déposées (re-bipage par un second agent, cf.
+  // demande client du 10/11/2026) PLUS celle-ci. Sans ce cumul, le fichier
+  // écrase le précédent (même nom « stock.dat <zone> ») et la fiche de contrôle
+  // régénérée ne porterait plus que les derniers bipages.
+  // `collecteCourante` est placée en dernier et n'est jamais comptée deux fois,
+  // y compris au RE-DÉPÔT (elle est alors déjà « exporte »).
+  const cumul = await chargerCumulZone({
+    entrepriseId: collecte.entreprise?._id || collecte.entreprise,
+    sessionId: session ? session._id : collecte.session || null,
+    zoneCode: collecte.zoneCode,
+    zoneType: collecte.zoneType,
+    collecteCourante: collecte,
+  });
+  const contenu = genererContenuFichier(cumul.lignes);
 
   // Dépôt À LA RACINE du dossier de l'inventaire : c'est là que l'équipe ouvre
   // le dossier et s'attend à voir ses .DAT. (Le dépôt dans un sous-dossier par
@@ -1735,8 +1805,18 @@ const effectuerDepot = async (
     dossier,
     mode, // "session" (impression auto) ou "annee" (repli)
     sessionNom: session ? session.nom : "",
+    // Ce que CET agent a compté…
     lignes: collecte.lignes.length,
     totalQuantite: collecte.totalQuantite,
+    // …et ce que porte réellement le fichier / la fiche de contrôle (cumul de
+    // la zone quand elle a été bipée en plusieurs fois).
+    cumul: {
+      collectes: cumul.collectes,
+      anterieures: cumul.anterieures,
+      lignes: cumul.lignes.length,
+      quantite: cumul.totalQuantite,
+      agents: cumul.agents,
+    },
   };
 };
 
@@ -1854,6 +1934,15 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
     statut: "actif",
   });
 
+  // Même règle qu'en ligne : une zone déjà déposée n'est pas un refus, la
+  // collecte hors ligne devient un COMPLÉMENT et le .DAT portera le cumul.
+  const dejaOffline = await etatZoneDejaBipee({
+    entrepriseId: entreprise._id,
+    sessionId: session ? session._id : null,
+    zoneCode: zone ? zone.code : code,
+    zoneType: zone ? zone.type || "" : type,
+  });
+
   const collecte = new InventaireCollecte({
     entreprise: entreprise._id,
     nomDossierDBF: entreprise.nomDossierDBF,
@@ -1863,6 +1952,8 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
     zoneCode: zone ? zone.code : code,
     zoneType: zone ? zone.type || "" : type,
     zoneLibelle: zone ? zone.libelle || "" : "",
+    estComplement: !!dejaOffline,
+    complementDe: dejaOffline ? dejaOffline.premiereId : null,
     offlineId: idOffline,
     lignes: lignes.map((l) => ({
       // Le schéma exige un nart : pour un article inconnu du catalogue local,
@@ -1886,8 +1977,15 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
     observation,
   });
 
+  // `ajoute` : la zone était déjà bipée, ce comptage s'y est AJOUTÉ. Hors ligne
+  // l'app ne pouvait pas le savoir au moment du bipage (aucun réseau) : elle
+  // l'annonce à la synchronisation.
+  const ajouteOffline = (fichier.cumul?.anterieures || 0) > 0;
   res.json({
-    message: "Zone hors ligne déposée avec succès",
+    message: ajouteOffline
+      ? `Bipages ajoutés à la zone ${collecte.zoneCode} (${fichier.cumul.lignes} article(s) au total)`
+      : "Zone hors ligne déposée avec succès",
+    ajoute: ajouteOffline,
     zoneConnue: !!zone,
     collecte: collecteResume(collecte),
     fichier,
@@ -1930,6 +2028,10 @@ const getRecapZones = asyncHandler(async (req, res) => {
   } else {
     filtreCollecte.session = null;
   }
+  // ⚠️ Les collectes ANNULÉES par « Recommencer la zone » sont exclues : leur
+  // comptage a été jeté (fiche et lignes bipées supprimées), le garder ici
+  // doublait les quantités dès que la zone était re-bipée.
+  filtreCollecte.annulee = { $ne: true };
 
   const collectes = await InventaireCollecte.find(filtreCollecte).sort({
     zoneCode: 1,
@@ -2313,6 +2415,7 @@ const getRecapZonePdf = asyncHandler(async (req, res) => {
     entreprise: entreprise._id,
     session: session ? session._id : null,
     zoneCode,
+    annulee: { $ne: true },
   };
 
   const collectes = await InventaireCollecte.find(filtreCollecte).sort({
@@ -2331,19 +2434,20 @@ const getRecapZonePdf = asyncHandler(async (req, res) => {
   }
 
   // Lignes au format attendu par construireLignes ({ code, quantite }).
-  const lignesDat = [];
+  // ⚠️ Les collectes de la zone sont FUSIONNÉES par article : une zone bipée en
+  // plusieurs fois (re-bipage, cf. inventaireCumulService) sortait autrement
+  // deux lignes pour le même article au lieu de la quantité totale.
   let zoneLibelle = "";
   let zoneType = "";
   for (const collecte of collectes) {
     zoneLibelle = zoneLibelle || collecte.zoneLibelle || "";
     zoneType = zoneType || collecte.zoneType || "";
-    for (const ligne of collecte.lignes) {
-      lignesDat.push({
-        code: ligne.gencod || ligne.nart || "",
-        quantite: parseFloat(ligne.quantite) || 0,
-      });
-    }
   }
+  const { lignes: lignesCumulees } = fusionnerLignesCollectes(collectes);
+  const lignesDat = lignesCumulees.map((ligne) => ({
+    code: ligne.gencod || ligne.nart || "",
+    quantite: parseFloat(ligne.quantite) || 0,
+  }));
 
   const { rows } = await construireLignes(entreprise, lignesDat);
 
@@ -2546,6 +2650,11 @@ const getSuiviBipage = asyncHandler(async (req, res) => {
       ...temps,
       totalArticles: c.totalArticles || 0,
       totalQuantite: c.totalQuantite || 0,
+      // Reprise d'une zone déjà déposée (les bipages se sont AJOUTÉS) et
+      // comptage jeté par « Recommencer la zone » : le suivi doit les
+      // distinguer d'un bipage normal.
+      estComplement: !!c.estComplement,
+      annulee: !!c.annulee,
       fichierExport: c.fichierExport || "",
       observationAgent: c.observationAgent || "",
       observation: c.observation || "",
