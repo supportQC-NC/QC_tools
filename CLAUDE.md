@@ -991,10 +991,14 @@ récap de zone, ni feuille d'écarts. En faire une vraie destination suppose de
 déplacer la génération de la fiche du watcher vers `effectuerDepot` (qui a déjà
 le cumul de la zone) — non fait, et l'enum ne l'accepte pas.
 
-⚠️ **Seul `rcommun` est surveillé par l'agent d'impression de QC** : en
-`collect_sec`, les fiches de contrôle ne sortent pas tout seules à l'imprimante,
-elles se consultent et s'impriment depuis l'écran Fiches de contrôle. Dit dans
-l'UI au moment du choix.
+**L'agent d'impression suit la destination** : `tickOnce` boucle sur les
+sessions actives, charge l'entreprise puis recalcule la racine — il scanne donc
+`collect_sec/<slug>/` aussi bien que `STOCK/<slug>/`, et les fiches sortent
+automatiquement dans les deux cas. Chez QC c'est gratuit : `cheminExportInventaire`
+= `\\192.168.0.250\Rcommun\STOCK\collect_sec`, le **même partage** que l'agent
+lit déjà, et le `.env` du poste d'impression ne définit pas `RCOMMON_STOCK_ROOT`
+(le chemin stocké est utilisé tel quel). Seule condition : que le poste de l'agent
+accède au dossier d'export de la société.
 
 **Miroir FTP des inventaires par zones** (29/10/2026) : chaque inventaire a un
 dossier de RÉFÉRENCE `inventaire/<TRIG>/<slug>/` sur le FTPS robot-documents

@@ -570,14 +570,16 @@ const AdminInventaireProgressionScreen = () => {
                   ` · par ${session.createdBy.prenom || ""} ${session.createdBy.nom || ""}`}
               </span>
               {/* Dépôt réel des .dat : la racine suit la DESTINATION choisie à
-                  l'initialisation (partage STOCK ou collect_sec). */}
+                  l'initialisation (partage STOCK ou collect_sec). C'est aussi
+                  le dossier que lit l'agent d'impression (`tickOnce` recalcule
+                  la racine session par session). */}
               {session.dossierDat && (
                 <span
                   className="session-meta"
                   title={
                     session.destination === "collect_sec"
-                      ? "Dossier d'export de la société (collect_sec) — non surveillé par l'agent d'impression"
-                      : "Partage STOCK (RCOMMUN) — surveillé par l'agent d'impression"
+                      ? "Dossier d'export de la société (collect_sec), surveillé par l'agent d'impression"
+                      : "Partage STOCK (RCOMMUN), surveillé par l'agent d'impression"
                   }
                 >
                   Dépôt (
@@ -892,7 +894,9 @@ const AdminInventaireProgressionScreen = () => {
                 <h3>Dossier de l'inventaire</h3>
                 <p>
                   Où seront déposés les fichiers .dat des collecteurs et les
-                  fiches de contrôle PDF de cet inventaire.
+                  fiches de contrôle PDF de cet inventaire. L'agent
+                  d'impression suit ce choix : dans les deux cas les fiches
+                  sortent automatiquement à l'imprimante.
                 </p>
                 <label className="init-destination-choix">
                   <input
@@ -905,9 +909,8 @@ const AdminInventaireProgressionScreen = () => {
                   <span>
                     <strong>RCOMMUN — partage STOCK</strong>
                     <small>
-                      Choix habituel. C'est le seul dossier surveillé par
-                      l'agent d'impression : les fiches de contrôle sortent
-                      automatiquement à l'imprimante.
+                      Choix habituel : le dossier historique des inventaires,
+                      à la racine du partage STOCK.
                     </small>
                   </span>
                 </label>
@@ -926,9 +929,9 @@ const AdminInventaireProgressionScreen = () => {
                     <small>
                       Le chemin d'export configuré sur la fiche société, celui
                       des .dat de réappro. Pour une société sans partage STOCK.
-                      ⚠️ L'agent d'impression de QC ne surveille pas ce dossier :
-                      les fiches de contrôle se consultent et s'impriment depuis
-                      l'écran Fiches de contrôle.
+                      L'inventaire y crée son propre sous-dossier, à côté des
+                      .dat de réappro. ⚠️ Le poste qui fait tourner l'agent
+                      d'impression doit pouvoir accéder à ce dossier.
                     </small>
                   </span>
                 </label>
