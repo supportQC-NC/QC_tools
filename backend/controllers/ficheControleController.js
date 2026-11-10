@@ -288,7 +288,7 @@ const supprimerFiche = asyncHandler(async (req, res) => {
   }
 
   try {
-    const pdfPath = resoudreCheminPdf(fiche);
+    const pdfPath = resoudreCheminPdf(fiche, entreprise);
     if (pdfPath) {
       fs.unlinkSync(pdfPath);
     }

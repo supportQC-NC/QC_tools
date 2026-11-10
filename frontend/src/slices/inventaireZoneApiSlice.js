@@ -8,11 +8,17 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
     // Initialiser un inventaire (archive l'actif précédent)
     // `filtreProformas` = plage de dates + clients du « comptage sans
     // collecteur », saisis UNE FOIS au démarrage de l'inventaire.
+    // `destination` = où vit le dossier de l'inventaire : "rcommun" (partage
+    // STOCK, défaut) ou "collect_sec" (chemin d'export de la société).
     initInventaireZone: builder.mutation({
-      query: ({ entrepriseId, nom, filtreProformas }) => ({
+      query: ({ entrepriseId, nom, filtreProformas, destination }) => ({
         url: `${BASE}/init/${entrepriseId}`,
         method: "POST",
-        body: { nom, ...(filtreProformas && { filtreProformas }) },
+        body: {
+          nom,
+          ...(filtreProformas && { filtreProformas }),
+          ...(destination && { destination }),
+        },
       }),
       // L'init purge aussi LigneBipage / collectes / fiches : sans « Bipage »
       // et « SuiviBipage », l'écran Détail des bipages ressert son cache

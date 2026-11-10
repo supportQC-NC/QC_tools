@@ -22,11 +22,15 @@ import {
   extraireCodeZone,
   estFichierDat,
   getInventaireDirs,
+  racineInventaire,
   resoudreCheminPdf,
   assurerPdfFiche,
   sanitizeName,
 } from "./ficheControleService.js";
-import { deposerFichierInventaireFtp } from "./inventaireFtpService.js";
+import {
+  deposerFichierInventaireFtp,
+  miroirInventaireActif,
+} from "./inventaireFtpService.js";
 import { fusionnerLignesCollectes } from "./inventaireCumulService.js";
 import { deposerDocumentFtp } from "./documentsFtpService.js";
 import { enteteFicheImport } from "./bipageImportService.js";
@@ -475,7 +479,7 @@ const traiterFichier = async (
   // (écrasement idempotent, pas de doublon). Best-effort : un FTP injoignable
   // n'empêche ni le traitement ni l'impression.
   const slugFtp = session.dossierSlug || session.nom;
-  if (slugFtp && entreprise.trigramme) {
+  if (slugFtp && entreprise.trigramme && miroirInventaireActif(entreprise)) {
     await deposerFichierInventaireFtp(
       entreprise.trigramme,
       slugFtp,
@@ -526,7 +530,16 @@ const traiterReimpressions = async (report) => {
   const entreprises = new Map(); // cache par id, le temps du passage
   for (const fiche of fiches) {
     const rr = { fiche: fiche.datFileName, ok: false, message: "" };
-    let pdfPath = resoudreCheminPdf(fiche);
+    // Entreprise chargée d'emblée : elle porte le collect_xxx où le PDF peut
+    // vivre quand l'inventaire n'a pas été initialisé sur le partage STOCK
+    // (`racinesInventaire`), et elle sert à la régénération juste en dessous.
+    const cle = String(fiche.entreprise);
+    if (!entreprises.has(cle)) {
+      // eslint-disable-next-line no-await-in-loop
+      entreprises.set(cle, await Entreprise.findById(fiche.entreprise));
+    }
+    const entreprise = entreprises.get(cle);
+    let pdfPath = resoudreCheminPdf(fiche, entreprise);
     let temporaire = false;
 
     // Fiche d'IMPORT (proforma / Excel) : aucun fichier n'existe sur le
@@ -536,12 +549,6 @@ const traiterReimpressions = async (report) => {
     // Couvre aussi la réimpression d'une fiche .DAT dont les fichiers ont
     // disparu du partage.
     if (!pdfPath) {
-      const cle = String(fiche.entreprise);
-      if (!entreprises.has(cle)) {
-        // eslint-disable-next-line no-await-in-loop
-        entreprises.set(cle, await Entreprise.findById(fiche.entreprise));
-      }
-      const entreprise = entreprises.get(cle);
       if (entreprise) {
         try {
           // En-tête enrichi pour les imports de proforma (observation +
@@ -612,23 +619,33 @@ export const tickOnce = async () => {
       files: [],
     };
 
-    // Dossier surveillé, recalculé pour l'ENVIRONNEMENT COURANT (config.sharePath
-    // + <nom>). On NE se fie PAS à session.dossierDat, qui peut avoir été figé en
-    // chemin d'un autre OS (session créée sur le VPS Linux → "/mnt/..." ; l'agent
-    // local Windows a besoin de "\\192.168.0.250\Rcommun\STOCK\<nom>").
-    // Dossier = slug UNIQUE (horodaté) si présent, sinon repli sur le nom pour
-    // les anciennes sessions créées avant l'introduction du slug.
-    const slug = session.dossierSlug || session.nom;
-    const base = slug ? getInventaireDirs(slug).base : session.dossierDat;
-    sr.dossierDat = base;
-    if (!base) {
-      sr.error = "Aucun dossier (nom de session vide) — réinitialisez l'inventaire.";
-      report.sessions.push(sr);
-      continue;
-    }
+    // L'entreprise est chargée EN PREMIER : la racine du dossier surveillé
+    // dépend d'elle quand l'inventaire a été initialisé sur son collect_xxx
+    // (`session.destination`).
     const entreprise = await Entreprise.findById(session.entreprise);
     if (!entreprise) {
       sr.error = "Entreprise introuvable";
+      report.sessions.push(sr);
+      continue;
+    }
+
+    // Dossier surveillé, recalculé pour l'ENVIRONNEMENT COURANT (racine de la
+    // destination + <nom>). On NE se fie PAS à session.dossierDat, qui peut
+    // avoir été figé en chemin d'un autre OS (session créée sur le VPS Linux
+    // → "/mnt/..." ; l'agent local Windows a besoin de
+    // "\\192.168.0.250\Rcommun\STOCK\<nom>").
+    // Dossier = slug UNIQUE (horodaté) si présent, sinon repli sur le nom pour
+    // les anciennes sessions créées avant l'introduction du slug.
+    const slug = session.dossierSlug || session.nom;
+    const base = slug
+      ? getInventaireDirs(
+          slug,
+          racineInventaire(session.destination, entreprise),
+        ).base
+      : session.dossierDat;
+    sr.dossierDat = base;
+    if (!base) {
+      sr.error = "Aucun dossier (nom de session vide) — réinitialisez l'inventaire.";
       report.sessions.push(sr);
       continue;
     }
@@ -775,8 +792,11 @@ export const isWatching = () => !!intervalHandle;
 /** Démarre la surveillance périodique. */
 export const startInventaireWatcher = () => {
   if (intervalHandle) return;
+  // La racine affichée est celle du partage STOCK (destination par défaut) ;
+  // un inventaire initialisé sur le collect_xxx de sa société est surveillé
+  // là-bas — `tickOnce` recalcule la racine session par session.
   console.log(
-    `📂 Surveillance .DAT démarrée (${config.sharePath}, ${config.watchIntervalMs}ms)`,
+    `📂 Surveillance .DAT démarrée (par défaut ${config.sharePath}, ${config.watchIntervalMs}ms)`,
   );
   intervalHandle = setInterval(tick, config.watchIntervalMs);
   // premier passage rapide

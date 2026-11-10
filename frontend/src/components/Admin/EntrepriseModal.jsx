@@ -309,6 +309,7 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
     cheminLogoEtiquettes: "",
     dossierFtpDocuments: "",
     modeDepotDat: "rcommun",
+    miroirFtpInventaire: true,
     couleurPrimaire: DEFAULT_PRIMAIRE,
     couleurSecondaire: DEFAULT_SECONDAIRE,
     logo: "",
@@ -412,6 +413,8 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
         cheminLogoEtiquettes: entreprise.cheminLogoEtiquettes || "",
         dossierFtpDocuments: entreprise.dossierFtpDocuments || "",
         modeDepotDat: entreprise.modeDepotDat || "rcommun",
+        // Défaut OUI : le miroir était inconditionnel avant ce réglage.
+        miroirFtpInventaire: entreprise.miroirFtpInventaire !== false,
         couleurPrimaire: entreprise.couleurPrimaire || DEFAULT_PRIMAIRE,
         couleurSecondaire: entreprise.couleurSecondaire || DEFAULT_SECONDAIRE,
         logo: entreprise.logo || "",
@@ -1136,6 +1139,27 @@ const EntrepriseModal = ({ entreprise, onClose, asPage = false }) => {
                 RCOMMUN). En mode RCOMMUN, le renseigner active une simple
                 copie d'archive FTP des documents générés. Consultation :
                 écran Documents FTP.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="miroirFtpInventaire"
+                  checked={formData.miroirFtpInventaire}
+                  onChange={handleChange}
+                />
+                <span>Miroir FTP des inventaires par zones</span>
+              </label>
+              <span className="input-hint">
+                Chaque inventaire reçoit un dossier de référence sur le FTP
+                robot-documents (inventaire/&lt;TRIGRAMME&gt;/&lt;inventaire&gt;)
+                où sont recopiés les .dat déposés et les fiches de contrôle
+                PDF. C'est une COPIE : le dossier de dépôt choisi à
+                l'initialisation reste le flux de travail. Décocher pour une
+                société qui n'a rien à archiver sur le FTP — plus aucune
+                connexion FTPS n'est alors tentée pour ses inventaires.
               </span>
             </div>
 

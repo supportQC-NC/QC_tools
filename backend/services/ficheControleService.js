@@ -76,9 +76,65 @@ export const makeInventaireSlug = (nom, date = new Date()) => {
   return `${base} ${stamp}`.trim();
 };
 
-/** Renvoie les chemins des dossiers d'un inventaire (nom OU slug de dossier). */
-export const getInventaireDirs = (nom) => {
-  const base = path.join(config.sharePath, sanitizeName(nom));
+/**
+ * DESTINATIONS possibles du dossier d'un inventaire (choisies à l'initialisation
+ * et stockées sur la session, cf. InventaireZoneSessionModel.destination).
+ *
+ * ⚠️ On stocke le MODE, jamais un chemin absolu : le même Mongo sert au poste
+ * de dev (Windows, UNC) et au VPS (Linux, montages). La racine est donc
+ * RECALCULÉE à chaque usage pour l'environnement courant — c'est déjà la raison
+ * pour laquelle le dépôt, le watcher et la réimpression ignorent
+ * `session.dossierDat`.
+ *
+ * `ftp` est RÉSERVÉ et volontairement non proposé : le watcher lit un système
+ * de fichiers (`fs.readdirSync`), un inventaire qui ne vivrait que sur le FTPS
+ * ne produirait ni FicheControle, ni LigneBipage, ni impression. Le FTP reste
+ * le MIROIR de référence (inventaireFtpService).
+ */
+export const DESTINATIONS = ["rcommun", "collect_sec"];
+
+/** Normalise une destination reçue de l'extérieur (repli = défaut historique). */
+export const normaliserDestination = (v) =>
+  DESTINATIONS.includes(String(v || "").trim()) ? String(v).trim() : "rcommun";
+
+/**
+ * Racine du dossier d'inventaire pour une destination, dans l'environnement
+ * COURANT :
+ *  - `rcommun`     → partage STOCK (`config.sharePath` / STOCK_SHARE_PATH) ;
+ *  - `collect_sec` → `entreprise.cheminExportInventaire`, déjà traduit par le
+ *    getter du modèle (RCOMMON_STOCK_ROOT garde le dernier segment, propre à
+ *    chaque société : collect_sec, collect_sec_aw…).
+ * Repli sur le partage STOCK si la société n'a pas de chemin d'export : mieux
+ * vaut le dossier historique qu'un chemin vide.
+ */
+export const racineInventaire = (destination, entreprise = null) => {
+  if (normaliserDestination(destination) === "collect_sec") {
+    const collect = String(entreprise?.cheminExportInventaire || "").trim();
+    if (collect) return collect;
+  }
+  return config.sharePath;
+};
+
+/**
+ * TOUTES les racines où un fichier d'inventaire de cette société peut vivre,
+ * dans l'ordre de préférence. Sert aux fonctions de RECHERCHE (retrouver un PDF
+ * ou un .DAT existant) : elles n'ont pas à savoir quelle destination avait été
+ * choisie, et les inventaires créés avant ce choix restent trouvables.
+ */
+export const racinesInventaire = (entreprise = null) => {
+  const racines = [config.sharePath];
+  const collect = String(entreprise?.cheminExportInventaire || "").trim();
+  if (collect && !racines.includes(collect)) racines.push(collect);
+  return racines;
+};
+
+/**
+ * Renvoie les chemins des dossiers d'un inventaire (nom OU slug de dossier).
+ * `racine` = résultat de `racineInventaire(session.destination, entreprise)` ;
+ * omise, on garde le partage STOCK (comportement historique).
+ */
+export const getInventaireDirs = (nom, racine = config.sharePath) => {
+  const base = path.join(racine || config.sharePath, sanitizeName(nom));
   return {
     base,
     archiveDat: path.join(base, config.archiveDatDirName),
@@ -88,8 +144,8 @@ export const getInventaireDirs = (nom) => {
 };
 
 /** Crée (récursivement) tous les dossiers de l'inventaire. */
-export const ensureInventaireDirs = (nom) => {
-  const dirs = getInventaireDirs(nom);
+export const ensureInventaireDirs = (nom, racine = config.sharePath) => {
+  const dirs = getInventaireDirs(nom, racine);
   fs.mkdirSync(dirs.base, { recursive: true });
   fs.mkdirSync(dirs.archiveDat, { recursive: true });
   fs.mkdirSync(dirs.archivePdf, { recursive: true });
@@ -103,12 +159,13 @@ export const ensureInventaireDirs = (nom) => {
  * Le PDF est généré par l'agent local (Windows → chemin UNC) mais peut devoir
  * être servi/relu par le VPS (Linux → /mnt/rcommun) : on ne se fie donc PAS au
  * chemin absolu stocké (`fiche.pdfPath`, propre à la machine qui l'a créé). On
- * le recalcule depuis `config.sharePath` + <slug d'inventaire> (getInventaireDirs)
+ * le recalcule depuis la/les RACINES de la société (`racinesInventaire` :
+ * partage STOCK puis son collect_xxx) + <slug d'inventaire> (getInventaireDirs)
  * puis on cherche le fichier dans le SOUS-DOSSIER d'emplacement (zone.type) —
  * archive_pdf puis racine du sous-dossier — avec repli sur la racine de
  * l'inventaire (fiches sans emplacement / legacy). Renvoie le 1er chemin EXISTANT.
  */
-export const resoudreCheminPdf = (fiche) => {
+export const resoudreCheminPdf = (fiche, entreprise = null) => {
   if (!fiche) return "";
   // Slug de dossier en priorité (dossier unique horodaté) ; repli sur le nom
   // pour les anciennes fiches créées avant l'introduction du slug.
@@ -116,15 +173,21 @@ export const resoudreCheminPdf = (fiche) => {
   // pdfFileName est un nom "pur" ; on garantit le basename par sécurité.
   const fileName = fiche.pdfFileName ? path.basename(fiche.pdfFileName) : "";
   const candidats = [];
+  // On balaie TOUTES les racines possibles de la société (partage STOCK puis
+  // son collect_xxx) plutôt que de stocker la destination sur chaque fiche :
+  // cette fonction cherche un fichier EXISTANT, et les fiches antérieures au
+  // choix de destination restent ainsi trouvables.
   if (nom && fileName) {
-    const dirs = getInventaireDirs(nom);
-    // Sous-dossier d'emplacement (MAGASIN/DOCK/… ou défaut) où vit le PDF.
-    const scanDir = path.join(dirs.base, emplacementDir(fiche.zoneType));
-    candidats.push(path.join(scanDir, config.archivePdfDirName, fileName));
-    candidats.push(path.join(scanDir, fileName));
-    // Replis racine : anciennes fiches à plat (avant les sous-dossiers).
-    candidats.push(path.join(dirs.archivePdf, fileName)); // archivé
-    candidats.push(path.join(dirs.base, fileName)); // pas encore archivé
+    for (const racine of racinesInventaire(entreprise)) {
+      const dirs = getInventaireDirs(nom, racine);
+      // Sous-dossier d'emplacement (MAGASIN/DOCK/… ou défaut) où vit le PDF.
+      const scanDir = path.join(dirs.base, emplacementDir(fiche.zoneType));
+      candidats.push(path.join(scanDir, config.archivePdfDirName, fileName));
+      candidats.push(path.join(scanDir, fileName));
+      // Replis racine : anciennes fiches à plat (avant les sous-dossiers).
+      candidats.push(path.join(dirs.archivePdf, fileName)); // archivé
+      candidats.push(path.join(dirs.base, fileName)); // pas encore archivé
+    }
   }
   if (fiche.pdfPath) candidats.push(fiche.pdfPath); // dernier recours
   for (const p of candidats) {
@@ -491,23 +554,27 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
  * <code> » : le dossier d'emplacement y est déjà, on l'accroche simplement au
  * dossier de l'inventaire recalculé ici (cf. resoudreCheminPdf).
  */
-export const resoudreCheminDat = (fiche) => {
+export const resoudreCheminDat = (fiche, entreprise = null) => {
   if (!fiche) return "";
   const nom = fiche.inventaireSlug || fiche.inventaireNom || "";
   const logique = String(fiche.datFileName || "");
   if (!nom || !logique) return "";
-  const dirs = getInventaireDirs(nom);
   const parts = logique.split("/").filter(Boolean);
   const fileName = parts.pop();
   const sousDossier = parts.length
     ? parts.join(path.sep)
     : emplacementDir(fiche.zoneType);
-  const candidats = [
-    path.join(dirs.base, sousDossier, fileName),
-    path.join(dirs.base, sousDossier, config.archiveDatDirName, fileName),
-    path.join(dirs.base, fileName), // anciennes fiches à plat
-    path.join(dirs.archiveDat, fileName),
-  ];
+  // Toutes les racines possibles de la société (cf. resoudreCheminPdf).
+  const candidats = [];
+  for (const racine of racinesInventaire(entreprise)) {
+    const dirs = getInventaireDirs(nom, racine);
+    candidats.push(
+      path.join(dirs.base, sousDossier, fileName),
+      path.join(dirs.base, sousDossier, config.archiveDatDirName, fileName),
+      path.join(dirs.base, fileName), // anciennes fiches à plat
+      path.join(dirs.archiveDat, fileName),
+    );
+  }
   for (const p of candidats) {
     try {
       if (fs.existsSync(p)) return p;
@@ -525,8 +592,8 @@ export const resoudreCheminDat = (fiche) => {
  * sauve la mise quand un programme externe a déplacé/supprimé les fichiers du
  * partage, ou quand le backend web n'a pas accès au partage du tout.
  */
-const retrouverLignesDat = async (fiche) => {
-  const datPath = resoudreCheminDat(fiche);
+const retrouverLignesDat = async (fiche, entreprise = null) => {
+  const datPath = resoudreCheminDat(fiche, entreprise);
   if (datPath) {
     try {
       const lignes = parseDat(fs.readFileSync(datPath, "utf8"));
@@ -568,11 +635,11 @@ export const assurerPdfFiche = async (fiche, entreprise, surchargeEntete = null)
   // la proforma), on régénère TOUJOURS — le PDF du disque, s'il existait,
   // porterait l'ancien en-tête.
   if (!surchargeEntete) {
-    const existant = resoudreCheminPdf(fiche);
+    const existant = resoudreCheminPdf(fiche, entreprise);
     if (existant) return { chemin: existant, temporaire: false, origine: "disque" };
   }
 
-  const { lignes, origine } = await retrouverLignesDat(fiche);
+  const { lignes, origine } = await retrouverLignesDat(fiche, entreprise);
   if (!lignes.length) return { chemin: "", temporaire: false, origine: "" };
 
   const { rows } = await construireLignes(entreprise, lignes);

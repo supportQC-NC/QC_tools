@@ -646,6 +646,69 @@
   color: var(--text-secondary);
 }
 
+/* DESTINATION du dossier de l'inventaire, dans la modale d'initialisation.
+   Mêmes marges que le bloc proformas qui le suit : les deux blocs se lisent
+   comme une même suite de réglages de démarrage. */
+.init-destination {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.init-destination h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.init-destination p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.init-destination-choix {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 9px 10px;
+  margin-bottom: 7px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.init-destination-choix:last-child {
+  margin-bottom: 0;
+}
+
+.init-destination-choix input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: #f59e0b;
+}
+
+.init-destination-choix span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.init-destination-choix strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.init-destination-choix small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
 /* Sélection des proformas dans la modale d'initialisation : saisie une fois
    pour tout l'inventaire, plus jamais redemandée à chaque import. */
 .init-proformas {

@@ -11,8 +11,9 @@
 // Ce que fait cet agent :
 //   1. se connecte au MÊME MongoDB (Atlas) que le VPS ;
 //   2. lance le watcher (services/inventaireWatchService) qui, à intervalle :
-//        - surveille le dossier de chaque inventaire actif sur le Rcommun
-//          (config.sharePath = STOCK_SHARE_PATH + <nom d'inventaire>),
+//        - surveille le dossier de chaque inventaire actif, sous la racine de
+//          sa DESTINATION (partage STOCK par défaut = STOCK_SHARE_PATH, ou le
+//          collect_xxx de la société) + <nom d'inventaire>,
 //        - pour chaque nouveau stock.dat <code>[_<EMPLACEMENT>] : génère le PDF
 //          de la fiche, l'imprime (SumatraPDF via pdf-to-printer), archive le
 //          .DAT et le PDF, et enregistre la FicheControle (Mongo) ;
@@ -49,7 +50,7 @@ const main = async () => {
   console.log("──────────────────────────────────────────────");
   console.log("🖨️  Agent d'impression des fiches de contrôle");
   console.log("──────────────────────────────────────────────");
-  console.log(`   Partage surveillé : ${config.sharePath}`);
+  console.log(`   Partage par défaut: ${config.sharePath}`);
   console.log(`   Intervalle        : ${config.watchIntervalMs} ms`);
   console.log(
     `   Impression auto   : ${config.autoprint ? "OUI" : "NON (mode test)"}`,

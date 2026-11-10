@@ -139,6 +139,10 @@ const AdminInventaireProgressionScreen = () => {
     dateFin: "",
     clients: "",
   });
+  // DESTINATION du dossier de l'inventaire, choisie à l'initialisation :
+  // "rcommun" = partage STOCK (défaut, seul dossier que l'agent d'impression
+  // surveille) ; "collect_sec" = le chemin d'export de la société.
+  const [initDestination, setInitDestination] = useState("rcommun");
   const [showAnnulerConfirm, setShowAnnulerConfirm] = useState(false);
   const [showHistorique, setShowHistorique] = useState(false);
 
@@ -242,6 +246,7 @@ const AdminInventaireProgressionScreen = () => {
     setDesignation(null);
     setAgentUserId("");
     setDernierAgentId("");
+    setInitDestination("rcommun");
   }, [selectedEntreprise]);
 
   const handleConfirmInit = async () => {
@@ -251,6 +256,7 @@ const AdminInventaireProgressionScreen = () => {
       await initInventaire({
         entrepriseId: selectedEntreprise,
         filtreProformas: initProformas,
+        destination: initDestination,
       }).unwrap();
     } catch (err) {
       setBipFeedback({
@@ -563,12 +569,30 @@ const AdminInventaireProgressionScreen = () => {
                 {session.createdBy &&
                   ` · par ${session.createdBy.prenom || ""} ${session.createdBy.nom || ""}`}
               </span>
+              {/* Dépôt réel des .dat : la racine suit la DESTINATION choisie à
+                  l'initialisation (partage STOCK ou collect_sec). */}
+              {session.dossierDat && (
+                <span
+                  className="session-meta"
+                  title={
+                    session.destination === "collect_sec"
+                      ? "Dossier d'export de la société (collect_sec) — non surveillé par l'agent d'impression"
+                      : "Partage STOCK (RCOMMUN) — surveillé par l'agent d'impression"
+                  }
+                >
+                  Dépôt (
+                  {session.destination === "collect_sec"
+                    ? "collect_sec"
+                    : "RCOMMUN"}
+                  ) : {session.dossierDat}
+                </span>
+              )}
               {session.dossierFtp && (
                 <span
                   className="session-meta"
-                  title="Dossier de référence sur le serveur FTP robot-documents (miroir du partage STOCK)"
+                  title="Dossier de référence sur le serveur FTP robot-documents (copie du dossier de dépôt)"
                 >
-                  Dossier : {session.dossierFtp}
+                  Miroir FTP : {session.dossierFtp}
                 </span>
               )}
             </div>
@@ -858,6 +882,57 @@ const AdminInventaireProgressionScreen = () => {
                   </>
                 )}
               </p>
+
+              {/* DESTINATION du dossier de l'inventaire. Le choix est définitif
+                  pour cet inventaire : dépôt des .dat, surveillance par
+                  l'agent d'impression et téléchargement du ZIP suivent tous
+                  cette racine. Le miroir FTP, lui, reste une copie de
+                  référence (réglable par société dans la fiche société). */}
+              <div className="init-destination">
+                <h3>Dossier de l'inventaire</h3>
+                <p>
+                  Où seront déposés les fichiers .dat des collecteurs et les
+                  fiches de contrôle PDF de cet inventaire.
+                </p>
+                <label className="init-destination-choix">
+                  <input
+                    type="radio"
+                    name="initDestination"
+                    value="rcommun"
+                    checked={initDestination === "rcommun"}
+                    onChange={() => setInitDestination("rcommun")}
+                  />
+                  <span>
+                    <strong>RCOMMUN — partage STOCK</strong>
+                    <small>
+                      Choix habituel. C'est le seul dossier surveillé par
+                      l'agent d'impression : les fiches de contrôle sortent
+                      automatiquement à l'imprimante.
+                    </small>
+                  </span>
+                </label>
+                <label className="init-destination-choix">
+                  <input
+                    type="radio"
+                    name="initDestination"
+                    value="collect_sec"
+                    checked={initDestination === "collect_sec"}
+                    onChange={() => setInitDestination("collect_sec")}
+                  />
+                  <span>
+                    <strong>
+                      Dossier d'export de la société (collect_sec)
+                    </strong>
+                    <small>
+                      Le chemin d'export configuré sur la fiche société, celui
+                      des .dat de réappro. Pour une société sans partage STOCK.
+                      ⚠️ L'agent d'impression de QC ne surveille pas ce dossier :
+                      les fiches de contrôle se consultent et s'impriment depuis
+                      l'écran Fiches de contrôle.
+                    </small>
+                  </span>
+                </label>
+              </div>
 
               {/* Sélection des proformas : demandée UNE SEULE FOIS, ici. Les
                   imports « comptage sans collecteur » s'en serviront ensuite

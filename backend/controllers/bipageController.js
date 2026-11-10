@@ -13,6 +13,7 @@ import articleCacheService from "../services/articleService.js";
 import {
   config,
   getInventaireDirs,
+  racineInventaire,
   emplacementDir,
   sanitizeName,
   construireLignes,
@@ -20,7 +21,10 @@ import {
 } from "../services/ficheControleService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
 import { ZipArchive } from "archiver";
-import { deposerFichierInventaireFtp } from "../services/inventaireFtpService.js";
+import {
+  deposerFichierInventaireFtp,
+  miroirInventaireActif,
+} from "../services/inventaireFtpService.js";
 import os from "os";
 import fournissCacheService from "../services/fournissCacheService.js";
 import { envoyerClasseur } from "../utils/envoyerClasseur.js";
@@ -575,7 +579,7 @@ const genererDatIntegration = asyncHandler(async (req, res) => {
 
   // Copie miroir FTP (référence), SANS attendre — jamais bloquant.
   const slugFtp = session.dossierSlug || session.nom;
-  if (slugFtp) {
+  if (slugFtp && miroirInventaireActif(entreprise)) {
     for (const f of fichiers) {
       void deposerFichierInventaireFtp(
         entreprise.trigramme,
@@ -1155,7 +1159,11 @@ const recommencerZone = asyncHandler(async (req, res) => {
   // Base recalculée pour l'environnement courant (slug unique), comme le watcher
   // — plus fiable que session.dossierDat (figé, potentiellement cross-OS).
   const slug = session.dossierSlug || session.nom;
-  const base = slug ? getInventaireDirs(slug).base : session.dossierDat || "";
+  // Racine de la DESTINATION de la session (partage STOCK ou collect_xxx).
+  const base = slug
+    ? getInventaireDirs(slug, racineInventaire(session.destination, entreprise))
+        .base
+    : session.dossierDat || "";
 
   const fichiersSupprimes = [];
   const avertissements = [];

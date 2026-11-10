@@ -59,7 +59,29 @@ const sessionSchema = new mongoose.Schema(
       index: true,
     },
     nom: { type: String, default: "" },
-    // Dossier réseau (partage STOCK) où le collecteur dépose les .DAT
+    // DESTINATION du dossier de l'inventaire, choisie à l'initialisation :
+    //  - "rcommun"     : partage STOCK (STOCK_SHARE_PATH, ou le partage
+    //    Windows Rcommun\STOCK en dev),
+    //    défaut historique et seul dossier surveillé par l'agent d'impression
+    //    de QC ;
+    //  - "collect_sec" : le dossier d'export de la société
+    //    (`Entreprise.cheminExportInventaire` : collect_sec, collect_sec_aw…),
+    //    pour les sociétés qui n'ont pas de partage STOCK.
+    // ⚠️ On stocke le MODE, pas un chemin : la racine est recalculée à chaque
+    // usage pour l'environnement courant (Windows UNC en dev, montage Linux en
+    // prod — même Mongo). Voir `racineInventaire()`.
+    // Le FTP n'est PAS une destination : il reste le MIROIR de référence
+    // (`dossierFtp` ci-dessous), parce que le watcher lit un système de
+    // fichiers et qu'un inventaire vivant uniquement sur le FTPS ne
+    // produirait ni fiche de contrôle, ni LigneBipage, ni impression.
+    destination: {
+      type: String,
+      enum: ["rcommun", "collect_sec"],
+      default: "rcommun",
+    },
+    // Dossier réseau où le collecteur dépose les .DAT, tel que calculé à
+    // l'initialisation (INDICATIF : affiché à l'écran et conservé en trace).
+    // Ne JAMAIS s'en servir pour écrire ou scanner — cf. `destination`.
     dossierDat: { type: String, default: "" },
     // Slug UNIQUE du dossier (nom + horodatage) : chaque réinitialisation crée un
     // dossier distinct. Le watcher / le dépôt recalculent le chemin via

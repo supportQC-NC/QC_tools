@@ -964,16 +964,59 @@ imprimer. C'est `npm run print-agent` (`backend/printAgent.js`), lancé sur le p
 `192.168.0.250` qui a le Rcommun **et** l'imprimante, qui porte le watcher. Il se
 connecte au **même** MongoDB Atlas.
 
+**DESTINATION du dossier d'inventaire, choisie à l'initialisation** (11/11/2026) :
+`InventaireZoneSession.destination` vaut `rcommun` (défaut — partage STOCK,
+`config.sharePath` / `STOCK_SHARE_PATH`) ou `collect_sec` (le
+`cheminExportInventaire` de la société, pour celles qui n'ont pas de partage
+STOCK). Radios dans la modale « Initialiser un inventaire ».
+
+⚠️ **On stocke le MODE, jamais un chemin absolu** : le même Mongo sert au poste
+de dev (Windows UNC) et au VPS (Linux, montages), donc la racine est recalculée
+à chaque usage par `racineInventaire(destination, entreprise)` puis passée à
+`getInventaireDirs(slug, racine)`. `session.dossierDat` reste **indicatif**
+(affichage/trace) — ne jamais s'en servir pour écrire ou scanner. Les **six**
+endroits qui recalculent cette racine doivent rester alignés, sinon un .dat
+atterrit dans un dossier que le watcher ne lit pas : init / dépôt mobile
+(`resoudreDossierDepot`) / watcher (`tickOnce`, qui charge désormais
+l'entreprise AVANT de calculer la base) / « Annuler » / ZIP local /
+« Recommencer la zone ». Les fonctions de **recherche** d'un fichier existant
+(`resoudreCheminPdf`, `resoudreCheminDat`) balaient au contraire **toutes** les
+racines de la société (`racinesInventaire`) : elles n'ont pas à connaître la
+destination, et les inventaires antérieurs à ce choix restent trouvables.
+
+⚠️ **Le FTP n'est PAS une destination** (arbitrage du 11/11/2026). Le watcher
+lit un système de fichiers (`fs.readdirSync`) : un inventaire vivant uniquement
+sur le FTPS ne produirait ni `FicheControle`, ni `LigneBipage`, ni impression, ni
+récap de zone, ni feuille d'écarts. En faire une vraie destination suppose de
+déplacer la génération de la fiche du watcher vers `effectuerDepot` (qui a déjà
+le cumul de la zone) — non fait, et l'enum ne l'accepte pas.
+
+⚠️ **Seul `rcommun` est surveillé par l'agent d'impression de QC** : en
+`collect_sec`, les fiches de contrôle ne sortent pas tout seules à l'imprimante,
+elles se consultent et s'impriment depuis l'écran Fiches de contrôle. Dit dans
+l'UI au moment du choix.
+
 **Miroir FTP des inventaires par zones** (29/10/2026) : chaque inventaire a un
 dossier de RÉFÉRENCE `inventaire/<TRIG>/<slug>/` sur le FTPS robot-documents
 (`services/inventaireFtpService.js`, chemin stocké dans `session.dossierFtp`),
 alimenté au dépôt mobile (.dat) et par le watcher (.dat final + PDF). ⚠️ Le
-partage STOCK reste le **flux opérationnel** (watcher → FicheControle +
+dossier de dépôt local reste le **flux opérationnel** (watcher → FicheControle +
 LigneBipage + impression) : les écritures FTP sont best-effort et ne bloquent
-jamais le terrain ; « Annuler » supprime aussi le dossier FTP. « Enregistrer en
-local » = `GET /api/inventaires-zones/:id/dossier-zip[?sessionId=]` (fusion
-FTP + partage, ZIP streamé — archiver v8 : `new ZipArchive(...)`, plus d'export
-par défaut), bouton sur l'écran Progression + historique.
+jamais le terrain ; « Annuler » supprime aussi le dossier FTP. **Activable par
+société** depuis le 11/11/2026 — `Entreprise.miroirFtpInventaire` (case à cocher,
+onglet Chemins de la fiche société), **défaut `true`** = comportement historique ;
+le helper `miroirInventaireActif()` ne coupe le miroir que sur un `false`
+explicite, pour qu'un `select` partiel ne le désactive jamais par accident.
+Indépendant de `modeDepotDat` (qui ne concerne que les .dat réappro / bipage /
+prépa). ⚠️ Tout `populate`/`select` d'entreprise sur un chemin d'inventaire doit
+inclure `cheminExportInventaire` **et** `miroirFtpInventaire` (les trois de
+`inventaireCollecteController` les portent) : un champ absent fait silencieusement
+retomber la racine sur le partage STOCK.
+« Enregistrer en local » = `GET /api/inventaires-zones/:id/dossier-zip[?sessionId=]`
+(fusion FTP + dossier de dépôt, ZIP streamé — archiver v8 : `new ZipArchive(...)`,
+plus d'export par défaut), bouton sur l'écran Progression + historique ; il
+interroge le FTP **même miroir coupé** (un inventaire plus ancien peut y être
+archivé, la lecture est sans effet de bord).
 
 Depuis le web on **ne réimprime plus à distance** : l'écran Fiches de contrôle
 propose l'**aperçu** et le **téléchargement** du PDF

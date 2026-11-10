@@ -327,7 +327,7 @@
 // const getCollecteById = asyncHandler(async (req, res) => {
 //   const collecte = await InventaireCollecte.findById(req.params.id).populate(
 //     "entreprise",
-//     "nomDossierDBF trigramme nomComplet cheminExportInventaire cheminBase",
+//     "nomDossierDBF trigramme nomComplet cheminExportInventaire cheminBase miroirFtpInventaire",
 //   );
 
 //   if (!collecte) {
@@ -543,7 +543,7 @@
 // const exportCollecte = asyncHandler(async (req, res) => {
 //   const collecte = await InventaireCollecte.findById(req.params.id).populate(
 //     "entreprise",
-//     "nomDossierDBF trigramme nomComplet cheminExportInventaire",
+//     "nomDossierDBF trigramme nomComplet cheminExportInventaire miroirFtpInventaire",
 //   );
 
 //   if (!collecte) {
@@ -987,8 +987,12 @@ import {
   ecrirePDF,
   getInventaireDirs,
   emplacementDir,
+  racineInventaire,
 } from "../services/ficheControleService.js";
-import { deposerFichierInventaireFtp } from "../services/inventaireFtpService.js";
+import {
+  deposerFichierInventaireFtp,
+  miroirInventaireActif,
+} from "../services/inventaireFtpService.js";
 import {
   chargerCumulZone,
   etatZoneDejaBipee,
@@ -1067,11 +1071,13 @@ const nomFichierZone = (zoneCode, zoneType = "") => {
  *
  * RÈGLE CLÉ : le .DAT doit atterrir dans le dossier que SURVEILLE le watcher,
  * sinon il n'est jamais imprimé. Le watcher surveille le dossier de la session
- * = `getInventaireDirs(nom).base` = `config.sharePath` + <nom d'inventaire>.
+ * = `getInventaireDirs(slug, racine).base`, où `racine` dépend de la
+ * DESTINATION choisie à l'initialisation (partage STOCK par défaut, ou le
+ * dossier d'export collect_xxx de la société).
  *
  * On recalcule ce dossier pour l'ENVIRONNEMENT COURANT à chaque dépôt :
- *  - en dev : config.sharePath = partage Windows UNC (\\...\STOCK) ;
- *  - en prod : config.sharePath = STOCK_SHARE_PATH (montage Linux).
+ *  - en dev : partage Windows UNC (\\...\STOCK), ou le collect_xxx en base ;
+ *  - en prod : STOCK_SHARE_PATH, ou le chemin traduit par RCOMMON_STOCK_ROOT.
  * Ainsi dépôt et surveillance pointent TOUJOURS le même dossier, quel que soit
  * l'OS — même si `session.dossierDat` avait été figé en chemin Windows lors
  * d'une création depuis un poste dev (Mongo partagé).
@@ -1090,8 +1096,12 @@ const resoudreDossierDepot = async (entreprise) => {
   const slug = session && (session.dossierSlug || session.nom);
   if (slug) {
     // Dossier surveillé, recalculé pour l'environnement courant (slug unique
-    // horodaté si présent, sinon nom pour les anciennes sessions).
-    const dossier = getInventaireDirs(slug).base;
+    // horodaté si présent, sinon nom pour les anciennes sessions) sous la
+    // racine de la DESTINATION retenue à l'initialisation.
+    const dossier = getInventaireDirs(
+      slug,
+      racineInventaire(session.destination, entreprise),
+    ).base;
     return { dossier, mode: "session", session };
   }
 
@@ -1392,7 +1402,7 @@ const getCollectesEnCours = asyncHandler(async (req, res) => {
 const getCollecteById = asyncHandler(async (req, res) => {
   const collecte = await InventaireCollecte.findById(req.params.id).populate(
     "entreprise",
-    "nomDossierDBF trigramme nomComplet cheminExportInventaire cheminBase",
+    "nomDossierDBF trigramme nomComplet cheminExportInventaire cheminBase miroirFtpInventaire",
   );
 
   if (!collecte) {
@@ -1633,7 +1643,7 @@ const deleteLigneCollecte = asyncHandler(async (req, res) => {
 const exportCollecte = asyncHandler(async (req, res) => {
   const collecte = await InventaireCollecte.findById(req.params.id).populate(
     "entreprise",
-    "nomDossierDBF trigramme nomComplet cheminExportInventaire",
+    "nomDossierDBF trigramme nomComplet cheminExportInventaire miroirFtpInventaire",
   );
 
   if (!collecte) {
@@ -1744,7 +1754,11 @@ const effectuerDepot = async (
   // (connexion TLS + ensureDir, et jusqu'à 2 × 15 s si le serveur ne répond
   // pas → « délai d'attente dépassé » sur l'app alors que le dépôt avait
   // réussi). Le service logge lui-même les échecs et ne rejette jamais.
-  if (session && (session.dossierSlug || session.nom)) {
+  if (
+    session &&
+    (session.dossierSlug || session.nom) &&
+    miroirInventaireActif(entreprise)
+  ) {
     void deposerFichierInventaireFtp(
       entreprise.trigramme,
       session.dossierSlug || session.nom,
@@ -1883,7 +1897,7 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
   } = req.body || {};
 
   const entreprise = await Entreprise.findById(entrepriseId).select(
-    "nomDossierDBF trigramme nomComplet cheminExportInventaire",
+    "nomDossierDBF trigramme nomComplet cheminExportInventaire miroirFtpInventaire",
   );
   if (!entreprise) {
     res.status(404);

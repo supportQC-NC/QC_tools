@@ -24,6 +24,17 @@ import { sanitizeName } from "./ficheControleService.js";
 
 const RACINE_FTP = "inventaire";
 
+/**
+ * Le miroir FTP est-il actif pour cette société ?
+ * (`Entreprise.miroirFtpInventaire`, onglet Documents de la fiche société.)
+ *
+ * ⚠️ Le défaut est OUI : le miroir était inconditionnel avant l'introduction
+ * du réglage, et un document non peuplé / un `select` partiel ne doit pas le
+ * désactiver par accident. Seul un `false` explicite coupe le miroir.
+ */
+export const miroirInventaireActif = (entreprise) =>
+  entreprise?.miroirFtpInventaire !== false;
+
 /** Chemin FTP du dossier d'un inventaire : inventaire/<TRIG>/<slug>. */
 export function cheminFtpInventaire(trigramme, slug) {
   const trig = sanitizeName(String(trigramme || "").toUpperCase()) || "SANS_TRI";
@@ -111,6 +122,7 @@ export async function telechargerDossierInventaireFtp(trigramme, slug, dirLocal)
 }
 
 export default {
+  miroirInventaireActif,
   cheminFtpInventaire,
   creerDossierInventaireFtp,
   deposerFichierInventaireFtp,

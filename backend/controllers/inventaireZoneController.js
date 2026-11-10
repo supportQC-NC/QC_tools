@@ -16,11 +16,14 @@ import User from "../models/UserModel.js";
 import {
   getInventaireDirs,
   makeInventaireSlug,
+  normaliserDestination,
+  racineInventaire,
   sanitizeName,
 } from "../services/ficheControleService.js";
 import {
   cheminFtpInventaire,
   creerDossierInventaireFtp,
+  miroirInventaireActif,
   supprimerDossierInventaireFtp,
   telechargerDossierInventaireFtp,
 } from "../services/inventaireFtpService.js";
@@ -146,7 +149,14 @@ const sessionResume = (session) => ({
  */
 const initInventaireZone = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
-  const { nom, filtreProformas } = req.body;
+  const { nom, filtreProformas, destination } = req.body;
+
+  // Destination du dossier de l'inventaire, choisie par l'utilisateur :
+  // partage STOCK (défaut) ou dossier d'export de la société (collect_xxx).
+  // On stocke le MODE et on ne calcule le chemin que pour l'environnement
+  // courant — cf. InventaireZoneSessionModel.destination.
+  const destinationFinale = normaliserDestination(destination);
+  const racine = racineInventaire(destinationFinale, entreprise);
 
   const zones = await Zone.find({ entreprise: entreprise._id }).sort({
     code: 1,
@@ -202,7 +212,7 @@ const initInventaireZone = asyncHandler(async (req, res) => {
   // par emplacement (+ leurs archive_dat/archive_pdf/zone_non_trouvee) sont
   // créés à la demande, au dépôt et par le watcher : rien à la racine.
   // Best-effort : si le partage est inaccessible, on n'empêche pas l'init.
-  const dossierDat = getInventaireDirs(dossierSlug).base;
+  const dossierDat = getInventaireDirs(dossierSlug, racine).base;
   try {
     fs.mkdirSync(dossierDat, { recursive: true });
   } catch (err) {
@@ -216,12 +226,20 @@ const initInventaireZone = asyncHandler(async (req, res) => {
   // jusqu'à 30 s avant de rendre la main (2 hôtes × 15 s) alors que le chemin
   // est connu d'avance et que les dépôts suivants recréent le dossier au
   // besoin (ensureDir). Le service logge lui-même les échecs.
-  const dossierFtp = cheminFtpInventaire(entreprise.trigramme, dossierSlug);
-  void creerDossierInventaireFtp(entreprise.trigramme, dossierSlug);
+  // Miroir désactivé pour la société (fiche société) → aucune connexion FTPS
+  // et aucun chemin affiché : il n'y aurait rien dedans.
+  const miroirFtp = miroirInventaireActif(entreprise);
+  const dossierFtp = miroirFtp
+    ? cheminFtpInventaire(entreprise.trigramme, dossierSlug)
+    : "";
+  if (miroirFtp) {
+    void creerDossierInventaireFtp(entreprise.trigramme, dossierSlug);
+  }
 
   const session = await InventaireZoneSession.create({
     entreprise: entreprise._id,
     nom: nomFinal,
+    destination: destinationFinale,
     dossierDat,
     dossierSlug,
     dossierFtp,
@@ -567,7 +585,12 @@ const annulerInventaireZone = asyncHandler(async (req, res) => {
   let dossierSupprime = false;
   let dossierErreur = "";
   const slug = session.dossierSlug || session.nom;
-  const base = slug ? getInventaireDirs(slug).base : session.dossierDat;
+  // Racine de la DESTINATION choisie à l'initialisation (partage STOCK ou
+  // collect_xxx de la société), recalculée pour l'environnement courant.
+  const base = slug
+    ? getInventaireDirs(slug, racineInventaire(session.destination, entreprise))
+        .base
+    : session.dossierDat;
   if (base) {
     try {
       fs.rmSync(base, { recursive: true, force: true });
@@ -579,7 +602,7 @@ const annulerInventaireZone = asyncHandler(async (req, res) => {
 
   // 1 bis) Suppression du dossier miroir FTP — SANS await (même raison que
   // l'init : ne pas suspendre la réponse au FTP), échecs loggés par le service.
-  if (slug) {
+  if (slug && miroirInventaireActif(entreprise)) {
     void supprimerDossierInventaireFtp(entreprise.trigramme, slug);
   }
 
@@ -719,13 +742,17 @@ const telechargerDossierZip = asyncHandler(async (req, res) => {
 
   const slug = session.dossierSlug || session.nom;
 
-  // Dossier de travail temporaire : d'abord le contenu FTP, puis le partage
-  // par-dessus (mêmes chemins relatifs → le partage, qui porte les PDF et les
-  // .DAT retraités par l'agent, a le dernier mot).
+  // Dossier de travail temporaire : d'abord le contenu FTP, puis le dossier de
+  // dépôt par-dessus (mêmes chemins relatifs → le dépôt local, qui porte les
+  // PDF et les .DAT retraités par l'agent, a le dernier mot). La racine du
+  // dépôt suit la DESTINATION choisie à l'initialisation.
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "inv-zip-"));
   try {
     let rienTrouve = true;
 
+    // Le FTP est interrogé MÊME si le miroir est désactivé aujourd'hui : un
+    // inventaire plus ancien peut y avoir été archivé avant la coupure, et la
+    // lecture est sans effet de bord (échec déjà non bloquant ci-dessous).
     try {
       if (await telechargerDossierInventaireFtp(entreprise.trigramme, slug, tmpDir)) {
         rienTrouve = false;
@@ -734,7 +761,10 @@ const telechargerDossierZip = asyncHandler(async (req, res) => {
       console.error(`[Inventaire] ZIP : FTP injoignable (${err.message})`);
     }
 
-    const basePartage = slug ? getInventaireDirs(slug).base : "";
+    const basePartage = slug
+      ? getInventaireDirs(slug, racineInventaire(session.destination, entreprise))
+          .base
+      : "";
     if (basePartage && fs.existsSync(basePartage)) {
       fs.cpSync(basePartage, tmpDir, { recursive: true, force: true });
       rienTrouve = false;
@@ -743,7 +773,7 @@ const telechargerDossierZip = asyncHandler(async (req, res) => {
     if (rienTrouve) {
       res.status(404);
       throw new Error(
-        "Dossier introuvable : ni sur le FTP robot-documents, ni sur le partage STOCK.",
+        "Dossier introuvable : ni sur le FTP robot-documents, ni dans le dossier de dépôt de l'inventaire.",
       );
     }
 

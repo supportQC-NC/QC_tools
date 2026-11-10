@@ -143,6 +143,7 @@ const createEntreprise = asyncHandler(async (req, res) => {
     vendeurs,
     dossierFtpDocuments,
     modeDepotDat,
+    miroirFtpInventaire,
   } = req.body;
 
   // Vérifier si le dossier DBF existe déjà
@@ -188,6 +189,10 @@ const createEntreprise = asyncHandler(async (req, res) => {
   if (modeDepotDat !== undefined) {
     entrepriseData.modeDepotDat =
       modeDepotDat === "ftp" ? "ftp" : "rcommun";
+  }
+  // Miroir FTP des inventaires par zones (indépendant de modeDepotDat).
+  if (miroirFtpInventaire !== undefined) {
+    entrepriseData.miroirFtpInventaire = !!miroirFtpInventaire;
   }
 
   // Champs réception (rapport de contrôle commande)
@@ -285,6 +290,7 @@ const updateEntreprise = asyncHandler(async (req, res) => {
     vendeurs,
     dossierFtpDocuments,
     modeDepotDat,
+    miroirFtpInventaire,
   } = req.body;
 
   // Vérifier unicité du dossier DBF si modifié
@@ -361,6 +367,10 @@ const updateEntreprise = asyncHandler(async (req, res) => {
   }
   if (modeDepotDat !== undefined) {
     entreprise.modeDepotDat = modeDepotDat === "ftp" ? "ftp" : "rcommun";
+  }
+  // Miroir FTP des inventaires par zones (indépendant de modeDepotDat).
+  if (miroirFtpInventaire !== undefined) {
+    entreprise.miroirFtpInventaire = !!miroirFtpInventaire;
   }
 
   // Champs réception (rapport de contrôle commande)

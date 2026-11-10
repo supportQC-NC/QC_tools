@@ -199,6 +199,21 @@ const entrepriseSchema = new mongoose.Schema(
       enum: ["rcommun", "ftp"],
       default: "rcommun",
     },
+    // MIROIR FTP DES INVENTAIRES PAR ZONES (demande client du 29/10/2026).
+    // Quand il est actif, chaque inventaire a son dossier de RÉFÉRENCE sur le
+    // FTPS robot-documents (`inventaire/<TRIG>/<slug>`, cf.
+    // services/inventaireFtpService.js) : .DAT déposés et fiches PDF y sont
+    // recopiés en BEST-EFFORT, le dossier local restant le flux opérationnel
+    // (c'est lui que lit le watcher).
+    // Défaut TRUE = comportement historique (le miroir était inconditionnel).
+    // Le mettre à false pour une société qui n'a rien à archiver sur le FTP :
+    // plus aucune connexion FTPS n'est tentée pour ses inventaires.
+    // ⚠️ Indépendant de `modeDepotDat` (qui concerne les .dat réappro /
+    // bipage / prépa) : les .dat d'INVENTAIRE ne passent jamais par le FTP.
+    miroirFtpInventaire: {
+      type: Boolean,
+      default: true,
+    },
     // Destinataires de l'EMAIL D'ALERTE du rapport de réception (réservé à ce rapport).
     // Liste d'adresses email (service Achats, chef de dépôt, ...).
     emailsRapportReception: {

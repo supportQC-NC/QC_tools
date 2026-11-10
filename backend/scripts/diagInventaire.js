@@ -65,9 +65,16 @@ const main = async () => {
   console.log(`\n=== SESSIONS ACTIVES : ${sessions.length} ===`);
   for (const s of sessions) {
     const slug = s.dossierSlug || s.nom;
-    const base = slug ? getInventaireDirs(slug).base : s.dossierDat;
+    // La racine dépend de la DESTINATION choisie à l'initialisation : partage
+    // STOCK (défaut) ou collect_xxx de la société.
+    // eslint-disable-next-line no-await-in-loop
+    const ent = await Entreprise.findById(s.entreprise);
+    const base = slug
+      ? getInventaireDirs(slug, racineInventaire(s.destination, ent)).base
+      : s.dossierDat;
     console.log(`\n— Société ${s.entreprise} · « ${s.nom} »`);
     console.log("  dossierSlug :", s.dossierSlug || "(vide → repli sur nom)");
+    console.log("  destination :", s.destination || "rcommun");
     console.log("  dossierDat  :", s.dossierDat || "(vide)");
     console.log("  Dossier SURVEILLÉ (recalculé) :", base);
     console.log("  existe ?", base ? fs.existsSync(base) : false);
