@@ -230,20 +230,25 @@ const AdminBipagesScreen = () => {
     if (/^S[1-5]$/.test(up)) return nomDepot(up);
     return t || "Sans emplacement";
   };
-  // La barre Intégration liste TOUS les emplacements (MAGASIN/DOCK/S3/S4/S5 +
-  // tout type présent dans les lignes), même sans bipage : le mapping est
-  // visible et réglable d'avance — un emplacement sans ligne ne produit
+  // La barre Intégration liste les EMPLACEMENTS DE LA SOCIÉTÉ — ceux du
+  // DICTIONNAIRE DES RAYONS, renvoyés par le serveur dans `types`, plus ceux
+  // réellement présents dans les lignes. Ce ne sont PAS les dépôts S1..S5 de
+  // la fiche article : ceux-là sont la CIBLE du mapping (la colonne de droite),
+  // pas la liste des zones. Les lister à gauche laissait croire que « S3 » était
+  // un emplacement de rangement, et masquait les vrais types (RESERVE, QUAI…).
+  // MAGASIN et DOCK restent proposés même absents du dictionnaire : ils ont un
+  // dépôt par défaut (S1 / S2) et un emplacement sans ligne ne produit
   // simplement aucun fichier.
   const typesIntegration = (() => {
-    const std = ["MAGASIN", "DOCK", "S3", "S4", "S5"];
-    const vus = new Set(std);
-    const extra = (data?.types || []).filter((t) => {
-      const up = String(t || "").toUpperCase();
-      if (!t || vus.has(up)) return false;
+    const vus = new Set();
+    const liste = [];
+    for (const t of [...(data?.types || []), "MAGASIN", "DOCK"]) {
+      const up = String(t || "").trim().toUpperCase();
+      if (!up || vus.has(up)) continue;
       vus.add(up);
-      return true;
-    });
-    return [...std, ...extra];
+      liste.push(t);
+    }
+    return liste;
   })();
   // Défauts métier : MAGASIN → S1, DOCK → S2, et un emplacement spécial
   // S3/S4/S5 (zones importées par proforma) part dans SON dépôt.

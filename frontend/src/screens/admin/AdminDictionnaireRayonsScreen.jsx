@@ -166,15 +166,34 @@ const AdminDictionnaireRayonsScreen = () => {
   );
   const nbCodes = rows.filter((r) => String(r.gism1).trim()).length;
 
+  // Type de zone : LIBRE depuis le 12/11/2026. Le dictionnaire n'est plus
+  // limité à MAGASIN et DOCK — une société peut déclarer RESERVE, QUAI, SAV…
+  // On se contente de normaliser (majuscules, sans espaces), le reste du
+  // produit traite ces valeurs comme n'importe quel emplacement.
+  const normType = (v) =>
+    String(v || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "_") || "MAGASIN";
+
+  // Types proposés = ceux PRÉSENTS dans le fichier, plus les deux historiques
+  // (MAGASIN/DOCK restent offerts même sur un dictionnaire vide, et eux seuls
+  // correspondent aux colonnes GISM1/GISM2 de la fiche article).
+  const typesDisponibles = useMemo(() => {
+    const vus = new Set(["MAGASIN", "DOCK"]);
+    rows.forEach((r) => {
+      const t = normType(r.emplacement);
+      if (t) vus.add(t);
+    });
+    return [...vus].sort();
+  }, [rows]);
+
   // Lignes retenues pour les ÉTIQUETTES (selon l'emplacement choisi).
   const rowsEtiquettes = useMemo(
     () =>
       emplEtiquettes === "TOUS"
         ? rows
-        : rows.filter(
-            (r) =>
-              (r.emplacement === "DOCK" ? "DOCK" : "MAGASIN") === emplEtiquettes,
-          ),
+        : rows.filter((r) => normType(r.emplacement) === emplEtiquettes),
     [rows, emplEtiquettes],
   );
   const nbCodesEtiq = rowsEtiquettes.filter((r) => String(r.gism1).trim()).length;
@@ -192,8 +211,7 @@ const AdminDictionnaireRayonsScreen = () => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (emplFiltre !== "TOUS") {
-        const empl = r.emplacement === "DOCK" ? "DOCK" : "MAGASIN";
-        if (empl !== emplFiltre) return false;
+        if (normType(r.emplacement) !== emplFiltre) return false;
       }
       if (!q) return true;
       const code = String(r.gism1 || "").toLowerCase();
@@ -219,7 +237,7 @@ const AdminDictionnaireRayonsScreen = () => {
             libelle: String(r.libelle || "").trim(),
             metrage: Math.max(0, Math.round(Number(r.metrage) || 0)),
             priorite: prioStr === "" ? null : Math.max(0, Math.round(Number(prioStr) || 0)),
-            emplacement: r.emplacement === "DOCK" ? "DOCK" : "MAGASIN",
+            emplacement: normType(r.emplacement),
           };
         }),
       };
@@ -612,9 +630,17 @@ const AdminDictionnaireRayonsScreen = () => {
                 )}
               </div>
 
+              {/* Suggestions de types pour la saisie libre de la colonne
+                  Emplacement (une seule liste pour tout le tableau). */}
+              <datalist id="dicr-types-zone">
+                {typesDisponibles.map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
+
               <div className="dicr-empl-filter">
                 <span className="dicr-filter-lbl">Emplacement :</span>
-                {["TOUS", "MAGASIN", "DOCK"].map((v) => (
+                {["TOUS", ...typesDisponibles].map((v) => (
                   <button
                     key={v}
                     type="button"
@@ -733,16 +759,26 @@ const AdminDictionnaireRayonsScreen = () => {
                               />
                             </td>
                             <td>
-                              <select
-                                className="dicr-in dicr-select"
-                                value={r.emplacement === "DOCK" ? "DOCK" : "MAGASIN"}
+                              {/* Saisie LIBRE : MAGASIN et DOCK sont proposés
+                                  mais n'importe quel type est accepté
+                                  (RESERVE, QUAI…). */}
+                              <input
+                                className="dicr-in"
+                                list="dicr-types-zone"
+                                value={r.emplacement ?? ""}
+                                placeholder="MAGASIN"
+                                title="Type de zone — libre. MAGASIN et DOCK sont les seuls à correspondre aux colonnes GISM1 / GISM2 de la fiche article."
                                 onChange={(e) =>
                                   updateRow(r._id, "emplacement", e.target.value)
                                 }
-                              >
-                                <option value="MAGASIN">MAGASIN</option>
-                                <option value="DOCK">DOCK</option>
-                              </select>
+                                onBlur={(e) =>
+                                  updateRow(
+                                    r._id,
+                                    "emplacement",
+                                    normType(e.target.value),
+                                  )
+                                }
+                              />
                             </td>
                             <td className="dicr-sz-cell">
                               {hasCode ? sz.length : "—"}
@@ -831,7 +867,7 @@ const AdminDictionnaireRayonsScreen = () => {
               </button>
             </div>
             <div className="dicr-types">
-              {["TOUS", "MAGASIN", "DOCK"].map((v) => (
+              {["TOUS", ...typesDisponibles].map((v) => (
                 <button
                   key={v}
                   type="button"

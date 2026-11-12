@@ -35,11 +35,17 @@ const normHeader = (v) =>
     .replace(/[̀-ͯ]/g, "")
     .replace(/[\s_.\-]+/g, "");
 
-// Emplacement normalisé : « DOCK » ou « MAGASIN » (défaut MAGASIN).
-export const normEmplacement = (v) => {
-  const h = normHeader(v);
-  return h === "DOCK" ? "DOCK" : "MAGASIN";
-};
+// Emplacement (type de zone) normalisé : MAJUSCULES, sans accent ni espace,
+// vide → MAGASIN (défaut historique).
+//
+// ⚠️ Le type est LIBRE depuis le 12/11/2026. Avant, tout ce qui n'était pas
+// « DOCK » devenait « MAGASIN » : une société qui déclarait RESERVE, SAV ou
+// QUAI dans son dictionnaire voyait ces rayons fusionner silencieusement avec
+// le magasin, et les fiches d'inventaire correspondantes disparaissaient.
+// MAGASIN et DOCK gardent leur sens particulier — eux seuls correspondent aux
+// colonnes GISM1 / GISM2 de la fiche article — mais ils ne sont plus les
+// seules valeurs possibles.
+export const normEmplacement = (v) => normHeader(v) || "MAGASIN";
 
 // Priorité normalisée : entier ≥ 0, ou null si vide/non numérique.
 export const normPriorite = (v) => {
@@ -384,11 +390,24 @@ export const buildIndexRayons = async (entreprise) => {
   return resultat;
 };
 
-/** Cherche un rayon par son code ET son emplacement. */
+/**
+ * Cherche un rayon par son code ET son emplacement.
+ *
+ * Repli : à défaut de correspondance exacte, le MÊME CODE à un autre
+ * emplacement. Indispensable depuis que le type de zone est libre — la
+ * préparation et le réappro interrogent le dictionnaire avec MAGASIN (GISM1)
+ * ou DOCK (GISM2), et un rayon déclaré RESERVE ou QUAI ne sortirait sinon
+ * AUCUN libellé sur la fiche papier, alors que le code, lui, est le bon.
+ */
 export const lookupRayon = (index, code, emplacement) => {
   const c = safeTrim(code).toUpperCase();
   if (!c || !index) return null;
-  return index.get(`${c}|${normEmplacement(emplacement)}`) || null;
+  const exact = index.get(`${c}|${normEmplacement(emplacement)}`);
+  if (exact) return exact;
+  for (const [cle, valeur] of index) {
+    if (cle.startsWith(`${c}|`)) return valeur;
+  }
+  return null;
 };
 
 // Analyse un buffer xlsx uploadé (import de masse) et renvoie ses lignes de zone

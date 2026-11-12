@@ -93,11 +93,12 @@ export const saveDictionnaire = asyncHandler(async (req, res) => {
 // @desc    Étiquettes (A8, Code128/QR) à partir du dictionnaire. Deux modes
 //          (champ « sousZones ») : true (défaut) = une étiquette par sous-zone
 //          (« <GISM1>_A », …) ; false = une étiquette par ZONE, le code encodé
-//          est le GISM1 seul (sans suffixe _A/_B). Filtrable par emplacement
-//          (« MAGASIN » | « DOCK », absent/autre = tous).
+//          est le GISM1 seul (sans suffixe _A/_B). Filtrable par emplacement :
+//          n'importe quel TYPE présent dans le dictionnaire (MAGASIN, DOCK,
+//          RESERVE…), vide ou « TOUS » = tous les types.
 // @route   POST /api/dictionnaire-rayons/:nomDossierDBF/etiquettes
 // @body    { codeType?: "barcode"|"qr", codes?: string[], sousZones?: boolean,
-//            emplacement?: "MAGASIN"|"DOCK" }
+//            emplacement?: string }
 //          (codes vide -> tous)
 // @access  Private (export_gisements_admin, read) + accès entreprise
 export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
@@ -105,8 +106,11 @@ export const genererEtiquettesRayons = asyncHandler(async (req, res) => {
   const codeType = req.body?.codeType === "qr" ? "qr" : "barcode";
   const codes = Array.isArray(req.body?.codes) ? req.body.codes : [];
   const sousZones = req.body?.sousZones !== false; // défaut : avec sous-zones
+  // Le type de zone est LIBRE (dictionnaire) : on ne valide plus contre une
+  // liste fermée, sinon un emplacement RESERVE/QUAI serait silencieusement
+  // ignoré et l'utilisateur obtiendrait les étiquettes de TOUT le magasin.
   const emplRaw = (req.body?.emplacement ?? "").toString().trim().toUpperCase();
-  const emplacement = ["MAGASIN", "DOCK"].includes(emplRaw) ? emplRaw : null;
+  const emplacement = emplRaw && emplRaw !== "TOUS" ? normEmplacement(emplRaw) : null;
 
   const { rows } = await readDictionnaire(entreprise);
   if (!rows.length) {

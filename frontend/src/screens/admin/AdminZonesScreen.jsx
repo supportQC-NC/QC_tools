@@ -99,6 +99,19 @@ const AdminZonesScreen = () => {
 
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
 
+  // Types de zone proposés : ceux DÉJÀ présents (donc ceux du dictionnaire de
+  // la société), plus MAGASIN et DOCK. Le type est LIBRE — le dictionnaire des
+  // rayons accepte RESERVE, QUAI, SAV… et une fiche ajoutée à la main doit
+  // pouvoir viser n'importe lequel d'entre eux.
+  const typesZone = useMemo(() => {
+    const vus = new Set(["MAGASIN", "DOCK"]);
+    zones.forEach((z) => {
+      const t = String(z.type || "").trim().toUpperCase();
+      if (t) vus.add(t);
+    });
+    return [...vus].sort();
+  }, [zones]);
+
   // Les _id réellement sélectionnés ET toujours présents : une fiche supprimée
   // ou balayée par une régénération sort d'elle-même de la sélection.
   const idsSelectionnes = useMemo(
@@ -711,16 +724,30 @@ const AdminZonesScreen = () => {
                   </label>
 
                   <label>
-                    <span>Emplacement</span>
-                    <select
+                    <span>Emplacement (type de zone)</span>
+                    <input
+                      type="text"
+                      list="zones-types"
                       value={formZone.type}
+                      placeholder="MAGASIN"
+                      title="Libre : MAGASIN, DOCK, ou tout autre type déclaré dans le dictionnaire des rayons (RESERVE, QUAI…)."
                       onChange={(e) =>
                         setFormZone({ ...formZone, type: e.target.value })
                       }
-                    >
-                      <option value="MAGASIN">MAGASIN</option>
-                      <option value="DOCK">DOCK</option>
-                    </select>
+                      onBlur={(e) =>
+                        setFormZone({
+                          ...formZone,
+                          type:
+                            e.target.value.trim().toUpperCase().replace(/\s+/g, "_") ||
+                            "MAGASIN",
+                        })
+                      }
+                    />
+                    <datalist id="zones-types">
+                      {typesZone.map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                    </datalist>
                   </label>
 
                   <label className="form-wide">
@@ -754,8 +781,11 @@ const AdminZonesScreen = () => {
                 </div>
 
                 <p className="form-hint">
-                  Un même code peut exister en <strong>MAGASIN</strong> et en{" "}
-                  <strong>DOCK</strong> : ce sont deux fiches distinctes.
+                  Un même code peut exister à <strong>plusieurs
+                  emplacements</strong> : ce sont autant de fiches distinctes.
+                  Le type est libre — seuls <strong>MAGASIN</strong> et{" "}
+                  <strong>DOCK</strong> correspondent aux colonnes GISM1 / GISM2
+                  de la fiche article.
                 </p>
 
                 {formError && (

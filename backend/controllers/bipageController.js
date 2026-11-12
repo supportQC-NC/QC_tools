@@ -27,6 +27,7 @@ import {
 } from "../services/inventaireFtpService.js";
 import os from "os";
 import fournissCacheService from "../services/fournissCacheService.js";
+import { readDictionnaire } from "../services/dictionnaireRayonsService.js";
 import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import {
   fmtNum,
@@ -104,7 +105,7 @@ const buildFilter = (session, query) => {
  * emplacements différents apparaissent bien SÉPARÉMENT. Repli sur le snapshot
  * de session pour les anciennes lignes sans zoneType.
  */
-const buildZonesMeta = async (session) => {
+const buildZonesMeta = async (session, entreprise = null) => {
   const typeByCode = {};
   (session.zones || []).forEach((z) => {
     if (typeByCode[z.code] === undefined) typeByCode[z.code] = z.type || "";
@@ -131,7 +132,26 @@ const buildZonesMeta = async (session) => {
       a.code.localeCompare(b.code, "fr", { numeric: true }) ||
       a.type.localeCompare(b.type, "fr"),
   );
-  const types = [...new Set(zonesMeta.map((z) => z.type).filter(Boolean))].sort();
+  // Types proposés au filtre : ceux du DICTIONNAIRE DES RAYONS, qui définit
+  // les emplacements de la société (MAGASIN, DOCK, RESERVE, QUAI…) — et NON
+  // les dépôts S1..S5 de la fiche article, qui sont une autre notion (le
+  // stock, pas le rangement). On y ajoute les types réellement présents dans
+  // les lignes : un import proforma peut viser un emplacement absent du
+  // dictionnaire, il doit rester filtrable.
+  const typesVus = new Set(zonesMeta.map((z) => z.type).filter(Boolean));
+  if (entreprise) {
+    try {
+      const { rows } = await readDictionnaire(entreprise);
+      for (const r of rows || []) {
+        const t = String(r?.emplacement || "").trim();
+        if (t) typesVus.add(t);
+      }
+    } catch {
+      // Dictionnaire illisible (partage injoignable) : on se contente des
+      // types présents dans les lignes, le filtre reste utilisable.
+    }
+  }
+  const types = [...typesVus].sort((a, b) => a.localeCompare(b, "fr"));
 
   return { zonesMeta, types };
 };
@@ -213,7 +233,17 @@ const completerGencod = async (entreprise, lignes) => {
  */
 const ordonnerCommeLesFiches = (lignes) => {
   const cleBloc = (l) =>
-    `${l.zoneType || ""} ${l.zoneCode || ""} ${l.datFileName || ""}`;
+    `${l.zoneType || ""} ${l.zoneCode || ""} ${l.datFileName || ""}`;
+
+  // Une ligne saisie depuis l'écran n'appartient à aucun fichier : elle a été
+  // AJOUTÉE APRÈS le comptage, elle se range donc en FIN de zone.
+  //
+  // ⚠️ Ne pas s'en remettre à sa date de création pour le deviner : le bloc
+  // d'un .DAT est SUPPRIMÉ puis RÉINSÉRÉ à chaque passage du watcher (zone
+  // re-bipée, cumul recalculé), donc ses lignes peuvent être PLUS RÉCENTES
+  // que la ligne manuelle — et celle-ci remontait alors en tête de zone.
+  // La règle est explicite, elle ne dépend plus d'un horodatage.
+  const estManuel = (l) => l.source === "manuel" || !l.datFileName;
 
   const anciennete = new Map();
   for (const l of lignes) {
@@ -231,12 +261,23 @@ const ordonnerCommeLesFiches = (lignes) => {
       sensitivity: "variant",
     });
     if (z) return z;
+
+    // Les ajouts manuels ferment la zone, quelles que soient les dates.
+    const m = Number(estManuel(a)) - Number(estManuel(b));
+    if (m) return m;
+
+    // Entre blocs issus de fichiers : du plus ancien au plus récent, soit
+    // l'ordre dans lequel ils ont été bipés puis déposés.
     const d = (anciennete.get(cleBloc(a)) || 0) - (anciennete.get(cleBloc(b)) || 0);
     if (d) return d;
     // Même ancienneté (lignes créées dans la même milliseconde) : le nom de
     // fichier départage, pour que deux blocs ne s'entrelacent jamais.
     const f = String(a.datFileName || "").localeCompare(String(b.datFileName || ""));
     if (f) return f;
+
+    // Dans un bloc : le numéro de ligne de la fiche (colonne N° du PDF).
+    // Entre plusieurs ajouts manuels : leur ordre de saisie — `ordre` est
+    // attribué à la création comme « dernier de la zone + 1 ».
     return (Number(a.ordre) || 0) - (Number(b.ordre) || 0);
   });
 };
@@ -313,7 +354,7 @@ const getBipages = asyncHandler(async (req, res) => {
   // Zone par zone, dans l'ordre du bipage — le même que celui des fiches PDF.
   lignes = ordonnerCommeLesFiches(lignes);
 
-  const { zonesMeta, types } = await buildZonesMeta(session);
+  const { zonesMeta, types } = await buildZonesMeta(session, entreprise);
 
   res.json({
     active: true,

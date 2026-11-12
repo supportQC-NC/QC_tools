@@ -22,11 +22,17 @@ import { drawEAN13Pdf, genererEanInterne } from "../utils/ean13.js";
 
 const safe = (v) => (v == null ? "" : String(v)).trim();
 
-// Emplacement normalisé : seuls MAGASIN et DOCK existent côté dictionnaire, et
-// l'identité d'une zone est le couple (code, emplacement). Tout le reste retombe
-// sur MAGASIN, sinon deux écritures du même emplacement créeraient deux fiches.
+// Emplacement (type de zone) normalisé. L'identité d'une zone est le couple
+// (code, emplacement) : on normalise la CASSE et les espaces pour que deux
+// écritures du même type ne créent pas deux fiches.
+//
+// ⚠️ Le type est LIBRE depuis le 12/11/2026, comme dans le dictionnaire des
+// rayons : une société peut déclarer RESERVE, QUAI, SAV… Forcer MAGASIN pour
+// tout ce qui n'était pas DOCK faisait disparaître ces zones — elles
+// fusionnaient avec le magasin, et aucune fiche propre n'était générée.
+// Vide → MAGASIN (défaut historique).
 export const normaliserEmplacement = (v) =>
-  safe(v).toUpperCase() === "DOCK" ? "DOCK" : "MAGASIN";
+  safe(v).toUpperCase().replace(/\s+/g, "_") || "MAGASIN";
 
 /**
  * Les 4 codes d'une fiche rayon. UNE SEULE définition pour tout le monde :
