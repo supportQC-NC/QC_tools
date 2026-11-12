@@ -9,6 +9,7 @@
 //   ca_annee     = vente_annee × PVTE
 //   taux_marque  = (PVTE − PREV) / PVTE  (en %, taux de marque HT sur prix de vente)
 //                  Articles à coût 0/absent exclus des sommes de marge.
+//   pvte / pvttc = prix de vente magasin HT (PVTE) et TTC (PVTETTC)
 //   coef         = PVTE / PREV  (coefficient multiplicateur : même marge que le
 //                  taux de marque, rapportée au prix de revient au lieu du PV)
 //   jour_rupture = ΣRUP1..RUP12
@@ -215,6 +216,7 @@ const SORT_FIELDS = new Set([
   "jourRupture",
   "stockTotal",
   "pvte",
+  "pvttc",
 ]);
 
 export const getDetail = async (entreprise, options = {}) => {
@@ -275,6 +277,9 @@ export const getDetail = async (entreprise, options = {}) => {
       coef: m.coef,
       jourRupture: m.jourRupture,
       pvte: m.pvte,
+      // PV TTC magasin (article.PVTETTC) : c'est le prix affiché en rayon, le
+      // seul que le commercial puisse citer au client — PVTE reste le HT.
+      pvttc: m.pvttc,
       prev: m.prev,
       stockMag: m.stockMag,
       stockDock: m.stockDock,

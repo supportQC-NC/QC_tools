@@ -108,6 +108,7 @@ export const buildTopVentesDetailWorkbook = async ({
     { key: "tauxMarque", entete: "Taux de marque %", largeur: 16, dbf: "PREV" },
     { key: "coef", entete: "Coef. multiplicateur", largeur: 17, dbf: "PREV" },
     { key: "pvte", entete: "PV HT (PVTE)", largeur: 13, dbf: "PVTE" },
+    { key: "pvttc", entete: "PV TTC magasin (PVTETTC)", largeur: 22, dbf: "PVTETTC" },
     { key: "prev", entete: "PR (PREV)", largeur: 12, dbf: "PREV" },
     { key: "jourRupture", entete: "Rupture 12 mois (j)", largeur: 17, dbf: "RUP1" },
     { key: "stockMag", entete: "Stock magasin (S1)", largeur: 17, dbf: "S1" },
@@ -153,6 +154,7 @@ export const buildTopVentesDetailWorkbook = async ({
         tauxMarque: a.tauxMarque ?? null,
         coef: a.coef ?? null,
         pvte: a.pvte,
+        pvttc: a.pvttc,
         prev: a.prev,
         jourRupture: a.jourRupture,
         stockMag: a.stockMag,
@@ -178,7 +180,7 @@ export const buildTopVentesDetailWorkbook = async ({
   ligneTotal.font = { bold: true };
   ligneTotal.border = { top: { style: "double" } };
 
-  for (const key of ["caAnnee", "pvte", "prev"]) {
+  for (const key of ["caAnnee", "pvte", "pvttc", "prev"]) {
     if (clesVisibles.has(key)) ws.getColumn(key).numFmt = "#,##0";
   }
   for (const key of ["tauxMarque", "coef", "venteMoisMoy"]) {

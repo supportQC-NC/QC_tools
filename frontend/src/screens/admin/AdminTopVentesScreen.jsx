@@ -49,6 +49,14 @@ const AIDE_COEF =
   "Même marge que la colonne Marque, exprimée autrement : 40 % de marque = coef 1,67.\n" +
   "Vide (—) si le prix de revient ou le prix de vente est à 0.";
 
+const AIDE_PV_HT =
+  "Prix de vente magasin HORS TAXE (champ PVTE de article.dbf).\n" +
+  "C'est la base du CA annuel et du taux de marque.";
+
+const AIDE_PV_TTC =
+  "Prix de vente magasin TOUTES TAXES (champ PVTETTC de article.dbf).\n" +
+  "C'est le prix affiché en rayon, celui qu'on cite au client.";
+
 const AIDE_MARQUE_MOY =
   "Marque moyenne du groupe, PONDÉRÉE PAR LE CA (et non moyenne des marques article par article) :\n" +
   "(Σ CA − Σ coût) / Σ CA × 100, sur les 12 derniers mois.\n" +
@@ -415,6 +423,24 @@ const DetailModal = ({ dossier, drill, onClose }) => {
               <Th label="Ventes/an" field="venteAnnee" sort={sort} dir={dir} onSort={onSort} num />
               <Th label="CA annuel" field="caAnnee" sort={sort} dir={dir} onSort={onSort} num />
               <Th
+                label="PV HT"
+                field="pvte"
+                sort={sort}
+                dir={dir}
+                onSort={onSort}
+                num
+                title={AIDE_PV_HT}
+              />
+              <Th
+                label="PV TTC"
+                field="pvttc"
+                sort={sort}
+                dir={dir}
+                onSort={onSort}
+                num
+                title={AIDE_PV_TTC}
+              />
+              <Th
                 label="Marque %"
                 field="tauxMarque"
                 sort={sort}
@@ -439,13 +465,13 @@ const DetailModal = ({ dossier, drill, onClose }) => {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={drill.type === "fournisseur" ? 9 : 8} className="tv-empty">
+                <td colSpan={drill.type === "fournisseur" ? 11 : 10} className="tv-empty">
                   Chargement…
                 </td>
               </tr>
             ) : articles.length === 0 ? (
               <tr>
-                <td colSpan={drill.type === "fournisseur" ? 9 : 8} className="tv-empty">
+                <td colSpan={drill.type === "fournisseur" ? 11 : 10} className="tv-empty">
                   Aucun article.
                 </td>
               </tr>
@@ -475,6 +501,8 @@ const DetailModal = ({ dossier, drill, onClose }) => {
                   )}
                   <td className="num">{fmtQty(a.venteAnnee)}</td>
                   <td className="num">{fmtFranc(a.caAnnee)}</td>
+                  <td className="num">{fmtFranc(a.pvte)}</td>
+                  <td className="num">{fmtFranc(a.pvttc)}</td>
                   <td className="num">{fmtPct(a.tauxMarque)}</td>
                   <td className="num">{fmtCoef(a.coef)}</td>
                   <td className="num">{a.jourRupture}</td>
