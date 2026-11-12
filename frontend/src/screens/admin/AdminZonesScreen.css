@@ -518,3 +518,148 @@
     max-width: none;
   }
 }
+/* ==========================================================================
+   Sélection de fiches + ajout manuel
+   ========================================================================== */
+
+/* Actions de la barre d'outils, entre les compteurs et la recherche */
+.zones-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+/* Colonne des cases à cocher : largeur fixe, la case reste cliquable au centre */
+.admin-table th.select-cell,
+.admin-table td.select-cell {
+  width: 38px;
+  padding-left: 12px;
+  padding-right: 0;
+  text-align: center;
+}
+
+.select-cell input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+.admin-table tbody tr.row-selected {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.admin-table tbody tr.row-selected:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.admin-table td.actions-cell {
+  width: 46px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.btn-icon.danger:hover:not(:disabled) {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+/* Provenance de la fiche : seule « manuelle » est mise en avant, c'est la
+   seule qui change un comportement (elle survit aux régénérations). */
+.badge-origine {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.badge-origine.manuel {
+  background: rgba(139, 92, 246, 0.16);
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+/* Formulaire de la modale d'ajout */
+.modal-intro {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.form-grid label.form-wide {
+  grid-column: 1 / -1;
+}
+
+.form-grid label em {
+  color: #ef4444;
+  font-style: normal;
+}
+
+.form-grid input,
+.form-grid select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.form-grid input:focus,
+.form-grid select:focus {
+  border-color: #8b5cf6;
+}
+
+.form-hint {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .zones-toolbar-actions {
+    width: 100%;
+  }
+}

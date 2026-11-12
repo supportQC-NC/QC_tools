@@ -22,6 +22,35 @@ import { drawEAN13Pdf, genererEanInterne } from "../utils/ean13.js";
 
 const safe = (v) => (v == null ? "" : String(v)).trim();
 
+// Emplacement normalisé : seuls MAGASIN et DOCK existent côté dictionnaire, et
+// l'identité d'une zone est le couple (code, emplacement). Tout le reste retombe
+// sur MAGASIN, sinon deux écritures du même emplacement créeraient deux fiches.
+export const normaliserEmplacement = (v) =>
+  safe(v).toUpperCase() === "DOCK" ? "DOCK" : "MAGASIN";
+
+/**
+ * Les 4 codes d'une fiche rayon. UNE SEULE définition pour tout le monde :
+ * la génération depuis le dictionnaire ET l'ajout manuel passent par ici.
+ * Deux copies de cette règle divergeraient, et une fiche manuelle imprimerait
+ * des codes que le collecteur ne saurait pas résoudre.
+ *
+ *   - principal = « code|emplacement », rendu en QR (et non en code-barres) :
+ *     c'est l'identité de la zone, résolue telle quelle par resoudreCode, et
+ *     elle distingue le même code en MAGASIN et en DOCK ;
+ *   - les 3 EAN de phase sont MINTÉS (EAN-13 internes déterministes, préfixe 2).
+ */
+export const minterCodesZone = ({ trigramme, code, emplacement }) => {
+  const trig = safe(trigramme).toUpperCase() || "XXX";
+  const c = safe(code);
+  const empl = normaliserEmplacement(emplacement);
+  return {
+    eanPrincipal: `${c}|${empl}`,
+    eanPapillonnage: genererEanInterne(`${trig}|${c}|${empl}|papillonnage`),
+    eanBipage: genererEanInterne(`${trig}|${c}|${empl}|bipage`),
+    eanControle: genererEanInterne(`${trig}|${c}|${empl}|controle`),
+  };
+};
+
 // Construit les documents Zone à partir du dictionnaire des rayons de l'entreprise.
 // Renvoie { fichier, zones:[{ code, libelle, type, metreLineaire, eanPrincipal,
 //   eanPapillonnage, eanBipage, eanControle }], doublons }. Lève une erreur si dico
@@ -55,7 +84,7 @@ export const construireZonesDepuisDictionnaire = async (entreprise) => {
   for (const r of rows) {
     const code = safe(r?.gism1);
     if (!code) continue;
-    const empl = safe(r?.emplacement) || "MAGASIN";
+    const empl = normaliserEmplacement(r?.emplacement);
     const cle = `${code} ${empl}`;
     if (parCle.has(cle)) doublons += 1;
     else ordre.push(cle);
@@ -64,12 +93,8 @@ export const construireZonesDepuisDictionnaire = async (entreprise) => {
       libelle: safe(r?.libelle),
       type: empl,
       metreLineaire: Math.max(0, Math.round(Number(r?.metrage) || 0)),
-      // Principal = « code|emplacement » (rendu en QR) → unique par zone et résolu par
-      // resoudreCode, pour distinguer le même code en MAGASIN vs DOCK.
-      eanPrincipal: `${code}|${empl}`,
-      eanPapillonnage: genererEanInterne(`${trig}|${code}|${empl}|papillonnage`),
-      eanBipage: genererEanInterne(`${trig}|${code}|${empl}|bipage`),
-      eanControle: genererEanInterne(`${trig}|${code}|${empl}|controle`),
+      origine: "dictionnaire",
+      ...minterCodesZone({ trigramme: trig, code, emplacement: empl }),
     });
   }
 
@@ -274,4 +299,9 @@ export const generateZoneFichesPDF = async ({ zones, stream }) => {
   });
 };
 
-export default { construireZonesDepuisDictionnaire, generateZoneFichesPDF };
+export default {
+  construireZonesDepuisDictionnaire,
+  generateZoneFichesPDF,
+  minterCodesZone,
+  normaliserEmplacement,
+};

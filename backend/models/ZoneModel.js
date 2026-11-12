@@ -54,6 +54,17 @@ const zoneSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    // D'où vient la fiche. Seule valeur qui change un comportement : "manuel".
+    // Une zone ajoutée à la main SURVIT à une régénération depuis le dictionnaire
+    // et à un import CSV — sans ce drapeau elle serait balayée au tour suivant,
+    // alors qu'elle existe justement pour compléter le dictionnaire.
+    // Les documents antérieurs n'ont pas le champ : ils valent "dictionnaire".
+    origine: {
+      type: String,
+      enum: ["dictionnaire", "csv", "manuel"],
+      default: "dictionnaire",
+      index: true,
+    },
   },
   {
     timestamps: true,
