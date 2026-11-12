@@ -496,7 +496,11 @@ const genererFicheControle = asyncHandler(async (req, res) => {
     throw new Error(`Aucun article à contrôler pour la proforma ${numfact}`);
   }
 
-  // Flags (mêmes règles que la fiche de contrôle normale)
+  // Flags (mêmes règles que la fiche de contrôle normale) :
+  //   A = article inconnu | XX = surplus de stock (qté > stock) | D = doublon.
+  // « stock > qté » a été retiré des DEUX fiches le 12/11/2026 — laisser la
+  // règle ici ferait diverger ce document de la fiche de contrôle, alors qu'il
+  // est censé la reproduire.
   const counts = new Map();
   entries.forEach((e) => counts.set(e.dupKey, (counts.get(e.dupKey) || 0) + 1));
 
@@ -505,7 +509,6 @@ const genererFicheControle = asyncHandler(async (req, res) => {
     if (counts.get(e.dupKey) > 1) flags.push("D");
     if (e.nonTrouve) flags.push("A");
     else if (e.qte > e.stock) flags.push("XX");
-    else if (e.stock > e.qte) flags.push("A");
 
     return {
       n: i + 1,

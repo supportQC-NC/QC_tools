@@ -239,7 +239,9 @@ export const parseDat = (content) => {
 /**
  * @returns { rows, stats }
  * row = { n, code, nart, att, designation, reference, qte, stock, rouge, nonTrouve }
- * ATT : D = doublon dans le fichier, XX = qté > stock, A = stock > qté OU article non trouvé
+ * ATT : A = article inconnu du catalogue, XX = surplus de stock (qté bipée >
+ * stock), D = doublon dans le fichier. « stock > qté bipée » n'est plus une
+ * anomalie (12/11/2026) : trop fréquent, il noyait les trois autres.
  *
  * ⚠️ La colonne CODE de la fiche porte le **GENCOD du catalogue** (demande
  * client du 10/11/2026), PAS le code brut bipé ni le NART — ce dernier a sa
@@ -306,16 +308,28 @@ export const construireLignes = async (entreprise, lignesDat) => {
     const estDoublon = counts.get(e.dupKey) > 1;
     if (estDoublon) flags.push("D");
 
+    // TROIS anomalies, et trois seulement :
+    //   A  = article INCONNU du catalogue ;
+    //   XX = surplus de stock (quantité bipée > stock théorique) ;
+    //   D  = doublon (même article compté ≥ 2 fois dans la zone).
+    //
+    // ⚠️ « stock > qté bipée » N'EST PLUS une anomalie (demande client du
+    // 12/11/2026). C'était le cas le plus FRÉQUENT — tout article dont il
+    // reste du stock et qu'on n'a pas fini de compter le déclenchait — et il
+    // noyait les trois autres : des fiches entières sortaient en rouge, donc
+    // plus rien ne ressortait. L'écart stock/comptage reste traité là où c'est
+    // sa place : la feuille d'écarts.
     if (e.nonTrouve) {
       flags.push("A");
     } else if (e.qte > e.stock) {
       flags.push("XX");
-    } else if (e.stock > e.qte) {
-      flags.push("A");
     }
 
     if (estDoublon) doublons += 1;
     if (flags.includes("XX")) excedent += 1;
+    // `attention` compte les lignes marquées A, donc désormais exactement les
+    // articles inconnus : les deux compteurs sont égaux, et `attention` est
+    // conservé parce que FicheControle.stats et les écrans le lisent déjà.
     if (flags.includes("A")) attention += 1;
     if (e.nonTrouve) nonTrouves += 1;
 
@@ -548,7 +562,7 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     .font("Helvetica")
     .text(
       legende ||
-        "   D = Doublon | A = Attention requise (stock > qté ou article non trouvé) | XX = Quantité excédentaire | Lignes rouges = Contrôle prioritaire",
+        "   A = Article inconnu | XX = Surplus de stock (qté bipée > stock) | D = Doublon | Lignes grisées = Contrôle prioritaire",
     );
 
   doc.end();

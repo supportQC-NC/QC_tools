@@ -491,7 +491,7 @@ const AdminFichesControleScreen = () => {
                           {f.stats?.attention > 0 && (
                             <span
                               className="badge badge-a"
-                              title="Attention (stock > qté / non trouvé)"
+                              title="Articles inconnus du catalogue"
                             >
                               A {f.stats.attention}
                             </span>
@@ -499,7 +499,7 @@ const AdminFichesControleScreen = () => {
                           {f.stats?.excedent > 0 && (
                             <span
                               className="badge badge-xx"
-                              title="Quantité excédentaire"
+                              title="Surplus de stock : quantité bipée supérieure au stock théorique"
                             >
                               XX {f.stats.excedent}
                             </span>
