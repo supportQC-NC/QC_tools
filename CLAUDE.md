@@ -264,6 +264,15 @@ pouvoir être crédité de son travail. La route reste `admin` +
 `checkEntrepriseAccess` et ne renvoie que l'identité (nom, e-mail) : aucun droit,
 aucune donnée société.
 
+Chaque compte y porte en plus **`aAccesEntreprise`** (accès à la société de CET
+inventaire, même règle que `getAccessibleEntreprises` — `allEntreprises`, société
+listée dans `permission.entreprises`, admin hérité sans `Permission`). C'est un
+drapeau d'**affichage** : la fenêtre de désignation d'agent n'affiche par défaut
+que les comptes de la société (dérouler tout l'annuaire pour trouver l'agent du
+magasin n'est pas tenable), et décocher le filtre rouvre la liste entière. Le
+périmètre de la route, lui, ne change pas — un renfort reste créditable, et biper
+son badge rouvre la liste de lui-même.
+
 ### Le registre des modules vit à trois endroits
 
 `backend/config/adminModules.js` (source de vérité), son miroir

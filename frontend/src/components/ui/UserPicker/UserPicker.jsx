@@ -2,10 +2,11 @@
 //
 // Sélecteur d'utilisateur RÉUTILISABLE, avec recherche dans le menu déroulant.
 //
-// Pourquoi pas un <select> : la liste porte TOUS les comptes de l'application
-// (pas seulement ceux d'une société), elle est donc trop longue pour être
-// parcourue à la souris. Le filtre se fait sur le nom ET sur l'e-mail, sans
-// accent ni casse — on tape « lea » et on trouve « Léa ».
+// Pourquoi pas un <select> : la liste peut porter TOUS les comptes de
+// l'application, elle est donc trop longue pour être parcourue à la souris. La
+// recherche se fait sur le nom ET sur l'e-mail, sans accent ni casse — on tape
+// « lea » et on trouve « Léa ». Le pré-filtrage de `users` (par société, par
+// équipe…) reste la responsabilité de l'appelant.
 //
 // Composant contrôlé : `value` = id sélectionné (ou ""), `onChange(id)`.
 // Aucune dépendance externe : ni lib de combobox, ni portail (le menu est

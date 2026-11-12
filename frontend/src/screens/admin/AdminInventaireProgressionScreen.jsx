@@ -114,6 +114,13 @@ const AdminInventaireProgressionScreen = () => {
   // { source: 'bip'|'manuel', code?, zone, phase }
   const [designation, setDesignation] = useState(null);
   const [agentUserId, setAgentUserId] = useState("");
+  // Filtre de la liste d'agents : par défaut, seuls les comptes qui ont ACCÈS à
+  // la société de l'inventaire. La liste complète reste à un clic — un renfort
+  // venu d'une autre société du groupe doit rester créditable — mais dérouler
+  // tout l'annuaire pour trouver l'agent du magasin n'est pas tenable.
+  // L'état vit ici et pas dans la fenêtre : un même poste enchaîne les coupons,
+  // il ne doit pas re-cocher à chaque scan.
+  const [agentsSocieteSeuls, setAgentsSocieteSeuls] = useState(true);
   // Badge scanné : le poste bipe la carte de l'agent plutôt que de le chercher
   // dans la liste. Le scan ne fait que REMPLIR le sélecteur — la validation
   // reste la même, et la liste reste utilisable quand quelqu'un a oublié sa
@@ -155,6 +162,22 @@ const AdminInventaireProgressionScreen = () => {
   const { data: agentsPossibles } = useGetAgentsPossiblesQuery(
     selectedEntreprise,
     { skip: !selectedEntreprise },
+  );
+
+  // Agents proposés dans la fenêtre de désignation. L'agent DÉJÀ sélectionné
+  // est toujours conservé, même hors filtre : sans lui, le sélecteur
+  // réafficherait « Moi (par défaut) » alors qu'un badge vient d'être bipé.
+  const agentsAffiches = useMemo(() => {
+    const tous = agentsPossibles || [];
+    if (!agentsSocieteSeuls) return tous;
+    return tous.filter(
+      (u) => u.aAccesEntreprise || String(u._id) === String(agentUserId),
+    );
+  }, [agentsPossibles, agentsSocieteSeuls, agentUserId]);
+
+  const nbAgentsSociete = useMemo(
+    () => (agentsPossibles || []).filter((u) => u.aAccesEntreprise).length,
+    [agentsPossibles],
   );
 
   const {
@@ -275,6 +298,7 @@ const AdminInventaireProgressionScreen = () => {
     setShowHistorique(false);
     setDesignation(null);
     setAgentUserId("");
+    setAgentsSocieteSeuls(true);
     setDernierAgentId("");
     setInitDestination("rcommun");
   }, [selectedEntreprise]);
@@ -396,6 +420,13 @@ const AdminInventaireProgressionScreen = () => {
     try {
       const u = await resoudreBadge(code).unwrap();
       setAgentUserId(u._id);
+      // Badge d'un renfort qui n'a pas accès à la société : on rouvre la liste
+      // complète. Le filtre resterait coché avec un seul nom dedans, et on
+      // croirait à une liste cassée.
+      const connu = (agentsPossibles || []).find(
+        (a) => String(a._id) === String(u._id),
+      );
+      if (connu && !connu.aAccesEntreprise) setAgentsSocieteSeuls(false);
       setBadgeMsg({ type: "ok", texte: `Badge reconnu : ${u.nomComplet}` });
       setBadgeSaisi("");
     } catch (err) {
@@ -1107,8 +1138,32 @@ const AdminInventaireProgressionScreen = () => {
                 </p>
               )}
 
+              {/* Filtre de la liste : par défaut les seuls comptes ayant
+                  accès à la société de l'inventaire. Décocher rouvre tout
+                  l'annuaire, pour créditer un renfort d'une autre société. */}
+              <label className="designation-filtre">
+                <input
+                  type="checkbox"
+                  checked={agentsSocieteSeuls}
+                  onChange={(e) => setAgentsSocieteSeuls(e.target.checked)}
+                />
+                <span>
+                  Seulement les comptes ayant accès à{" "}
+                  <strong>
+                    {entrepriseObj?.trigramme || "cette société"}
+                  </strong>
+                  <em>
+                    {agentsSocieteSeuls
+                      ? ` ${nbAgentsSociete} compte${nbAgentsSociete > 1 ? "s" : ""}`
+                      : ` ${(agentsPossibles || []).length} compte${
+                          (agentsPossibles || []).length > 1 ? "s" : ""
+                        } — tout l'annuaire`}
+                  </em>
+                </span>
+              </label>
+
               <UserPicker
-                users={agentsPossibles || []}
+                users={agentsAffiches}
                 value={agentUserId}
                 onChange={setAgentUserId}
                 placeholder="Moi (par défaut)"
@@ -1116,10 +1171,11 @@ const AdminInventaireProgressionScreen = () => {
               />
               <p className="designation-hint">
                 Bipez le badge de l'agent, ou cherchez-le par son nom ou son
-                e-mail. Tous les comptes de l'application sont proposés, pas
-                seulement ceux de la société : un renfort venu d'une autre
-                société doit pouvoir être crédité. Sans choix, la phase est mise
-                à votre nom.
+                e-mail. Décochez le filtre pour atteindre{" "}
+                <strong>tous</strong> les comptes de l'application : un renfort
+                venu d'une autre société du groupe doit pouvoir être crédité
+                (bipez son badge et la liste s'ouvre d'elle-même). Sans choix,
+                la phase est mise à votre nom.
               </p>
             </div>
             <div className="modal-footer">

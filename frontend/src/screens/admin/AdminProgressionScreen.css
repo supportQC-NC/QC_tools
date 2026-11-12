@@ -639,6 +639,35 @@
   color: var(--text-secondary);
 }
 
+/* Filtre de la liste d'agents, au-dessus du sélecteur : on reprend la forme
+   des choix de la modale d'initialisation (.init-destination-choix) pour que
+   les deux fenêtres se lisent pareil. */
+.designation-filtre {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.designation-filtre input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: #f59e0b;
+}
+
+.designation-filtre em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
 .designation-hint {
   margin: 0;
   font-size: 12px;
