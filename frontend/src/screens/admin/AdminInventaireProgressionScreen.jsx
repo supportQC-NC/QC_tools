@@ -228,11 +228,24 @@ const AdminInventaireProgressionScreen = () => {
 
   const filteredZones = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return zonesEmplacement;
-    return zonesEmplacement.filter((z) =>
-      [z.code, z.libelle, z.type].some((v) =>
-        (v || "").toLowerCase().includes(q),
-      ),
+    const lot = q
+      ? zonesEmplacement.filter((z) =>
+          [z.code, z.libelle, z.type].some((v) =>
+            (v || "").toLowerCase().includes(q),
+          ),
+        )
+      : zonesEmplacement;
+    // Tri par code À L'AFFICHAGE : une zone ajoutée après l'initialisation de
+    // l'inventaire (fiche créée à la main) est AJOUTÉE EN FIN du tableau de la
+    // session — l'ajout est atomique pour ne pas écraser une phase validée en
+    // même temps, il ne peut donc pas réordonner. Sans ce tri elle se
+    // retrouverait en dernière ligne, derrière des centaines de rayons, et
+    // passerait pour absente. `numeric` range A_1, A_2d, A_9, A_10 dans
+    // l'ordre du magasin (et non A_1, A_10, A_2d).
+    return [...lot].sort((a, b) =>
+      String(a.code || "").localeCompare(String(b.code || ""), "fr", {
+        numeric: true,
+      }),
     );
   }, [zonesEmplacement, search]);
 

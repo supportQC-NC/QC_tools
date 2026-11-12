@@ -6,6 +6,15 @@ import mongoose from "mongoose";
  * À l'initialisation, on fige (snapshot) les zones de l'entreprise pour que
  * un ré-import du CSV pendant l'inventaire ne modifie pas une session en cours.
  *
+ * ⚠️ Le snapshot protège le TRAVAIL FAIT, il ne ferme pas la porte : depuis le
+ * 13/11/2026, toute zone du référentiel absente du snapshot y est AJOUTÉE
+ * (phases vierges) au premier accès à la session — une fiche ajoutée à la main
+ * parce qu'un rayon manque au dictionnaire doit apparaître dans la progression
+ * et voir ses coupons validés. Voir `synchroniserZonesReferentiel`
+ * (inventaireZoneController). Rien n'est jamais RETIRÉ par cette
+ * réconciliation : une zone déjà comptée reste dans l'inventaire même si sa
+ * fiche disparaît du référentiel.
+ *
  * Chaque zone comporte 3 phases indépendantes (ordre libre) :
  *   papillonnage / bipage / controle
  * marquées "faites" en bipant le code-barres correspondant de la zone.
