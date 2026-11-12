@@ -96,13 +96,6 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
-    // Emplacements spéciaux S3/S4/S5 (inventoriés par import de proformas),
-    // proposés seulement s'ils existent dans la fiche article de la société.
-    getEmplacementsSpeciaux: builder.query({
-      query: (entrepriseId) => `${BASE}/${entrepriseId}/emplacements-speciaux`,
-      keepUnusedDataFor: 300,
-    }),
-
     // Gisements d'un emplacement, lus dans la fiche article (zones proposées
     // à l'import, même sans bipage ni fiche zone).
     getGisementsEmplacement: builder.query({
@@ -183,7 +176,6 @@ export const {
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
-  useGetEmplacementsSpeciauxQuery,
   useGetGisementsEmplacementQuery,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,

@@ -341,9 +341,23 @@ const construireIndexRayons = async (entreprise) => {
       // emplacement) est une erreur de saisie, pas une seconde zone.
       if (index.has(cle)) continue;
       index.set(cle, {
+        // `code` = l'écriture EXACTE du dictionnaire. La clé est en majuscules
+        // (recherche insensible à la casse), mais les codes de rayon ne le sont
+        // pas toujours (« au_M » chez QC) et une zone se résout sur son code
+        // EXACT : rendre la clé majusculée créerait une zone « virtuelle » à
+        // côté de la vraie.
+        code: safeTrim(r.gism1),
         libelle: safeTrim(r.libelle),
         priorite: r.priorite,
         emplacement,
+        // Écriture BRUTE de la colonne « emplacement ». `emplacement` est
+        // normalisé pour la RECHERCHE (sans accent, sans espace : « QUAI 2 » →
+        // « QUAI2 ») alors que le type d'une fiche de zone est normalisé
+        // autrement (zoneFicheService : « QUAI_2 », accents conservés). Les
+        // deux formes se rejoignent au lookup, mais une liste d'emplacements
+        // construite sur la seule forme de recherche afficherait QUAI2 ET
+        // QUAI_2 pour la même ligne de dictionnaire.
+        emplacementBrut: safeTrim(r.emplacement),
       });
     }
     return { index, fichier, exists: true };
@@ -408,6 +422,46 @@ export const lookupRayon = (index, code, emplacement) => {
     if (cle.startsWith(`${c}|`)) return valeur;
   }
   return null;
+};
+
+/**
+ * EMPLACEMENTS (types de zone) réellement DÉCLARÉS dans le dictionnaire de la
+ * société, avec le nombre de rayons de chacun.
+ *
+ * C'est la seule liste légitime d'emplacements : depuis que le type est libre
+ * (12/11/2026), une société peut déclarer RESERVE, QUAI, SAV… et la liste en
+ * dur « MAGASIN / DOCK / S3 / S4 / S5 » (qui venait des DÉPÔTS de stock de
+ * l'ERP, pas du terrain) ne décrivait plus son magasin : ni les emplacements
+ * qu'elle a vraiment, ni rien d'autre que MAGASIN et DOCK à filtrer.
+ *
+ * Passe par l'index CACHÉ (`buildIndexRayons`, TTL + mtime) : cette liste
+ * alimente des menus déroulants, relire le xlsx du partage à chaque ouverture
+ * d'écran coûterait le prix d'un accès réseau pour rien.
+ *
+ * `normaliser` permet à l'appelant d'obtenir les clés dans SA convention :
+ * par défaut celle de la recherche (`normEmplacement`), mais le référentiel de
+ * zones passe la sienne (`zoneFicheService.normaliserEmplacement`) pour que la
+ * liste se compare directement à `Zone.type`.
+ *
+ * Renvoie { exists, fichier, emplacements: [{ key, nbRayons }] }.
+ */
+export const listerEmplacementsDictionnaire = async (
+  entreprise,
+  { normaliser = normEmplacement } = {},
+) => {
+  const { index, fichier, exists } = await buildIndexRayons(entreprise);
+
+  const parEmplacement = new Map();
+  for (const valeur of index.values()) {
+    const key = normaliser(valeur?.emplacementBrut ?? valeur?.emplacement ?? "");
+    if (!parEmplacement.has(key)) parEmplacement.set(key, { key, nbRayons: 0 });
+    parEmplacement.get(key).nbRayons += 1;
+  }
+
+  const emplacements = [...parEmplacement.values()].sort((a, b) =>
+    a.key.localeCompare(b.key, "fr"),
+  );
+  return { exists, fichier, emplacements };
 };
 
 // Analyse un buffer xlsx uploadé (import de masse) et renvoie ses lignes de zone
@@ -661,4 +715,5 @@ export default {
   letterSuffix,
   normEmplacement,
   normPriorite,
+  listerEmplacementsDictionnaire,
 };

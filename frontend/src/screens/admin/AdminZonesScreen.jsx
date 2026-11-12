@@ -21,6 +21,7 @@ import {
   useImportZonesMutation,
   useGenererZonesDepuisDictionnaireMutation,
   useGetZonesDictionnaireQuery,
+  useGetZonesEmplacementsQuery,
   useDeleteAllZonesMutation,
   useCreateZoneMutation,
   useDeleteZoneMutation,
@@ -31,6 +32,21 @@ import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminZonesScreen.css";
 
+/**
+ * Résumé « 320 MAGASIN, 40 DOCK, 12 RESERVE » du décompte par emplacement du
+ * dictionnaire. Les emplacements VIDES sont écartés : le serveur garde MAGASIN
+ * et DOCK à 0 pour la compatibilité, les afficher ferait croire à un rayon
+ * manquant. Le type de zone est libre — aucun emplacement n'est nommé en dur.
+ */
+const resumeEmplacements = (parEmplacement) => {
+  const entrees = Object.entries(parEmplacement || {}).filter(([, n]) => n > 0);
+  if (entrees.length === 0) return "aucun emplacement renseigné";
+  return entrees
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr"))
+    .map(([key, n]) => `${n} ${key}`)
+    .join(", ");
+};
+
 const AdminZonesScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [file, setFile] = useState(null);
@@ -38,6 +54,9 @@ const AdminZonesScreen = () => {
   const [confirm, setConfirm] = useState(null); // "import" | "generateDico" | "deleteAll" | null
   const [importResult, setImportResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+  // Retour des saisies unitaires : dit notamment si la fiche a rejoint (ou
+  // quitté) l'inventaire EN COURS — c'est l'effet le moins visible de l'écran.
+  const [infoMsg, setInfoMsg] = useState("");
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Sélection du tableau : on retient des _id, pas des index de ligne — la
@@ -72,6 +91,13 @@ const AdminZonesScreen = () => {
   );
   const dicoDisponible = !!dico?.disponible;
 
+  // Emplacements de la société (dictionnaire + fiches) : ils alimentent la
+  // liste de types proposée à la saisie manuelle.
+  const { data: emplacementsSociete } = useGetZonesEmplacementsQuery(
+    { entrepriseId: selectedEntreprise },
+    { skip: !selectedEntreprise },
+  );
+
   const [importZones, { isLoading: importing }] = useImportZonesMutation();
   const [genererDepuisDico, { isLoading: generatingDico }] =
     useGenererZonesDepuisDictionnaireMutation();
@@ -99,18 +125,29 @@ const AdminZonesScreen = () => {
 
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
 
-  // Types de zone proposés : ceux DÉJÀ présents (donc ceux du dictionnaire de
-  // la société), plus MAGASIN et DOCK. Le type est LIBRE — le dictionnaire des
-  // rayons accepte RESERVE, QUAI, SAV… et une fiche ajoutée à la main doit
-  // pouvoir viser n'importe lequel d'entre eux.
+  // Types de zone proposés : les emplacements DÉCLARÉS AU DICTIONNAIRE de la
+  // société et ceux des fiches déjà présentes. Le type est LIBRE — le
+  // dictionnaire accepte RESERVE, QUAI, SAV… et une fiche ajoutée à la main
+  // doit pouvoir viser n'importe lequel d'entre eux, y compris un emplacement
+  // du dictionnaire qu'aucune fiche ne porte encore.
   const typesZone = useMemo(() => {
-    const vus = new Set(["MAGASIN", "DOCK"]);
+    const vus = new Set();
+    for (const e of emplacementsSociete?.emplacements || []) {
+      const t = String(e?.key || "").trim().toUpperCase();
+      if (t) vus.add(t);
+    }
     zones.forEach((z) => {
       const t = String(z.type || "").trim().toUpperCase();
       if (t) vus.add(t);
     });
+    // Repli : une société sans dictionnaire ni fiche n'aurait aucune
+    // proposition, et le champ est une saisie libre à compléter.
+    if (vus.size === 0) {
+      vus.add("MAGASIN");
+      vus.add("DOCK");
+    }
     return [...vus].sort();
-  }, [zones]);
+  }, [zones, emplacementsSociete]);
 
   // Les _id réellement sélectionnés ET toujours présents : une fiche supprimée
   // ou balayée par une régénération sort d'elle-même de la sélection.
@@ -149,6 +186,7 @@ const AdminZonesScreen = () => {
   useEffect(() => {
     setImportResult(null);
     setErrorMsg("");
+    setInfoMsg("");
     setSearch("");
     setFile(null);
     setSelection(new Set());
@@ -263,14 +301,20 @@ const AdminZonesScreen = () => {
     e.preventDefault();
     setFormError("");
     setErrorMsg("");
+    setInfoMsg("");
     try {
-      await createZone({
+      const creee = await createZone({
         entrepriseId: selectedEntreprise,
         code: formZone.code,
         libelle: formZone.libelle,
         type: formZone.type,
         metreLineaire: formZone.metreLineaire,
       }).unwrap();
+      setInfoMsg(
+        creee?.ajouteeAInventaireActif
+          ? `Fiche ${creee.code} (${creee.type}) créée et ajoutée à l'inventaire en cours : elle apparaît dans la progression et son coupon est bipable.`
+          : `Fiche ${creee?.code || formZone.code} créée.`,
+      );
       setFormZone(null);
     } catch (err) {
       setFormError(err?.data?.message || "Création impossible");
@@ -281,11 +325,13 @@ const AdminZonesScreen = () => {
     const cible = zoneASupprimer;
     setZoneASupprimer(null);
     setErrorMsg("");
+    setInfoMsg("");
     try {
-      await deleteZone({
+      const r = await deleteZone({
         entrepriseId: selectedEntreprise,
         id: cible._id,
       }).unwrap();
+      setInfoMsg(r?.message || "Zone supprimée");
       setSelection((prev) => {
         const next = new Set(prev);
         next.delete(cible._id);
@@ -383,6 +429,12 @@ const AdminZonesScreen = () => {
               </div>
             )}
 
+            {infoMsg && (
+              <div className="import-feedback info">
+                <HiCheckCircle /> {infoMsg}
+              </div>
+            )}
+
             {importResult && (
               <div className="import-feedback success">
                 <HiCheckCircle />
@@ -440,8 +492,7 @@ const AdminZonesScreen = () => {
                 <div>
                   Dictionnaire <strong>{dico.nomFichier}</strong> —{" "}
                   <strong>{dico.rayons}</strong> rayon(s) :{" "}
-                  {dico.parEmplacement?.MAGASIN ?? 0} magasin,{" "}
-                  {dico.parEmplacement?.DOCK ?? 0} dock.
+                  {resumeEmplacements(dico.parEmplacement)}.
                   {dico.sousZonesIgnorees > 0 &&
                     ` ${dico.sousZonesIgnorees} sous-zone(s) écartée(s).`}
                 </div>

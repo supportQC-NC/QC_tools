@@ -27,7 +27,11 @@ import {
 } from "../services/inventaireFtpService.js";
 import os from "os";
 import fournissCacheService from "../services/fournissCacheService.js";
-import { readDictionnaire } from "../services/dictionnaireRayonsService.js";
+import {
+  readDictionnaire,
+  buildIndexRayons,
+  normEmplacement,
+} from "../services/dictionnaireRayonsService.js";
 import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import {
   fmtNum,
@@ -497,56 +501,6 @@ const setStockFige = asyncHandler(async (req, res) => {
  */
 const DEPOTS_STOCK = ["S1", "S2", "S3", "S4", "S5"];
 
-/**
- * @desc    EMPLACEMENTS SPÉCIAUX S3/S4/S5 d'une société : au-delà de
- *          MAGASIN (S1) et DOCK (S2), certains dépôts sont inventoriés via
- *          des proformas. On ne les propose à l'import QUE s'ils existent
- *          dans la fiche article : du stock Sx quelque part, ou un gisement
- *          GISMx réellement renseigné (les « ÄÄÄÄÄÄ » de remplissage DOS ne
- *          comptent pas). Leur NOM vient de la fiche société (onglet
- *          Entrepôts, `mappingEntrepots`).
- * @route   GET /api/bipages/:entrepriseId/emplacements-speciaux
- * @access  Private (module inventaire ou bipage, read)
- */
-const getEmplacementsSpeciaux = asyncHandler(async (req, res) => {
-  const entreprise = req.entreprise;
-
-  await articleCacheService.preload(entreprise).catch(() => {});
-  const acache = await articleCacheService.getArticles(entreprise);
-
-  // Une « vraie » valeur de gisement contient au moins un caractère
-  // alphanumérique ASCII (écarte les remplissages DOS type « ÄÄÄÄÄÄ »).
-  const gisementReel = (v) => /[A-Za-z0-9]/.test(String(v || ""));
-
-  const compte = {
-    S3: { stock: 0, gism: 0 },
-    S4: { stock: 0, gism: 0 },
-    S5: { stock: 0, gism: 0 },
-  };
-  for (const rec of acache.records) {
-    for (const d of ["S3", "S4", "S5"]) {
-      if (Number(rec[d]) !== 0 && Number.isFinite(Number(rec[d]))) {
-        compte[d].stock += 1;
-      }
-      if (gisementReel(rec[`GISM${d[1]}`])) compte[d].gism += 1;
-    }
-  }
-
-  // TOUJOURS proposés, même sans stock ni gisement (décision client
-  // 29/10/2026) : un entrepôt qu'on inventorie par proforma peut être à zéro
-  // dans l'ERP tant que rien n'a été intégré — le masquer empêcherait
-  // justement sa première intégration. Les compteurs restent informatifs.
-  const noms = entreprise.mappingEntrepots || {};
-  const emplacements = ["S3", "S4", "S5"].map((d) => ({
-    key: d,
-    nom: String(noms[d] || d).trim() || d,
-    articlesEnStock: compte[d].stock,
-    articlesAvecGisement: compte[d].gism,
-  }));
-
-  res.json({ emplacements });
-});
-
 // Champ gisement de la fiche article correspondant à chaque emplacement.
 const CHAMP_GISM_PAR_EMPLACEMENT = {
   MAGASIN: "GISM1",
@@ -557,38 +511,72 @@ const CHAMP_GISM_PAR_EMPLACEMENT = {
 };
 
 /**
- * @desc    GISEMENTS D'UN EMPLACEMENT, lus dans la FICHE ARTICLE : tous les
- *          codes distincts du champ GISMx correspondant (GISM1 pour MAGASIN,
- *          GISM2 pour DOCK, GISM3/4/5 pour S3/S4/S5), avec le nombre
- *          d'articles. C'est la liste des zones proposées à l'import de
- *          proformas — indépendante du référentiel de zones ET du bipage :
- *          un gisement jamais bipé reste sélectionnable.
+ * @desc    GISEMENTS D'UN EMPLACEMENT : les codes proposés à l'import d'un
+ *          comptage sans collecteur, de DEUX sources fusionnées par code —
+ *            1. la FICHE ARTICLE, quand l'emplacement correspond à une colonne
+ *               GISMx (GISM1 pour MAGASIN, GISM2 pour DOCK, GISM3/4/5 pour un
+ *               emplacement nommé S3/S4/S5), avec le nombre d'articles ;
+ *            2. le DICTIONNAIRE DES RAYONS de la société, qui apporte le
+ *               libellé et les rayons d'un emplacement LIBRE (RESERVE, QUAI,
+ *               SAV…), lesquels n'ont aucune colonne GISMx dans l'ERP.
+ *
+ *          ⚠️ Un emplacement sans colonne GISMx n'est plus une erreur 400 :
+ *          depuis que le type de zone est libre (12/11/2026), les écrans ne
+ *          proposent plus les dépôts S1..S5 de l'ERP mais les emplacements
+ *          réellement déclarés, et refuser ceux-là rendait leur comptage
+ *          impossible.
+ *
+ *          Reste indépendant du bipage : un gisement jamais bipé, voire inconnu
+ *          des fiches de zone, reste sélectionnable.
  * @route   GET /api/bipages/:entrepriseId/gisements-emplacement?emplacement=MAGASIN
  * @access  Private (module inventaire ou bipage, read)
  */
 const getGisementsEmplacement = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
-  const empl = String(req.query.emplacement || "").trim().toUpperCase();
-  const champ = CHAMP_GISM_PAR_EMPLACEMENT[empl];
-  if (!champ) {
+  const empl = normEmplacement(req.query.emplacement);
+  if (!String(req.query.emplacement || "").trim()) {
     res.status(400);
-    throw new Error("Emplacement inconnu (MAGASIN, DOCK, S3, S4 ou S5).");
+    throw new Error("Emplacement requis.");
   }
+  const champ = CHAMP_GISM_PAR_EMPLACEMENT[empl] || null;
 
-  await articleCacheService.preload(entreprise).catch(() => {});
-  const acache = await articleCacheService.getArticles(entreprise);
-
-  // Un gisement « réel » contient au moins un alphanumérique ASCII (écarte
-  // les remplissages DOS « ÄÄÄÄÄÄ » présents dans GISM3-5).
   const parCode = new Map();
-  for (const rec of acache.records) {
-    const brut = String(rec[champ] || "").trim();
-    if (!/[A-Za-z0-9]/.test(brut)) continue;
-    const cle = brut.toUpperCase();
-    const cur = parCode.get(cle) || { code: brut, nbArticles: 0 };
-    cur.nbArticles += 1;
-    parCode.set(cle, cur);
+
+  // 1 — fiche article (seulement si l'emplacement a une colonne GISMx).
+  if (champ) {
+    await articleCacheService.preload(entreprise).catch(() => {});
+    const acache = await articleCacheService.getArticles(entreprise);
+
+    // Un gisement « réel » contient au moins un alphanumérique ASCII (écarte
+    // les remplissages DOS « ÄÄÄÄÄÄ » présents dans GISM3-5).
+    for (const rec of acache.records) {
+      const brut = String(rec[champ] || "").trim();
+      if (!/[A-Za-z0-9]/.test(brut)) continue;
+      const cle = brut.toUpperCase();
+      const cur = parCode.get(cle) || { code: brut, nbArticles: 0, libelle: "" };
+      cur.nbArticles += 1;
+      parCode.set(cle, cur);
+    }
   }
+
+  // 2 — dictionnaire des rayons (index caché : clé « CODE|EMPLACEMENT »).
+  // Best-effort : un partage injoignable ne doit pas vider la liste.
+  try {
+    const { index } = await buildIndexRayons(entreprise);
+    for (const [cle, valeur] of index) {
+      if (valeur?.emplacement !== empl) continue;
+      // `valeur.code` porte l'écriture exacte du dictionnaire ; la clé, elle,
+      // est majusculée — et une zone se résout sur son code EXACT.
+      const code = valeur.code || cle.split("|")[0];
+      const dedup = code.toUpperCase();
+      const cur = parCode.get(dedup) || { code, nbArticles: 0, libelle: "" };
+      if (!cur.libelle) cur.libelle = valeur.libelle || "";
+      parCode.set(dedup, cur);
+    }
+  } catch (e) {
+    console.error("[bipage] gisements dictionnaire:", e.message);
+  }
+
   const gisements = [...parCode.values()].sort((a, b) =>
     a.code.localeCompare(b.code, "fr", { numeric: true }),
   );
@@ -1954,7 +1942,6 @@ export {
   recommencerZone,
   setStockFige,
   genererDatIntegration,
-  getEmplacementsSpeciaux,
   getGisementsEmplacement,
   listProformasBipage,
   apercuImportProformas,

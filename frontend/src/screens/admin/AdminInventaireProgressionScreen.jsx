@@ -24,7 +24,7 @@ import {
   useDeleteZoneSessionMutation,
   useGetAgentsPossiblesQuery,
 } from "../../slices/inventaireZoneApiSlice";
-import { useGetEmplacementsSpeciauxQuery } from "../../slices/bipageApiSlice";
+import { useGetZonesEmplacementsQuery } from "../../slices/zoneApiSlice";
 import { useSelector } from "react-redux";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
@@ -185,22 +185,39 @@ const AdminInventaireProgressionScreen = () => {
 
   const zones = useMemo(() => session?.zones || [], [session]);
 
-  // Noms des entrepôts S3/S4/S5 (fiche société, onglet Entrepôts) : passés au
-  // bloc d'import, qui propose l'EMPLACEMENT puis cherche ses gisements dans
-  // la fiche article — indépendant du référentiel de zones et du bipage.
-  const { data: emplacementsSpeciaux } = useGetEmplacementsSpeciauxQuery(
-    selectedEntreprise,
+  // EMPLACEMENTS de la société : ceux de son dictionnaire des rayons et ceux
+  // de ses fiches de zone (zones ajoutées à la main comprises).
+  //
+  // ⚠️ Plus les dépôts de stock de l'ERP (S1 → MAGASIN, S2 → DOCK, S3/S4/S5
+  // nommés dans la fiche société) : cette liste en dur laissait « magasin » et
+  // « dock » pour seul choix à une société dont le dictionnaire déclare aussi
+  // RESERVE, QUAI, SAV… — le type de zone est libre depuis le 12/11/2026.
+  const { data: emplacementsSociete } = useGetZonesEmplacementsQuery(
+    { entrepriseId: selectedEntreprise },
     { skip: !selectedEntreprise },
   );
 
-  // Emplacements réellement présents dans l'inventaire (jamais une liste en
-  // dur : chaque société a les siens). Les zones sans emplacement sont
-  // regroupées sous une entrée explicite plutôt que d'être invisibles.
+  // Emplacements proposés au filtre : ceux de la société, PLUS ceux réellement
+  // portés par les zones de l'inventaire (une session initialisée avant une
+  // mise à jour du dictionnaire garde les siens). Les zones sans emplacement
+  // sont regroupées sous une entrée explicite plutôt que d'être invisibles.
+  //
+  // Le compte affiché est celui des zones DE L'INVENTAIRE : un emplacement
+  // déclaré au dictionnaire mais absent de la session se lit « aucune zone »
+  // au lieu d'ouvrir un tableau vide sans explication.
   const emplacements = useMemo(() => {
-    const set = new Set();
-    zones.forEach((z) => set.add((z.type || "").trim()));
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [zones]);
+    const compte = new Map();
+    zones.forEach((z) => {
+      const key = (z.type || "").trim();
+      compte.set(key, (compte.get(key) || 0) + 1);
+    });
+    for (const e of emplacementsSociete?.emplacements || []) {
+      if (!compte.has(e.key)) compte.set(e.key, 0);
+    }
+    return [...compte.entries()]
+      .map(([key, nbZones]) => ({ key, nbZones }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+  }, [zones, emplacementsSociete]);
 
   const zonesEmplacement = useMemo(() => {
     if (!emplacement) return zones;
@@ -685,7 +702,7 @@ const AdminInventaireProgressionScreen = () => {
           <ImportComptageZone
             entrepriseId={selectedEntreprise}
             zones={zones}
-            emplacementsSpeciaux={emplacementsSpeciaux?.emplacements || []}
+            emplacementsDispo={emplacementsSociete?.emplacements || []}
             filtreProformas={session?.filtreProformas}
             onMessage={(message, tone) =>
               setBipFeedback({ tone: tone === "error" ? "error" : "success", message })
@@ -745,13 +762,17 @@ const AdminInventaireProgressionScreen = () => {
             >
               <option value="">Tous les emplacements</option>
               {emplacements.map((e) =>
-                e ? (
-                  <option key={e} value={e}>
-                    {e}
+                e.key ? (
+                  <option key={e.key} value={e.key}>
+                    {e.key}
+                    {e.nbZones
+                      ? ` · ${e.nbZones} zone${e.nbZones > 1 ? "s" : ""}`
+                      : " · aucune zone"}
                   </option>
                 ) : (
                   <option key={SANS_EMPLACEMENT} value={SANS_EMPLACEMENT}>
-                    Sans emplacement
+                    Sans emplacement · {e.nbZones} zone
+                    {e.nbZones > 1 ? "s" : ""}
                   </option>
                 ),
               )}

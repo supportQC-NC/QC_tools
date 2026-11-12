@@ -37,6 +37,15 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Zone"],
     }),
 
+    // EMPLACEMENTS (types de zone) de la société : ceux du dictionnaire des
+    // rayons + ceux des fiches de zone (donc les zones ajoutées à la main).
+    // Remplace la liste en dur « MAGASIN / DOCK / S3 / S4 / S5 », qui décrivait
+    // les dépôts de stock de l'ERP et non le magasin réel.
+    getZonesEmplacements: builder.query({
+      query: ({ entrepriseId }) => `${ZONES_URL}/${entrepriseId}/emplacements`,
+      providesTags: ["Zone"],
+    }),
+
     // Liste des zones d'une entreprise (recherche serveur optionnelle via ?search=)
     getZones: builder.query({
       query: ({ entrepriseId, search }) => ({
@@ -52,13 +61,17 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
       providesTags: ["Zone"],
     }),
 
+    // ⚠️ Les trois saisies unitaires invalident aussi « InventaireZone » : côté
+    // serveur elles font rejoindre / quitter le snapshot de l'inventaire ACTIF
+    // (zoneController), donc l'écran Progression doit refetcher plutôt
+    // qu'attendre son prochain poll.
     createZone: builder.mutation({
       query: ({ entrepriseId, ...data }) => ({
         url: `${ZONES_URL}/${entrepriseId}`,
         method: "POST",
         body: data,
       }),
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "InventaireZone"],
     }),
 
     updateZone: builder.mutation({
@@ -67,7 +80,7 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
         method: "PUT",
         body: data,
       }),
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "InventaireZone"],
     }),
 
     deleteZone: builder.mutation({
@@ -75,7 +88,7 @@ export const zoneApiSlice = apiSlice.injectEndpoints({
         url: `${ZONES_URL}/${entrepriseId}/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Zone"],
+      invalidatesTags: ["Zone", "InventaireZone"],
     }),
 
     deleteAllZones: builder.mutation({
@@ -92,6 +105,7 @@ export const {
   useImportZonesMutation,
   useGenererZonesDepuisDictionnaireMutation,
   useGetZonesDictionnaireQuery,
+  useGetZonesEmplacementsQuery,
   useGetZonesQuery,
   useLazyGetZonesQuery,
   useGetZoneByCodeQuery,

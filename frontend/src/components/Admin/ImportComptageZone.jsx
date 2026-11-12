@@ -24,6 +24,14 @@
 // Si la zone n'avait jamais été comptée, le serveur coche automatiquement ses
 // phases « papillonnage » et « bipage » : sans passage au collecteur, personne
 // ne rapportera les coupons correspondants.
+//
+// EMPLACEMENTS proposés (13/11/2026) : ceux de la société — dictionnaire des
+// rayons + fiches de zone, zones manuelles comprises — et plus les DÉPÔTS de
+// l'ERP (S1 → MAGASIN, S2 → DOCK, entrepôts S3/S4/S5 de la fiche société). La
+// liste en dur ne décrivait plus aucune société depuis que le type de zone est
+// libre : chez QC le dictionnaire déclare MECALAC, qui n'était proposé nulle
+// part. Un entrepôt à compter par proforma se déclare donc au dictionnaire (ou
+// s'ajoute en zone manuelle).
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -78,7 +86,9 @@ const filtreRenseigne = (f) => !!(f?.dateDebut || f?.dateFin || f?.clients);
 const ImportComptageZone = ({
   entrepriseId,
   zones = [],
-  emplacementsSpeciaux = [],
+  // Emplacements de la société : dictionnaire des rayons + fiches de zone
+  // (GET /api/zones/:id/emplacements). Voir le memo `emplacements` ci-dessous.
+  emplacementsDispo = [],
   filtreProformas,
   onMessage,
 }) => {
@@ -98,33 +108,36 @@ const ImportComptageZone = ({
   const [importExcel, { isLoading: importingExcel }] =
     useImportExcelBipageMutation();
 
-  // Emplacements proposés : MAGASIN et DOCK toujours, S3/S4/S5 avec leur NOM
-  // d'entrepôt (fiche société), plus tout autre type présent dans les zones.
+  // Emplacements proposés : ceux de la SOCIÉTÉ (dictionnaire des rayons +
+  // fiches de zone, zones manuelles comprises), plus ceux portés par les zones
+  // de l'inventaire en cours.
+  //
+  // ⚠️ Plus de liste en dur « MAGASIN / DOCK / S3 / S4 / S5 » : elle venait des
+  // DÉPÔTS DE STOCK de l'ERP (S1..S5, les entrepôts nommés dans la fiche
+  // société) et non du terrain. Depuis que le type de zone est libre
+  // (12/11/2026), un emplacement se déclare dans le dictionnaire des rayons —
+  // ou s'ajoute comme zone manuelle. Un entrepôt à compter par proforma doit
+  // donc y figurer ; les colonnes GISM1/GISM2 (MAGASIN/DOCK) et GISM3..5 d'un
+  // emplacement nommé S3/S4/S5 restent exploitées côté serveur pour proposer
+  // ses gisements, mais elles ne décident plus de ce qui est proposé ici.
   const emplacements = useMemo(() => {
-    const nomsSpeciaux = Object.fromEntries(
-      emplacementsSpeciaux.map((e) => [e.key, e.nom]),
-    );
-    const base = [
-      { key: "MAGASIN", nom: "MAGASIN" },
-      { key: "DOCK", nom: "DOCK" },
-      ...["S3", "S4", "S5"].map((k) => ({ key: k, nom: nomsSpeciaux[k] || k })),
-    ];
-    const connus = new Set(base.map((e) => e.key));
+    const parCle = new Map();
+    for (const e of emplacementsDispo) {
+      const key = String(e?.key || "").trim();
+      if (key) parCle.set(key.toUpperCase(), { key });
+    }
     for (const z of zones) {
       const t = String(z.type || "").trim();
-      if (t && !connus.has(t.toUpperCase())) {
-        connus.add(t.toUpperCase());
-        base.push({ key: t, nom: t });
-      }
+      if (t && !parCle.has(t.toUpperCase()))
+        parCle.set(t.toUpperCase(), { key: t });
     }
-    return base;
-  }, [zones, emplacementsSpeciaux]);
+    return [...parCle.values()].sort((a, b) => a.key.localeCompare(b.key, "fr"));
+  }, [zones, emplacementsDispo]);
 
-  const nomEmplacement = (key) =>
-    emplacements.find((e) => e.key === key)?.nom || key;
-
-  // Gisements de l'emplacement choisi, lus dans la fiche article, fusionnés
-  // avec les zones du référentiel de la session (qui apportent leur libellé).
+  // Gisements de l'emplacement choisi : le serveur fusionne la fiche article
+  // (colonne GISMx, quand l'emplacement en a une) et le dictionnaire des
+  // rayons ; on y rajoute ici les zones du référentiel de la session, qui font
+  // foi sur le code et apportent leur libellé.
   const { data: gisementsData, isFetching: gisementsLoading } =
     useGetGisementsEmplacementQuery(
       { entrepriseId, emplacement },
@@ -137,7 +150,7 @@ const ImportComptageZone = ({
       parCode.set(g.code.toUpperCase(), {
         code: g.code,
         type: emplacement,
-        libelle: "",
+        libelle: g.libelle || "",
         nbArticles: g.nbArticles,
       });
     }
@@ -146,26 +159,34 @@ const ImportComptageZone = ({
         continue;
       const cle = String(z.code || "").toUpperCase();
       const cur = parCode.get(cle);
-      if (cur) cur.libelle = z.libelle || cur.libelle;
-      else parCode.set(cle, { code: z.code, type: emplacement, libelle: z.libelle || "" });
+      if (cur) {
+        // La FICHE DE ZONE fait foi sur le code : une zone se résout sur son
+        // écriture EXACTE (« au_M » chez QC) et les gisements de la fiche
+        // article / du dictionnaire ne garantissent pas la casse. Sans ça,
+        // l'import créerait une zone « virtuelle » à côté de la vraie.
+        cur.code = z.code;
+        cur.libelle = z.libelle || cur.libelle;
+      } else {
+        parCode.set(cle, { code: z.code, type: emplacement, libelle: z.libelle || "" });
+      }
     }
     const liste = [...parCode.values()].sort((a, b) =>
       a.code.localeCompare(b.code, "fr", { numeric: true }),
     );
-    // Entrepôts S3/S4/S5 : toujours une entrée « tout l'entrepôt » en tête —
-    // ils s'inventorient souvent EN BLOC par proforma, avec ou sans gisement
-    // dans la fiche article (S4 peut n'en avoir aucun).
-    if (/^S[3-5]$/i.test(emplacement)) {
-      const nom = nomEmplacement(emplacement);
-      liste.unshift({
-        code: nom,
+    // Emplacement SANS AUCUN gisement : une entrée « tout l'emplacement », pour
+    // qu'il reste comptable EN BLOC par proforma. C'était le cas des entrepôts
+    // S3/S4/S5 (un entrepôt peut n'avoir aucun gisement dans la fiche
+    // article) ; la règle vaut maintenant pour tout emplacement déclaré, le
+    // type de zone étant libre.
+    if (liste.length === 0 && !gisementsLoading) {
+      liste.push({
+        code: emplacement,
         type: emplacement,
-        libelle: "tout l'entrepôt",
+        libelle: "tout l'emplacement",
       });
     }
     return liste;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emplacement, gisementsData, zones, emplacements]);
+  }, [emplacement, gisementsData, gisementsLoading, zones]);
 
   const zoneChoisie = useMemo(
     () => zonesEmplacement.find((z) => cleZone(z) === zoneKey) || null,
@@ -230,14 +251,14 @@ const ImportComptageZone = ({
                 <option value="">— Choisir —</option>
                 {emplacements.map((e) => (
                   <option key={e.key} value={e.key}>
-                    {e.nom === e.key ? e.key : `${e.nom} (${e.key})`}
+                    {e.key}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="icz-field icz-grow">
-              <span>Zone / gisement (fiche article)</span>
+              <span>Zone / gisement</span>
               <select
                 className="icz-select"
                 value={zoneKey}
@@ -251,7 +272,7 @@ const ImportComptageZone = ({
                       ? "Recherche des gisements…"
                       : zonesEmplacement.length
                         ? "— Choisir un gisement —"
-                        : "Aucun gisement dans la fiche article"}
+                        : "Aucun gisement pour cet emplacement"}
                 </option>
                 {zonesEmplacement.map((z) => (
                   <option key={cleZone(z)} value={cleZone(z)}>

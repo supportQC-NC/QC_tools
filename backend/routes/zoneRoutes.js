@@ -12,6 +12,7 @@ import {
   deleteAllZones,
   genererZonesDepuisDictionnaire,
   getDictionnaireStatut,
+  getEmplacements,
   genererFichesPDF,
 } from "../controllers/zoneController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -73,6 +74,16 @@ router.get(
   checkEntrepriseAccess,
   checkModuleAccess("inventaire", "read"),
   getDictionnaireStatut,
+);
+
+// Emplacements (types de zone) de la société : dictionnaire + référentiel de
+// zones (préfixe statique : AVANT /:id)
+router.get(
+  "/:entrepriseId/emplacements",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess("inventaire", "read"),
+  getEmplacements,
 );
 
 // Fiches PDF imprimables (préfixe statique /fiches-pdf : AVANT /:id)
