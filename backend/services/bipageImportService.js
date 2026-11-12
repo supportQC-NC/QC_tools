@@ -886,6 +886,8 @@ export const importerProformas = async (
         zoneType: emplacement,
         ordre: r.n,
         eanArticle: r.code,
+        // Code tel qu'il figurait dans la source importée.
+        codeScanne: r.codeScanne || r.code,
         qteScan: deduction ? -r.qte : r.qte,
         nart: r.nart === "-" ? "" : r.nart,
         gencod: r.gencod || "",
@@ -1102,6 +1104,8 @@ export const importerExcelBipage = async (
       zoneType: emplacement,
       ordre: r.n,
       eanArticle: r.code,
+      // Code tel qu'il figurait dans la source importée.
+      codeScanne: r.codeScanne || r.code,
       qteScan: deduction ? -r.qte : r.qte,
       nart: r.nart === "-" ? "" : r.nart,
       designation: r.designation,

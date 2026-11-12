@@ -72,9 +72,12 @@ const buildFilter = (session, query) => {
 
   if (query.search) {
     const rx = new RegExp(escapeRegex(query.search.trim()), "i");
-    // `gencod` est dans la recherche parce qu'il est AFFICHÉ : l'utilisateur
-    // qui lit un code-barres à l'écran doit pouvoir le retaper ici.
-    clauses.push({ $or: [{ nart: rx }, { eanArticle: rx }, { gencod: rx }] });
+    // `gencod` et `codeScanne` sont dans la recherche parce qu'ils sont
+    // AFFICHÉS : l'utilisateur qui lit un code à l'écran doit pouvoir le
+    // retaper ici, qu'il s'agisse du code bipé ou du gencode du catalogue.
+    clauses.push({
+      $or: [{ nart: rx }, { eanArticle: rx }, { gencod: rx }, { codeScanne: rx }],
+    });
   }
 
   // Provenance : ne garder que ce qui a été touché à la main.
@@ -192,6 +195,52 @@ const completerGencod = async (entreprise, lignes) => {
   }
 };
 
+/**
+ * Ordonne les lignes COMME LES FICHES DE CONTRÔLE : zone par zone, et dans
+ * chaque zone dans l'ORDRE DU BIPAGE.
+ *
+ * ⚠️ Le tri Mongo `{ zoneType, zoneCode, datFileName, ordre }` ne donnait pas
+ * cet ordre : `datFileName` passait AVANT `ordre`, donc les blocs d'une même
+ * zone se rangeaient par NOM DE FICHIER, en alphabétique. Une ligne ajoutée à
+ * la main (datFileName vide) remontait en TÊTE de sa zone alors qu'elle a été
+ * saisie en dernier, et un import proforma/Excel s'intercalait selon sa
+ * référence. À l'écran, l'ordre ne correspondait donc plus à celui des fiches.
+ *
+ * On garde les blocs d'un même fichier CONTIGUS — une fiche PDF = un bloc — et
+ * on les range par ANCIENNETÉ (première ligne créée), ce qui est l'ordre dans
+ * lequel ils ont été bipés puis déposés. À l'intérieur d'un bloc, `ordre` est
+ * le numéro de ligne de la fiche (colonne N° du PDF).
+ */
+const ordonnerCommeLesFiches = (lignes) => {
+  const cleBloc = (l) =>
+    `${l.zoneType || ""} ${l.zoneCode || ""} ${l.datFileName || ""}`;
+
+  const anciennete = new Map();
+  for (const l of lignes) {
+    const cle = cleBloc(l);
+    const t = new Date(l.createdAt || 0).getTime() || 0;
+    const vu = anciennete.get(cle);
+    if (vu === undefined || t < vu) anciennete.set(cle, t);
+  }
+
+  return [...lignes].sort((a, b) => {
+    const t = String(a.zoneType || "").localeCompare(String(b.zoneType || ""));
+    if (t) return t;
+    const z = String(a.zoneCode || "").localeCompare(String(b.zoneCode || ""), "fr", {
+      numeric: true,
+      sensitivity: "variant",
+    });
+    if (z) return z;
+    const d = (anciennete.get(cleBloc(a)) || 0) - (anciennete.get(cleBloc(b)) || 0);
+    if (d) return d;
+    // Même ancienneté (lignes créées dans la même milliseconde) : le nom de
+    // fichier départage, pour que deux blocs ne s'entrelacent jamais.
+    const f = String(a.datFileName || "").localeCompare(String(b.datFileName || ""));
+    if (f) return f;
+    return (Number(a.ordre) || 0) - (Number(b.ordre) || 0);
+  });
+};
+
 const getBipages = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
   const session = await InventaireZoneSession.findOne({
@@ -211,6 +260,7 @@ const getBipages = asyncHandler(async (req, res) => {
   await backfillZoneType(session);
 
   const filter = buildFilter(session, req.query);
+  // Tri Mongo large (il borne le limit), puis remise dans l'ordre des fiches.
   let lignes = await LigneBipage.find(filter)
     .sort({ zoneType: 1, zoneCode: 1, datFileName: 1, ordre: 1 })
     .limit(5000)
@@ -259,6 +309,9 @@ const getBipages = asyncHandler(async (req, res) => {
   // résout depuis le cache articles pour l'affichage, sans réécrire en base
   // (une lecture ne doit pas écrire). Les lignes créées depuis le portent.
   await completerGencod(entreprise, lignes);
+
+  // Zone par zone, dans l'ordre du bipage — le même que celui des fiches PDF.
+  lignes = ordonnerCommeLesFiches(lignes);
 
   const { zonesMeta, types } = await buildZonesMeta(session);
 
@@ -1039,6 +1092,9 @@ const ajouterLigneBipage = asyncHandler(async (req, res) => {
     // Le code brut « scanné » n'existe pas : on inscrit le NART saisi, comme le
     // fait le collecteur pour un article sans code-barres.
     eanArticle: nart,
+    // Rien n'a été bipé ici : la saisie EST le NART, et l'écran l'affiche tel
+    // quel dans la colonne « Code bipé » — marqué « ajoutée à la main ».
+    codeScanne: nart,
     qteScan,
     nart,
     observation,
@@ -1074,13 +1130,16 @@ const exportCsv = asyncHandler(async (req, res) => {
   await backfillZoneType(session);
 
   const filter = buildFilter(session, req.query);
-  const lignes = await LigneBipage.find(filter)
+  let lignes = await LigneBipage.find(filter)
     .sort({ zoneType: 1, zoneCode: 1, datFileName: 1, ordre: 1 })
     .lean();
 
   // Même rattrapage que la liste : le CSV doit porter le code-barres, y
   // compris pour les bipages antérieurs au champ `gencod`.
   await completerGencod(entreprise, lignes);
+
+  // Même ordre qu'à l'écran et que les fiches : zone par zone, ordre du bipage.
+  lignes = ordonnerCommeLesFiches(lignes);
 
   const sep = ";";
   const esc = (v) => {
@@ -1102,7 +1161,9 @@ const exportCsv = asyncHandler(async (req, res) => {
     [
       l.zoneCode,
       l.zoneType || "",
-      l.eanArticle,
+      // CODE_SCANNE = ce que l'agent a bipé. Les lignes antérieures au champ
+      // n'ont que `eanArticle` (le code de la fiche) : repli, faute de mieux.
+      l.codeScanne || l.eanArticle || "",
       l.gencod || "",
       l.qteScan,
       l.nart,

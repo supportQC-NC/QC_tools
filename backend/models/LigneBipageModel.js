@@ -27,8 +27,18 @@ const ligneBipageSchema = new mongoose.Schema(
     zoneType: { type: String, default: "", index: true },
     ordre: { type: Number, default: 0 },
 
-    // Code brut scanné, tel quel dans le .DAT
+    // Code tel qu'il figure dans la colonne CODE de la fiche de contrôle :
+    // le GENCOD du catalogue, et seulement à défaut le code bipé.
     eanArticle: { type: String, default: "" },
+
+    // CE QUI A ÉTÉ RÉELLEMENT BIPÉ par le collecteur, sans interprétation :
+    // le code-barres s'il a douché une étiquette, le NART s'il l'a saisi à la
+    // main. C'est la seule trace de ce qu'a fait l'agent — `eanArticle` et
+    // `gencod` sont, eux, le résultat de la RÉSOLUTION dans le catalogue
+    // (renvois GENDOUBL suivis compris), donc un autre code la plupart du temps.
+    // Vide sur les lignes antérieures au champ : l'écran retombe alors sur
+    // `eanArticle`, faute de mieux.
+    codeScanne: { type: String, default: "" },
 
     // Éditables par l'admin
     qteScan: { type: Number, default: 0 },

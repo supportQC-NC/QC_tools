@@ -259,14 +259,26 @@
   white-space: nowrap;
 }
 
-/* Code BIPÉ affiché dans la colonne Gencode faute de code-barres catalogue
-   (article inconnu, ou article sans GENCOD). Souligné en pointillés + italique
-   pour qu'on ne le lise pas comme un code du catalogue — la valeur reste
-   lisible et sélectionnable, c'est elle qu'on va retaper pour corriger. */
+/* Colonne « Code bipé » : c'est désormais une colonne à part entière, pas un
+   repli dans Gencode. La valeur normale se lit donc sans emphase — la mettre
+   en orange sur CHAQUE ligne ne signalerait plus rien. */
 .code-scanne {
+  cursor: help;
+}
+
+/* Valeur RECONSTITUÉE (bipage antérieur au champ `codeScanne`) : ce n'est pas
+   forcément ce qui a été douché. Pointillés + italique pour qu'on ne s'y fie
+   pas comme à une trace du terrain. */
+.code-scanne-repli {
   font-style: italic;
   color: #f59e0b;
   border-bottom: 1px dotted rgba(245, 158, 11, 0.6);
+}
+
+/* Aucun gencode catalogue pour cette ligne : on l'assume au lieu d'afficher
+   le code bipé, qui a sa propre colonne juste avant. */
+.code-absent {
+  color: var(--text-muted, #8a95a1);
   cursor: help;
 }
 

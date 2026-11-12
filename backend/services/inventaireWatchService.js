@@ -372,6 +372,8 @@ const traiterFichier = async (
         zoneType: zone.type || "",
         ordre: r.n,
         eanArticle: r.code,
+        // Ce que l'agent a réellement bipé, avant toute résolution.
+        codeScanne: r.codeScanne || r.code,
         qteScan: r.qte,
         nart: r.nart === "-" ? "" : r.nart,
         gencod: r.gencod || "",

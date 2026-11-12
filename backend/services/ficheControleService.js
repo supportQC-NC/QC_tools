@@ -326,8 +326,8 @@ export const construireLignes = async (entreprise, lignesDat) => {
       code: e.gencod || e.code,
       nart: e.nart,
       gencod: e.gencod || "",
-      // Code réellement bipé, conservé pour le diagnostic (écrans web) — il
-      // n'apparaît plus dans le PDF.
+      // Code réellement bipé, SANS résolution : il a sa propre colonne dans la
+      // fiche (« CODE BIPÉ ») et à l'écran, à côté du GENCODE du catalogue.
       codeScanne: e.code,
       att: flags.join(" "),
       designation: e.designation,
@@ -354,20 +354,33 @@ export const construireLignes = async (entreprise, lignesDat) => {
 // ===========================================
 // GÉNÉRATION PDF (modèle "FICHE DE CONTRÔLE INVENTAIRE")
 // ===========================================
+// ⚠️ La somme des largeurs DOIT valoir 535 pt : A4 portrait (595,28) moins les
+// deux marges de 30. Toute colonne ajoutée se prend sur les autres.
+// Total actuel : 26+62+62+46+28+144+60+34+40+33 = 535.
+// Les deux colonnes de code sont calées au plus juste : un GENCOD est un C(13),
+// soit 54,2 pt en Helvetica 7,5 — 58 pt utiles suffisent. Tout ce qui a été
+// gagné est rendu à DÉSIGNATION, la seule colonne qui souffre vraiment d'être
+// tronquée (c'est elle qui permet de reconnaître l'article en rayon).
 const COLS = [
   { key: "n", label: "N°", w: 26, align: "center" },
+  // CODE BIPÉ = ce que l'agent a réellement douché ou saisi, SANS résolution :
+  // le code-barres s'il a bipé une étiquette, le NART s'il l'a tapé. Demandé
+  // pour pouvoir confronter le terrain au catalogue : quand la ligne est
+  // fausse, c'est presque toujours ici que ça se voit (code d'un autre
+  // article, zéro de tête absent, renvoi GENDOUBL suivi vers une autre fiche).
+  { key: "codeScanne", label: "CODE BIPÉ", w: 62, align: "left" },
   // Intitulé « GENCODE » et pas « CODE » (demande client du 10/11/2026) : la
-  // colonne porte le code-barres du catalogue, le contrôleur doit savoir qu'il
-  // compare à l'étiquette du rayon et pas à une référence interne (NART, colonne
-  // suivante). 37,9 pt de large pour 88 pt de colonne : l'en-tête tient.
-  { key: "code", label: "GENCODE", w: 88, align: "left" },
-  { key: "nart", label: "NART", w: 50, align: "left" },
-  { key: "att", label: "ATT", w: 30, align: "center" },
-  { key: "designation", label: "DÉSIGNATION", w: 168, align: "left" },
-  { key: "reference", label: "RÉFÉRENCE", w: 70, align: "left" },
+  // colonne porte le code-barres du catalogue — celui de l'étiquette en rayon —
+  // obtenu par RÉSOLUTION du code bipé, et pas une référence interne (NART,
+  // colonne suivante).
+  { key: "code", label: "GENCODE", w: 62, align: "left" },
+  { key: "nart", label: "NART", w: 46, align: "left" },
+  { key: "att", label: "ATT", w: 28, align: "center" },
+  { key: "designation", label: "DÉSIGNATION", w: 144, align: "left" },
+  { key: "reference", label: "RÉFÉRENCE", w: 60, align: "left" },
   { key: "qte", label: "QTÉ", w: 34, align: "center" },
   { key: "stock", label: "STOCK", w: 40, align: "center" },
-  { key: "ctl", label: "CTL", w: 29, align: "center" },
+  { key: "ctl", label: "CTL", w: 33, align: "center" },
 ];
 
 const formatDateFr = (d) =>
@@ -613,7 +626,11 @@ const retrouverLignesDat = async (fiche, entreprise = null) => {
   if (enBase.length) {
     return {
       lignes: enBase.map((l) => ({
-        code: String(l.eanArticle || l.nart || "").trim(),
+        // On repart du code RÉELLEMENT BIPÉ : c'est lui que la fiche doit
+        // afficher en colonne CODE BIPÉ, et le repasser dans construireLignes
+        // redonne exactement la même résolution qu'au dépôt. Repli sur
+        // `eanArticle` pour les lignes antérieures à ce champ.
+        code: String(l.codeScanne || l.eanArticle || l.nart || "").trim(),
         quantite: Number(l.qteScan) || 0,
       })),
       origine: "base",
