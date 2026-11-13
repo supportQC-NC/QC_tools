@@ -12,6 +12,13 @@
 // Deux documents, deux usages (voir badgeUtilisateurService côté serveur) :
 //   · la FEUILLE DE POSTE reste au poste de saisie, on y bipe l'agent ;
 //   · les CARTES se découpent et se plastifient, une par agent.
+//
+// FILTRE SOCIÉTÉ (13/11/2026) : le menu déroulant « Société » borne TOUT l'écran
+// aux comptes qui ont ACCÈS à cette société — liste, compteur « sans badge »,
+// attribution et les deux PDF. On prépare l'inventaire d'un magasin : imprimer
+// l'annuaire entier pour en distribuer dix cartes n'était pas tenable. Le
+// serveur refait le filtre à l'impression (`filtrerParAccesEntreprise`), la
+// règle d'accès n'est donc pas décidée par le client.
 import React, { useMemo, useState } from "react";
 import {
   HiIdentification,
@@ -28,6 +35,7 @@ import {
   useGenererBadgesManquantsMutation,
   badgesPdfUrl,
 } from "../../slices/userApiSlice";
+import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminBadgesScreen.css";
 
@@ -42,21 +50,54 @@ const societesDe = (u) => {
   return (p.entreprises || []).map((e) => e.trigramme || e.nomComplet || "");
 };
 
+/**
+ * Ce compte a-t-il ACCÈS à cette société ?
+ *
+ * Même règle que le contrôle d'accès du serveur (`getAccessibleEntreprises`) :
+ * `allEntreprises`, ou la société listée dans ses permissions ; un ADMIN sans
+ * document de permissions est un super-admin hérité, donc il a accès.
+ * ⚠️ Miroir NON sécuritaire : le serveur refait le filtre à l'impression
+ * (`filtrerParAccesEntreprise`). Ici, c'est l'affichage.
+ */
+const aAccesSociete = (u, entrepriseId) => {
+  if (!entrepriseId) return true;
+  const p = u?.permissions;
+  if (!p) return u?.role === "admin";
+  if (p.allEntreprises) return true;
+  return (p.entreprises || []).some(
+    (e) => String(e?._id || e) === String(entrepriseId),
+  );
+};
+
 const AdminBadgesScreen = () => {
   const { data: users, isLoading, isFetching, refetch } = useGetUsersQuery();
   const [genererBadges, { isLoading: generation }] =
     useGenererBadgesManquantsMutation();
 
+  const { data: entreprises } = useGetMyEntreprisesQuery();
+
   const [recherche, setRecherche] = useState("");
+  // Société dont on veut les badges ("" = toutes celles de mon périmètre).
+  // Filtre TOUT l'écran : la liste, le compteur « sans badge », l'attribution
+  // et les deux PDF — on imprime les badges d'un magasin, pas de l'annuaire.
+  const [societe, setSociete] = useState("");
   const [tri, setTri] = useState("nom"); // nom | entreprise
   const [avecInactifs, setAvecInactifs] = useState(false);
   // Sélection pour l'impression. Vide = tout ce qui est affiché.
   const [selection, setSelection] = useState(() => new Set());
   const [msg, setMsg] = useState(null);
 
+  // Comptes du périmètre choisi, avant recherche : c'est sur eux que portent le
+  // compteur « sans badge » et l'attribution, pour que le bandeau parle du même
+  // ensemble que le tableau.
+  const perimetre = useMemo(
+    () => (users || []).filter((u) => aAccesSociete(u, societe)),
+    [users, societe],
+  );
+
   const liste = useMemo(() => {
     const q = recherche.trim().toLowerCase();
-    return (users || [])
+    return perimetre
       .filter((u) => (avecInactifs ? true : u.isActive))
       .filter((u) => {
         if (!q) return true;
@@ -69,11 +110,16 @@ const AdminBadgesScreen = () => {
           sensitivity: "base",
         }),
       );
-  }, [users, recherche, avecInactifs]);
+  }, [perimetre, recherche, avecInactifs]);
 
   const sansBadge = useMemo(
-    () => (users || []).filter((u) => !String(u.codeBarre || "").trim()).length,
-    [users],
+    () => perimetre.filter((u) => !String(u.codeBarre || "").trim()).length,
+    [perimetre],
+  );
+
+  const societeChoisie = useMemo(
+    () => (entreprises || []).find((e) => String(e._id) === String(societe)),
+    [entreprises, societe],
   );
 
   const basculer = (id) =>
@@ -97,7 +143,7 @@ const AdminBadgesScreen = () => {
   const lancerRattrapage = async () => {
     setMsg(null);
     try {
-      const res = await genererBadges().unwrap();
+      const res = await genererBadges({ entreprise: societe }).unwrap();
       setMsg({ type: "ok", texte: res.message });
     } catch (err) {
       setMsg({
@@ -112,7 +158,13 @@ const AdminBadgesScreen = () => {
   const ouvrirPdf = (format) => {
     const ids = [...selection];
     window.open(
-      `${BASE_URL}${badgesPdfUrl({ format, tri, ids })}`,
+      `${BASE_URL}${badgesPdfUrl({
+        format,
+        tri,
+        ids,
+        entreprise: societe,
+        inactifs: avecInactifs,
+      })}`,
       "_blank",
       "noopener",
     );
@@ -147,8 +199,11 @@ const AdminBadgesScreen = () => {
         <div className="badges-rattrapage">
           <HiExclamationCircle />
           <span>
-            <b>{sansBadge}</b> compte{sansBadge > 1 ? "s" : ""} sans badge —
-            créé{sansBadge > 1 ? "s" : ""} avant cette fonctionnalité.
+            <b>{sansBadge}</b> compte{sansBadge > 1 ? "s" : ""} sans badge
+            {societeChoisie
+              ? ` chez ${societeChoisie.trigramme || societeChoisie.nomComplet}`
+              : ""}{" "}
+            — créé{sansBadge > 1 ? "s" : ""} avant cette fonctionnalité.
           </span>
           <button
             className="btn-primary"
@@ -177,6 +232,29 @@ const AdminBadgesScreen = () => {
             placeholder="Nom, e-mail, code-barres…"
           />
         </div>
+
+        <label className="badges-champ">
+          <span>Société</span>
+          <select
+            value={societe}
+            onChange={(e) => {
+              setSociete(e.target.value);
+              // La sélection cochée appartenait à l'autre périmètre : la garder
+              // ferait imprimer des comptes que l'écran n'affiche plus (ou,
+              // filtre serveur aidant, un PDF vide).
+              setSelection(new Set());
+            }}
+            title="N'afficher et n'imprimer que les comptes ayant accès à cette société"
+          >
+            <option value="">Toutes mes sociétés</option>
+            {(entreprises || []).map((e) => (
+              <option key={e._id} value={e._id}>
+                {e.trigramme ? `${e.trigramme} — ` : ""}
+                {e.nomComplet || e.nomDossierDBF}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="badges-champ">
           <span>Classement du PDF</span>
@@ -209,6 +287,16 @@ const AdminBadgesScreen = () => {
         {selection.size
           ? `${selection.size} compte(s) sélectionné(s) : le PDF ne portera qu'eux.`
           : `Aucune sélection : le PDF portera les ${nbImprimes} compte(s) affiché(s) qui ont un badge.`}
+        {societeChoisie && (
+          <>
+            {" "}
+            Périmètre :{" "}
+            <b>
+              {societeChoisie.trigramme || societeChoisie.nomComplet} uniquement
+            </b>{" "}
+            (comptes ayant accès à cette société).
+          </>
+        )}
       </p>
 
       <div className="badges-table-wrap">

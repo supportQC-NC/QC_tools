@@ -189,6 +189,9 @@
   letter-spacing: normal;
   font-weight: 500;
   cursor: pointer;
+  /* Un nom de société complet (« Quincaillerie Calédonienne — … ») poussait la
+     barre et renvoyait les boutons d'impression à la ligne suivante. */
+  max-width: 280px;
 }
 
 .badges-check {

@@ -24,6 +24,7 @@ import {
   canAssignRole,
   isSuperAdmin,
   canAccessTeam,
+  getAccessibleEntreprises,
 } from "../middleware/accessControl.js";
 import {
   genererListePDF,
@@ -1139,15 +1140,71 @@ const generateResetEmail = ({ prenom, nom, resetUrl }) => `
  * @route   POST /api/users/badges/generer
  * @access  Private/Admin (module users_admin, write)
  */
+/**
+ * Restreint un lot de comptes à ceux qui ont ACCÈS à une société donnée.
+ *
+ * Même règle que `getAccessibleEntreprises` (middleware/accessControl) :
+ * `allEntreprises`, ou la société listée dans `permission.entreprises` ; un
+ * ADMIN hérité SANS document `Permission` est super-admin, donc a accès.
+ * On ne peut pas appeler ce helper-là ici : il ferait une requête `Permission`
+ * par compte, alors qu'une seule suffit pour tout le lot.
+ *
+ * @param {Array} users        comptes déjà bornés au périmètre géré
+ * @param {string} entrepriseId société visée (ObjectId en chaîne)
+ * @returns {Promise<Array>} le sous-ensemble ayant accès
+ */
+const filtrerParAccesEntreprise = async (users, entrepriseId) => {
+  const cible = String(entrepriseId);
+  const permissions = await Permission.find({
+    user: { $in: users.map((u) => u._id) },
+  })
+    .select("user allEntreprises entreprises")
+    .lean();
+  const parUser = new Map(permissions.map((p) => [String(p.user), p]));
+
+  return users.filter((u) => {
+    const perm = parUser.get(String(u._id));
+    if (!perm) return u.role === "admin"; // admin hérité = super-admin
+    if (perm.allEntreprises) return true;
+    return (perm.entreprises || []).some((e) => String(e) === cible);
+  });
+};
+
+/**
+ * Société demandée en query, ou null pour « toutes les sociétés du périmètre ».
+ * Refuse (403) une société hors du périmètre de l'acteur : les deux routes
+ * badges ne sont pas montées derrière `checkEntrepriseAccess` (elles ne portent
+ * pas `:entrepriseId`), et sans ce contrôle le filtre répondrait « qui a accès
+ * à telle société » pour une société qu'on ne gère pas.
+ */
+const societeDemandee = async (req, res) => {
+  const v = String(req.query.entreprise || "").trim();
+  if (!mongoose.isValidObjectId(v)) return null;
+
+  const perimetre = await getAccessibleEntreprises(req.user);
+  if (!perimetre.all && !perimetre.ids.includes(v)) {
+    res.status(403);
+    throw new Error("Société hors de votre périmètre.");
+  }
+  return v;
+};
+
 const genererBadgesManquants = asyncHandler(async (req, res) => {
   // Périmètre hiérarchique : on ne régularise que les comptes qu'on gère.
   const scope = await getManageableUserScope(req.user);
   const filtre = scope.all ? {} : { _id: { $in: scope.userIds } };
 
-  const sansCode = await User.find({
+  let sansCode = await User.find({
     ...filtre,
     $or: [{ codeBarre: { $exists: false } }, { codeBarre: "" }, { codeBarre: null }],
   });
+
+  // Société choisie dans le menu déroulant de l'écran : on ne régularise que
+  // les comptes qui y ont accès. L'écran travaille entièrement dans ce
+  // périmètre (liste, compteur « sans badge », PDF) — attribuer en silence des
+  // badges à des comptes qu'il n'affiche pas serait incompréhensible.
+  const societe = await societeDemandee(req, res);
+  if (societe) sansCode = await filtrerParAccesEntreprise(sansCode, societe);
 
   let generes = 0;
   const echecs = [];
@@ -1168,7 +1225,9 @@ const genererBadgesManquants = asyncHandler(async (req, res) => {
     echecs,
     message: generes
       ? `${generes} badge(s) attribué(s).`
-      : "Tous les comptes gérés ont déjà un badge.",
+      : societe
+        ? "Tous les comptes de cette société ont déjà un badge."
+        : "Tous les comptes gérés ont déjà un badge.",
   });
 });
 
@@ -1232,7 +1291,17 @@ const exporterBadgesPdf = asyncHandler(async (req, res) => {
   // Un compte désactivé n'a rien à faire sur une feuille d'inventaire.
   if (req.query.inactifs !== "1") filtre.isActive = true;
 
-  const users = await User.find(filtre).select("nom prenom email codeBarre").lean();
+  let users = await User.find(filtre)
+    // `role` sert au filtre par société (admin hérité sans Permission).
+    .select("nom prenom email codeBarre role")
+    .lean();
+
+  // SOCIÉTÉ choisie dans le menu déroulant de l'écran : seuls les comptes qui y
+  // ont accès sont imprimés. Le filtre est appliqué CÔTÉ SERVEUR et pas
+  // seulement par la liste d'`ids` du client : sans sélection explicite,
+  // l'export portait tout le périmètre géré, donc tout le monde.
+  const societe = await societeDemandee(req, res);
+  if (societe) users = await filtrerParAccesEntreprise(users, societe);
 
   // ⚠️ Sans code-barres, une carte sort vide et devient indétectable une fois
   // découpée : on écarte ces comptes du document plutôt que d'imprimer du vide.
@@ -1240,7 +1309,9 @@ const exporterBadgesPdf = asyncHandler(async (req, res) => {
   if (prets.length === 0) {
     res.status(400);
     throw new Error(
-      "Aucun compte avec badge dans cette sélection. Lancez d'abord « Attribuer les badges manquants ».",
+      societe
+        ? "Aucun compte avec badge pour cette société. Vérifiez le filtre, ou lancez « Attribuer les badges manquants »."
+        : "Aucun compte avec badge dans cette sélection. Lancez d'abord « Attribuer les badges manquants ».",
     );
   }
 

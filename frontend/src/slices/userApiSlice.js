@@ -12,9 +12,22 @@ export const userPhotoUrl = (id, v) =>
  *   tri    : "nom" | "entreprise"  (sans effet sur les cartes)
  *   ids    : sélection ; vide = tout le périmètre géré
  */
-export const badgesPdfUrl = ({ format = "liste", tri = "nom", ids = [] } = {}) => {
+// `entreprise` = société choisie dans le menu déroulant de l'écran Badges :
+// seuls les comptes qui y ONT ACCÈS sont imprimés (filtre appliqué côté
+// serveur, pas seulement par la liste d'ids). `inactifs` fait suivre au PDF la
+// case « afficher les comptes désactivés » : sans lui, l'écran pouvait montrer
+// un compte désactivé et le PDF l'écarter en silence.
+export const badgesPdfUrl = ({
+  format = "liste",
+  tri = "nom",
+  ids = [],
+  entreprise = "",
+  inactifs = false,
+} = {}) => {
   const params = new URLSearchParams({ format, tri });
   if (ids.length) params.set("ids", ids.join(","));
+  if (entreprise) params.set("entreprise", entreprise);
+  if (inactifs) params.set("inactifs", "1");
   return `${USERS_URL}/badges/pdf?${params.toString()}`;
 };
 
@@ -90,9 +103,13 @@ export const userApiSlice = apiSlice.injectEndpoints({
     // ── Badges (code-barres utilisateurs) ────────────────────────────────
     // Rattrapage des comptes créés avant la fonctionnalité. Invalide "User" :
     // la liste doit réafficher les codes fraîchement attribués.
+    // `entreprise` (optionnel) : n'attribue les badges manquants qu'aux comptes
+    // ayant accès à cette société — même périmètre que ce que l'écran affiche.
     genererBadgesManquants: builder.mutation({
-      query: () => ({
-        url: `${USERS_URL}/badges/generer`,
+      query: ({ entreprise } = {}) => ({
+        url: `${USERS_URL}/badges/generer${
+          entreprise ? `?entreprise=${encodeURIComponent(entreprise)}` : ""
+        }`,
         method: "POST",
       }),
       invalidatesTags: ["User"],
