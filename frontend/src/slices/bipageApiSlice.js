@@ -85,13 +85,17 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
-    // Figer / défiger le stock : photo de la base article pour que la feuille
-    // d'écarts compare à un stock STABLE pendant l'inventaire.
+    // Figer / défiger / reprendre le stock : photo de la base article pour que
+    // la feuille d'écarts compare à un stock STABLE pendant l'inventaire.
+    // `mode` : "figer" (photo NEUVE, remplace la précédente), "defiger"
+    // (retour au stock live, la photo est CONSERVÉE), "reprendre" (réactive la
+    // photo conservée telle quelle). `actif` est envoyé en plus pour un
+    // backend antérieur au mode « reprendre » (figer/défiger seulement).
     setStockFige: builder.mutation({
-      query: ({ entrepriseId, actif }) => ({
+      query: ({ entrepriseId, mode }) => ({
         url: `${BASE}/${entrepriseId}/stock-fige`,
         method: "POST",
-        body: { actif },
+        body: { mode, actif: mode !== "defiger" },
       }),
       invalidatesTags: ["Bipage"],
     }),

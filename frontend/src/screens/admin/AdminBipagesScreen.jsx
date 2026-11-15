@@ -272,21 +272,35 @@ const AdminBipagesScreen = () => {
     );
   };
 
-  // Figer / défiger le stock (photo de la base article pour les écarts).
+  // Figer / défiger / reprendre le stock (photo de la base article pour les
+  // écarts). Depuis le 16/11/2026, défiger CONSERVE la photo : on repasse au
+  // stock live, et « Reprendre » réactive la photo telle quelle (figer reprend
+  // toujours une photo NEUVE). Un `at` non nul avec `actif: false` = photo
+  // conservée disponible.
   const stockFige = data?.session?.stockFige;
-  const basculerStockFige = async () => {
-    const actif = !stockFige?.actif;
-    const confirmation = actif
-      ? "Figer le stock ?\n\nLe stock de TOUS les articles est photographié maintenant : la feuille d'écarts comparera les comptages à cette photo, même si des ventes ou réceptions modifient le stock réel pendant l'inventaire."
-      : "Défiger le stock ?\n\nLa photo est supprimée : la feuille d'écarts repart du stock réel actuel. (Refiger ensuite créera une photo NEUVE, à la date du nouveau gel.)";
+  const datePhotoFige = stockFige?.at
+    ? new Date(stockFige.at).toLocaleString("fr-FR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })
+    : "";
+  const changerStockFige = async (mode) => {
+    const confirmations = {
+      figer: stockFige?.at
+        ? `Figer le stock (NOUVELLE photo) ?\n\nLe stock de TOUS les articles est photographié maintenant et REMPLACE la photo du ${datePhotoFige}. La feuille d'écarts comparera les comptages à cette nouvelle photo.`
+        : "Figer le stock ?\n\nLe stock de TOUS les articles est photographié maintenant : la feuille d'écarts comparera les comptages à cette photo, même si des ventes ou réceptions modifient le stock réel pendant l'inventaire.",
+      defiger:
+        "Défiger le stock ?\n\nLa feuille d'écarts repart du stock réel (live). La photo est CONSERVÉE : « Reprendre le stock figé » la réactivera telle quelle, et « Figer » en prendra une nouvelle.",
+      reprendre: `Reprendre le stock figé ?\n\nLa feuille d'écarts comparera de nouveau les comptages à la photo conservée du ${datePhotoFige} (aucune nouvelle photo n'est prise).`,
+    };
     // eslint-disable-next-line no-alert
-    if (!window.confirm(confirmation)) return;
+    if (!window.confirm(confirmations[mode])) return;
     try {
       const res = await setStockFige({
         entrepriseId: selectedEntreprise,
-        actif,
+        mode,
       }).unwrap();
-      setMsg(res?.message || (actif ? "Stock figé." : "Stock défigé."));
+      setMsg(res?.message || "État du stock figé mis à jour.");
     } catch (e) {
       alert(e?.data?.message || "Échec du changement d'état du stock figé");
     }
@@ -695,34 +709,63 @@ const AdminBipagesScreen = () => {
                 {ecartsLoading === "xlsx" ? "Génération…" : "Excel"}
               </button>
               {/* Stock figé : la feuille d'écarts compare à la PHOTO du stock
-                  prise au gel, pas au stock réel qui bouge pendant
-                  l'inventaire. Défiger supprime la photo (retour au réel). */}
-              <button
-                className={stockFige?.actif ? "btn-danger" : "btn-secondary"}
-                onClick={basculerStockFige}
-                disabled={figeEnCours}
-                title={
-                  stockFige?.actif
-                    ? "Défiger : supprime la photo, les écarts repartent du stock réel"
-                    : "Figer : photographie le stock actuel, les écarts compareront à cette photo"
-                }
-              >
-                {figeEnCours
-                  ? "En cours…"
-                  : stockFige?.actif
-                    ? "Défiger le stock"
-                    : "Figer le stock"}
-              </button>
-              {stockFige?.actif && (
+                  prise au gel (colonne STOCK FIGÉ + colonne STOCK LIVE
+                  indicative), pas au stock réel qui bouge pendant
+                  l'inventaire. Défiger CONSERVE la photo (retour au live) ;
+                  « Reprendre » la réactive telle quelle ; « Figer » prend
+                  toujours une photo neuve. */}
+              {stockFige?.actif ? (
+                <button
+                  className="btn-danger"
+                  onClick={() => changerStockFige("defiger")}
+                  disabled={figeEnCours}
+                  title="Défiger : les écarts repartent du stock réel (live). La photo est conservée et pourra être reprise."
+                >
+                  {figeEnCours ? "En cours…" : "Défiger le stock"}
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => changerStockFige("figer")}
+                    disabled={figeEnCours}
+                    title={
+                      stockFige?.at
+                        ? "Figer : prend une NOUVELLE photo du stock actuel (remplace la photo conservée)"
+                        : "Figer : photographie le stock actuel, les écarts compareront à cette photo"
+                    }
+                  >
+                    {figeEnCours
+                      ? "En cours…"
+                      : stockFige?.at
+                        ? "Figer le stock (nouvelle photo)"
+                        : "Figer le stock"}
+                  </button>
+                  {stockFige?.at && (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => changerStockFige("reprendre")}
+                      disabled={figeEnCours}
+                      title={`Reprendre : les écarts comparent de nouveau à la photo conservée du ${datePhotoFige} (aucune nouvelle photo)`}
+                    >
+                      {figeEnCours
+                        ? "En cours…"
+                        : `Reprendre le stock figé (${datePhotoFige})`}
+                    </button>
+                  )}
+                </>
+              )}
+              {stockFige?.at && (
                 <span
                   className="ecarts-fige-info"
-                  title="Tout le catalogue est couvert par la photo : les articles sans stock au moment du gel y valent 0."
+                  title={
+                    stockFige.actif
+                      ? "Tout le catalogue est couvert par la photo : les articles sans stock au moment du gel y valent 0. Les documents d'écarts portent aussi le stock live, à titre indicatif."
+                      : "Photo conservée mais NON utilisée : les écarts comparent au stock réel (live). « Reprendre le stock figé » la réactive."
+                  }
                 >
-                  Photo du{" "}
-                  {new Date(stockFige.at).toLocaleString("fr-FR", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+                  Photo du {datePhotoFige}
+                  {stockFige.actif ? "" : " (conservée, écarts sur le stock live)"}
                   {" — "}
                   {stockFige.nbCatalogue
                     ? `${new Intl.NumberFormat("fr-FR").format(stockFige.nbCatalogue)} articles couverts, dont ${new Intl.NumberFormat("fr-FR").format(stockFige.nbArticles)} en stock`

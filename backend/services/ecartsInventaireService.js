@@ -65,15 +65,28 @@ export const dessinerDocInventaire = async ({
   const pageRight = doc.page.width - margin;
   const pageBottom = doc.page.height - margin;
 
+  // STOCK FIGÉ + STOCK LIVE (16/11/2026) : quand les lignes portent
+  // `stockLive` (écarts bipage avec stock figé actif), la colonne STOCK
+  // devient « STOCK FIGÉ » (la référence du calcul d'écart) et une colonne
+  // indicative « STOCK LIVE » (le stock réel, qui continue de bouger avec les
+  // ventes) s'intercale. DÉSIGNATION et FOURNISSEUR cèdent la largeur
+  // nécessaire ; sans `stockLive` (écran proforma, bipage non figé), la mise
+  // en page historique est inchangée.
+  const avecLive = groupes.some((g) =>
+    (g.rows || []).some((r) => r.stockLive !== undefined),
+  );
   const COLS = [
     { key: "nart", label: "NART", w: 40, align: "left" },
     { key: "att", label: "ATT", w: 26, align: "center" },
-    { key: "design", label: "DÉSIGNATION", w: 196, align: "left" },
+    { key: "design", label: "DÉSIGNATION", w: avecLive ? 180 : 196, align: "left" },
     { key: "refer", label: "RÉFÉRENCE", w: 70, align: "left" },
     { key: "gencod", label: "GENCODE", w: 66, align: "left" },
     { key: "fourn", label: "FOURN.", w: 30, align: "left" },
-    { key: "fournNom", label: "FOURNISSEUR", w: 78, align: "left" },
-    { key: "stock", label: "STOCK", w: 44, align: "right" },
+    { key: "fournNom", label: "FOURNISSEUR", w: avecLive ? 68 : 78, align: "left" },
+    { key: "stock", label: avecLive ? "STOCK FIGÉ" : "STOCK", w: 44, align: "right" },
+    ...(avecLive
+      ? [{ key: "stockLive", label: "STOCK LIVE", w: 44, align: "right" }]
+      : []),
     { key: "qte", label: "QTÉ", w: 44, align: "right" },
     { key: "diff", label: "DIFF", w: 46, align: "right" },
     { key: "diffval", label: "DIFF (XPF)", w: 74, align: "right" },
@@ -156,7 +169,7 @@ export const dessinerDocInventaire = async ({
       COLS.forEach((c) => {
         doc.rect(x, y, c.w, h).stroke();
         let val = r[c.key];
-        if (["stock", "qte", "diff", "diffval"].includes(c.key)) {
+        if (["stock", "stockLive", "qte", "diff", "diffval"].includes(c.key)) {
           const num = r[c.key];
           // diffval = XPF (entier) ; les quantités gardent leurs décimales.
           val = c.key === "diffval" ? fmtNum(num) : fmtQteDoc(num);
@@ -191,6 +204,7 @@ export const dessinerDocInventaire = async ({
             fourn: "",
             fournNom: "",
             stock: "",
+            stockLive: "",
             qte: d.qte,
             diff: "",
             diffval: "",
@@ -334,22 +348,38 @@ export const construireClasseurEcarts = async ({
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Inventaire");
 
-  ws.columns = [
-    { key: "nart", width: 12 },
-    { key: "att", width: 7 },
-    { key: "design", width: 40 },
-    { key: "refer", width: 16 },
-    { key: "gencod", width: 16 },
-    { key: "fourn", width: 8 },
-    { key: "fournNom", width: 28 },
-    { key: "stock", width: 10 },
-    { key: "qte", width: 10 },
-    { key: "diff", width: 10 },
-    { key: "diffval", width: 16 },
-    { key: "ctl", width: 16 },
+  // Même règle que le PDF : la colonne « STOCK LIVE » n'existe que si les
+  // lignes portent `stockLive` (écarts bipage avec stock figé actif) ; la
+  // colonne STOCK s'intitule alors « STOCK FIGÉ ». Les indices de cellule
+  // suivent la liste (plus aucun numéro en dur : insérer une colonne ne doit
+  // jamais décaler silencieusement les autres).
+  const avecLive = groupes.some((g) =>
+    (g.rows || []).some((r) => r.stockLive !== undefined),
+  );
+  const COLONNES = [
+    { key: "nart", header: "NART", width: 12 },
+    { key: "att", header: "ATT", width: 7 },
+    { key: "design", header: "DÉSIGNATION", width: 40 },
+    { key: "refer", header: "RÉFÉRENCE", width: 16 },
+    { key: "gencod", header: "GENCODE", width: 16 },
+    { key: "fourn", header: "FOURN.", width: 8 },
+    { key: "fournNom", header: "FOURNISSEUR", width: 28 },
+    { key: "stock", header: avecLive ? "STOCK FIGÉ" : "STOCK", width: 10 },
+    ...(avecLive
+      ? [{ key: "stockLive", header: "STOCK LIVE", width: 10 }]
+      : []),
+    { key: "qte", header: "QTÉ", width: 10 },
+    { key: "diff", header: "DIFF", width: 10 },
+    { key: "diffval", header: "DIFF (XPF)", width: 16 },
+    { key: "ctl", header: "QTÉ CONTRÔLÉE", width: 16 },
   ];
+  const nbCols = COLONNES.length;
+  // Indice de cellule (1-based) d'une colonne par sa clé.
+  const col = (key) => COLONNES.findIndex((c) => c.key === key) + 1;
 
-  ws.mergeCells(1, 1, 1, 12);
+  ws.columns = COLONNES.map(({ key, width }) => ({ key, width }));
+
+  ws.mergeCells(1, 1, 1, nbCols);
   const tcell = ws.getCell(1, 1);
   tcell.value = titre;
   tcell.font = { bold: true, size: 13 };
@@ -369,36 +399,22 @@ export const construireClasseurEcarts = async ({
         : { argb: "FF000000" };
 
   let rownum = 4;
-  const headers = [
-    "NART",
-    "ATT",
-    "DÉSIGNATION",
-    "RÉFÉRENCE",
-    "GENCODE",
-    "FOURN.",
-    "FOURNISSEUR",
-    "STOCK",
-    "QTÉ",
-    "DIFF",
-    "DIFF (XPF)",
-    "QTÉ CONTRÔLÉE",
-  ];
   const hr = ws.getRow(rownum);
-  headers.forEach((h, i) => {
-    const c = hr.getCell(i + 1);
-    c.value = h;
-    c.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    c.fill = {
+  COLONNES.forEach((c, i) => {
+    const cell = hr.getCell(i + 1);
+    cell.value = c.header;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: "FF333333" },
     };
-    c.alignment = { horizontal: i >= 7 ? "right" : "left" };
+    cell.alignment = { horizontal: i + 1 >= col("stock") ? "right" : "left" };
   });
   rownum++;
 
   for (const g of groupes) {
-    ws.mergeCells(rownum, 1, rownum, 12);
+    ws.mergeCells(rownum, 1, rownum, nbCols);
     const gc = ws.getCell(rownum, 1);
     gc.value = `${groupLabel} ${g.key}${g.nom ? " — " + g.nom : ""} (${g.rows.length})`;
     gc.font = { bold: true };
@@ -411,28 +427,33 @@ export const construireClasseurEcarts = async ({
 
     for (const r of g.rows) {
       const row = ws.getRow(rownum);
-      row.getCell(1).value = r.nart;
-      const ac = row.getCell(2);
+      row.getCell(col("nart")).value = r.nart;
+      const ac = row.getCell(col("att"));
       ac.value = r.att;
       if (r.att)
         ac.font = { bold: true, color: { argb: "FFCC0000" } };
       ac.alignment = { horizontal: "center" };
-      row.getCell(3).value = r.design;
-      row.getCell(4).value = r.refer;
-      row.getCell(5).value = r.gencod;
-      row.getCell(6).value = r.fourn;
-      row.getCell(7).value = r.fournNom;
-      const sc = row.getCell(8);
+      row.getCell(col("design")).value = r.design;
+      row.getCell(col("refer")).value = r.refer;
+      row.getCell(col("gencod")).value = r.gencod;
+      row.getCell(col("fourn")).value = r.fourn;
+      row.getCell(col("fournNom")).value = r.fournNom;
+      const sc = row.getCell(col("stock"));
       sc.value = r.stock;
       sc.numFmt = numFmtQte;
-      const qc = row.getCell(9);
+      if (avecLive) {
+        const lc = row.getCell(col("stockLive"));
+        lc.value = r.stockLive;
+        lc.numFmt = numFmtQte;
+      }
+      const qc = row.getCell(col("qte"));
       qc.value = r.qte;
       qc.numFmt = numFmtQte;
-      const dc = row.getCell(10);
+      const dc = row.getCell(col("diff"));
       dc.value = r.diff;
       dc.numFmt = numFmtQte;
       dc.font = { color: fontColor(r.diff) };
-      const vc = row.getCell(11);
+      const vc = row.getCell(col("diffval"));
       vc.value = r.diffval;
       vc.numFmt = numFmt;
       vc.font = { color: fontColor(r.diffval) };
@@ -441,11 +462,12 @@ export const construireClasseurEcarts = async ({
       if (Array.isArray(r.detail) && r.detail.length) {
         for (const d of r.detail) {
           const dr = ws.getRow(rownum);
-          dr.getCell(3).value = `   ↳ ${d.texte ? d.texte + " " : ""}(${d.numfact})`;
-          const dq = dr.getCell(9);
+          dr.getCell(col("design")).value =
+            `   ↳ ${d.texte ? d.texte + " " : ""}(${d.numfact})`;
+          const dq = dr.getCell(col("qte"));
           dq.value = d.qte;
           dq.numFmt = numFmtQte;
-          for (let i = 1; i <= 12; i++) {
+          for (let i = 1; i <= nbCols; i++) {
             dr.getCell(i).font = {
               italic: true,
               size: 9,
@@ -464,7 +486,7 @@ export const construireClasseurEcarts = async ({
 
     const sr = ws.getRow(rownum);
     sr.getCell(1).value = `Sous-total ${groupLabel} ${g.key}`;
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= nbCols; i++) {
       sr.getCell(i).fill = {
         type: "pattern",
         pattern: "solid",
@@ -472,7 +494,7 @@ export const construireClasseurEcarts = async ({
       };
       sr.getCell(i).font = { bold: true };
     }
-    const stc = sr.getCell(11);
+    const stc = sr.getCell(col("diffval"));
     stc.value = g.subtotal;
     stc.numFmt = numFmt;
     stc.font = { bold: true, color: fontColor(g.subtotal) };
@@ -481,7 +503,7 @@ export const construireClasseurEcarts = async ({
 
   const tr = ws.getRow(rownum);
   tr.getCell(1).value = "TOTAL GÉNÉRAL";
-  for (let i = 1; i <= 12; i++) {
+  for (let i = 1; i <= nbCols; i++) {
     tr.getCell(i).fill = {
       type: "pattern",
       pattern: "solid",
@@ -489,7 +511,7 @@ export const construireClasseurEcarts = async ({
     };
     tr.getCell(i).font = { bold: true, color: { argb: "FFFFFFFF" } };
   }
-  const gtc = tr.getCell(11);
+  const gtc = tr.getCell(col("diffval"));
   gtc.value = grandTotal;
   gtc.numFmt = numFmt;
 

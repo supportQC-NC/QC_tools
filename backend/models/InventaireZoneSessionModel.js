@@ -115,7 +115,14 @@ const sessionSchema = new mongoose.Schema(
     dossierFtp: { type: String, default: "" },
     // STOCK FIGÉ : quand `actif`, la feuille d'écarts compare les comptages à
     // la PHOTO du stock (InventaireStockSnapshot) prise au moment du gel, pas
-    // au stock réel qui bouge pendant l'inventaire. Défiger supprime la photo.
+    // au stock réel qui bouge pendant l'inventaire.
+    // Depuis le 16/11/2026, DÉFIGER NE SUPPRIME PLUS LA PHOTO : `actif` repasse
+    // à false (écarts sur le stock réel) mais `at`/`par`/`nbArticles`/
+    // `nbCatalogue` restent les métadonnées de la photo CONSERVÉE, que
+    // « Reprendre le stock figé » peut réactiver telle quelle. Seul « Figer »
+    // (nouvelle photo) remplace la photo ; l'annulation / la réinitialisation
+    // de l'inventaire la suppriment toujours. Un `at` nul = aucune photo
+    // disponible (jamais figé, ou défigé par l'ancien code qui supprimait).
     stockFige: {
       actif: { type: Boolean, default: false },
       at: { type: Date, default: null },

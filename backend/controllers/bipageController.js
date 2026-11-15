@@ -399,14 +399,20 @@ const chargerStockFige = async (session) => {
 };
 
 /**
- * @desc    FIGER / DÉFIGER le stock de l'inventaire actif (demande client du
- *          29/10/2026). Figer photographie le stock total (S1..S5) de tous
- *          les articles à stock ≠ 0 : la feuille d'écarts compare ensuite les
- *          comptages à cette photo, pas au stock réel qui bouge (ventes,
- *          réceptions) pendant l'inventaire. Défiger supprime la photo et
- *          repasse sur le stock réel ; refiger recrée une photo neuve.
+ * @desc    FIGER / DÉFIGER / REPRENDRE le stock de l'inventaire actif
+ *          (demande client du 29/10/2026, étendue le 16/11/2026).
+ *          · "figer"     — photographie le stock total (S1..S5) de tous les
+ *            articles à stock ≠ 0 : la feuille d'écarts compare ensuite les
+ *            comptages à cette photo, pas au stock réel qui bouge (ventes,
+ *            réceptions). Remplace toute photo précédente.
+ *          · "defiger"   — repasse les écarts sur le stock LIVE, mais CONSERVE
+ *            la photo (demande client 16/11/2026 — avant, défiger supprimait).
+ *          · "reprendre" — réactive la photo conservée, SANS en reprendre une
+ *            nouvelle (la référence redevient le stock figé précédent).
  * @route   POST /api/bipages/:entrepriseId/stock-fige
- * @body    { actif: true | false }
+ * @body    { mode: "figer" | "defiger" | "reprendre" }
+ *          (rétro-compat : { actif: true | false } = figer / defiger — une
+ *          version du front antérieure à « reprendre » garde son comportement)
  * @access  Private (module inventaire ou bipage, write)
  */
 const setStockFige = asyncHandler(async (req, res) => {
@@ -420,62 +426,107 @@ const setStockFige = asyncHandler(async (req, res) => {
     throw new Error("Aucun inventaire actif.");
   }
 
-  const actif = req.body?.actif === true || req.body?.actif === "true";
-
-  // Dans tous les cas on repart d'une photo vierge : défiger la supprime,
-  // refiger la remplace (jamais de photo périmée qui traîne).
-  await InventaireStockSnapshot.deleteMany({ session: session._id });
-
-  let nbArticles = 0;
-  let nbCatalogue = 0;
-  if (actif) {
-    await articleCacheService.preload(entreprise).catch(() => {});
-    const acache = await articleCacheService.getArticles(entreprise);
-
-    // Photo compacte : seulement les stocks ≠ 0 (négatifs compris — un stock
-    // négatif est un écart réel à montrer). NART en MAJUSCULES, la clé de
-    // recherche des écarts. Les articles à stock 0 sont couverts PAR
-    // CONVENTION (absent de la photo = 0) : on compte quand même le catalogue
-    // entier pour l'afficher à l'écran (périmètre réellement couvert).
-    const narts = [];
-    const stocks = [];
-    for (const rec of acache.records) {
-      const nart = String(rec.NART || "").trim().toUpperCase();
-      if (!nart) continue;
-      nbCatalogue += 1;
-      const stock = articleCacheService.calculateStockTotal(rec);
-      if (!stock) continue;
-      narts.push(nart);
-      stocks.push(stock);
-    }
-    nbArticles = narts.length;
-
-    const blocs = [];
-    for (let i = 0; i < narts.length; i += TAILLE_BLOC_SNAPSHOT) {
-      blocs.push({
-        entreprise: entreprise._id,
-        session: session._id,
-        ordre: blocs.length,
-        narts: narts.slice(i, i + TAILLE_BLOC_SNAPSHOT),
-        stocks: stocks.slice(i, i + TAILLE_BLOC_SNAPSHOT),
-      });
-    }
-    if (blocs.length) await InventaireStockSnapshot.insertMany(blocs);
+  let mode = String(req.body?.mode || "").trim();
+  if (!mode) {
+    mode =
+      req.body?.actif === true || req.body?.actif === "true"
+        ? "figer"
+        : "defiger";
+  }
+  if (!["figer", "defiger", "reprendre"].includes(mode)) {
+    res.status(400);
+    throw new Error("Mode invalide. Attendu : figer, defiger ou reprendre.");
   }
 
+  if (mode === "defiger") {
+    // La photo est CONSERVÉE : seul `actif` change. `at`, `par` et les
+    // compteurs restent les métadonnées de la photo gardée, que « reprendre »
+    // réactivera telle quelle.
+    session.stockFige.actif = false;
+    await session.save();
+    const photoDispo = !!session.stockFige.at;
+    return res.json({
+      message: photoDispo
+        ? `Stock défigé : les écarts repartent du stock réel. La photo du ${new Date(
+            session.stockFige.at,
+          ).toLocaleString("fr-FR")} est conservée (« Reprendre le stock figé » la réactive).`
+        : "Stock défigé : les écarts repartent du stock réel.",
+      stockFige: session.stockFige,
+    });
+  }
+
+  if (mode === "reprendre") {
+    // Réactivation de la photo conservée — on vérifie qu'elle existe VRAIMENT
+    // (blocs présents), pas seulement ses métadonnées : l'annulation ou une
+    // réinitialisation a pu les purger entre-temps.
+    const photoExiste = await InventaireStockSnapshot.exists({
+      session: session._id,
+    });
+    if (!photoExiste || !session.stockFige?.at) {
+      res.status(400);
+      throw new Error(
+        "Aucune photo de stock conservée pour cet inventaire : utilisez « Figer le stock » pour en prendre une nouvelle.",
+      );
+    }
+    session.stockFige.actif = true;
+    await session.save();
+    return res.json({
+      message: `Stock figé repris : les écarts comparent de nouveau à la photo du ${new Date(
+        session.stockFige.at,
+      ).toLocaleString("fr-FR")}.`,
+      stockFige: session.stockFige,
+    });
+  }
+
+  // mode === "figer" : photo NEUVE, qui remplace l'éventuelle précédente
+  // (jamais deux photos pour une même session).
+  await InventaireStockSnapshot.deleteMany({ session: session._id });
+
+  await articleCacheService.preload(entreprise).catch(() => {});
+  const acache = await articleCacheService.getArticles(entreprise);
+
+  // Photo compacte : seulement les stocks ≠ 0 (négatifs compris — un stock
+  // négatif est un écart réel à montrer). NART en MAJUSCULES, la clé de
+  // recherche des écarts. Les articles à stock 0 sont couverts PAR
+  // CONVENTION (absent de la photo = 0) : on compte quand même le catalogue
+  // entier pour l'afficher à l'écran (périmètre réellement couvert).
+  const narts = [];
+  const stocks = [];
+  let nbCatalogue = 0;
+  for (const rec of acache.records) {
+    const nart = String(rec.NART || "").trim().toUpperCase();
+    if (!nart) continue;
+    nbCatalogue += 1;
+    const stock = articleCacheService.calculateStockTotal(rec);
+    if (!stock) continue;
+    narts.push(nart);
+    stocks.push(stock);
+  }
+  const nbArticles = narts.length;
+
+  const blocs = [];
+  for (let i = 0; i < narts.length; i += TAILLE_BLOC_SNAPSHOT) {
+    blocs.push({
+      entreprise: entreprise._id,
+      session: session._id,
+      ordre: blocs.length,
+      narts: narts.slice(i, i + TAILLE_BLOC_SNAPSHOT),
+      stocks: stocks.slice(i, i + TAILLE_BLOC_SNAPSHOT),
+    });
+  }
+  if (blocs.length) await InventaireStockSnapshot.insertMany(blocs);
+
   session.stockFige = {
-    actif,
-    at: actif ? new Date() : null,
-    par: actif ? req.user._id : null,
+    actif: true,
+    at: new Date(),
+    par: req.user._id,
     nbArticles,
     nbCatalogue,
   };
   await session.save();
 
   res.json({
-    message: actif
-      ? `Stock figé : ${nbArticles} articles photographiés.`
-      : "Stock défigé : les écarts repartent du stock réel.",
+    message: `Stock figé : ${nbArticles} articles photographiés.`,
     stockFige: session.stockFige,
   });
 });
@@ -781,6 +832,13 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       stock: fige
         ? fige.get(nart.toUpperCase()) ?? 0
         : articleCacheService.calculateStockTotal(rec),
+      // Stock figé actif : le document porte AUSSI le stock LIVE (celui qui
+      // continue de bouger avec les ventes), en colonne INDICATIVE — la
+      // référence du calcul d'écart reste la photo (demande client
+      // 16/11/2026). Sans photo, pas de colonne (stockLive absent).
+      ...(fige && {
+        stockLive: articleCacheService.calculateStockTotal(rec),
+      }),
       prev: num(rec.PREV),
       qte: 0,
       nonTrouve: false,
@@ -803,6 +861,7 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
             gencod: "",
             fourn: "",
             stock: fige.get(nartFige) ?? 0,
+            stockLive: 0,
             prev: 0,
             qte: 0,
             nonTrouve: true,
@@ -827,6 +886,7 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
           gencod: "",
           fourn: "",
           stock: 0,
+          ...(fige && { stockLive: 0 }),
           prev: 0,
           qte: 0,
           nonTrouve: true,
@@ -889,11 +949,20 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   ]
     .filter(Boolean)
     .join(", ");
+  // Stock figé actif : le titre date la photo de référence — le lecteur du
+  // document doit savoir que la colonne STOCK FIGÉ n'est pas le stock du jour.
+  const figeLabel =
+    fige && session.stockFige?.at
+      ? ` — stock figé du ${new Date(session.stockFige.at).toLocaleString(
+          "fr-FR",
+          { dateStyle: "short", timeStyle: "short" },
+        )}`
+      : "";
   const titre = `Écarts d'inventaire — ${session.nom} — par ${
     groupBy === "fournisseur" ? "fournisseur" : "famille"
   }${filtreLabel ? ` — ${filtreLabel}` : ""} — ${perimetreLabel}${
     seuil ? ` (|écart| > ${fmtNum(seuil)} XPF)` : ""
-  }`;
+  }${figeLabel}`;
 
   const base = `ecarts_${session.nom.replace(/[^\w-]+/g, "_")}_${groupBy}`;
 
