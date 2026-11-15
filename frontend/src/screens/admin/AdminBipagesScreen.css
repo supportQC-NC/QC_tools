@@ -473,6 +473,69 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Mode « Calcul des écarts » : la feuille d'écarts rendue à l'écran ──── */
+.mode-ecarts-actif {
+  box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.35);
+}
+
+.ecarts-table .ecart-groupe td {
+  background: #26263e;
+  font-weight: 700;
+  color: var(--text, #e7e7ef);
+  border-top: 2px solid #3a3a5c;
+}
+
+.ecarts-table .ecart-soustotal td {
+  background: #1f1f33;
+  font-weight: 700;
+}
+
+.ecarts-table .ecart-total td {
+  background: #30304d;
+  font-weight: 800;
+  border-top: 2px solid #4da6ff;
+}
+
+.ecarts-table .ecart-att {
+  color: #ff6b6b;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ecart-pos {
+  color: #4ade80;
+}
+
+.ecart-neg {
+  color: #ff6b6b;
+}
+
+/* Sous-ligne « gisement bipé » d'un article : où il a été compté, et pour
+   combien — la quantité y est corrigible. */
+.ecarts-table .ecart-zone td {
+  background: rgba(139, 92, 246, 0.07);
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: none;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.ecart-zone-lib b {
+  color: #c4b5fd;
+}
+
+.ecart-zone-qte {
+  max-width: 90px;
+}
+
+.ecarts-vide {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
 /* Filtre sur-comptage (qté bipée > stock) dans la rangée de filtres. */
 .surstock-filtre {
   display: inline-flex;

@@ -195,10 +195,12 @@ export const dessinerDocInventaire = async ({
         for (const d of r.detail) {
           const sh = 12;
           ensureSpace(sh);
+          // Les sous-lignes proforma portent un numéro de document ; celles
+          // des gisements bipés n'en ont pas — pas de parenthèses vides.
           const sub = {
             nart: "",
             att: "",
-            design: `   ↳ ${d.texte ? d.texte + " " : ""}(${d.numfact})`,
+            design: `   ↳ ${d.texte ? d.texte + " " : ""}${d.numfact ? `(${d.numfact})` : ""}`.trimEnd(),
             refer: "",
             gencod: "",
             fourn: "",
@@ -295,9 +297,12 @@ export const dessinerDocInventaire = async ({
 /**
  * Regroupe les lignes d'écart par famille (2 premiers caractères du NART) ou
  * par fournisseur, avec sous-totaux et total général.
+ * `ordre` : tri DANS chaque groupe — "nart" (historique, défaut) ou "design"
+ * (désignation alphabétique, demande client du 16/11/2026 ; le NART départage
+ * les désignations identiques pour un ordre stable).
  * @returns { groupes, grandTotal, groupLabel }
  */
-export const grouperEcarts = (rows, groupBy) => {
+export const grouperEcarts = (rows, groupBy, ordre = "nart") => {
   const parFournisseur = groupBy === "fournisseur";
   const keyOf = (r) =>
     parFournisseur ? r.fourn || "—" : (r.nart || "").slice(0, 2) || "—";
@@ -320,8 +325,11 @@ export const grouperEcarts = (rows, groupBy) => {
   const groupes = [...groupsMap.values()].sort((a, b) =>
     String(a.key).localeCompare(String(b.key), "fr", { numeric: true }),
   );
+  const parNart = (a, b) => (a.nart || "").localeCompare(b.nart || "", "fr");
+  const parDesign = (a, b) =>
+    (a.design || "").localeCompare(b.design || "", "fr") || parNart(a, b);
   groupes.forEach((g) =>
-    g.rows.sort((a, b) => (a.nart || "").localeCompare(b.nart || "", "fr")),
+    g.rows.sort(ordre === "design" ? parDesign : parNart),
   );
 
   return {
@@ -463,7 +471,7 @@ export const construireClasseurEcarts = async ({
         for (const d of r.detail) {
           const dr = ws.getRow(rownum);
           dr.getCell(col("design")).value =
-            `   ↳ ${d.texte ? d.texte + " " : ""}(${d.numfact})`;
+            `   ↳ ${d.texte ? d.texte + " " : ""}${d.numfact ? `(${d.numfact})` : ""}`.trimEnd();
           const dq = dr.getCell(col("qte"));
           dq.value = d.qte;
           dq.numFmt = numFmtQte;

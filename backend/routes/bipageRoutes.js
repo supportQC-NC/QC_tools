@@ -6,6 +6,7 @@ import {
   getStatsZonesRetouchees,
   getStatsProformasZones,
   exportEcartsBipage,
+  setEcartQteZone,
   updateBipage,
   ajouterLigneBipage,
   exportCsv,
@@ -56,8 +57,14 @@ router.get("/:entrepriseId/stats-proformas-zones", protect, canReadImport, check
 
 router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exportCsv);
 
-// Feuille d'écarts (PDF / Excel) — MÊME document que l'inventaire proforma.
+// Feuille d'écarts (PDF / Excel, ou format=json pour le mode « Calcul des
+// écarts » de l'écran) — MÊME document que l'inventaire proforma.
 router.get("/:entrepriseId/ecarts", protect, canReadImport, checkEntrepriseAccess, exportEcartsBipage);
+
+// Correction du TOTAL bipé d'un article dans UN gisement, depuis le mode
+// « Calcul des écarts » (la différence est appliquée à la ligne la plus
+// récente du couple article × gisement).
+router.put("/:entrepriseId/ecarts/qte", protect, canWrite, checkEntrepriseAccess, setEcartQteZone);
 
 router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAccess, recommencerZone);
 

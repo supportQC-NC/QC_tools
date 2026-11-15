@@ -20,6 +20,8 @@ import {
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
+  useGetEcartsBipageQuery,
+  useSetEcartQteZoneMutation,
   getBipagesCsvUrl,
 } from "../../slices/bipageApiSlice";
 import { useSelector } from "react-redux";
@@ -123,6 +125,19 @@ const CelluleGencode = ({ ligne }) => {
   );
 };
 
+// ── Formatage du mode « Calcul des écarts » ─────────────────────────────────
+// Quantités à 3 décimales max (articles au mètre), montants XPF entiers —
+// mêmes règles que le document imprimé (fmtQteDoc / fmtNum côté serveur).
+const fmtQteE = (n) =>
+  Number.isFinite(Number(n))
+    ? new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 3 }).format(
+        Number(n),
+      )
+    : "—";
+const fmtXpfE = (n) =>
+  new Intl.NumberFormat("fr-FR").format(Math.round(Number(n) || 0));
+const signeEcart = (n) => (n > 0 ? "ecart-pos" : n < 0 ? "ecart-neg" : "");
+
 const AdminBipagesScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
@@ -143,6 +158,12 @@ const AdminBipagesScreen = () => {
   const [groupBy, setGroupBy] = useState("famille"); // famille | fournisseur
   const [seuil, setSeuil] = useState(""); // seuil |écart| en XPF
   const [perimetre, setPerimetre] = useState("comptes"); // comptes | stock
+  // Tri DANS les groupes (document ET mode écarts) : NART ou désignation.
+  const [ordre, setOrdre] = useState("nart"); // nart | design
+  // Mode « Calcul des écarts » : le tableau des lignes laisse place à la
+  // feuille d'écarts elle-même (mêmes filtres, mêmes groupes que le document),
+  // relisible et corrigible AVANT impression.
+  const [modeEcarts, setModeEcarts] = useState(false);
   const [ecartsLoading, setEcartsLoading] = useState("");
   // Bulle d'aide du périmètre : la distinction « comptés / stock complet »
   // change complètement le document, elle mérite mieux qu'une infobulle native.
@@ -205,6 +226,28 @@ const AdminBipagesScreen = () => {
       },
       { skip: !selectedEntreprise },
     );
+
+  // Feuille d'écarts en JSON (mode « Calcul des écarts ») : mêmes réglages et
+  // mêmes filtres que le document imprimé — ce qu'on voit est ce qu'on imprime.
+  const {
+    data: ecartsData,
+    isFetching: ecartsFetching,
+    error: ecartsError,
+  } = useGetEcartsBipageQuery(
+    {
+      entrepriseId: selectedEntreprise,
+      groupBy,
+      seuil,
+      perimetre,
+      ordre,
+      zone,
+      type,
+      search,
+      marque,
+    },
+    { skip: !selectedEntreprise || !modeEcarts },
+  );
+  const [setEcartQteZone] = useSetEcartQteZoneMutation();
 
   const [updateBipage] = useUpdateBipageMutation();
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
@@ -437,11 +480,13 @@ const AdminBipagesScreen = () => {
       params.set("groupBy", groupBy);
       params.set("format", format);
       params.set("perimetre", perimetre);
+      params.set("ordre", ordre);
       if (seuil) params.set("seuil", seuil);
       // Les filtres de l'écran cadrent le document : on exporte ce qu'on voit.
       if (zone) params.set("zone", zone);
       if (type) params.set("type", type);
       if (search) params.set("search", search);
+      if (marque) params.set("marque", marque);
 
       const url = `${BASE_URL}/api/bipages/${selectedEntreprise}/ecarts?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
@@ -474,6 +519,29 @@ const AdminBipagesScreen = () => {
       setMsg(e.message || "Génération impossible");
     } finally {
       setEcartsLoading("");
+    }
+  };
+
+  // Correction d'une quantité PAR GISEMENT depuis le mode écarts : le total du
+  // couple (article, gisement) devient la valeur saisie — la différence est
+  // appliquée à la ligne la plus récente côté serveur, avec la traçabilité
+  // d'une correction. Le refetch (invalidation « Bipage ») recale la feuille.
+  const corrigerQteZone = async (row, z, valeur) => {
+    const qte = Number(String(valeur ?? "").replace(",", "."));
+    if (!Number.isFinite(qte) || qte === Number(z.qte)) return;
+    try {
+      await setEcartQteZone({
+        entrepriseId: selectedEntreprise,
+        cle: row.cle,
+        zoneCode: z.code,
+        zoneType: z.type || "",
+        qte,
+      }).unwrap();
+      setMsg(
+        `${row.nart} — gisement ${z.code}${z.type ? ` (${z.type})` : ""} : quantité corrigée à ${qte}.`,
+      );
+    } catch (e) {
+      alert(e?.data?.message || "Correction impossible");
     }
   };
 
@@ -616,6 +684,19 @@ const AdminBipagesScreen = () => {
             </label>
 
             <label>
+              Trier par
+              <select
+                className="filter-select"
+                value={ordre}
+                onChange={(e) => setOrdre(e.target.value)}
+                title="Ordre des articles À L'INTÉRIEUR de chaque groupe, à l'écran comme sur le document"
+              >
+                <option value="nart">NART</option>
+                <option value="design">Désignation (A→Z)</option>
+              </select>
+            </label>
+
+            <label>
               Seuil écart (XPF)
               <input
                 type="number"
@@ -690,6 +771,21 @@ const AdminBipagesScreen = () => {
             </label>
 
             <div className="ecarts-actions">
+              {/* Mode « Calcul des écarts » : la feuille s'affiche À L'ÉCRAN
+                  (mêmes groupes, mêmes filtres que le document), relisible et
+                  corrigible gisement par gisement avant d'imprimer. */}
+              <button
+                className={modeEcarts ? "btn-primary mode-ecarts-actif" : "btn-secondary"}
+                onClick={() => setModeEcarts((v) => !v)}
+                title={
+                  modeEcarts
+                    ? "Revenir au tableau des lignes bipées"
+                    : "Afficher la feuille d'écarts à l'écran, pour la relire et la corriger avant impression"
+                }
+              >
+                <HiTable />{" "}
+                {modeEcarts ? "Retour aux lignes" : "Calcul des écarts"}
+              </button>
               <button
                 className="btn-primary"
                 onClick={() => exporterEcarts("pdf")}
@@ -890,8 +986,14 @@ const AdminBipagesScreen = () => {
             </div>
 
             <span className="bipages-count">
-              {lignes.length} ligne{lignes.length > 1 ? "s" : ""}
-              {isFetching ? " …" : ""}
+              {modeEcarts
+                ? `${(ecartsData?.groupes || []).reduce(
+                    (s, g) => s + g.rows.length,
+                    0,
+                  )} article(s) en écart${ecartsFetching ? " …" : ""}`
+                : `${lignes.length} ligne${lignes.length > 1 ? "s" : ""}${
+                    isFetching ? " …" : ""
+                  }`}
             </span>
 
             <button
@@ -930,6 +1032,7 @@ const AdminBipagesScreen = () => {
               couple, que l'utilisateur ne saisit donc jamais. Quand le filtre
               n'est pas assez précis, on explique ce qu'il manque plutôt que
               d'afficher un bouton inerte. */}
+          {!modeEcarts && (
           <div className="ajout-bar">
             {peutAjouter ? (
               !ajoutOuvert && (
@@ -948,8 +1051,9 @@ const AdminBipagesScreen = () => {
               </span>
             )}
           </div>
+          )}
 
-          {peutAjouter && ajoutOuvert && (
+          {!modeEcarts && peutAjouter && ajoutOuvert && (
             <div className="ajout-form">
               <div className="ajout-form-head">
                 <span className="ajout-cible">
@@ -1011,6 +1115,164 @@ const AdminBipagesScreen = () => {
             </div>
           )}
 
+          {modeEcarts ? (
+            /* ── Mode « Calcul des écarts » : la feuille à l'écran ──────────
+               Mêmes groupes, mêmes totaux et mêmes filtres que le PDF/Excel.
+               Sous chaque article : ses gisements bipés avec la quantité de
+               chacun — modifiable (corrigée sur la ligne la plus récente du
+               gisement), pour ajuster la feuille AVANT de l'imprimer. */
+            <div className="admin-bipages-table-container">
+              {ecartsFetching && !ecartsData ? (
+                <div className="admin-loading">Calcul des écarts…</div>
+              ) : ecartsError ? (
+                <div className="ecarts-vide">
+                  {ecartsError?.data?.message ||
+                    "Impossible de calculer les écarts."}
+                </div>
+              ) : (
+                (() => {
+                  const groupes = ecartsData?.groupes || [];
+                  const avecLive = !!ecartsData?.stockFige?.actif;
+                  const nbCols = avecLive ? 12 : 11;
+                  return (
+                    <table className="admin-table ecarts-table">
+                      <thead>
+                        <tr>
+                          <th>NART</th>
+                          <th title="D = compté dans plusieurs zones · XX = quantité excédentaire (qté > stock)">
+                            ATT
+                          </th>
+                          <th>Désignation</th>
+                          <th>Référence</th>
+                          <th>Gencode</th>
+                          <th>Fourn.</th>
+                          <th>Fournisseur</th>
+                          <th className="num-cell">
+                            {avecLive ? "Stock figé" : "Stock"}
+                          </th>
+                          {avecLive && <th className="num-cell">Stock live</th>}
+                          <th className="num-cell">Qté bipée</th>
+                          <th className="num-cell">Diff</th>
+                          <th className="num-cell">Diff (XPF)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupes.length === 0 ? (
+                          <tr>
+                            <td colSpan={nbCols} className="no-data">
+                              Aucun article au-dessus du seuil avec ces filtres.
+                            </td>
+                          </tr>
+                        ) : (
+                          <>
+                            {groupes.map((g) => (
+                              <React.Fragment key={g.key}>
+                                <tr className="ecart-groupe">
+                                  <td colSpan={nbCols}>
+                                    {ecartsData.groupLabel} {g.key}
+                                    {g.nom ? ` — ${g.nom}` : ""} ({g.rows.length})
+                                  </td>
+                                </tr>
+                                {g.rows.map((r) => (
+                                  <React.Fragment key={r.cle || r.nart}>
+                                    <tr
+                                      className={r.nonTrouve ? "row-unknown" : ""}
+                                    >
+                                      <td className="mono">{r.nart}</td>
+                                      <td className="ecart-att">{r.att}</td>
+                                      <td className="desig-cell">{r.design}</td>
+                                      <td>{r.refer}</td>
+                                      <td className="mono">{r.gencod}</td>
+                                      <td>{r.fourn}</td>
+                                      <td>{r.fournNom}</td>
+                                      <td className="num-cell">
+                                        {fmtQteE(r.stock)}
+                                      </td>
+                                      {avecLive && (
+                                        <td className="num-cell">
+                                          {fmtQteE(r.stockLive)}
+                                        </td>
+                                      )}
+                                      <td className="num-cell">
+                                        {fmtQteE(r.qte)}
+                                      </td>
+                                      <td
+                                        className={`num-cell ${signeEcart(r.diff)}`}
+                                      >
+                                        {fmtQteE(r.diff)}
+                                      </td>
+                                      <td
+                                        className={`num-cell ${signeEcart(r.diffval)}`}
+                                      >
+                                        {fmtXpfE(r.diffval)}
+                                      </td>
+                                    </tr>
+                                    {(r.zonesBipees || []).map((z) => (
+                                      <tr
+                                        key={`${r.cle}|${z.code}|${z.type}`}
+                                        className="ecart-zone"
+                                      >
+                                        <td />
+                                        <td />
+                                        <td
+                                          className="ecart-zone-lib"
+                                          colSpan={avecLive ? 7 : 6}
+                                        >
+                                          ↳ Gisement <b>{z.code}</b>
+                                          {z.type ? ` · ${z.type}` : ""}
+                                        </td>
+                                        <td className="num-cell">
+                                          <input
+                                            key={`${r.cle}|${z.code}|${z.type}|${z.qte}`}
+                                            className="cell-input num ecart-zone-qte"
+                                            type="number"
+                                            step="any"
+                                            defaultValue={z.qte}
+                                            onBlur={(e) =>
+                                              corrigerQteZone(
+                                                r,
+                                                z,
+                                                e.target.value,
+                                              )
+                                            }
+                                            onKeyDown={onCellKeyDown}
+                                            title="Quantité bipée dans ce gisement — modifiable : la correction est appliquée à la ligne la plus récente du gisement"
+                                          />
+                                        </td>
+                                        <td colSpan={2} />
+                                      </tr>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                                <tr className="ecart-soustotal">
+                                  <td colSpan={nbCols - 1}>
+                                    Sous-total {ecartsData.groupLabel} {g.key}
+                                  </td>
+                                  <td
+                                    className={`num-cell ${signeEcart(g.subtotal)}`}
+                                  >
+                                    {fmtXpfE(g.subtotal)}
+                                  </td>
+                                </tr>
+                              </React.Fragment>
+                            ))}
+                            <tr className="ecart-total">
+                              <td colSpan={nbCols - 1}>TOTAL GÉNÉRAL</td>
+                              <td
+                                className={`num-cell ${signeEcart(ecartsData.grandTotal)}`}
+                              >
+                                {fmtXpfE(ecartsData.grandTotal)}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  );
+                })()
+              )}
+            </div>
+          ) : (
           <div className="admin-bipages-table-container">
             <table className="admin-table">
               <thead>
@@ -1162,6 +1424,7 @@ const AdminBipagesScreen = () => {
               </tbody>
             </table>
           </div>
+          )}
         </>
       )}
 

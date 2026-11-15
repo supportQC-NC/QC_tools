@@ -100,6 +100,47 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // Mode « Calcul des écarts » : la feuille d'écarts en JSON (mêmes filtres
+    // et mêmes groupes que le document imprimé), pour relecture et correction
+    // à l'écran avant impression. `ordre` : tri dans les groupes (nart|design).
+    getEcartsBipage: builder.query({
+      query: ({
+        entrepriseId,
+        groupBy,
+        seuil,
+        perimetre,
+        ordre,
+        zone,
+        type,
+        search,
+        marque,
+      }) => {
+        const params = new URLSearchParams({ format: "json" });
+        if (groupBy) params.set("groupBy", groupBy);
+        if (seuil) params.set("seuil", seuil);
+        if (perimetre) params.set("perimetre", perimetre);
+        if (ordre) params.set("ordre", ordre);
+        if (zone) params.set("zone", zone);
+        if (type) params.set("type", type);
+        if (search) params.set("search", search);
+        if (marque) params.set("marque", marque);
+        return `${BASE}/${entrepriseId}/ecarts?${params.toString()}`;
+      },
+      providesTags: ["Bipage"],
+    }),
+
+    // Correction du TOTAL bipé d'un article dans UN gisement (mode « Calcul
+    // des écarts ») : la différence est appliquée à la ligne la plus récente
+    // du couple article × gisement, avec la traçabilité d'une correction.
+    setEcartQteZone: builder.mutation({
+      query: ({ entrepriseId, cle, zoneCode, zoneType, qte }) => ({
+        url: `${BASE}/${entrepriseId}/ecarts/qte`,
+        method: "PUT",
+        body: { cle, zoneCode, zoneType, qte },
+      }),
+      invalidatesTags: ["Bipage"],
+    }),
+
     // Gisements d'un emplacement, lus dans la fiche article (zones proposées
     // à l'import, même sans bipage ni fiche zone).
     getGisementsEmplacement: builder.query({
@@ -180,6 +221,8 @@ export const {
   useAjouterLigneBipageMutation,
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
+  useGetEcartsBipageQuery,
+  useSetEcartQteZoneMutation,
   useGetGisementsEmplacementQuery,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,

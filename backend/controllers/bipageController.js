@@ -778,6 +778,13 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   const groupBy = req.query.groupBy === "fournisseur" ? "fournisseur" : "famille";
   const seuil = Math.max(0, Number(req.query.seuil) || 0);
   const toutLeStock = req.query.perimetre === "stock";
+  // Tri DANS les groupes : NART (historique) ou désignation alphabétique
+  // (demande client 16/11/2026).
+  const ordre = req.query.ordre === "design" ? "design" : "nart";
+  // `format=json` : le mode « Calcul des écarts » de l'écran Détail des
+  // bipages — la MÊME feuille (mêmes filtres, même calcul, mêmes groupes),
+  // rendue à l'écran pour relecture/correction avant impression.
+  const enJson = req.query.format === "json";
 
   // Comptage : mêmes filtres que la liste de l'écran (zone, emplacement,
   // recherche), pour que le document reflète ce que l'utilisateur regarde.
@@ -787,6 +794,10 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
 
   // Cumul par article. Clé = NART résolu, repli sur le code scanné : deux zones
   // qui comptent le même article doivent s'additionner, pas se doubler.
+  // `parZone` conserve le DÉTAIL par gisement (demande client 16/11/2026) : le
+  // contrôleur qui part vérifier un écart doit savoir OÙ l'article a été bipé
+  // — y compris quand il ne l'a été qu'à un seul endroit — et pour combien à
+  // chaque endroit.
   const compte = new Map();
   for (const l of lignes) {
     const cle = String(l.nart || l.eanArticle || "").trim().toUpperCase();
@@ -796,10 +807,20 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       design: "",
       code: String(l.nart || l.eanArticle || "").trim(),
       zones: new Set(),
+      parZone: new Map(),
     };
     cur.qte += Number(l.qteScan) || 0;
     if (!cur.design && l.designation) cur.design = l.designation;
-    cur.zones.add(`${l.zoneCode}|${l.zoneType || ""}`);
+    const typeZone = String(l.zoneType || "").trim();
+    const cleZone = `${l.zoneCode}|${typeZone}`;
+    cur.zones.add(cleZone);
+    const pz = cur.parZone.get(cleZone) || {
+      code: String(l.zoneCode || "").trim(),
+      type: typeZone,
+      qte: 0,
+    };
+    pz.qte += Number(l.qteScan) || 0;
+    cur.parZone.set(cleZone, pz);
     compte.set(cle, cur);
   }
 
@@ -824,6 +845,9 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
         ? String(rec.FOURNISS).trim()
         : String(rec.FOURN || "").trim();
     univers.set(nart.toUpperCase(), {
+      // `cle` = la clé d'agrégation (NART résolu, repli code scanné) : c'est
+      // elle que l'écran renvoie pour corriger une quantité par gisement.
+      cle: nart.toUpperCase(),
       nart,
       design: String(rec.DESIGN || "").trim(),
       refer: String(rec.REFER || "").trim(),
@@ -855,6 +879,7 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
         if (idx !== undefined) ajouterArticle(acache.records[idx]);
         else
           univers.set(nartFige, {
+            cle: nartFige,
             nart: nartFige,
             design: "(article disparu du fichier)",
             refer: "",
@@ -880,6 +905,7 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       if (idx !== undefined) ajouterArticle(acache.records[idx]);
       else
         univers.set(cle, {
+          cle,
           nart: info.code,
           design: info.design,
           refer: "",
@@ -897,6 +923,13 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     // « D » ici = article compté dans PLUSIEURS zones : le doublon à vérifier
     // n'est pas la ligne répétée (le collecteur cumule) mais le rayon en double.
     cible.doublon = info.zones.size > 1;
+    // Détail par gisement, TOUJOURS renvoyé (même un seul) : le contrôleur
+    // doit savoir où aller vérifier.
+    cible.zonesBipees = [...info.parZone.values()].sort(
+      (a, b) =>
+        a.code.localeCompare(b.code, "fr", { numeric: true }) ||
+        a.type.localeCompare(b.type, "fr"),
+    );
   }
 
   const rows = [];
@@ -910,7 +943,32 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     rows.push({ ...row, diff, diffval, att: flags.join(" ") });
   }
 
+  // Sous-lignes « gisement » du DOCUMENT (PDF/Excel) : où l'article a été bipé
+  // et pour combien — toujours, même un seul gisement (le contrôleur part de
+  // cette feuille pour aller vérifier au rayon). Même mécanique `detail` que
+  // les sous-lignes proforma de l'autre écran.
+  for (const r of rows) {
+    if (Array.isArray(r.zonesBipees) && r.zonesBipees.length) {
+      r.detail = r.zonesBipees.map((z) => ({
+        texte: `Gisement ${z.code}${z.type ? ` · ${z.type}` : ""}`,
+        numfact: "",
+        qte: z.qte,
+      }));
+    }
+  }
+
   if (rows.length === 0) {
+    if (enJson) {
+      return res.json({
+        titre: "",
+        groupLabel: groupBy === "fournisseur" ? "Fournisseur" : "Famille",
+        grandTotal: 0,
+        groupes: [],
+        stockFige: fige
+          ? { actif: true, at: session.stockFige?.at || null }
+          : { actif: false },
+      });
+    }
     res.status(404);
     throw new Error("Aucun article au-dessus du seuil de valeur indiqué.");
   }
@@ -938,7 +996,7 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     r.fournNom = nomFournByCode.get(code);
   }
 
-  const { groupes, grandTotal, groupLabel } = grouperEcarts(rows, groupBy);
+  const { groupes, grandTotal, groupLabel } = grouperEcarts(rows, groupBy, ordre);
 
   const perimetreLabel = toutLeStock
     ? "stock complet"
@@ -965,6 +1023,21 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   }${figeLabel}`;
 
   const base = `ecarts_${session.nom.replace(/[^\w-]+/g, "_")}_${groupBy}`;
+
+  // Mode « Calcul des écarts » de l'écran : la feuille en JSON, pour relecture
+  // et correction avant impression. Les rows portent `cle` (clé d'agrégation,
+  // pour la correction par gisement) et `zonesBipees`.
+  if (enJson) {
+    return res.json({
+      titre,
+      groupLabel,
+      grandTotal,
+      groupes,
+      stockFige: fige
+        ? { actif: true, at: session.stockFige?.at || null }
+        : { actif: false },
+    });
+  }
 
   if (req.query.format === "xlsx") {
     const wb = await construireClasseurEcarts({
@@ -1103,6 +1176,97 @@ const updateBipage = asyncHandler(async (req, res) => {
 
   await ligne.save();
   res.json(ligne);
+});
+
+/**
+ * @desc    CORRIGER LA QUANTITÉ BIPÉE d'un article dans UN gisement, depuis le
+ *          mode « Calcul des écarts » (16/11/2026). La feuille agrège les
+ *          lignes : l'utilisateur corrige le TOTAL du couple (article,
+ *          gisement), et la différence est appliquée à la ligne la plus
+ *          récente de ce couple — les autres lignes ne bougent pas, le total
+ *          devient exactement la valeur saisie. Même traçabilité que la
+ *          correction unitaire (`modifie`, valeurs d'origine figées à la
+ *          première passe).
+ * @route   PUT /api/bipages/:entrepriseId/ecarts/qte
+ * @body    { cle, zoneCode, zoneType, qte }
+ *          `cle` = clé d'agrégation de la feuille (NART résolu, repli code
+ *          scanné, MAJUSCULES) — renvoyée par le format=json.
+ * @access  Private (module bipage, write)
+ */
+const setEcartQteZone = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  const cle = String(req.body.cle || "").trim().toUpperCase();
+  const zoneCode = String(req.body.zoneCode || "").trim();
+  const zoneType = String(req.body.zoneType ?? "").trim();
+  const qte = Number(req.body.qte);
+  if (!cle || !zoneCode) {
+    res.status(400);
+    throw new Error("Article et gisement requis.");
+  }
+  if (!Number.isFinite(qte)) {
+    res.status(400);
+    throw new Error("Quantité invalide.");
+  }
+
+  // Lignes du couple (article, gisement). `zoneType` vide doit retrouver les
+  // lignes sans emplacement (champ "" ou absent sur les anciennes lignes).
+  const lignesZone = await LigneBipage.find({
+    session: session._id,
+    zoneCode,
+    zoneType: zoneType || { $in: [null, ""] },
+  });
+  const concernees = lignesZone.filter(
+    (l) => String(l.nart || l.eanArticle || "").trim().toUpperCase() === cle,
+  );
+  if (!concernees.length) {
+    res.status(404);
+    throw new Error(
+      `Aucune ligne bipée pour cet article dans la zone ${zoneCode}${
+        zoneType ? ` (${zoneType})` : ""
+      }.`,
+    );
+  }
+
+  const somme = concernees.reduce((s, l) => s + (Number(l.qteScan) || 0), 0);
+  // Quantités à 3 décimales (articles au mètre) — jamais d'arrondi à l'unité.
+  const delta = Math.round((qte - somme) * 1000) / 1000;
+  if (!delta) {
+    return res.json({ cle, zoneCode, zoneType, qte: somme, modifie: false });
+  }
+
+  const ligne = concernees.sort(
+    (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+  )[concernees.length - 1];
+  const qteAvant = Number(ligne.qteScan) || 0;
+  ligne.qteScan = Math.round((qteAvant + delta) * 1000) / 1000;
+  if (!ligne.modifie) {
+    ligne.qteScanOrigine = qteAvant;
+    ligne.nartOrigine = String(ligne.nart || "");
+    ligne.modifie = true;
+  }
+  ligne.modifieAt = new Date();
+  ligne.modifiePar = req.user._id;
+  ligne.modifieParNom = nomUtilisateur(req.user);
+  await ligne.save();
+
+  res.json({
+    cle,
+    zoneCode,
+    zoneType,
+    qte,
+    nbLignes: concernees.length,
+    ligneAjustee: ligne._id,
+    modifie: true,
+  });
 });
 
 /**
@@ -2005,6 +2169,7 @@ export {
   getStatsProformasZones,
   ficheProformaImportee,
   exportEcartsBipage,
+  setEcartQteZone,
   updateBipage,
   ajouterLigneBipage,
   exportCsv,
