@@ -473,61 +473,223 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Mode « Calcul des écarts » : la feuille d'écarts rendue à l'écran ──── */
+/* ── Mode « Calcul des écarts » : la feuille d'écarts rendue à l'écran ────
+   Lisibilité avant tout : en-tête très contrasté, bandeaux de groupe
+   COLLANTS (on sait toujours dans quelle famille on lit), zébrage des
+   articles, colonnes numériques à droite en chiffres tabulaires, écarts
+   teintés fond + texte (le signe se voit de loin), sous-lignes gisement
+   indentées avec liseré violet. */
 .mode-ecarts-actif {
   box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.35);
 }
 
+.ecarts-table {
+  font-size: 12.5px;
+}
+
+/* En-tête : plus sombre et plus contrasté que le tableau des lignes, avec un
+   liseré bleu — on voit immédiatement qu'on n'est plus dans les bipages. */
+.ecarts-table thead th {
+  background: #12122a;
+  color: #c7cdfb;
+  border-bottom: 2px solid #4da6ff;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  /* Au-dessus des bandeaux de groupe collants : à z-index égal, l'ordre DOM
+     ferait passer le bandeau (tbody) PAR-DESSUS l'en-tête au défilement. */
+  z-index: 2;
+}
+
+.ecarts-table thead th.num-cell {
+  text-align: right;
+}
+
+/* Colonnes numériques : à DROITE (les ordres de grandeur s'alignent),
+   chiffres tabulaires, jamais coupées. */
+.ecarts-table td.num-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-right: 14px;
+}
+
+/* Bandeau de groupe (famille / fournisseur) : collant sous l'en-tête — sur
+   un long groupe on sait toujours où on lit. `top` ≈ hauteur de l'en-tête. */
 .ecarts-table .ecart-groupe td {
-  background: #26263e;
+  position: sticky;
+  top: 33px;
+  z-index: 1;
+  background: linear-gradient(90deg, #2c2c52, #1d1d36);
+  color: #e4e7ff;
   font-weight: 700;
-  color: var(--text, #e7e7ef);
-  border-top: 2px solid #3a3a5c;
+  font-size: 12.5px;
+  letter-spacing: 0.2px;
+  padding: 8px 12px;
+  border-top: 1px solid rgba(77, 166, 255, 0.35);
+  border-bottom: 1px solid #3a3a5c;
 }
 
-.ecarts-table .ecart-soustotal td {
-  background: #1f1f33;
+/* Lignes articles : zébrage doux (suivre une ligne sur 12 colonnes), survol
+   bleu nettement visible. */
+.ecarts-table .ecart-row td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.ecarts-table .ecart-row.pair td {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ecarts-table .ecart-row:hover td {
+  background: rgba(77, 166, 255, 0.1);
+}
+
+/* Article inconnu du catalogue : la teinte rouge l'emporte sur le zébrage. */
+.ecarts-table .ecart-row.row-unknown td {
+  background: rgba(255, 107, 107, 0.09);
+}
+
+.ecarts-table .ecart-nart {
+  color: #a78bfa;
   font-weight: 700;
 }
 
-.ecarts-table .ecart-total td {
-  background: #30304d;
-  font-weight: 800;
-  border-top: 2px solid #4da6ff;
+.ecarts-table .desig-cell {
+  color: var(--text-primary);
+  font-weight: 500;
+  max-width: 300px;
 }
 
+.ecarts-table .ecart-fournnom {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* Repères ATT en pastilles (D = multi-zones, XX = excédent). */
 .ecarts-table .ecart-att {
-  color: #ff6b6b;
-  font-weight: 700;
   text-align: center;
   white-space: nowrap;
 }
 
-.ecart-pos {
+.att-chip {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: rgba(255, 107, 107, 0.14);
+  color: #ff8787;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+}
+
+/* Stock live : indicatif — en retrait visuel par rapport au stock figé,
+   la référence du calcul. */
+.ecarts-table td.ecart-live {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Qté bipée : LA colonne qu'on relit — surlignée en bleu. */
+.ecarts-table td.col-qte {
+  background: rgba(77, 166, 255, 0.09);
+  color: #9ed0ff;
+  font-weight: 700;
+}
+
+/* Écarts : fond teinté + texte coloré + gras — le signe se voit de loin.
+   Un écart nul s'efface (gris), il ne crie pas. */
+.ecarts-table td.ecart-pos {
   color: #4ade80;
+  background: rgba(74, 222, 128, 0.09);
+  font-weight: 700;
 }
 
-.ecart-neg {
+.ecarts-table td.ecart-neg {
   color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.09);
+  font-weight: 700;
 }
 
-/* Sous-ligne « gisement bipé » d'un article : où il a été compté, et pour
-   combien — la quantité y est corrigible. */
+.ecarts-table td.ecart-zero {
+  color: var(--text-muted);
+}
+
+/* Sous-ligne « gisement bipé » : indentée, liseré violet à gauche — elle se
+   lit comme le détail de l'article au-dessus, jamais comme un article. */
 .ecarts-table .ecart-zone td {
   background: rgba(139, 92, 246, 0.07);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
-  border-top: none;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  border-bottom: 1px dashed rgba(139, 92, 246, 0.25);
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.ecarts-table .ecart-zone td:first-child {
+  border-left: 3px solid #8b5cf6;
+}
+
+.ecarts-table .ecart-zone-lib {
+  padding-left: 26px;
 }
 
 .ecart-zone-lib b {
   color: #c4b5fd;
+  font-size: 12px;
 }
 
 .ecart-zone-qte {
   max-width: 90px;
+  text-align: right;
+  background: rgba(77, 166, 255, 0.06);
+  border-color: rgba(77, 166, 255, 0.35);
+}
+
+.ecart-zone-qte:hover,
+.ecart-zone-qte:focus {
+  border-color: #4da6ff;
+}
+
+/* Sous-total de groupe : montant à droite, bandeau discret mais net. */
+.ecarts-table .ecart-soustotal td {
+  background: #22223c;
+  font-weight: 700;
+  color: #cfd3ef;
+  border-top: 1px solid #3a3a5c;
+  border-bottom: 2px solid #3a3a5c;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+/* Total général : le bandeau le plus fort du tableau. */
+.ecarts-table .ecart-total td {
+  background: linear-gradient(90deg, #2a3b63, #1c2746);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13px;
+  border-top: 2px solid #4da6ff;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+/* Sur les bandeaux sous-total / total, le MONTANT garde la couleur de son
+   signe (le bandeau impose sa couleur de texte, déclaré après les teintes de
+   signe — on re-spécifie la couleur SEULE). Le fond reste celui du bandeau :
+   à spécificité égale, la règle du bandeau, déclarée après, gagne. */
+.ecarts-table .ecart-soustotal td.ecart-pos,
+.ecarts-table .ecart-total td.ecart-pos {
+  color: #4ade80;
+}
+
+.ecarts-table .ecart-soustotal td.ecart-neg,
+.ecarts-table .ecart-total td.ecart-neg {
+  color: #ff6b6b;
 }
 
 .ecarts-vide {

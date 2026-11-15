@@ -136,7 +136,7 @@ const fmtQteE = (n) =>
     : "—";
 const fmtXpfE = (n) =>
   new Intl.NumberFormat("fr-FR").format(Math.round(Number(n) || 0));
-const signeEcart = (n) => (n > 0 ? "ecart-pos" : n < 0 ? "ecart-neg" : "");
+const signeEcart = (n) => (n > 0 ? "ecart-pos" : n < 0 ? "ecart-neg" : "ecart-zero");
 
 const AdminBipagesScreen = () => {
   // Société active : lue depuis la sélection GLOBALE (Header).
@@ -1147,10 +1147,24 @@ const AdminBipagesScreen = () => {
                           <th>Gencode</th>
                           <th>Fourn.</th>
                           <th>Fournisseur</th>
-                          <th className="num-cell">
+                          <th
+                            className="num-cell"
+                            title={
+                              avecLive
+                                ? "Photo du stock au gel — la RÉFÉRENCE du calcul d'écart"
+                                : "Stock théorique (ERP)"
+                            }
+                          >
                             {avecLive ? "Stock figé" : "Stock"}
                           </th>
-                          {avecLive && <th className="num-cell">Stock live</th>}
+                          {avecLive && (
+                            <th
+                              className="num-cell"
+                              title="Stock réel actuel (continue de bouger avec les ventes) — indicatif, pas la référence du calcul"
+                            >
+                              Stock live
+                            </th>
+                          )}
                           <th className="num-cell">Qté bipée</th>
                           <th className="num-cell">Diff</th>
                           <th className="num-cell">Diff (XPF)</th>
@@ -1173,27 +1187,51 @@ const AdminBipagesScreen = () => {
                                     {g.nom ? ` — ${g.nom}` : ""} ({g.rows.length})
                                   </td>
                                 </tr>
-                                {g.rows.map((r) => (
+                                {g.rows.map((r, idx) => (
                                   <React.Fragment key={r.cle || r.nart}>
                                     <tr
-                                      className={r.nonTrouve ? "row-unknown" : ""}
+                                      className={`ecart-row ${
+                                        idx % 2 ? "pair" : ""
+                                      } ${r.nonTrouve ? "row-unknown" : ""}`.trim()}
                                     >
-                                      <td className="mono">{r.nart}</td>
-                                      <td className="ecart-att">{r.att}</td>
-                                      <td className="desig-cell">{r.design}</td>
+                                      <td className="mono ecart-nart">
+                                        {r.nart}
+                                      </td>
+                                      <td className="ecart-att">
+                                        {r.att
+                                          ? r.att.split(" ").map((flag) => (
+                                              <span
+                                                key={flag}
+                                                className="att-chip"
+                                                title={
+                                                  flag === "D"
+                                                    ? "Compté dans plusieurs zones"
+                                                    : "Quantité excédentaire (qté > stock)"
+                                                }
+                                              >
+                                                {flag}
+                                              </span>
+                                            ))
+                                          : ""}
+                                      </td>
+                                      <td className="desig-cell" title={r.design}>
+                                        {r.design}
+                                      </td>
                                       <td>{r.refer}</td>
                                       <td className="mono">{r.gencod}</td>
                                       <td>{r.fourn}</td>
-                                      <td>{r.fournNom}</td>
+                                      <td className="ecart-fournnom" title={r.fournNom}>
+                                        {r.fournNom}
+                                      </td>
                                       <td className="num-cell">
                                         {fmtQteE(r.stock)}
                                       </td>
                                       {avecLive && (
-                                        <td className="num-cell">
+                                        <td className="num-cell ecart-live">
                                           {fmtQteE(r.stockLive)}
                                         </td>
                                       )}
-                                      <td className="num-cell">
+                                      <td className="num-cell col-qte">
                                         {fmtQteE(r.qte)}
                                       </td>
                                       <td
