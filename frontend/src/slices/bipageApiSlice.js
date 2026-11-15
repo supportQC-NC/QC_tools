@@ -110,6 +110,7 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         seuil,
         perimetre,
         ordre,
+        anomalie,
         zone,
         type,
         search,
@@ -120,6 +121,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         if (seuil) params.set("seuil", seuil);
         if (perimetre) params.set("perimetre", perimetre);
         if (ordre) params.set("ordre", ordre);
+        // Type d'anomalie : manquant | excedent | multizone | inconnu.
+        if (anomalie) params.set("anomalie", anomalie);
         if (zone) params.set("zone", zone);
         if (type) params.set("type", type);
         if (search) params.set("search", search);

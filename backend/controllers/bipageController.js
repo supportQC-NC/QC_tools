@@ -781,6 +781,15 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   // Tri DANS les groupes : NART (historique) ou désignation alphabétique
   // (demande client 16/11/2026).
   const ordre = req.query.ordre === "design" ? "design" : "nart";
+  // Filtre par TYPE D'ANOMALIE (demande client 16/11/2026) : ne garder que les
+  // manquants (diff < 0), les excédents (diff > 0), les articles comptés dans
+  // PLUSIEURS zones (repère D) ou les articles INCONNUS du catalogue. Appliqué
+  // AVANT le groupement : l'écran, les sous-totaux et le document imprimé
+  // disent tous la même chose. Valeur inconnue = pas de filtre.
+  const ANOMALIES = ["manquant", "excedent", "multizone", "inconnu"];
+  const anomalie = ANOMALIES.includes(req.query.anomalie)
+    ? req.query.anomalie
+    : "";
   // `format=json` : le mode « Calcul des écarts » de l'écran Détail des
   // bipages — la MÊME feuille (mêmes filtres, même calcul, mêmes groupes),
   // rendue à l'écran pour relecture/correction avant impression.
@@ -943,11 +952,19 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     rows.push({ ...row, diff, diffval, att: flags.join(" ") });
   }
 
+  // Filtre d'anomalie (voir plus haut) — sur les lignes DÉJÀ calculées : le
+  // seuil et le périmètre s'appliquent d'abord, comme sans filtre.
+  let rowsFiltres = rows;
+  if (anomalie === "manquant") rowsFiltres = rows.filter((r) => r.diff < 0);
+  else if (anomalie === "excedent") rowsFiltres = rows.filter((r) => r.diff > 0);
+  else if (anomalie === "multizone") rowsFiltres = rows.filter((r) => r.doublon);
+  else if (anomalie === "inconnu") rowsFiltres = rows.filter((r) => r.nonTrouve);
+
   // Sous-lignes « gisement » du DOCUMENT (PDF/Excel) : où l'article a été bipé
   // et pour combien — toujours, même un seul gisement (le contrôleur part de
   // cette feuille pour aller vérifier au rayon). Même mécanique `detail` que
   // les sous-lignes proforma de l'autre écran.
-  for (const r of rows) {
+  for (const r of rowsFiltres) {
     if (Array.isArray(r.zonesBipees) && r.zonesBipees.length) {
       r.detail = r.zonesBipees.map((z) => ({
         texte: `Gisement ${z.code}${z.type ? ` · ${z.type}` : ""}`,
@@ -957,7 +974,7 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     }
   }
 
-  if (rows.length === 0) {
+  if (rowsFiltres.length === 0) {
     if (enJson) {
       return res.json({
         titre: "",
@@ -970,13 +987,17 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       });
     }
     res.status(404);
-    throw new Error("Aucun article au-dessus du seuil de valeur indiqué.");
+    throw new Error(
+      anomalie
+        ? "Aucun article ne correspond au filtre d'anomalie (avec ce seuil et ces filtres)."
+        : "Aucun article au-dessus du seuil de valeur indiqué.",
+    );
   }
 
   // Nom du fournisseur (fourniss.dbf) — nécessaire au groupement fournisseur
-  // comme à la colonne du document.
+  // comme à la colonne du document. Seules les lignes RETENUES sont résolues.
   const nomFournByCode = new Map();
-  for (const r of rows) {
+  for (const r of rowsFiltres) {
     const code = String(r.fourn || "").trim();
     if (!code) {
       r.fournNom = "";
@@ -996,14 +1017,25 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     r.fournNom = nomFournByCode.get(code);
   }
 
-  const { groupes, grandTotal, groupLabel } = grouperEcarts(rows, groupBy, ordre);
+  const { groupes, grandTotal, groupLabel } = grouperEcarts(
+    rowsFiltres,
+    groupBy,
+    ordre,
+  );
 
   const perimetreLabel = toutLeStock
     ? "stock complet"
     : "articles comptés";
+  const ANOMALIE_LABELS = {
+    manquant: "manquants seuls",
+    excedent: "excédents seuls",
+    multizone: "articles multi-zones (D) seuls",
+    inconnu: "articles inconnus seuls",
+  };
   const filtreLabel = [
     req.query.type ? `emplacement ${req.query.type}` : "",
     req.query.zone ? `zone ${req.query.zone}` : "",
+    anomalie ? ANOMALIE_LABELS[anomalie] : "",
   ]
     .filter(Boolean)
     .join(", ");

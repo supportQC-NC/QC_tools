@@ -160,6 +160,10 @@ const AdminBipagesScreen = () => {
   const [perimetre, setPerimetre] = useState("comptes"); // comptes | stock
   // Tri DANS les groupes (document ET mode écarts) : NART ou désignation.
   const [ordre, setOrdre] = useState("nart"); // nart | design
+  // Filtre par TYPE D'ANOMALIE, appliqué côté serveur : écran, sous-totaux et
+  // document imprimé disent la même chose.
+  // "" | manquant | excedent | multizone | inconnu
+  const [anomalie, setAnomalie] = useState("");
   // Mode « Calcul des écarts » : le tableau des lignes laisse place à la
   // feuille d'écarts elle-même (mêmes filtres, mêmes groupes que le document),
   // relisible et corrigible AVANT impression.
@@ -240,6 +244,7 @@ const AdminBipagesScreen = () => {
       seuil,
       perimetre,
       ordre,
+      anomalie,
       zone,
       type,
       search,
@@ -481,6 +486,7 @@ const AdminBipagesScreen = () => {
       params.set("format", format);
       params.set("perimetre", perimetre);
       params.set("ordre", ordre);
+      if (anomalie) params.set("anomalie", anomalie);
       if (seuil) params.set("seuil", seuil);
       // Les filtres de l'écran cadrent le document : on exporte ce qu'on voit.
       if (zone) params.set("zone", zone);
@@ -693,6 +699,22 @@ const AdminBipagesScreen = () => {
               >
                 <option value="nart">NART</option>
                 <option value="design">Désignation (A→Z)</option>
+              </select>
+            </label>
+
+            <label>
+              Anomalie
+              <select
+                className="filter-select"
+                value={anomalie}
+                onChange={(e) => setAnomalie(e.target.value)}
+                title="Ne garder qu'un type d'anomalie — à l'écran comme sur le document imprimé (sous-totaux recalculés sur la sélection)"
+              >
+                <option value="">Toutes</option>
+                <option value="manquant">Manquants (diff &lt; 0)</option>
+                <option value="excedent">Excédents (diff &gt; 0)</option>
+                <option value="multizone">Multi-zones (D)</option>
+                <option value="inconnu">Articles inconnus</option>
               </select>
             </label>
 
