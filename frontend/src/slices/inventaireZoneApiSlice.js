@@ -112,6 +112,23 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["InventaireZone", "SuiviBipage"],
     }),
 
+    // Neutraliser / réactiver une zone (rayon qui n'existe plus physiquement).
+    // Sans `confirmer`, le serveur répond `action: "confirmation_requise"`
+    // (avec le travail déjà porté par la zone) au lieu d'écrire : c'est à
+    // l'écran d'afficher la confirmation puis de rappeler avec confirmer=true.
+    setZoneNeutralisee: builder.mutation({
+      query: ({ entrepriseId, code, emplacement, neutralisee, confirmer }) => ({
+        url: `${BASE}/${entrepriseId}/zone/${encodeURIComponent(code)}/neutraliser`,
+        method: "PUT",
+        body: {
+          neutralisee,
+          emplacement: emplacement ?? "",
+          ...(confirmer && { confirmer: true }),
+        },
+      }),
+      invalidatesTags: ["InventaireZone"],
+    }),
+
     // Supprimer une session archivée
     deleteZoneSession: builder.mutation({
       query: ({ entrepriseId, id }) => ({
@@ -133,5 +150,6 @@ export const {
   useGetZoneProgressQuery,
   useGetZoneHistoriqueQuery,
   useSetPhaseManuelleMutation,
+  useSetZoneNeutraliseeMutation,
   useDeleteZoneSessionMutation,
 } = inventaireZoneApiSlice;

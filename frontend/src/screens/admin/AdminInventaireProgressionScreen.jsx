@@ -13,6 +13,8 @@ import {
   HiExclamationCircle,
   HiTrash,
   HiDownload,
+  HiEye,
+  HiEyeOff,
 } from "react-icons/hi";
 import {
   useGetActiveSessionQuery,
@@ -20,6 +22,7 @@ import {
   useAnnulerInventaireZoneMutation,
   useBiperZoneMutation,
   useSetPhaseManuelleMutation,
+  useSetZoneNeutraliseeMutation,
   useGetZoneHistoriqueQuery,
   useDeleteZoneSessionMutation,
   useGetAgentsPossiblesQuery,
@@ -44,11 +47,14 @@ const PHASE_META = {
 
 // Statut d'avancement d'une zone (même règle que le récap par zone) :
 //   3 phases → vert (complet) ; bipage → violet ; papillonnage → orange ; sinon rouge.
+// Une zone NEUTRALISÉE (rayon qui n'existe plus physiquement) est grise et
+// hors avancement.
 const STATUT_META = {
   complet: { label: "Complet", color: "#4ade80" },
   comptage: { label: "Comptage", color: "#8b5cf6" },
   papillonnage: { label: "Papillonnage", color: "#f59e0b" },
   todo: { label: "Pas commencé", color: "#ff6b6b" },
+  neutralisee: { label: "Neutralisée (hors inventaire)", color: "#6b7280" },
 };
 // Nom de l'agent crédité d'une phase. Le serveur peuple `by` ; on retombe sur
 // une chaîne vide si la phase est ancienne (avant la désignation d'agent).
@@ -64,17 +70,20 @@ const SANS_EMPLACEMENT = "__sans__";
 
 /**
  * Avancement d'un lot de zones, mêmes règles que `computeProgress` du serveur
- * (une zone = 3 phases). Recalculé ici pour que le filtre d'emplacement fasse
- * bouger les compteurs sans aller-retour serveur.
+ * (une zone = 3 phases ; les zones NEUTRALISÉES ne comptent pas). Recalculé
+ * ici pour que le filtre d'emplacement fasse bouger les compteurs sans
+ * aller-retour serveur.
  */
 const calculerProgression = (lot) => {
   const compteurs = { papillonnage: 0, bipage: 0, controle: 0 };
-  lot.forEach((z) => {
+  const actives = lot.filter((z) => !z.neutralisee);
+  actives.forEach((z) => {
     PHASES.forEach((ph) => {
       if (z[ph]?.fait) compteurs[ph] += 1;
     });
   });
-  const totalZones = lot.length;
+  const totalZones = actives.length;
+  const zonesNeutralisees = lot.length - actives.length;
   const totalPhases = totalZones * PHASES.length;
   const faites = PHASES.reduce((t, ph) => t + compteurs[ph], 0);
   const parPhase = {};
@@ -90,11 +99,13 @@ const calculerProgression = (lot) => {
     totalPhases,
     faites,
     pct: totalPhases ? Math.round((faites / totalPhases) * 100) : 0,
+    zonesNeutralisees,
     parPhase,
   };
 };
 
 const zoneStatut = (z) => {
+  if (z?.neutralisee) return "neutralisee";
   const pap = !!z?.papillonnage?.fait;
   const bip = !!z?.bipage?.fait;
   const ctrl = !!z?.controle?.fait;
@@ -152,6 +163,10 @@ const AdminInventaireProgressionScreen = () => {
   const [initDestination, setInitDestination] = useState("rcommun");
   const [showAnnulerConfirm, setShowAnnulerConfirm] = useState(false);
   const [showHistorique, setShowHistorique] = useState(false);
+  // Confirmation de neutralisation d'une zone qui porte DÉJÀ du travail
+  // (phases faites, lignes bipées) : le serveur refuse d'écrire tant que la
+  // confirmation n'est pas explicite. { zone, travail }
+  const [confirmNeutralisation, setConfirmNeutralisation] = useState(null);
 
   const bipInputRef = useRef(null);
 
@@ -200,6 +215,8 @@ const AdminInventaireProgressionScreen = () => {
     useAnnulerInventaireZoneMutation();
   const [biperZone, { isLoading: biping }] = useBiperZoneMutation();
   const [setPhaseManuelle] = useSetPhaseManuelleMutation();
+  const [setZoneNeutralisee, { isLoading: neutralisant }] =
+    useSetZoneNeutraliseeMutation();
   const [deleteZoneSession, { isLoading: deletingSession }] =
     useDeleteZoneSessionMutation();
 
@@ -521,8 +538,50 @@ const AdminInventaireProgressionScreen = () => {
         phase,
         fait: false,
       }).unwrap();
-    } catch {
-      // silencieux : le polling resynchronise
+    } catch (err) {
+      // Le serveur peut REFUSER la décoche (papillonnage d'une zone bipée :
+      // bipée ⇒ papillonnée) : sans message, le clic semblerait ignoré.
+      const message = err?.data?.message;
+      if (message) setBipFeedback({ tone: "warning", message });
+      // sinon silencieux : le polling resynchronise
+    }
+  };
+
+  // Neutraliser / réactiver une zone. Premier appel SANS confirmation : si la
+  // zone porte déjà du travail (phase faite, lignes bipées), le serveur répond
+  // `confirmation_requise` sans rien écrire et on ouvre la fenêtre de
+  // confirmation ; la validation rappelle avec `confirmer: true`.
+  const handleToggleNeutralisee = async (zone, { confirmer = false } = {}) => {
+    if (neutralisant) return;
+    const versNeutralisee = !zone.neutralisee;
+    try {
+      const res = await setZoneNeutralisee({
+        entrepriseId: selectedEntreprise,
+        code: zone.code,
+        emplacement: zone.type || "",
+        neutralisee: versNeutralisee,
+        ...(confirmer && { confirmer: true }),
+      }).unwrap();
+
+      if (res.action === "confirmation_requise") {
+        setConfirmNeutralisation({ zone: res.zone, travail: res.travail });
+        return;
+      }
+
+      setConfirmNeutralisation(null);
+      setBipFeedback({
+        tone: res.action === "neutralisee" ? "warning" : "success",
+        message:
+          res.action === "neutralisee"
+            ? `Zone ${res.zone.code} neutralisée : elle ne compte plus dans l'avancement.`
+            : `Zone ${res.zone.code} réactivée : elle compte de nouveau dans l'avancement.`,
+      });
+    } catch (err) {
+      setConfirmNeutralisation(null);
+      setBipFeedback({
+        tone: "error",
+        message: err?.data?.message || "Neutralisation impossible",
+      });
     }
   };
 
@@ -743,9 +802,11 @@ const AdminInventaireProgressionScreen = () => {
               Ici et pas dans « Détail des bipages » : c'est le pilotage de
               l'inventaire, et un import vaut passage de l'agent — il coche
               papillonnage et bipage quand la zone n'avait jamais été comptée. */}
+          {/* Zones neutralisées exclues : on n'importe pas un comptage dans un
+              rayon qui n'existe plus. */}
           <ImportComptageZone
             entrepriseId={selectedEntreprise}
-            zones={zones}
+            zones={zones.filter((z) => !z.neutralisee)}
             emplacementsDispo={emplacementsSociete?.emplacements || []}
             filtreProformas={session?.filtreProformas}
             onMessage={(message, tone) =>
@@ -772,6 +833,10 @@ const AdminInventaireProgressionScreen = () => {
                     {" · "}
                     {progressFiltre.totalZones} zone
                     {progressFiltre.totalZones > 1 ? "s" : ""}
+                    {progressFiltre.zonesNeutralisees > 0 &&
+                      ` · ${progressFiltre.zonesNeutralisees} neutralisée${
+                        progressFiltre.zonesNeutralisees > 1 ? "s" : ""
+                      }`}
                   </span>
                   {emplacement && (
                     <span className="prog-global-total">
@@ -853,20 +918,25 @@ const AdminInventaireProgressionScreen = () => {
                       {PHASE_META[ph].label}
                     </th>
                   ))}
+                  <th className="neutraliser-col"></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredZones.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="no-data">
+                    <td colSpan={7} className="no-data">
                       Aucune zone.
                     </td>
                   </tr>
                 ) : (
                   filteredZones.map((z) => {
                     const st = zoneStatut(z);
+                    const neutralisee = !!z.neutralisee;
                     return (
-                    <tr key={`${z.code}||${z.type || ""}`}>
+                    <tr
+                      key={`${z.code}||${z.type || ""}`}
+                      className={neutralisee ? "zone-neutralisee" : undefined}
+                    >
                       <td className="statut-col">
                         <span
                           className="statut-dot"
@@ -878,6 +948,11 @@ const AdminInventaireProgressionScreen = () => {
                       <td>
                         {z.libelle}
                         {z.type && <span className="zone-type">{z.type}</span>}
+                        {neutralisee && (
+                          <span className="zone-neutralisee-tag">
+                            Neutralisée
+                          </span>
+                        )}
                       </td>
                       {PHASES.map((ph) => {
                         const fait = !!z[ph]?.fait;
@@ -890,11 +965,14 @@ const AdminInventaireProgressionScreen = () => {
                                   ? { borderColor: PHASE_META[ph].color }
                                   : undefined
                               }
+                              disabled={neutralisee}
                               onClick={() =>
                                 handleTogglePhase(z, ph, fait)
                               }
                               title={
-                                fait
+                                neutralisee
+                                  ? "Zone neutralisée : réactivez-la pour modifier ses phases"
+                                  : fait
                                   ? `Fait${
                                       nomAgentPhase(z[ph])
                                         ? ` par ${nomAgentPhase(z[ph])}`
@@ -912,6 +990,20 @@ const AdminInventaireProgressionScreen = () => {
                           </td>
                         );
                       })}
+                      <td className="neutraliser-col">
+                        <button
+                          className="btn-icon"
+                          disabled={neutralisant}
+                          onClick={() => handleToggleNeutralisee(z)}
+                          title={
+                            neutralisee
+                              ? "Réactiver la zone (elle comptera de nouveau dans l'avancement)"
+                              : "Neutraliser la zone (rayon qui n'existe plus) : elle sort de l'avancement et ses coupons sont refusés"
+                          }
+                        >
+                          {neutralisee ? <HiEye /> : <HiEyeOff />}
+                        </button>
+                      </td>
                     </tr>
                     );
                   })
@@ -1194,6 +1286,107 @@ const AdminInventaireProgressionScreen = () => {
               <button
                 className="btn-secondary"
                 onClick={handleAnnulerDesignation}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation de neutralisation d'une zone qui porte déjà du travail
+          (phases faites, lignes bipées) : demandée par le serveur, qui n'écrit
+          rien tant que `confirmer` n'est pas renvoyé. */}
+      {confirmNeutralisation && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setConfirmNeutralisation(null)}
+        >
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <HiEyeOff /> Neutraliser la zone{" "}
+                {confirmNeutralisation.zone.code}
+              </h2>
+              <button
+                className="btn-close-modal"
+                onClick={() => setConfirmNeutralisation(null)}
+              >
+                <HiX />
+              </button>
+            </div>
+            <div className="modal-content">
+              <p>
+                La zone{" "}
+                <strong>
+                  {confirmNeutralisation.zone.code}
+                  {confirmNeutralisation.zone.type
+                    ? ` (${confirmNeutralisation.zone.type})`
+                    : ""}
+                </strong>
+                {confirmNeutralisation.zone.libelle
+                  ? ` — ${confirmNeutralisation.zone.libelle} —`
+                  : ""}{" "}
+                porte <strong>déjà du travail</strong> :
+              </p>
+              <ul>
+                {(confirmNeutralisation.travail?.phasesFaites || []).map(
+                  (ph) => (
+                    <li key={ph}>
+                      phase <strong>{PHASE_META[ph]?.label || ph}</strong>{" "}
+                      validée ;
+                    </li>
+                  ),
+                )}
+                {confirmNeutralisation.travail?.nbLignesBipage > 0 && (
+                  <li>
+                    <strong>
+                      {confirmNeutralisation.travail.nbLignesBipage} ligne
+                      {confirmNeutralisation.travail.nbLignesBipage > 1
+                        ? "s"
+                        : ""}{" "}
+                      de bipage
+                    </strong>{" "}
+                    collectée
+                    {confirmNeutralisation.travail.nbLignesBipage > 1
+                      ? "s"
+                      : ""}{" "}
+                    ;
+                  </li>
+                )}
+                {confirmNeutralisation.travail?.nbCollectes > 0 && (
+                  <li>
+                    <strong>
+                      {confirmNeutralisation.travail.nbCollectes} collecte
+                      {confirmNeutralisation.travail.nbCollectes > 1 ? "s" : ""}
+                    </strong>{" "}
+                    au collecteur (en cours ou déposée
+                    {confirmNeutralisation.travail.nbCollectes > 1 ? "s" : ""}) ;
+                  </li>
+                )}
+              </ul>
+              <p>
+                La neutraliser la sort de l'avancement global et refuse ses
+                coupons au scan. <strong>Rien n'est supprimé</strong> : les
+                phases et les bipages restent enregistrés, et la réactiver
+                rend tout tel quel.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-danger"
+                disabled={neutralisant}
+                onClick={() =>
+                  handleToggleNeutralisee(confirmNeutralisation.zone, {
+                    confirmer: true,
+                  })
+                }
+              >
+                {neutralisant ? "Neutralisation…" : "Oui, neutraliser"}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setConfirmNeutralisation(null)}
               >
                 Annuler
               </button>

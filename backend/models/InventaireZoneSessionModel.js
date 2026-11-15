@@ -55,6 +55,19 @@ const zoneProgressSchema = new mongoose.Schema(
     papillonnage: { type: phaseSchema, default: () => ({}) },
     bipage: { type: phaseSchema, default: () => ({}) },
     controle: { type: phaseSchema, default: () => ({}) },
+    // ZONE NEUTRALISÉE (16/11/2026) : le rayon n'existe plus physiquement
+    // (réaménagement du magasin). La zone reste dans le snapshot — on ne
+    // supprime jamais une zone qui peut porter du travail — mais elle sort de
+    // l'avancement (computeProgress l'ignore) et ses coupons sont refusés au
+    // scan. Réversible : la réactivation rend les phases déjà faites telles
+    // quelles.
+    neutralisee: { type: Boolean, default: false },
+    neutraliseeAt: { type: Date, default: null },
+    neutraliseePar: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { _id: false },
 );

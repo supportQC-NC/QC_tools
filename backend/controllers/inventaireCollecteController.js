@@ -1793,6 +1793,8 @@ const effectuerDepot = async (
   // (« Recommencer la zone ») remet déjà `bipage.fait = false`. Match
   // code + emplacement d'abord (un même code peut exister aux deux), repli
   // code seul (collectes/zones sans type).
+  // BIPAGE ⇒ PAPILLONNAGE (16/11/2026) : une zone bipée est forcément
+  // papillonnée, le papillonnage est coché avec le même crédit.
   if (session) {
     const norm = (s) => String(s || "").trim().toUpperCase();
     const zone =
@@ -1801,13 +1803,15 @@ const effectuerDepot = async (
           norm(z.code) === norm(collecte.zoneCode) &&
           norm(z.type) === norm(collecte.zoneType),
       ) || session.zones.find((z) => norm(z.code) === norm(collecte.zoneCode));
-    if (zone && !zone.bipage?.fait) {
-      zone.bipage = {
+    if (zone && (!zone.bipage?.fait || !zone.papillonnage?.fait)) {
+      const credit = {
         fait: true,
         at: new Date(),
         by: collecte.user || null,
         saisiPar: collecte.user || null,
       };
+      if (!zone.bipage?.fait) zone.bipage = credit;
+      if (!zone.papillonnage?.fait) zone.papillonnage = { ...credit };
       session.markModified("zones");
       await session.save();
     }

@@ -225,7 +225,12 @@ const AdminInventaireDashboardScreen = () => {
   // « aucun inventaire actif » ne s'affichait jamais et le tableau de bord
   // montrait 0 zone sur un inventaire qui en compte 622.
   const doc = session.data?.active || null;
-  const zones = useMemo(() => doc?.zones || [], [doc]);
+  // Les zones NEUTRALISÉES (rayon qui n'existe plus, écran Progression) sont
+  // hors inventaire : exclues des compteurs, de la répartition et des courbes.
+  const zones = useMemo(
+    () => (doc?.zones || []).filter((z) => !z.neutralisee),
+    [doc],
+  );
 
   // Progression recalculée ICI à partir des zones : le serveur la renvoie déjà
   // (`/progress`), mais on tient de toute façon les zones pour la répartition —

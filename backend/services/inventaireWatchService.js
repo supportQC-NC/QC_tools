@@ -458,6 +458,8 @@ const traiterFichier = async (
   // Un .DAT traité VAUT la phase « bipage » faite pour la zone (parité avec le
   // dépôt mobile, qui coche déjà la phase) : couvre aussi les fichiers déposés
   // à la main sur le partage. « Recommencer la zone » remet `fait: false`.
+  // BIPAGE ⇒ PAPILLONNAGE (16/11/2026) : une zone bipée est forcément
+  // papillonnée, le papillonnage est coché avec le même crédit.
   const normCode = (s) => String(s || "").trim().toUpperCase();
   const zoneSession =
     session.zones.find(
@@ -465,13 +467,18 @@ const traiterFichier = async (
         normCode(z.code) === normCode(zone.code) &&
         normCode(z.type) === normCode(zone.type),
     ) || session.zones.find((z) => normCode(z.code) === normCode(zone.code));
-  if (zoneSession && !zoneSession.bipage?.fait) {
-    zoneSession.bipage = {
+  if (
+    zoneSession &&
+    (!zoneSession.bipage?.fait || !zoneSession.papillonnage?.fait)
+  ) {
+    const credit = {
       fait: true,
       at: new Date(),
       by: agentUserId,
       saisiPar: null,
     };
+    if (!zoneSession.bipage?.fait) zoneSession.bipage = credit;
+    if (!zoneSession.papillonnage?.fait) zoneSession.papillonnage = { ...credit };
     session.markModified("zones");
     await session.save();
   }

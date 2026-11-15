@@ -10,6 +10,7 @@ import {
   getProgress,
   getHistorique,
   setPhaseManuelle,
+  setZoneNeutralisee,
   deleteSession,
   telechargerDossierZip,
 } from "../controllers/inventaireZoneController.js";
@@ -102,6 +103,17 @@ router.get(
   admin,
   checkEntrepriseAccess,
   getHistorique,
+);
+
+// Neutraliser / réactiver une zone (rayon qui n'existe plus physiquement).
+// ⚠️ DÉCLARÉE AVANT la route de phase : "/zone/:code/:phase" matcherait aussi
+// « neutraliser » et répondrait « phase invalide ».
+router.put(
+  "/:entrepriseId/zone/:code/neutraliser",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  setZoneNeutralisee,
 );
 
 // Correction manuelle d'une phase

@@ -501,6 +501,40 @@
   font-weight: 700;
 }
 
+.phase-badge:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Zone neutralisée : rayon qui n'existe plus physiquement — la ligne reste
+   visible (réactivable) mais estompée, hors avancement. */
+.zone-neutralisee td {
+  opacity: 0.5;
+}
+
+/* La colonne d'action garde sa pleine visibilité : c'est elle qui réactive. */
+.zone-neutralisee td.neutraliser-col {
+  opacity: 1;
+}
+
+.zone-neutralisee-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #9ca3af;
+  border: 1px solid #6b7280;
+}
+
+.neutraliser-col {
+  width: 42px;
+  text-align: center;
+}
+
 /* Modal */
 .modal-backdrop {
   position: fixed;

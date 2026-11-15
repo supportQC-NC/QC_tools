@@ -71,7 +71,12 @@ const AdminRecapZonesScreen = () => {
 
   const session = activeData?.active || null;
   const progress = activeData?.progress || null;
-  const zones = useMemo(() => session?.zones || [], [session]);
+  // Les zones NEUTRALISÉES (rayon qui n'existe plus, écran Progression) sont
+  // hors inventaire : ni cartes, ni compteurs. Même règle que computeProgress.
+  const zones = useMemo(
+    () => (session?.zones || []).filter((z) => !z.neutralisee),
+    [session],
+  );
 
   // Statut calculé par zone.
   const zonesAvecStatut = useMemo(
