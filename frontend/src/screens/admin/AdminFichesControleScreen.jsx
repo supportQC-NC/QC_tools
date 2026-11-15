@@ -30,21 +30,22 @@ import "./AdminFichesControleScreen.css";
 
 const POLL = 5000;
 
-// Origine d'une fiche, lue dans sa référence (datFileName) : les imports
-// portent un préfixe (« proforma … », « deduction proforma … », « excel … »,
-// « deduction <fichier> ») ; tout le reste est un .DAT du collecteur.
+// Origine d'une fiche, lue dans sa référence (datFileName). Depuis le
+// 16/11/2026 les imports d'une zone partagent UNE fiche groupée
+// (« imports <zone> », cumul de toutes les proformas / fichiers Excel) ; les
+// anciens préfixes par document (« proforma … », « excel … », « deduction … »)
+// sont rangés sous la même origine — tout le reste est un .DAT du collecteur.
 const origineFiche = (f) => {
   const ref = String(f?.datFileName || "");
-  if (/^(deduction )?proforma /.test(ref)) return "proforma";
-  if (/^(excel |deduction )/.test(ref)) return "excel";
+  if (/^(imports |(deduction )?proforma |excel |deduction )/.test(ref))
+    return "imports";
   return "dat";
 };
 
 const FILTRES_ORIGINE = [
   { cle: "", label: "Toutes" },
   { cle: "dat", label: "Collecteur (.DAT)" },
-  { cle: "proforma", label: "Proformas importées" },
-  { cle: "excel", label: "Excel importés" },
+  { cle: "imports", label: "Imports (proforma / Excel)" },
 ];
 
 const AdminFichesControleScreen = () => {
@@ -101,7 +102,7 @@ const AdminFichesControleScreen = () => {
   const [marquer, { isLoading: marquage }] = useMarquerImprimeesMutation();
 
   const nbParOrigine = useMemo(() => {
-    const n = { dat: 0, proforma: 0, excel: 0 };
+    const n = { dat: 0, imports: 0 };
     for (const f of fiches) n[origineFiche(f)] += 1;
     return n;
   }, [fiches]);
@@ -471,10 +472,13 @@ const AdminFichesControleScreen = () => {
                         )}
                       </td>
                       <td>
-                        {origineFiche(f) === "proforma" ? (
-                          <span className="fiches-origine proforma">Proforma</span>
-                        ) : origineFiche(f) === "excel" ? (
-                          <span className="fiches-origine excel">Excel</span>
+                        {origineFiche(f) === "imports" ? (
+                          <span
+                            className="fiches-origine proforma"
+                            title="Fiche groupée de la zone : cumul de toutes les proformas / fichiers Excel intégrés (le libellé liste les documents)"
+                          >
+                            Imports
+                          </span>
                         ) : (
                           <span className="fiches-origine dat">Collecteur</span>
                         )}

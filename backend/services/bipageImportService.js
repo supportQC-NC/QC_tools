@@ -21,7 +21,12 @@
 // ⚠️ Aucune écriture DBF : l'ERP reste en lecture seule.
 import ExcelJS from "exceljs";
 import proformaCacheService from "./proformaCacheService.js";
-import { construireLignes } from "./ficheControleService.js";
+import {
+  construireLignes,
+  referenceImportsZone,
+  lignesImportsZone,
+  cumulerLignesImports,
+} from "./ficheControleService.js";
 import Zone from "../models/ZoneModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
 import FicheControle from "../models/FicheControleModel.js";
@@ -532,32 +537,80 @@ const referenceProforma = (numfact, zoneCode, emplacement, deduction) =>
   }`;
 
 /**
- * Enregistre (upsert) la FICHE DE CONTRÔLE d'un import (proforma / Excel) :
- * sans elle, un comptage importé n'apparaissait pas dans l'écran « Fiches de
- * contrôle » (constaté en prod, demande client du 30/10/2026). Aucun PDF n'est
- * écrit sur le partage : l'aperçu/téléchargement le régénère depuis les
- * LigneBipage (`assurerPdfFiche`, repli « base » — la référence d'import sert
- * de datFileName, c'est la même clé que les lignes). Réimporter le même trio
- * remet la fiche à jour au lieu d'en créer une deuxième ; « recommencer » la
- * zone la supprime avec les lignes.
- *
- * IMPRESSION (demande client du 30/10/2026) : même principe que les .DAT du
- * collecteur — la fiche doit SORTIR DE L'IMPRIMANTE à l'intégration. Le
- * backend (VPS) ne peut pas imprimer : on pose `reprintRequested`, et c'est
- * l'agent local (watcher, poste imprimante) qui régénère le PDF depuis les
- * lignes et l'imprime au passage suivant (`traiterReimpressions`), puis passe
- * `printed` à true.
+ * Libellé de la fiche GROUPÉE d'une zone : la liste de ce qui la compose
+ * (proformas, déductions, fichiers Excel), reconstruite depuis les lignes.
+ * Tronqué — l'en-tête de la fiche n'est pas un inventaire de références.
  */
-const enregistrerFicheImport = async ({
+const libelleImportsZone = (lignes) => {
+  const prof = new Set();
+  const profDed = new Set();
+  const excel = new Set();
+  const excelDed = new Set();
+  for (const l of lignes || []) {
+    const ref = String(l.datFileName || "");
+    const deduction =
+      l.modeImport === "deduction" || /^deduction /.test(ref);
+    const estProforma = l.source === "proforma" || /proforma /.test(ref);
+    if (estProforma) {
+      const n =
+        trim(l.sourceRef) || (RE_REFERENCE_PROFORMA.exec(ref) || [])[1] || "?";
+      (deduction ? profDed : prof).add(n);
+    } else {
+      (deduction ? excelDed : excel).add(trim(l.sourceRef) || "fichier");
+    }
+  }
+  const bouts = [];
+  if (prof.size)
+    bouts.push(`Proforma${prof.size > 1 ? "s" : ""} ${[...prof].join(", ")}`);
+  if (profDed.size)
+    bouts.push(`Déduction proforma ${[...profDed].join(", ")}`);
+  if (excel.size) bouts.push(`Excel ${[...excel].join(", ")}`);
+  if (excelDed.size) bouts.push(`Déduction Excel ${[...excelDed].join(", ")}`);
+  const libelle = `Imports — ${bouts.join(" · ")}`;
+  return libelle.length > 140 ? `${libelle.slice(0, 139)}…` : libelle;
+};
+
+/**
+ * Enregistre (upsert) LA fiche de contrôle DES IMPORTS d'une zone — UNE PAR
+ * ZONE, quel que soit le nombre de proformas / fichiers intégrés (demande
+ * client du 16/11/2026, qui remplace la fiche PAR DOCUMENT du 30/10/2026) :
+ * chaque ajout ou déduction régénère la fiche COMPLÈTE, cumul par article de
+ * tous les imports de la zone — comme le .dat cumulé d'une zone re-bipée.
+ * Les anciennes fiches « une par document » de la zone sont remplacées.
+ *
+ * Aucun PDF n'est écrit sur le partage : l'aperçu/téléchargement le régénère
+ * depuis les LigneBipage (`assurerPdfFiche` → `lignesImportsZone`, cumul).
+ * Plus aucune ligne d'import sur la zone (références remplacées par un
+ * ré-import vide ?) → la fiche est supprimée, elle n'a plus d'objet.
+ *
+ * IMPRESSION (demande client du 30/10/2026, inchangée) : la fiche doit SORTIR
+ * DE L'IMPRIMANTE à l'intégration. Le backend (VPS) ne peut pas imprimer : on
+ * pose `reprintRequested`, et l'agent local (watcher) régénère le PDF depuis
+ * les lignes et l'imprime au passage suivant (`traiterReimpressions`).
+ * `reimprimer: false` = migration silencieuse (rattrapage de lecture) : la
+ * fiche est groupée SANS déclencher d'impression, rien n'a changé au terrain.
+ */
+export const enregistrerFicheZoneImports = async ({
   entreprise,
   session,
-  reference,
   zoneCode,
   zoneType,
-  libelle,
-  stats,
+  reimprimer = true,
 }) => {
+  const reference = referenceImportsZone(zoneCode, zoneType);
   try {
+    const lignes = await lignesImportsZone(session._id, zoneCode, zoneType);
+    if (!lignes.length) {
+      await FicheControle.deleteMany({
+        session: session._id,
+        datFileName: reference,
+      });
+      return;
+    }
+
+    const cumul = cumulerLignesImports(lignes);
+    const { stats } = await construireLignes(entreprise, cumul);
+
     await FicheControle.findOneAndUpdate(
       { session: session._id, datFileName: reference },
       {
@@ -565,23 +618,34 @@ const enregistrerFicheImport = async ({
           entreprise: entreprise._id,
           inventaireNom: session.nom || "",
           inventaireSlug: session.dossierSlug || session.nom || "",
-          zoneCode,
-          zoneType,
-          zoneLibelle: libelle,
+          zoneCode: trim(zoneCode),
+          zoneType: trim(zoneType),
+          zoneLibelle: libelleImportsZone(lignes),
           date: new Date(),
           stats: stats || {},
-          printed: false,
-          // Impression par l'agent local au prochain passage (voir ci-dessus).
-          reprintRequested: true,
-          reprintRequestedAt: new Date(),
+          ...(reimprimer && {
+            printed: false,
+            reprintRequested: true,
+            reprintRequestedAt: new Date(),
+          }),
         },
       },
       { upsert: true },
     );
+
+    // Les anciennes fiches « une par document » de la zone sont remplacées par
+    // la fiche groupée (migration comprise) — les fiches .DAT du collecteur,
+    // elles, ne matchent pas ce motif et restent intactes.
+    await FicheControle.deleteMany({
+      session: session._id,
+      zoneCode: trim(zoneCode),
+      zoneType: trim(zoneType),
+      datFileName: { $regex: /^(?:deduction |excel |proforma )/ },
+    });
   } catch (e) {
     // Best-effort : le suivi ne doit jamais faire échouer l'import lui-même.
     console.error(
-      `[bipage-import] fiche de contrôle non enregistrée (${reference}) :`,
+      `[bipage-import] fiche de contrôle de zone non enregistrée (${reference}) :`,
       e.message,
     );
   }
@@ -866,7 +930,7 @@ export const importerProformas = async (
       continue;
     }
 
-    const { rows, stats } = await construireLignes(entreprise, aCompter);
+    const { rows } = await construireLignes(entreprise, aCompter);
     // Référence distincte par mode : une même proforma peut être intégrée en
     // comptage PUIS en déduction sans que l'un écrase l'autre (comme l'Excel).
     const reference = referenceProforma(numfact, zoneCode, emplacement, deduction);
@@ -903,17 +967,6 @@ export const importerProformas = async (
       })),
     );
 
-    // La fiche de contrôle de cet import, visible dans l'écran dédié.
-    await enregistrerFicheImport({
-      entreprise,
-      session,
-      reference,
-      zoneCode,
-      zoneType: emplacement,
-      libelle: `Proforma ${numfact}${deduction ? " (déduction)" : ""}`,
-      stats,
-    });
-
     totalLignes += rows.length;
     totalUnites += unites;
     resultats.push({
@@ -928,6 +981,19 @@ export const importerProformas = async (
   }
 
   const importees = resultats.filter((r) => r.statut === "importee").length;
+
+  // LA fiche de contrôle de la ZONE (une seule, cumul de tous ses imports),
+  // régénérée complète et renvoyée à l'imprimante — PAS une fiche par
+  // proforma (demande client du 16/11/2026).
+  if (importees) {
+    await enregistrerFicheZoneImports({
+      entreprise,
+      session,
+      zoneCode,
+      zoneType: emplacement,
+    });
+  }
+
   // Premier comptage de la zone : papillonnage et bipage passent à « fait ».
   const phasesMarquees =
     importees && premierComptage
@@ -1087,7 +1153,7 @@ export const importerExcelBipage = async (
     throw new Error("Aucune ligne exploitable (colonnes CODE et QUANTITE).");
   }
 
-  const { rows, stats } = await construireLignes(entreprise, aCompter);
+  const { rows } = await construireLignes(entreprise, aCompter);
   // La référence identifie l'import : mode + fichier + zone. Deux modes, deux
   // fichiers ou deux zones ne s'écrasent donc jamais ; le même trio, si.
   const reference = `${deduction ? "deduction" : "excel"} ${trim(nomFichier)} ${zoneCode}${
@@ -1121,15 +1187,13 @@ export const importerExcelBipage = async (
     })),
   );
 
-  // La fiche de contrôle de cet import, visible dans l'écran dédié.
-  await enregistrerFicheImport({
+  // LA fiche de contrôle de la ZONE (cumul de tous ses imports), régénérée
+  // complète — pas une fiche par fichier (demande client du 16/11/2026).
+  await enregistrerFicheZoneImports({
     entreprise,
     session,
-    reference,
     zoneCode,
     zoneType: emplacement,
-    libelle: `Excel ${trim(nomFichier)}${deduction ? " (déduction)" : ""}`,
-    stats,
   });
 
   // Premier comptage de la zone : papillonnage et bipage passent à « fait ».

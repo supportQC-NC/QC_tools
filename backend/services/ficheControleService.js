@@ -572,6 +572,80 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
   });
 };
 // ===========================================
+// FICHE D'IMPORTS GROUPÉE PAR ZONE
+// ===========================================
+//
+// Demande client du 16/11/2026 : intégrer PLUSIEURS proformas (ou fichiers
+// Excel) sur une zone ne doit plus produire une fiche de contrôle PAR
+// document — il n'y a qu'UNE fiche PAR ZONE, le CUMUL de tous les imports
+// (ajouts ET déductions), régénérée complète à chaque nouvel import. Même
+// logique que le .dat d'une zone re-bipée au collecteur (inventaireCumulService).
+//
+// Chaque import garde SA référence sur ses LigneBipage (datFileName
+// « proforma N … » / « excel F … » / « deduction … ») : c'est la clé de son
+// idempotence et du détail par document. Seule la FICHE est groupée, sous la
+// référence « imports <zone>[_<emplacement>] » — un nom qui ne peut collider ni
+// avec un .DAT (« <EMPL>/stock.dat <code> ») ni avec une référence d'import.
+
+export const PREFIXE_FICHE_IMPORTS = "imports ";
+
+export const referenceImportsZone = (zoneCode, zoneType) => {
+  const code = String(zoneCode || "").trim();
+  const type = String(zoneType || "").trim();
+  return `${PREFIXE_FICHE_IMPORTS}${code}${type ? `_${type}` : ""}`;
+};
+
+/**
+ * Toutes les lignes d'IMPORT d'une zone (proformas + Excel, ajouts et
+ * déductions), tolérant aux lignes historiques sans champ `source` (repérées
+ * par leur référence — un .DAT ne commence jamais par ces mots).
+ */
+export const lignesImportsZone = async (sessionId, zoneCode, zoneType) => {
+  const type = String(zoneType || "").trim();
+  return LigneBipage.find({
+    session: sessionId,
+    zoneCode: String(zoneCode || "").trim(),
+    zoneType: type || { $in: [null, ""] },
+    $or: [
+      { source: { $in: ["proforma", "excel"] } },
+      {
+        source: { $in: [null, ""] },
+        datFileName: { $regex: /^(?:deduction |excel |proforma )/ },
+      },
+    ],
+  })
+    .sort({ datFileName: 1, ordre: 1 })
+    .lean();
+};
+
+/**
+ * Cumul PAR ARTICLE des lignes d'import d'une zone → le format attendu par
+ * `construireLignes` ({ code, quantite }). Un article présent sur plusieurs
+ * documents sort en UNE ligne, quantités additionnées (déductions en négatif,
+ * elles se retranchent naturellement) — exactement comme le .dat cumulé d'une
+ * zone re-bipée. Clé = NART résolu, repli code scanné ; l'ordre est celui de
+ * la première apparition.
+ */
+export const cumulerLignesImports = (lignes) => {
+  const map = new Map();
+  for (const l of lignes || []) {
+    const cle = String(l.nart || l.codeScanne || l.eanArticle || "")
+      .trim()
+      .toUpperCase();
+    if (!cle) continue;
+    const cur = map.get(cle) || {
+      code: String(l.codeScanne || l.eanArticle || l.nart || "").trim(),
+      quantite: 0,
+    };
+    cur.quantite += Number(l.qteScan) || 0;
+    map.set(cle, cur);
+  }
+  // Un cumul retombé à zéro (import puis déduction identique) reste affiché :
+  // c'est une information de contrôle, pas une ligne fantôme.
+  return [...map.values()];
+};
+
+// ===========================================
 // RÉCUPÉRATION / RECONSTRUCTION DU PDF
 // ===========================================
 
@@ -620,6 +694,19 @@ export const resoudreCheminDat = (fiche, entreprise = null) => {
  * partage, ou quand le backend web n'a pas accès au partage du tout.
  */
 const retrouverLignesDat = async (fiche, entreprise = null) => {
+  // Fiche d'imports GROUPÉE PAR ZONE : aucun fichier sur le partage et les
+  // lignes ne portent pas sa référence (chacune garde celle de SON import).
+  // On reconstruit le CUMUL de la zone, toutes sources d'import confondues.
+  if (String(fiche?.datFileName || "").startsWith(PREFIXE_FICHE_IMPORTS)) {
+    const enBase = await lignesImportsZone(
+      fiche.session,
+      fiche.zoneCode,
+      fiche.zoneType,
+    );
+    const lignes = cumulerLignesImports(enBase);
+    return { lignes, origine: lignes.length ? "base" : "" };
+  }
+
   const datPath = resoudreCheminDat(fiche, entreprise);
   if (datPath) {
     try {

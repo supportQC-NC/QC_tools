@@ -3,10 +3,12 @@ import fs from "fs";
 import asyncHandler from "../middleware/asyncHandler.js";
 import FicheControle from "../models/FicheControleModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
+import LigneBipage from "../models/LigneBipageModel.js";
 import {
   config,
   resoudreCheminPdf,
   assurerPdfFiche,
+  referenceImportsZone,
 } from "../services/ficheControleService.js";
 import {
   scanManuel,
@@ -15,9 +17,9 @@ import {
   stopInventaireWatcher,
 } from "../services/inventaireWatchService.js";
 import {
-  importsProformaParSession,
   detailsProformas,
   enteteFicheImport,
+  enregistrerFicheZoneImports,
 } from "../services/bipageImportService.js";
 
 /**
@@ -37,47 +39,55 @@ const getFiches = asyncHandler(async (req, res) => {
     return res.json({ active: false, fiches: [] });
   }
 
-  // ── Rattrapage des imports de proformas ──
-  // Les fiches des imports sont créées à l'import depuis le 30/10/2026 ; les
-  // proformas intégrées AVANT n'en ont pas — on les crée ici à la volée, une
-  // fois (clé = la référence d'import portée par les lignes, c'est elle que
-  // l'aperçu PDF utilise pour retrouver les LigneBipage). Best-effort : un
-  // échec n'empêche pas la liste de s'afficher.
+  // ── Rattrapage / MIGRATION des fiches d'imports ──
+  // UNE fiche PAR ZONE depuis le 16/11/2026 (cumul de tous les imports de la
+  // zone — avant, une fiche PAR document). Toute zone importée qui n'a pas
+  // encore sa fiche groupée la reçoit ici : imports intégrés avant la fiche
+  // automatique du 30/10/2026 comme fiches « une par proforma » antérieures au
+  // regroupement (remplacées au passage par `enregistrerFicheZoneImports`).
+  // SANS impression (`reimprimer: false`) : rien n'a changé au terrain.
+  // Best-effort : un échec n'empêche pas la liste de s'afficher.
   try {
-    const imports = await importsProformaParSession(session._id);
-    if (imports.length) {
+    const zonesImports = await LigneBipage.aggregate([
+      {
+        $match: {
+          session: session._id,
+          $or: [
+            { source: { $in: ["proforma", "excel"] } },
+            {
+              source: { $in: [null, ""] },
+              datFileName: { $regex: /^(?:deduction |excel |proforma )/ },
+            },
+          ],
+        },
+      },
+      { $group: { _id: { code: "$zoneCode", type: "$zoneType" } } },
+    ]);
+    if (zonesImports.length) {
+      const refs = zonesImports.map((z) =>
+        referenceImportsZone(z._id.code, z._id.type),
+      );
       const existantes = new Set(
         (
-          await FicheControle.find({ session: session._id })
+          await FicheControle.find({
+            session: session._id,
+            datFileName: { $in: refs },
+          })
             .select("datFileName")
             .lean()
         ).map((f) => f.datFileName),
       );
-      const faites = new Set();
-      for (const imp of imports) {
-        if (
-          !imp.reference ||
-          existantes.has(imp.reference) ||
-          faites.has(imp.reference)
-        ) {
+      for (const z of zonesImports) {
+        if (existantes.has(referenceImportsZone(z._id.code, z._id.type))) {
           continue;
         }
-        faites.add(imp.reference);
-        await FicheControle.create({
-          entreprise: entreprise._id,
-          session: session._id,
-          inventaireNom: session.nom || "",
-          inventaireSlug: session.dossierSlug || session.nom || "",
-          datFileName: imp.reference,
-          zoneCode: imp.zoneCode,
-          zoneType: imp.zoneType,
-          zoneLibelle: `Proforma ${imp.numfact}${
-            imp.mode === "deduction" ? " (déduction)" : ""
-          }`,
-          date: imp.at || new Date(),
-          stats: { total: imp.lignes },
-          printed: false,
-        }).catch(() => {}); // doublon (course) : déjà créée par un autre passage
+        await enregistrerFicheZoneImports({
+          entreprise,
+          session,
+          zoneCode: z._id.code,
+          zoneType: z._id.type,
+          reimprimer: false,
+        });
       }
     }
   } catch (e) {
