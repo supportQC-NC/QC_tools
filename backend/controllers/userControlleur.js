@@ -163,6 +163,68 @@ const authUser = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Connexion par BADGE + code PIN (web et collecteur). Le bip du badge
+//          (EAN-13 du compte) identifie la personne, le PIN la prouve : le
+//          badge seul ne suffit JAMAIS — il est déterministe (dérivé de l'_id)
+//          et la feuille de poste imprime ceux de tout le monde. Un compte
+//          sans PIN défini n'a pas la connexion par badge.
+// @route   POST /api/users/login-badge
+// @access  Public (limité en débit — loginRateLimit)
+const authUserBadge = asyncHandler(async (req, res) => {
+  const codeBarre = String(req.body?.codeBarre || "").replace(/\D/g, "");
+  const pin = String(req.body?.pin || "").trim();
+
+  if (codeBarre.length !== 13 || !pin) {
+    res.status(400);
+    throw new Error("Badge (13 chiffres) et code PIN requis");
+  }
+
+  const user = await User.findOne({ codeBarre }).select("+pinBadge");
+
+  if (!user || !user.isActive) {
+    res.status(401);
+    throw new Error("Badge inconnu ou code PIN invalide");
+  }
+
+  // Message distinct VOULU : sur le terrain, un agent sans PIN verrait sinon
+  // « PIN invalide » et retaperait en boucle. Ne révèle que l'état d'une
+  // option du compte, pas un secret.
+  if (!user.pinBadge) {
+    res.status(401);
+    throw new Error(
+      "La connexion par badge n'est pas activée pour ce compte : définissez un code PIN (profil, ou via un administrateur).",
+    );
+  }
+
+  const isMatch = await user.comparePinBadge(pin);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error("Badge inconnu ou code PIN invalide");
+  }
+
+  user.lastLogin = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  const permissions = await Permission.findOne({ user: user._id }).populate(
+    "entreprises",
+    "nomDossierDBF trigramme nomComplet",
+  );
+
+  generateToken(res, user._id);
+
+  // Même forme de réponse que /login : les deux fronts la consomment pareil.
+  res.json({
+    _id: user._id,
+    email: user.email,
+    nom: user.nom,
+    prenom: user.prenom,
+    role: user.role,
+    photo: user.photo || null,
+    photoUpdatedAt: user.photoUpdatedAt || null,
+    permissions: permissions || null,
+  });
+});
+
 // @desc    Logout user / clear cookie
 // @route   POST /api/users/logout
 // @access  Public (doit fonctionner même avec un token expiré)
@@ -183,7 +245,10 @@ const logoutUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
+  // `+pinBadge` : uniquement pour le booléen `aPinBadge` (le hachage ne sort
+  // jamais). `codeBarre` manquait à la réponse : la carte « Mon badge » du
+  // profil ne s'affichait jamais (corrigé au passage, 16/11/2026).
+  const user = await User.findById(req.user._id).select("+pinBadge");
   const permissions = await Permission.findOne({ user: req.user._id }).populate(
     "entreprises",
     "nomDossierDBF trigramme nomComplet",
@@ -204,6 +269,8 @@ const getUserProfile = asyncHandler(async (req, res) => {
     lastLogin: user.lastLogin,
     photo: user.photo || null,
     photoUpdatedAt: user.photoUpdatedAt || null,
+    codeBarre: user.codeBarre || "",
+    aPinBadge: !!user.pinBadge,
     permissions: permissions || null,
   });
 });
@@ -363,6 +430,50 @@ const changePassword = asyncHandler(async (req, res) => {
   res.json({ ok: true, message: "Mot de passe modifié avec succès" });
 });
 
+// @desc    Définir / changer / retirer SON code PIN badge. Le mot de passe
+//          actuel est exigé (même règle que le changement de mot de passe) :
+//          une session restée ouverte ne doit pas suffire à s'octroyer une
+//          connexion par badge durable. PIN vide = connexion par badge
+//          désactivée pour le compte.
+// @route   PUT /api/users/profile/pin-badge
+// @access  Private
+const setPinBadge = asyncHandler(async (req, res) => {
+  const { currentPassword } = req.body;
+  const pin = String(req.body?.pin ?? "").trim();
+
+  if (!currentPassword) {
+    res.status(400);
+    throw new Error("Mot de passe actuel requis");
+  }
+  if (pin && !/^\d{4,6}$/.test(pin)) {
+    res.status(400);
+    throw new Error("Le code PIN doit faire 4 à 6 chiffres");
+  }
+
+  const user = await User.findById(req.user._id).select("+password");
+  if (!user) {
+    res.status(404);
+    throw new Error("Utilisateur non trouvé");
+  }
+
+  const ok = await user.comparePassword(currentPassword);
+  if (!ok) {
+    res.status(401);
+    throw new Error("Le mot de passe actuel est incorrect");
+  }
+
+  user.pinBadge = pin || null; // haché par le hook pre('save') si non vide
+  await user.save({ validateBeforeSave: false });
+
+  res.json({
+    ok: true,
+    aPinBadge: !!pin,
+    message: pin
+      ? "Code PIN enregistré : la connexion par badge est active."
+      : "Code PIN retiré : la connexion par badge est désactivée.",
+  });
+});
+
 // @desc    Forgot password
 // @route   POST /api/users/forgot-password
 // @access  Public
@@ -497,6 +608,14 @@ const createUser = asyncHandler(async (req, res) => {
     equipesValides.push(team);
   }
 
+  // Code PIN badge à la création (optionnel) : l'admin crée le compte, imprime
+  // le badge et remet le PIN — même règle de format que partout (4-6 chiffres).
+  const pinBadgeDemande = String(req.body?.pinBadge ?? "").trim();
+  if (pinBadgeDemande && !/^\d{4,6}$/.test(pinBadgeDemande)) {
+    res.status(400);
+    throw new Error("Le code PIN badge doit faire 4 à 6 chiffres");
+  }
+
   const user = await User.create({
     email,
     password,
@@ -504,6 +623,7 @@ const createUser = asyncHandler(async (req, res) => {
     prenom,
     role: targetRole,
     createdBy: req.user._id,
+    ...(pinBadgeDemande && { pinBadge: pinBadgeDemande }),
   });
 
   // Un compte ADMIN est super-admin par défaut (accès à toutes les entreprises +
@@ -716,8 +836,11 @@ const getUserById = asyncHandler(async (req, res) => {
     throw new Error("Utilisateur hors de votre périmètre");
   }
 
+  // `+pinBadge` : uniquement pour en dériver le booléen `aPinBadge` (l'écran
+  // d'édition affiche « PIN défini » / « non défini ») — le hachage ne sort
+  // jamais de la réponse.
   const user = await User.findById(req.params.id)
-    .select("-password")
+    .select("-password +pinBadge")
     .populate("createdBy", "nom prenom email");
 
   if (!user) {
@@ -730,8 +853,12 @@ const getUserById = asyncHandler(async (req, res) => {
     "nomDossierDBF trigramme nomComplet",
   );
 
+  const obj = user.toObject();
+  delete obj.pinBadge;
+
   res.json({
-    ...user.toObject(),
+    ...obj,
+    aPinBadge: !!user.pinBadge,
     permissions: permissions || null,
   });
 });
@@ -785,6 +912,19 @@ const updateUser = asyncHandler(async (req, res) => {
 
   if (req.body.password) {
     user.password = req.body.password;
+  }
+
+  // Code PIN badge : absent du corps = non touché ; "" = retiré (connexion par
+  // badge désactivée) ; 4-6 chiffres = défini (haché par le hook pre-save).
+  // C'est le canal de DISTRIBUTION normal : l'admin crée le compte, imprime le
+  // badge et remet le PIN à l'agent.
+  if (req.body.pinBadge !== undefined) {
+    const pin = String(req.body.pinBadge ?? "").trim();
+    if (pin && !/^\d{4,6}$/.test(pin)) {
+      res.status(400);
+      throw new Error("Le code PIN badge doit faire 4 à 6 chiffres");
+    }
+    user.pinBadge = pin || null;
   }
 
   const updatedUser = await user.save();
@@ -1380,6 +1520,8 @@ const exporterBadgesPdf = asyncHandler(async (req, res) => {
 
 export {
   authUser,
+  authUserBadge,
+  setPinBadge,
   genererBadgesManquants,
   getUserParBadge,
   exporterBadgesPdf,

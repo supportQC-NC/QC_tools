@@ -6,6 +6,7 @@ import {
   useUpdateProfileMutation,
   useUploadProfilePhotoMutation,
   useDeleteProfilePhotoMutation,
+  useSetPinBadgeMutation,
   userPhotoUrl,
 } from "../../slices/userApiSlice";
 import {
@@ -188,6 +189,40 @@ const ProfileScreen = () => {
   }, [profile]);
 
   const onField = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  // ── Code PIN de la connexion par badge ──
+  // Avec le badge bipé, ce PIN connecte au web et au collecteur. Le mot de
+  // passe actuel est exigé par le serveur (même règle qu'un changement de mot
+  // de passe) ; PIN vide = connexion par badge désactivée.
+  const [setPinBadge, { isLoading: savingPin }] = useSetPinBadgeMutation();
+  const [pinForm, setPinForm] = useState({ pin: "", currentPassword: "" });
+  const [pinMsg, setPinMsg] = useState(null);
+
+  const submitPin = async (retirer = false) => {
+    setPinMsg(null);
+    const pin = retirer ? "" : pinForm.pin.trim();
+    if (!retirer && !/^\d{4,6}$/.test(pin)) {
+      setPinMsg({ type: "error", text: "Le code PIN doit faire 4 à 6 chiffres." });
+      return;
+    }
+    if (!pinForm.currentPassword) {
+      setPinMsg({ type: "error", text: "Saisissez votre mot de passe actuel." });
+      return;
+    }
+    try {
+      const res = await setPinBadge({
+        currentPassword: pinForm.currentPassword,
+        pin,
+      }).unwrap();
+      setPinForm({ pin: "", currentPassword: "" });
+      setPinMsg({ type: "success", text: res?.message || "Code PIN mis à jour." });
+    } catch (err) {
+      setPinMsg({
+        type: "error",
+        text: err?.data?.message || "Enregistrement du code PIN impossible.",
+      });
+    }
+  };
 
   const submitProfile = async (e) => {
     e.preventDefault();
@@ -463,6 +498,80 @@ const ProfileScreen = () => {
               scan d'un coupon d'inventaire, pour créditer votre travail. Votre
               carte plastifiée est imprimée par un administrateur.
             </p>
+
+            {/* Connexion par badge : badge bipé + code PIN. Le PIN est le
+                secret (le badge est imprimé, il ne suffit jamais seul). */}
+            <div className="profile-pin">
+              <div className="sub-section-title">
+                Connexion par badge{" "}
+                <span className={`sub-badge ${profile.aPinBadge ? "ok" : "paused"}`}>
+                  {profile.aPinBadge ? "Activée (PIN défini)" : "Désactivée"}
+                </span>
+              </div>
+              <p className="profile-badge-aide">
+                Définissez un code PIN (4 à 6 chiffres) pour vous connecter au
+                site et au collecteur en bipant votre badge puis en tapant ce
+                code.
+              </p>
+              {pinMsg && (
+                <div className={`profile-banner ${pinMsg.type}`}>{pinMsg.text}</div>
+              )}
+              <div className="profile-grid">
+                <div className="form-group">
+                  <label>{profile.aPinBadge ? "Nouveau code PIN" : "Code PIN"}</label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    autoComplete="off"
+                    value={pinForm.pin}
+                    onChange={(e) =>
+                      setPinForm((f) => ({
+                        ...f,
+                        pin: e.target.value.replace(/\D/g, "").slice(0, 6),
+                      }))
+                    }
+                    placeholder="4 à 6 chiffres"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Mot de passe actuel</label>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={pinForm.currentPassword}
+                    onChange={(e) =>
+                      setPinForm((f) => ({ ...f, currentPassword: e.target.value }))
+                    }
+                    placeholder="Requis pour confirmer"
+                  />
+                </div>
+              </div>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => submitPin(false)}
+                  disabled={savingPin}
+                >
+                  {savingPin
+                    ? "Enregistrement..."
+                    : profile.aPinBadge
+                      ? "Changer le code PIN"
+                      : "Activer la connexion par badge"}
+                </button>
+                {profile.aPinBadge && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => submitPin(true)}
+                    disabled={savingPin}
+                  >
+                    Retirer le PIN (désactiver)
+                  </button>
+                )}
+              </div>
+            </div>
           </section>
         ) : null}
 

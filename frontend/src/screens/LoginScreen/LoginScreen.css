@@ -32,6 +32,37 @@
   color: #b3b0b0;
 }
 
+/* Bascule E-mail / Badge */
+.login-modes {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.login-mode {
+  flex: 1;
+  padding: 7px 0;
+  background: #121225;
+  border: 1px solid #2c2c44;
+  border-radius: 6px;
+  color: #b3b0b0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.login-mode.active {
+  border-color: #f7dd6d;
+  color: #f7dd6d;
+  font-weight: 600;
+}
+
+.login-badge-hint {
+  font-size: 10px;
+  color: #888;
+  line-height: 1.4;
+  margin: 0;
+}
+
 .login-error {
   padding: 8px;
   margin-bottom: 12px;

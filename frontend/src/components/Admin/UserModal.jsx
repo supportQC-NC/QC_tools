@@ -101,6 +101,10 @@ const UserModal = ({ user, onClose, asPage = false }) => {
     prenom: "",
     email: "",
     password: "",
+    // Code PIN de la connexion par badge (4-6 chiffres). Vide = non touché en
+    // édition ; `pinBadgeRetirer` (édition seule) le supprime explicitement.
+    pinBadge: "",
+    pinBadgeRetirer: false,
     role: "user",
     isActive: true,
     // Équipes de rattachement À LA CRÉATION (le compte devient membre ; la
@@ -234,6 +238,8 @@ const UserModal = ({ user, onClose, asPage = false }) => {
         prenom: user.prenom || "",
         email: user.email || "",
         password: "",
+        pinBadge: "",
+        pinBadgeRetirer: false,
         role: user.role || "user",
         isActive: user.isActive ?? true,
         permissions: {
@@ -487,14 +493,27 @@ const UserModal = ({ user, onClose, asPage = false }) => {
     setError("");
 
     try {
+      // Code PIN badge : champ vide = NON touché ("" explicite = retrait, via
+      // la case « Retirer » en édition). Format vérifié ici pour un message
+      // immédiat ; le serveur revérifie.
+      const { pinBadgeRetirer, ...payload } = formData;
+      if (pinBadgeRetirer) {
+        payload.pinBadge = "";
+      } else if (!payload.pinBadge) {
+        delete payload.pinBadge;
+      } else if (!/^\d{4,6}$/.test(payload.pinBadge)) {
+        setError("Le code PIN badge doit faire 4 à 6 chiffres");
+        return;
+      }
+
       if (isEdit) {
-        await updateUser({ id: user._id, ...formData }).unwrap();
+        await updateUser({ id: user._id, ...payload }).unwrap();
       } else {
-        if (!formData.password) {
+        if (!payload.password) {
           setError("Le mot de passe est requis");
           return;
         }
-        await createUser(formData).unwrap();
+        await createUser(payload).unwrap();
       }
       onClose();
     } catch (err) {
@@ -566,6 +585,57 @@ const UserModal = ({ user, onClose, asPage = false }) => {
             placeholder="••••••••"
             required={!isEdit}
           />
+        </div>
+
+        {/* Connexion par badge : badge bipé + ce code PIN. Le badge est
+            imprimé (feuille de poste, cartes) et ne suffit jamais seul. */}
+        <div className="form-group">
+          <label>
+            Code PIN badge
+            <span className="label-hint">
+              {" "}
+              (4-6 chiffres — connexion en bipant le badge ;{" "}
+              {isEdit
+                ? user?.aPinBadge
+                  ? "PIN défini, laisser vide pour ne pas changer"
+                  : "aucun PIN défini"
+                : "facultatif"}
+              )
+            </span>
+          </label>
+          <input
+            type="password"
+            name="pinBadge"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={formData.pinBadge}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                pinBadge: e.target.value.replace(/\D/g, "").slice(0, 6),
+                pinBadgeRetirer: false,
+              }))
+            }
+            placeholder="••••"
+            disabled={formData.pinBadgeRetirer}
+          />
+          {isEdit && user?.aPinBadge && (
+            <label className="label-hint" style={{ marginTop: 4 }}>
+              <input
+                type="checkbox"
+                checked={formData.pinBadgeRetirer}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    pinBadgeRetirer: e.target.checked,
+                    pinBadge: "",
+                  }))
+                }
+              />{" "}
+              Retirer le code PIN (désactive la connexion par badge)
+            </label>
+          )}
         </div>
 
         <div className="form-group">

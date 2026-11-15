@@ -41,6 +41,25 @@ export const userApiSlice = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    // Connexion par badge (EAN-13 du compte) + code PIN. Même réponse que
+    // /login ; le badge seul ne suffit jamais (voir userControlleur).
+    loginBadge: builder.mutation({
+      query: ({ codeBarre, pin }) => ({
+        url: `${USERS_URL}/login-badge`,
+        method: "POST",
+        body: { codeBarre, pin },
+      }),
+    }),
+    // Définir / changer / retirer SON code PIN badge (mot de passe actuel
+    // exigé ; pin vide = connexion par badge désactivée).
+    setPinBadge: builder.mutation({
+      query: ({ currentPassword, pin }) => ({
+        url: `${USERS_URL}/profile/pin-badge`,
+        method: "PUT",
+        body: { currentPassword, pin },
+      }),
+      invalidatesTags: ["User"],
+    }),
     logout: builder.mutation({
       query: () => ({
         url: `${USERS_URL}/logout`,
@@ -177,6 +196,8 @@ export const userApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useLoginMutation,
+  useLoginBadgeMutation,
+  useSetPinBadgeMutation,
   useLogoutMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,

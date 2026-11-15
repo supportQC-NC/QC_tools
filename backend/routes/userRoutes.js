@@ -3,6 +3,8 @@ import express from "express";
 import multer from "multer";
 import {
   authUser,
+  authUserBadge,
+  setPinBadge,
   logoutUser,
   getUserProfile,
   getSocketToken,
@@ -28,6 +30,7 @@ import {
 import { protect } from "../middleware/authMiddleware.js";
 import { checkModuleAccess } from "../middleware/checkEntrepriseAccess.js";
 import { allowUserManagement } from "../middleware/accessControl.js";
+import { limiterConnexion } from "../middleware/loginRateLimit.js";
 
 const router = express.Router();
 
@@ -45,8 +48,11 @@ const canWrite = allowUserManagement("write");
 // Suppression de COMPTE : réservée aux admins / users_admin (PAS les responsables).
 const canDelete = checkModuleAccess("users_admin", "delete");
 
-// Public — DOIVENT être avant /:id
-router.post("/login", authUser);
+// Public — DOIVENT être avant /:id. Les deux routes de connexion sont
+// limitées en débit (10 échecs / 15 min par IP + identifiant) : un PIN de
+// 4-6 chiffres comme un badge au format prévisible s'essaieraient en boucle.
+router.post("/login", limiterConnexion, authUser);
+router.post("/login-badge", limiterConnexion, authUserBadge);
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 
@@ -61,6 +67,8 @@ router.post("/socket-token", protect, getSocketToken);
 router.put("/profile", protect, updateUserProfile);
 // Changement de mot de passe (self) — AVANT /:id pour ne pas être capté par :id.
 router.put("/profile/password", protect, changePassword);
+// Code PIN de la connexion par badge (self, mot de passe actuel exigé).
+router.put("/profile/pin-badge", protect, setPinBadge);
 // Photo de profil (self) — AVANT /:id pour ne pas être capté par :id.
 router.post("/profile/photo", protect, uploadPhoto, uploadProfilePhoto);
 router.delete("/profile/photo", protect, deleteProfilePhoto);

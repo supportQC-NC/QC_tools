@@ -86,6 +86,17 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: { unique: true, sparse: true },
     },
+    // ── Connexion par badge (16/11/2026) ──────────────────────────────────
+    // Code PIN (4-6 chiffres) qui, AVEC le bip du badge, connecte l'utilisateur
+    // (web + collecteur). HACHÉ comme le mot de passe — le badge seul ne suffit
+    // JAMAIS : l'EAN-13 est déterministe (dérivé de l'_id) et la feuille de
+    // poste imprime les badges de tout le monde — le PIN est le vrai secret.
+    // null = connexion par badge désactivée pour ce compte.
+    pinBadge: {
+      type: String,
+      default: null,
+      select: false,
+    },
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -114,6 +125,16 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
+// Hash du PIN badge — hook SÉPARÉ, même raison que le badge : le hook du mot
+// de passe sort tôt (`isModified("password")`) et sauterait le PIN sur un
+// enregistrement qui ne touche pas au mot de passe.
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("pinBadge") || !this.pinBadge) return next();
+  const salt = await bcrypt.genSalt(12);
+  this.pinBadge = await bcrypt.hash(this.pinBadge, salt);
+  next();
+});
+
 // Badge : généré à la création, jamais réécrit ensuite.
 // ⚠️ Hook SÉPARÉ de celui du mot de passe : celui-ci sort tôt
 // (`isModified("password")`), et y greffer la génération la sauterait à chaque
@@ -129,6 +150,12 @@ userSchema.pre("save", function (next) {
 // Comparer les mots de passe
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Comparer le PIN badge (nécessite .select("+pinBadge") à la lecture)
+userSchema.methods.comparePinBadge = async function (candidatePin) {
+  if (!this.pinBadge) return false;
+  return await bcrypt.compare(String(candidatePin ?? ""), this.pinBadge);
 };
 
 // Générer un token de reset (valable 30 min)
