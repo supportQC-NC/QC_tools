@@ -7,6 +7,7 @@ import {
   getStatsProformasZones,
   exportEcartsBipage,
   setEcartQteZone,
+  purgerCorrectionsEcarts,
   updateBipage,
   ajouterLigneBipage,
   exportCsv,
@@ -65,6 +66,11 @@ router.get("/:entrepriseId/ecarts", protect, canReadImport, checkEntrepriseAcces
 // « Calcul des écarts » (la différence est appliquée à la ligne la plus
 // récente du couple article × gisement).
 router.put("/:entrepriseId/ecarts/qte", protect, canWrite, checkEntrepriseAccess, setEcartQteZone);
+
+// Purge de l'affichage « corrigé » sur la feuille d'écarts : les lignes
+// corrigées (affichées même sous le seuil) redeviennent soumises aux filtres
+// normaux. La trace de correction (modifie, valeurs d'origine) est conservée.
+router.post("/:entrepriseId/ecarts/purger-corrections", protect, canWrite, checkEntrepriseAccess, purgerCorrectionsEcarts);
 
 router.post("/:entrepriseId/recommencer", protect, canWrite, checkEntrepriseAccess, recommencerZone);
 

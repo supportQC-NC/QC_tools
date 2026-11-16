@@ -279,7 +279,7 @@ export const dessinerDocInventaire = async ({
     .fontSize(7)
     .fillColor("#555")
     .text(
-      "ATT : D = doublon (NART présent ≥ 2 fois sur la même proforma) | XX = quantité excédentaire (qté > stock)",
+      "ATT : D = doublon (NART présent ≥ 2 fois sur la même proforma) | XX = quantité excédentaire (qté > stock) | C = quantité corrigée après bipage",
       left,
       y,
       { width: tableW },

@@ -798,7 +798,9 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   // Comptage : mêmes filtres que la liste de l'écran (zone, emplacement,
   // recherche), pour que le document reflète ce que l'utilisateur regarde.
   const lignes = await LigneBipage.find(buildFilter(session, req.query))
-    .select("nart eanArticle qteScan designation zoneCode zoneType")
+    .select(
+      "nart eanArticle qteScan designation zoneCode zoneType modifie modifieAt modifieParNom correctionPurgee",
+    )
     .lean();
 
   // Cumul par article. Clé = NART résolu, repli sur le code scanné : deux zones
@@ -829,6 +831,18 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       qte: 0,
     };
     pz.qte += Number(l.qteScan) || 0;
+    // Ligne CORRIGÉE (et pas encore purgée) : l'article restera affiché sur la
+    // feuille même sous le seuil (demande client 17/11/2026). On retient la
+    // correction la plus récente pour l'infobulle « corrigée par X ».
+    if (l.modifie && !l.correctionPurgee) {
+      cur.corrige = true;
+      pz.corrige = true;
+      const at = l.modifieAt ? new Date(l.modifieAt) : null;
+      if (!cur.corrigeAt || (at && at > cur.corrigeAt)) {
+        cur.corrigeAt = at || cur.corrigeAt || null;
+        if (l.modifieParNom) cur.corrigeParNom = l.modifieParNom;
+      }
+    }
     cur.parZone.set(cleZone, pz);
     compte.set(cle, cur);
   }
@@ -932,6 +946,13 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     // « D » ici = article compté dans PLUSIEURS zones : le doublon à vérifier
     // n'est pas la ligne répétée (le collecteur cumule) mais le rayon en double.
     cible.doublon = info.zones.size > 1;
+    // Correction non purgée sur au moins une ligne : l'article est AFFICHÉ
+    // quoi qu'il arrive (il échappe au seuil et au filtre d'anomalie).
+    if (info.corrige) {
+      cible.corrige = true;
+      cible.corrigeParNom = info.corrigeParNom || "";
+      cible.corrigeAt = info.corrigeAt || null;
+    }
     // Détail par gisement, TOUJOURS renvoyé (même un seul) : le contrôleur
     // doit savoir où aller vérifier.
     cible.zonesBipees = [...info.parZone.values()].sort(
@@ -945,20 +966,30 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   for (const row of univers.values()) {
     const diff = row.qte - row.stock;
     const diffval = Math.round(diff * row.prev);
-    if (Math.abs(diffval) <= seuil) continue;
+    // Un article CORRIGÉ (correction non purgée) reste affiché même quand son
+    // écart repasse sous le seuil — c'est tout l'intérêt de la correction : on
+    // doit voir que l'écart a été traité, pas le voir disparaître (demande
+    // client 17/11/2026). Le bouton « Purger les corrections » lève ce forçage.
+    if (Math.abs(diffval) <= seuil && !row.corrige) continue;
     const flags = [];
     if (row.doublon) flags.push("D");
     if (row.qte > row.stock) flags.push("XX");
+    if (row.corrige) flags.push("C");
     rows.push({ ...row, diff, diffval, att: flags.join(" ") });
   }
 
   // Filtre d'anomalie (voir plus haut) — sur les lignes DÉJÀ calculées : le
-  // seuil et le périmètre s'appliquent d'abord, comme sans filtre.
+  // seuil et le périmètre s'appliquent d'abord, comme sans filtre. Les lignes
+  // CORRIGÉES passent tous les filtres (même règle que le seuil).
   let rowsFiltres = rows;
-  if (anomalie === "manquant") rowsFiltres = rows.filter((r) => r.diff < 0);
-  else if (anomalie === "excedent") rowsFiltres = rows.filter((r) => r.diff > 0);
-  else if (anomalie === "multizone") rowsFiltres = rows.filter((r) => r.doublon);
-  else if (anomalie === "inconnu") rowsFiltres = rows.filter((r) => r.nonTrouve);
+  if (anomalie === "manquant")
+    rowsFiltres = rows.filter((r) => r.corrige || r.diff < 0);
+  else if (anomalie === "excedent")
+    rowsFiltres = rows.filter((r) => r.corrige || r.diff > 0);
+  else if (anomalie === "multizone")
+    rowsFiltres = rows.filter((r) => r.corrige || r.doublon);
+  else if (anomalie === "inconnu")
+    rowsFiltres = rows.filter((r) => r.corrige || r.nonTrouve);
 
   // Sous-lignes « gisement » du DOCUMENT (PDF/Excel) : où l'article a été bipé
   // et pour combien — toujours, même un seul gisement (le contrôleur part de
@@ -1299,6 +1330,45 @@ const setEcartQteZone = asyncHandler(async (req, res) => {
     ligneAjustee: ligne._id,
     modifie: true,
   });
+});
+
+/**
+ * @desc    PURGER L'AFFICHAGE « CORRIGÉ » de la feuille d'écarts (17/11/2026).
+ *          Les lignes corrigées restent affichées sur la feuille même sous le
+ *          seuil ; ce bouton lève ce forçage pour les lignes qui correspondent
+ *          aux filtres COURANTS de l'écran (zone, emplacement, recherche) —
+ *          elles redeviennent soumises au seuil et aux filtres normaux.
+ *          ⚠️ La purge NE TOUCHE PAS la trace de correction : `modifie`, les
+ *          valeurs d'origine et le repère « corrigée » du mode lignes restent
+ *          intacts — seul l'affichage forcé sur la feuille d'écarts cesse.
+ * @route   POST /api/bipages/:entrepriseId/ecarts/purger-corrections?zone=&type=&search=&marque=
+ * @access  Private (module bipage, write)
+ */
+const purgerCorrectionsEcarts = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  // Mêmes filtres que la feuille affichée : on purge ce que l'utilisateur voit.
+  const filtre = buildFilter(session, req.query);
+  const resultat = await LigneBipage.updateMany(
+    { ...filtre, modifie: true, correctionPurgee: { $ne: true } },
+    {
+      $set: {
+        correctionPurgee: true,
+        correctionPurgeeAt: new Date(),
+        correctionPurgeeParNom: nomUtilisateur(req.user),
+      },
+    },
+  );
+
+  res.json({ purgees: resultat.modifiedCount || 0 });
 });
 
 /**
@@ -2204,6 +2274,7 @@ export {
   ficheProformaImportee,
   exportEcartsBipage,
   setEcartQteZone,
+  purgerCorrectionsEcarts,
   updateBipage,
   ajouterLigneBipage,
   exportCsv,

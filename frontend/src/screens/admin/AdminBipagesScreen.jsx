@@ -22,6 +22,7 @@ import {
   useSetStockFigeMutation,
   useGetEcartsBipageQuery,
   useSetEcartQteZoneMutation,
+  usePurgerCorrectionsEcartsMutation,
   getBipagesCsvUrl,
 } from "../../slices/bipageApiSlice";
 import { useSelector } from "react-redux";
@@ -253,6 +254,8 @@ const AdminBipagesScreen = () => {
     { skip: !selectedEntreprise || !modeEcarts },
   );
   const [setEcartQteZone] = useSetEcartQteZoneMutation();
+  const [purgerCorrections, { isLoading: purgeEnCours }] =
+    usePurgerCorrectionsEcartsMutation();
 
   const [updateBipage] = useUpdateBipageMutation();
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
@@ -551,6 +554,34 @@ const AdminBipagesScreen = () => {
     }
   };
 
+  // Purge de l'affichage « corrigé » : les lignes corrigées (gardées visibles
+  // même sous le seuil) redeviennent soumises aux filtres normaux. La trace de
+  // correction (repère crayon du mode lignes, valeurs d'origine) est conservée.
+  const purgerAffichageCorrections = async () => {
+    if (
+      !window.confirm(
+        "Purger l'affichage des corrections ?\n\nLes lignes corrigées ne seront plus forcées sur la feuille : celles repassées sous le seuil disparaîtront. La trace des corrections (mode lignes, valeurs d'origine) est conservée.",
+      )
+    )
+      return;
+    try {
+      const r = await purgerCorrections({
+        entrepriseId: selectedEntreprise,
+        zone,
+        type,
+        search,
+        marque,
+      }).unwrap();
+      setMsg(
+        r.purgees
+          ? `${r.purgees} correction(s) purgée(s) de la feuille d'écarts.`
+          : "Aucune correction à purger avec ces filtres.",
+      );
+    } catch (e) {
+      alert(e?.data?.message || "Purge impossible");
+    }
+  };
+
   // Export CSV authentifié : fetch avec cookie (credentials) → blob → download.
   // (window.open ne transmet pas correctement la requête API et casse en dev.)
   const exportCsv = async () => {
@@ -826,6 +857,20 @@ const AdminBipagesScreen = () => {
                 <HiTable />{" "}
                 {ecartsLoading === "xlsx" ? "Génération…" : "Excel"}
               </button>
+              {/* Les lignes corrigées restent affichées même sous le seuil
+                  (repère C) ; ce bouton lève ce forçage — portée = les filtres
+                  courants de l'écran. La trace de correction est conservée. */}
+              {modeEcarts && (
+                <button
+                  className="btn-secondary"
+                  onClick={purgerAffichageCorrections}
+                  disabled={purgeEnCours}
+                  title="Les lignes corrigées (repère C) ne seront plus forcées sur la feuille : celles sous le seuil disparaîtront. La trace des corrections est conservée (mode lignes)."
+                >
+                  <HiTrash />{" "}
+                  {purgeEnCours ? "Purge…" : "Purger les corrections"}
+                </button>
+              )}
               {/* Stock figé : la feuille d'écarts compare à la PHOTO du stock
                   prise au gel (colonne STOCK FIGÉ + colonne STOCK LIVE
                   indicative), pas au stock réel qui bouge pendant
@@ -1161,7 +1206,7 @@ const AdminBipagesScreen = () => {
                       <thead>
                         <tr>
                           <th>NART</th>
-                          <th title="D = compté dans plusieurs zones · XX = quantité excédentaire (qté > stock)">
+                          <th title="D = compté dans plusieurs zones · XX = quantité excédentaire (qté > stock) · C = corrigée (reste affichée même sous le seuil)">
                             ATT
                           </th>
                           <th>Désignation</th>
@@ -1214,7 +1259,9 @@ const AdminBipagesScreen = () => {
                                     <tr
                                       className={`ecart-row ${
                                         idx % 2 ? "pair" : ""
-                                      } ${r.nonTrouve ? "row-unknown" : ""}`.trim()}
+                                      } ${r.nonTrouve ? "row-unknown" : ""} ${
+                                        r.corrige ? "row-modifiee" : ""
+                                      }`.trim()}
                                     >
                                       <td className="mono ecart-nart">
                                         {r.nart}
@@ -1224,11 +1271,21 @@ const AdminBipagesScreen = () => {
                                           ? r.att.split(" ").map((flag) => (
                                               <span
                                                 key={flag}
-                                                className="att-chip"
+                                                className={
+                                                  flag === "C"
+                                                    ? "att-chip att-chip-corrige"
+                                                    : "att-chip"
+                                                }
                                                 title={
                                                   flag === "D"
                                                     ? "Compté dans plusieurs zones"
-                                                    : "Quantité excédentaire (qté > stock)"
+                                                    : flag === "C"
+                                                      ? `Corrigée${
+                                                          r.corrigeParNom
+                                                            ? ` par ${r.corrigeParNom}`
+                                                            : ""
+                                                        } — reste affichée même sous le seuil, jusqu'à « Purger les corrections »`
+                                                      : "Quantité excédentaire (qté > stock)"
                                                 }
                                               >
                                                 {flag}
@@ -1270,7 +1327,9 @@ const AdminBipagesScreen = () => {
                                     {(r.zonesBipees || []).map((z) => (
                                       <tr
                                         key={`${r.cle}|${z.code}|${z.type}`}
-                                        className="ecart-zone"
+                                        className={`ecart-zone ${
+                                          z.corrige ? "row-modifiee" : ""
+                                        }`.trim()}
                                       >
                                         <td />
                                         <td />
@@ -1280,6 +1339,15 @@ const AdminBipagesScreen = () => {
                                         >
                                           ↳ Gisement <b>{z.code}</b>
                                           {z.type ? ` · ${z.type}` : ""}
+                                          {z.corrige && (
+                                            <span
+                                              className="ecart-zone-corrigee"
+                                              title="Quantité corrigée dans ce gisement"
+                                            >
+                                              {" "}
+                                              corrigée
+                                            </span>
+                                          )}
                                         </td>
                                         <td className="num-cell">
                                           <input

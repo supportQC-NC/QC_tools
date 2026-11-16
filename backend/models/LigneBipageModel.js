@@ -98,6 +98,16 @@ const ligneBipageSchema = new mongoose.Schema(
     qteScanOrigine: { type: Number, default: null },
     nartOrigine: { type: String, default: null },
 
+    // ---- Purge de l'affichage « corrigé » (feuille d'écarts) -------------
+    // Une ligne corrigée reste TOUJOURS visible dans le mode « Calcul des
+    // écarts », même quand son écart repasse sous le seuil (demande client du
+    // 17/11/2026) — jusqu'à ce que l'utilisateur la PURGE via le bouton de
+    // l'écran. La purge ne touche JAMAIS la trace de correction (`modifie`,
+    // valeurs d'origine) : elle cesse seulement de forcer l'affichage.
+    correctionPurgee: { type: Boolean, default: false },
+    correctionPurgeeAt: { type: Date, default: null },
+    correctionPurgeeParNom: { type: String, default: "" },
+
     // Agent qui a bipé : code vendeur (REPRES pour une proforma, bloc du nom de
     // fichier pour un Excel) et son identité au moment de l'import. Le .DAT du
     // collecteur ne porte pas cette information : elle y reste vide.

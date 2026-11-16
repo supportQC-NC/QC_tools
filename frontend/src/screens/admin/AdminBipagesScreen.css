@@ -588,6 +588,21 @@
   border: 1px solid rgba(255, 107, 107, 0.45);
 }
 
+/* « C » = corrigée : ambre (la couleur des corrections du mode lignes), pas
+   rouge — ce n'est pas une anomalie, c'est un écart déjà traité. */
+.att-chip.att-chip-corrige {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+/* Mention « corrigée » sur la sous-ligne du gisement touché. */
+.ecart-zone-corrigee {
+  color: #f59e0b;
+  font-size: 11px;
+  font-style: italic;
+}
+
 /* Stock live : indicatif — en retrait visuel par rapport au stock figé,
    la référence du calcul. */
 .ecarts-table td.ecart-live {

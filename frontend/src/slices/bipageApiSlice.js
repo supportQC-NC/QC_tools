@@ -144,6 +144,26 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // Purge de l'affichage « corrigé » de la feuille d'écarts : les lignes
+    // corrigées (affichées même sous le seuil) redeviennent soumises aux
+    // filtres normaux. Portée = les filtres COURANTS de l'écran. La trace de
+    // correction (repère du mode lignes, valeurs d'origine) est conservée.
+    purgerCorrectionsEcarts: builder.mutation({
+      query: ({ entrepriseId, zone, type, search, marque }) => {
+        const params = new URLSearchParams();
+        if (zone) params.set("zone", zone);
+        if (type) params.set("type", type);
+        if (search) params.set("search", search);
+        if (marque) params.set("marque", marque);
+        const qs = params.toString();
+        return {
+          url: `${BASE}/${entrepriseId}/ecarts/purger-corrections${qs ? `?${qs}` : ""}`,
+          method: "POST",
+        };
+      },
+      invalidatesTags: ["Bipage"],
+    }),
+
     // Gisements d'un emplacement, lus dans la fiche article (zones proposées
     // à l'import, même sans bipage ni fiche zone).
     getGisementsEmplacement: builder.query({
@@ -226,6 +246,7 @@ export const {
   useSetStockFigeMutation,
   useGetEcartsBipageQuery,
   useSetEcartQteZoneMutation,
+  usePurgerCorrectionsEcartsMutation,
   useGetGisementsEmplacementQuery,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,
