@@ -130,8 +130,13 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   `genererContenuFichier`, jamais réaligné sur la fiche) ; la **résolution** de
   l'article part du code **bipé** (`InventaireCollecte.lignes[].codeScanne`,
   renvoyé par `POST /inventaires-collecte/:id/scan` puis reposté par l'app —
-  tolérant aux zéros de tête via `findByCode`), conservé en base et exposé en
-  `row.codeScanne` pour le diagnostic ; l'**affichage** prend le gencod.
+  tolérant aux zéros de tête via `findByCode`, **et la chaîne de renvois
+  GENDOUBL est suivie jusqu'à la fiche ACTIVE** depuis le 16/11/2026, 10 sauts
+  max dans `construireLignes` : sans ça, biper l'ancienne étiquette d'un
+  article renvoyé faisait sortir fiche, LigneBipage et écarts sur l'ancienne
+  fiche alors que l'app et le `.dat` comptent sur l'active), conservé en base
+  et exposé en `row.codeScanne` pour le diagnostic ; l'**affichage** prend le
+  gencod.
   `dupKey` reste bâti sur le NART résolu : la détection de doublons (`ATT = D`)
   est inchangée.
 - **UNE ZONE D'INVENTAIRE PEUT ÊTRE RE-BIPÉE, ET LE .DAT PORTE LE CUMUL**

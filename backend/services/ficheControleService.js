@@ -262,6 +262,31 @@ export const construireLignes = async (entreprise, lignesDat) => {
       record = null;
     }
 
+    // SUIVI DES RENVOIS GENDOUBL (corrigé le 16/11/2026) : `findByCode` rend
+    // la fiche TELLE QUELLE, renvoyée ou non — sans ce suivi, biper l'ancienne
+    // étiquette d'un article renvoyé faisait sortir la fiche de contrôle (et
+    // les LigneBipage, donc les écarts) sur l'ANCIENNE fiche, alors que l'app
+    // collecteur et le .dat comptent déjà sur la fiche ACTIVE. Même logique
+    // plafonnée que `suivreChaineRenvois` (scan collecteur) : 10 sauts max, et
+    // un renvoi vers une fiche disparue s'arrête sur la dernière trouvée.
+    // La colonne CODE BIPÉ, elle, garde le code brut (`l.code`), comme avant.
+    if (record) {
+      let sauts = 0;
+      while (sauts < 10) {
+        const gendoubl = String(record.GENDOUBL || "").trim();
+        if (!gendoubl) break;
+        let suivant = null;
+        try {
+          suivant = await articleCacheService.findByNart(entreprise, gendoubl);
+        } catch {
+          suivant = null;
+        }
+        if (!suivant) break;
+        record = suivant;
+        sauts += 1;
+      }
+    }
+
     if (!record) {
       entries.push({
         code: l.code,
