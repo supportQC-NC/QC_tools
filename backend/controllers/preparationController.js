@@ -2,6 +2,7 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import Preparation from "../models/PreparationModel.js";
 import PreparationUrgence from "../models/PreparationUrgenceModel.js";
+import FichePreparation from "../models/FichePreparationModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import User from "../models/UserModel.js";
 import articleCacheService from "../services/articleService.js";
@@ -31,7 +32,11 @@ const formatEntreprise = (e) => ({
 });
 
 // Charge une session de préparation et vérifie l'accès de l'utilisateur.
-const loadPreparationOwned = async (id, req, res) => {
+// `toutStatut` : les écrans de CONSULTATION et la suppression acceptent une
+// session abandonnée ; les ACTIONS de préparation (défaut) la refusent — sans
+// ce garde-fou, un collecteur resté ouvert sur une session reprise par un
+// autre agent continuerait d'y écrire des lignes fantômes.
+const loadPreparationOwned = async (id, req, res, { toutStatut = false } = {}) => {
   const prep = await Preparation.findById(id);
   if (!prep) {
     res.status(404);
@@ -43,6 +48,12 @@ const loadPreparationOwned = async (id, req, res) => {
   ) {
     res.status(403);
     throw new Error("Non autorisé");
+  }
+  if (!toutStatut && prep.status === "abandonne") {
+    res.status(409);
+    throw new Error(
+      "Cette préparation a été reprise ou clôturée par ailleurs — elle n'est plus modifiable. Repartez de la liste des commandes.",
+    );
   }
   return prep;
 };
@@ -72,6 +83,42 @@ const totalPrepare = (l) =>
 // ===========================================
 // SÉLECTION DE LA PROFORMA
 // ===========================================
+
+/**
+ * Retire les commandes DÉJÀ PRÉPARÉES (demande client du 17/11/2026) : une
+ * préparation scannée TERMINÉE ou une fiche papier marquée « préparée » depuis
+ * le web. L'ERP ne change pas l'ETAT de la proforma quand on la prépare ici :
+ * sans ce filtre, une commande préparée restait proposée « à préparer » pour
+ * toujours — sur le panneau priorité du suivi web comme sur l'app mobile.
+ * La saisie directe d'un numéro sur le collecteur reste possible (elle ne
+ * passe pas par cette liste) si une commande devait être re-préparée.
+ */
+const exclureDejaPreparees = async (entreprise, proformas) => {
+  if (!proformas.length) return proformas;
+  const numeros = proformas.map((p) => safeTrim(p.numfact)).filter(Boolean);
+  const [terminees, fiches] = await Promise.all([
+    Preparation.find({
+      entreprise: entreprise._id,
+      numpro: { $in: numeros },
+      status: "termine",
+    })
+      .select("numpro")
+      .lean(),
+    FichePreparation.find({
+      entreprise: entreprise._id,
+      numfact: { $in: numeros },
+      statut: "prepare",
+    })
+      .select("numfact")
+      .lean(),
+  ]);
+  const preparees = new Set([
+    ...terminees.map((p) => safeTrim(p.numpro)),
+    ...fiches.map((f) => safeTrim(f.numfact)),
+  ]);
+  if (!preparees.size) return proformas;
+  return proformas.filter((p) => !preparees.has(safeTrim(p.numfact)));
+};
 
 /**
  * Marque les proformas URGENTES (drapeau posé depuis le suivi web, modèle
@@ -124,10 +171,11 @@ const getProformasAPreparer = asyncHandler(async (req, res) => {
       limit,
     });
 
+  const restantes = await exclureDejaPreparees(entreprise, proformas);
   res.json({
     entreprise: formatEntreprise(entreprise),
     pagination,
-    proformas: await marquerUrgences(entreprise, proformas),
+    proformas: await marquerUrgences(entreprise, restantes),
   });
 });
 
@@ -151,10 +199,11 @@ const getReservationsAPreparer = asyncHandler(async (req, res) => {
       limit,
     });
 
+  const restantes = await exclureDejaPreparees(entreprise, proformas);
   res.json({
     entreprise: formatEntreprise(entreprise),
     pagination,
-    proformas: await marquerUrgences(entreprise, proformas),
+    proformas: await marquerUrgences(entreprise, restantes),
   });
 });
 
@@ -205,8 +254,20 @@ const setUrgencePreparation = asyncHandler(async (req, res) => {
 // SESSIONS
 // ===========================================
 
+// Une session « en cours » sans la moindre activité depuis ce délai est
+// considérée ABANDONNÉE : un autre agent peut reprendre la commande (l'ancienne
+// session passe en statut abandonne). En dessous, la commande est VERROUILLÉE
+// par son porteur — deux agents ne préparent jamais la même commande en même
+// temps.
+const INACTIVITE_REPRISE_MS = 30 * 60 * 1000;
+
 /**
  * @desc    Créer (ou reprendre) une session de préparation pour une proforma.
+ *          UNE SEULE session en cours par commande (17/11/2026) : la sienne
+ *          est reprise ; celle d'un autre agent bloque (409) tant qu'elle est
+ *          active, et n'est reprise qu'après 30 min d'inactivité. Un index
+ *          unique partiel barre les créations en rafale (double-tap/retry),
+ *          qui créaient jusqu'à 6 sessions identiques la même seconde.
  * @route   POST /api/preparations
  * @body    { entrepriseId, numpro }
  * @access  Private (prep_commande, write)
@@ -226,14 +287,38 @@ const createPreparation = asyncHandler(async (req, res) => {
 
   const numproTrim = safeTrim(numpro);
 
-  // Reprendre la session en cours si elle existe.
+  // Session en cours sur cette commande — QUEL QUE SOIT l'agent.
   const enCours = await Preparation.findOne({
     entreprise: entrepriseId,
-    user: req.user._id,
     numpro: numproTrim,
     status: "en_cours",
-  });
-  if (enCours) return res.json(enCours);
+  }).populate("user", "nom prenom email");
+  if (enCours) {
+    const memeUser = String(enCours.user?._id ?? enCours.user) === String(req.user._id);
+    if (memeUser) return res.json(enCours);
+
+    const inactiveDepuis = Date.now() - new Date(enCours.updatedAt).getTime();
+    if (inactiveDepuis < INACTIVITE_REPRISE_MS) {
+      const porteur =
+        `${safeTrim(enCours.user?.prenom)} ${safeTrim(enCours.user?.nom)}`.trim() ||
+        enCours.user?.email ||
+        "un autre agent";
+      res.status(409);
+      throw new Error(
+        `Commande déjà en cours de préparation par ${porteur}. Elle sera reprenable après 30 min sans activité.`,
+      );
+    }
+    // Session inactive : l'autre agent l'a visiblement abandonnée — elle est
+    // fermée et la préparation REPART DE ZÉRO pour le nouvel agent.
+    enCours.status = "abandonne";
+    enCours.abandonAt = new Date();
+    enCours.abandonMotif = `Reprise par ${
+      `${safeTrim(req.user.prenom)} ${safeTrim(req.user.nom)}`.trim() ||
+      req.user.email ||
+      "un autre agent"
+    } après inactivité`;
+    await enCours.save();
+  }
 
   // Analyse de la proforma (répartition dock/magasin + tri).
   let analyse;
@@ -253,17 +338,38 @@ const createPreparation = asyncHandler(async (req, res) => {
   const etat = analyse.proformaInfo?.etat;
   const type = etat != null && etat < 2 ? "reservation" : "proforma";
 
-  const preparation = await Preparation.create({
-    entreprise: entrepriseId,
-    nomDossierDBF: entreprise.nomDossierDBF,
-    user: req.user._id,
-    numpro: numproTrim,
-    type,
-    proformaInfo: analyse.proformaInfo,
-    lignes: analyse.lignes,
-    phase: "dock",
-    status: "en_cours",
-  });
+  let preparation;
+  try {
+    preparation = await Preparation.create({
+      entreprise: entrepriseId,
+      nomDossierDBF: entreprise.nomDossierDBF,
+      user: req.user._id,
+      numpro: numproTrim,
+      type,
+      proformaInfo: analyse.proformaInfo,
+      lignes: analyse.lignes,
+      phase: "dock",
+      status: "en_cours",
+    });
+  } catch (error) {
+    // RAFALE (double-tap / retry réseau) : l'index unique partiel n'a laissé
+    // passer qu'une création, les autres requêtes atterrissent ici. On renvoie
+    // la session gagnante — c'est forcément « la sienne » si elle vient d'être
+    // créée par la requête jumelle.
+    if (error?.code === 11000) {
+      const gagnante = await Preparation.findOne({
+        entreprise: entrepriseId,
+        numpro: numproTrim,
+        status: "en_cours",
+      });
+      if (gagnante && String(gagnante.user) === String(req.user._id)) {
+        return res.json(gagnante);
+      }
+      res.status(409);
+      throw new Error("Commande déjà en cours de préparation par un autre agent.");
+    }
+    throw error;
+  }
 
   // Précharge le cache articles en arrière-plan.
   articleCacheService.preload(entreprise).catch(() => {});
@@ -310,7 +416,9 @@ const getPreparationEnCours = asyncHandler(async (req, res) => {
  * @access  Private (prep_commande, read)
  */
 const getPreparationById = asyncHandler(async (req, res) => {
-  const prep = await loadPreparationOwned(req.params.id, req, res);
+  const prep = await loadPreparationOwned(req.params.id, req, res, {
+    toutStatut: true,
+  });
   res.json(prep);
 });
 
@@ -709,6 +817,54 @@ const genererRapport = asyncHandler(async (req, res) => {
   }));
   await prep.save();
 
+  // ── NETTOYAGE À LA CLÔTURE (17/11/2026) : la commande est PRÉPARÉE, rien
+  // d'autre ne doit rester « en cours » pour elle au suivi. ──
+  // 1) Les AUTRES sessions en_cours du même numpro (doublons de rafale,
+  //    sessions abandonnées) passent « abandonne ».
+  const nomOperateur = operateur
+    ? `${safeTrim(operateur.prenom)} ${safeTrim(operateur.nom)}`.trim()
+    : "";
+  await Preparation.updateMany(
+    {
+      entreprise: prep.entreprise,
+      numpro: prep.numpro,
+      status: "en_cours",
+      _id: { $ne: prep._id },
+    },
+    {
+      $set: {
+        status: "abandonne",
+        abandonAt: new Date(),
+        abandonMotif: `Commande préparée par ailleurs${
+          nomOperateur ? ` (${nomOperateur})` : ""
+        }`,
+      },
+    },
+  ).catch(() => {});
+  // 2) Une FICHE PAPIER imprimée pour la même commande est soldée : la
+  //    préparation a été faite au collecteur, laisser la fiche « en cours »
+  //    ferait sortir la commande en double (préparée + en cours).
+  await FichePreparation.updateOne(
+    {
+      entreprise: prep.entreprise,
+      numfact: prep.numpro,
+      statut: { $ne: "prepare" },
+    },
+    {
+      $set: {
+        statut: "prepare",
+        prepareAt: new Date(),
+        preparePar: `Collecteur${nomOperateur ? ` — ${nomOperateur}` : ""}`,
+      },
+    },
+  ).catch(() => {});
+  // 3) Le drapeau d'URGENCE n'a plus d'objet : la commande quitte la liste
+  //    « à préparer » (exclureDejaPreparees), on ne laisse pas traîner le doc.
+  await PreparationUrgence.deleteOne({
+    entreprise: prep.entreprise,
+    numpro: prep.numpro,
+  }).catch(() => {});
+
   res.json({
     message: sorties.rapport.emailSentAt
       ? "Rapport généré et envoyé"
@@ -726,7 +882,9 @@ const genererRapport = asyncHandler(async (req, res) => {
  * @access  Private (prep_commande, delete)
  */
 const deletePreparation = asyncHandler(async (req, res) => {
-  const prep = await loadPreparationOwned(req.params.id, req, res);
+  const prep = await loadPreparationOwned(req.params.id, req, res, {
+    toutStatut: true,
+  });
   await Preparation.deleteOne({ _id: prep._id });
   res.json({ message: "Préparation supprimée" });
 });

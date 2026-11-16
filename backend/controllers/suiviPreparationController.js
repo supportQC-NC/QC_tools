@@ -59,7 +59,16 @@ const getSuiviPreparations = asyncHandler(async (req, res) => {
 
   const [scannees, manuelles] = await Promise.all([
     Preparation.aggregate([
-      { $match: { nomDossierDBF: dossier, ...filtreDate } },
+      // Les sessions ABANDONNÉES (doublon de rafale, reprise par un autre
+      // agent, commande clôturée par ailleurs) ne sont pas du suivi : les
+      // montrer refaisait apparaître la même commande en double « en cours ».
+      {
+        $match: {
+          nomDossierDBF: dossier,
+          status: { $ne: "abandonne" },
+          ...filtreDate,
+        },
+      },
       { $sort: { createdAt: -1 } },
       { $limit: 300 },
       {

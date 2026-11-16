@@ -150,11 +150,21 @@ const preparationSchema = new mongoose.Schema(
       enum: ["dock", "magasin", "final"],
       default: "dock",
     },
+    // `abandonne` (17/11/2026) : session fermée SANS avoir été terminée —
+    // doublon de rafale (plusieurs POST simultanés du même agent), session
+    // laissée ouverte alors qu'une autre a clôturé la commande, ou reprise par
+    // un autre agent après inactivité. Ces sessions n'apparaissent plus au
+    // suivi et ne sont plus modifiables. Avant ce statut, elles restaient
+    // « en_cours » pour toujours : la même commande sortait en double (voire
+    // en x6) sur l'écran Suivi des préparations, parfois à côté de sa ligne
+    // « Préparée ».
     status: {
       type: String,
-      enum: ["en_cours", "termine"],
+      enum: ["en_cours", "termine", "abandonne"],
       default: "en_cours",
     },
+    abandonAt: { type: Date, default: null },
+    abandonMotif: { type: String, default: "" },
 
     commentaire: { type: String, default: "" },
 
@@ -210,6 +220,21 @@ const preparationSchema = new mongoose.Schema(
 
 preparationSchema.index({ entreprise: 1, user: 1, status: 1 });
 preparationSchema.index({ entreprise: 1, user: 1, numpro: 1, status: 1 });
+
+// VERROU GLOBAL (17/11/2026) : UNE SEULE session « en_cours » par commande et
+// par société, quel que soit l'agent — et surtout, barrage AU NIVEAU BASE
+// contre les rafales de création (constaté en production : 6 sessions
+// identiques créées la même seconde par un double-tap / retry réseau, le
+// contrôle lecture-puis-création du contrôleur laissant passer toutes les
+// requêtes concurrentes). `createPreparation` rattrape l'erreur E11000 et
+// renvoie la session gagnante.
+// ⚠️ Cet index ne peut se CONSTRUIRE que si les doublons en_cours existants
+// ont été résorbés : lancer `npm run preparations:nettoyer` avant/au premier
+// déploiement.
+preparationSchema.index(
+  { entreprise: 1, numpro: 1 },
+  { unique: true, partialFilterExpression: { status: "en_cours" } },
+);
 
 const Preparation = mongoose.model("Preparation", preparationSchema);
 
