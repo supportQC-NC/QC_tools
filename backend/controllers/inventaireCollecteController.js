@@ -2436,9 +2436,12 @@ const getRecapZonePdf = asyncHandler(async (req, res) => {
     annulee: { $ne: true },
   };
 
-  const collectes = await InventaireCollecte.find(filtreCollecte).sort({
-    updatedAt: 1,
-  });
+  const collectes = await InventaireCollecte.find(filtreCollecte)
+    .sort({
+      updatedAt: 1,
+    })
+    // L'en-tête « BIPÉ PAR » de la fiche a besoin de l'identité des agents.
+    .populate("user", "nom prenom email");
 
   if (!collectes.length) {
     res.status(404);
@@ -2461,7 +2464,8 @@ const getRecapZonePdf = asyncHandler(async (req, res) => {
     zoneLibelle = zoneLibelle || collecte.zoneLibelle || "";
     zoneType = zoneType || collecte.zoneType || "";
   }
-  const { lignes: lignesCumulees } = fusionnerLignesCollectes(collectes);
+  const { lignes: lignesCumulees, agents } =
+    fusionnerLignesCollectes(collectes);
   const lignesDat = lignesCumulees.map((ligne) => ({
     code: ligne.gencod || ligne.nart || "",
     quantite: parseFloat(ligne.quantite) || 0,
@@ -2481,6 +2485,8 @@ const getRecapZonePdf = asyncHandler(async (req, res) => {
       zoneType,
       zoneLibelle,
       date: new Date(),
+      // Tous les agents du cumul de la zone (re-bipage : les deux noms).
+      bipePar: (agents || []).join(" / "),
     },
     rows,
     outPath,

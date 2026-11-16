@@ -468,7 +468,7 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
   doc
     .font("Helvetica-Bold")
     .fontSize(16)
-    .text("FICHE DE CONTRÔLE INVENTAIRE", left, margin, {
+    .text("FICHE DE CONTRÔLE BIPAGE", left, margin, {
       width: right - left,
       align: "center",
     });
@@ -499,12 +499,24 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
   drawInfo(colB, (right - left) / 2, "Date", formatDateFr(header.date));
   y += infoH + 8;
 
-  // ---- VISA CONTRÔLE ----
+  // ---- BIPÉ PAR (remplace le « VISA CONTRÔLE » d'en-tête, 17/11/2026) ----
+  // Collecteur : prénom + nom du ou des agents qui ont bipé (cumul de la
+  // zone) ; import proforma : le VENDEUR (REPRES) qui a créé le document.
+  // Le visa du contrôleur, lui, est parti EN FIN DE FICHE (bloc signature).
   doc.rect(left, y, right - left, 20).stroke();
   doc
     .font("Helvetica-Bold")
     .fontSize(9)
-    .text("VISA CONTRÔLE :", left + 4, y + 6);
+    .text("BIPÉ PAR :", left + 4, y + 6, { continued: false });
+  doc
+    .font("Helvetica")
+    .fontSize(9)
+    .text(
+      fitText(doc, header.bipePar || "", right - left - 70),
+      left + 62,
+      y + 6,
+      { width: right - left - 70, lineBreak: false },
+    );
   y += 28;
 
   // ---- Table ----
@@ -523,8 +535,8 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     y += rowH;
   };
 
-  const ensureSpace = () => {
-    if (y + rowH > doc.page.height - margin - 24) {
+  const ensureSpace = (besoin = rowH) => {
+    if (y + besoin > doc.page.height - margin - 24) {
       doc.addPage();
       y = margin;
       drawHeader();
@@ -533,9 +545,15 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
 
   drawHeader();
 
-  doc.font("Helvetica").fontSize(7.5);
   rows.forEach((r) => {
-    ensureSpace();
+    // Une ligne INCONNUE (A) est suivie d'une ligne VIERGE de correction : on
+    // réserve la place des deux d'un coup pour qu'elles ne soient jamais
+    // séparées par un saut de page.
+    ensureSpace(r.nonTrouve ? rowH * 2 : rowH);
+    // Après un saut de page, drawHeader laisse la police en GRAS : on la
+    // repose à chaque ligne (et avant fitText, qui mesure avec la police
+    // courante) — les pages 2+ sortaient entièrement en gras.
+    doc.font("Helvetica").fontSize(7.5);
     let x = left;
 
     // Ligne en défaut : fond gris (texte noir, compatible impression N&B)
@@ -570,6 +588,18 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
       x += c.w;
     });
     y += rowH;
+
+    // Article inconnu (A) : ligne VIERGE juste en dessous, pour que l'agent
+    // écrive la correction à la main (demande client du 17/11/2026). Mêmes
+    // cellules, aucun contenu — la place est déjà réservée par ensureSpace.
+    if (r.nonTrouve) {
+      let xv = left;
+      COLS.forEach((c) => {
+        doc.rect(xv, y, c.w, rowH).stroke();
+        xv += c.w;
+      });
+      y += rowH;
+    }
   });
 
   // ---- Légende ----
@@ -589,6 +619,33 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
       legende ||
         "   A = Article inconnu | XX = Surplus de stock (qté bipée > stock) | D = Doublon | Lignes grisées = Contrôle prioritaire",
     );
+  y += 20;
+
+  // ---- VISA CONTRÔLE (fin de fiche, 17/11/2026) ----
+  // L'agent qui a CONTRÔLÉ la zone écrit son nom et signe ici — l'ancien
+  // encadré d'en-tête est devenu « BIPÉ PAR » (l'agent du comptage, lui, est
+  // connu du système). Bloc insécable : saut de page s'il ne tient pas.
+  const visaH = 64;
+  y += 10;
+  if (y + visaH > doc.page.height - margin) {
+    doc.addPage();
+    y = margin;
+  }
+  const milieu = left + (right - left) / 2;
+  doc.strokeColor("#000").rect(left, y, right - left, visaH).stroke();
+  doc.moveTo(milieu, y + 18).lineTo(milieu, y + visaH).stroke();
+  doc.moveTo(left, y + 18).lineTo(right, y + 18).stroke();
+  doc
+    .fillColor("#000")
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .text("VISA CONTRÔLE", left + 4, y + 5);
+  doc.font("Helvetica-Bold").fontSize(8).text("Nom :", left + 4, y + 24);
+  doc
+    .moveTo(left + 34, y + visaH - 14)
+    .lineTo(milieu - 10, y + visaH - 14)
+    .stroke();
+  doc.font("Helvetica-Bold").fontSize(8).text("Signature :", milieu + 4, y + 24);
 
   doc.end();
   await new Promise((resolve, reject) => {
@@ -718,6 +775,17 @@ export const resoudreCheminDat = (fiche, entreprise = null) => {
  * sauve la mise quand un programme externe a déplacé/supprimé les fichiers du
  * partage, ou quand le backend web n'a pas accès au partage du tout.
  */
+// Noms d'agents DISTINCTS d'un lot de LigneBipage, dans l'ordre d'apparition
+// (collecteur : prénom + nom de l'agent ; import proforma : le vendeur REPRES).
+const agentsDepuisLignes = (lignes) => {
+  const noms = [];
+  for (const l of lignes || []) {
+    const n = String(l.agentNom || "").trim();
+    if (n && !noms.includes(n)) noms.push(n);
+  }
+  return noms;
+};
+
 const retrouverLignesDat = async (fiche, entreprise = null) => {
   // Fiche d'imports GROUPÉE PAR ZONE : aucun fichier sur le partage et les
   // lignes ne portent pas sa référence (chacune garde celle de SON import).
@@ -729,17 +797,11 @@ const retrouverLignesDat = async (fiche, entreprise = null) => {
       fiche.zoneType,
     );
     const lignes = cumulerLignesImports(enBase);
-    return { lignes, origine: lignes.length ? "base" : "" };
-  }
-
-  const datPath = resoudreCheminDat(fiche, entreprise);
-  if (datPath) {
-    try {
-      const lignes = parseDat(fs.readFileSync(datPath, "utf8"));
-      if (lignes.length) return { lignes, origine: "dat" };
-    } catch {
-      /* on bascule sur la base */
-    }
+    return {
+      lignes,
+      origine: lignes.length ? "base" : "",
+      agents: agentsDepuisLignes(enBase),
+    };
   }
 
   const enBase = await LigneBipage.find({
@@ -748,6 +810,19 @@ const retrouverLignesDat = async (fiche, entreprise = null) => {
   })
     .sort({ ordre: 1 })
     .lean();
+  // Le « bipé par » ne vit QUE sur les LigneBipage (le .DAT ne porte aucun
+  // agent) : on les lit donc toujours, même quand les lignes viendront du .DAT.
+  const agents = agentsDepuisLignes(enBase);
+
+  const datPath = resoudreCheminDat(fiche, entreprise);
+  if (datPath) {
+    try {
+      const lignes = parseDat(fs.readFileSync(datPath, "utf8"));
+      if (lignes.length) return { lignes, origine: "dat", agents };
+    } catch {
+      /* on bascule sur la base */
+    }
+  }
 
   if (enBase.length) {
     return {
@@ -760,9 +835,10 @@ const retrouverLignesDat = async (fiche, entreprise = null) => {
         quantite: Number(l.qteScan) || 0,
       })),
       origine: "base",
+      agents,
     };
   }
-  return { lignes: [], origine: "" };
+  return { lignes: [], origine: "", agents: [] };
 };
 
 /**
@@ -782,7 +858,10 @@ export const assurerPdfFiche = async (fiche, entreprise, surchargeEntete = null)
     if (existant) return { chemin: existant, temporaire: false, origine: "disque" };
   }
 
-  const { lignes, origine } = await retrouverLignesDat(fiche, entreprise);
+  const { lignes, origine, agents } = await retrouverLignesDat(
+    fiche,
+    entreprise,
+  );
   if (!lignes.length) return { chemin: "", temporaire: false, origine: "" };
 
   const { rows } = await construireLignes(entreprise, lignes);
@@ -797,6 +876,11 @@ export const assurerPdfFiche = async (fiche, entreprise, surchargeEntete = null)
       zoneType: surchargeEntete?.zoneType ?? (fiche.zoneType || ""),
       date:
         surchargeEntete?.date ?? (fiche.date || fiche.createdAt || new Date()),
+      // Surcharge (import proforma : le VENDEUR) > valeur figée sur la fiche
+      // (watcher) > agents des LigneBipage (fiches antérieures au champ).
+      bipePar:
+        surchargeEntete?.bipePar ??
+        (String(fiche.bipePar || "").trim() || (agents || []).join(" / ")),
     },
     rows,
     outPath,

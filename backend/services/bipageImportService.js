@@ -426,6 +426,9 @@ export const enteteFicheImport = async (entreprise, fiche) => {
       client ? ` — ${client}` : ""
     }`,
     date: fiche.date || fiche.createdAt || new Date(),
+    // « Bipé par » d'une fiche d'import proforma = le VENDEUR qui a créé le
+    // document dans l'ERP (REPRES, demande client du 17/11/2026).
+    bipePar: d.agentNom || "",
   };
 };
 

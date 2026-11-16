@@ -10,6 +10,7 @@ import proformaCacheService from "../services/proformaCacheService.js";
 import articleCacheService from "../services/articleService.js";
 import fournissCacheService from "../services/fournissCacheService.js";
 import { ecrirePDF } from "../services/ficheControleService.js";
+import { nomAgent } from "../services/bipageImportService.js";
 import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import path from "path";
 import os from "os";
@@ -530,6 +531,8 @@ const genererFicheControle = asyncHandler(async (req, res) => {
     zoneType: "",
     zoneLibelle: `Proforma ${numfact}`,
     date: new Date(),
+    // « Bipé par » = le VENDEUR qui a créé la proforma (REPRES).
+    bipePar: headerRec ? nomAgent(entreprise, headerRec.REPRES) : "",
   };
 
   const tmp = path.join(

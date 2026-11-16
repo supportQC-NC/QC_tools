@@ -2178,6 +2178,8 @@ const ficheProformaImportee = asyncHandler(async (req, res) => {
       zoneType: "",
       zoneLibelle: `Proforma ${numfact}${client ? ` — ${client}` : ""}`,
       date: new Date(),
+      // « Bipé par » = le VENDEUR qui a créé la proforma (REPRES).
+      bipePar: d?.agentNom || "",
     },
     rows,
     outPath,

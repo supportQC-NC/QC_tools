@@ -35,6 +35,13 @@ const ficheControleSchema = new mongoose.Schema(
     zoneLibelle: { type: String, default: "" },
     zoneType: { type: String, default: "" },
 
+    // « Bipé par » : le ou les agents qui ont réellement bipé la zone (cumul
+    // des collectes, séparés par « / »). Figé ici pour que la REGÉNÉRATION du
+    // PDF (assurerPdfFiche) ressorte le même en-tête que l'impression
+    // d'origine. Vide sur les fiches antérieures au champ : on retombe alors
+    // sur l'agentNom des LigneBipage.
+    bipePar: { type: String, default: "" },
+
     // PDF généré
     pdfFileName: { type: String, default: "" },
     pdfPath: { type: String, default: "" },

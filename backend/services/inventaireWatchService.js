@@ -392,11 +392,15 @@ const traiterFichier = async (
   }
 
   const date = new Date();
+  // « Bipé par » : TOUS les agents du cumul de la zone (une zone re-bipée par
+  // un second agent porte les deux), repli sur l'agent de la dernière collecte.
+  const bipePar = (cumul.agents || []).join(" / ") || agentNom;
   const header = {
     zoneCode,
     zoneLibelle: zone.libelle || "",
     zoneType: zone.type || "",
     date,
+    bipePar,
   };
 
   // Le PDF prend le nom FINAL du .DAT (donc sans le suffixe d'emplacement) et
@@ -442,6 +446,7 @@ const traiterFichier = async (
         zoneCode,
         zoneLibelle: header.zoneLibelle,
         zoneType: header.zoneType,
+        bipePar,
         pdfFileName,
         pdfPath: finalPath,
         date,
