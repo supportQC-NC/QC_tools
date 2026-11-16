@@ -17,10 +17,18 @@ import {
   HiClipboardList,
   HiDocumentReport,
   HiMail,
+  HiExclamation,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
-import { selectGlobalDossier } from "../../slices/entrepriseGlobalSlice";
-import { useGetSuiviPreparationsQuery } from "../../slices/suiviPreparationApiSlice";
+import {
+  selectGlobalDossier,
+  selectGlobalEntrepriseId,
+} from "../../slices/entrepriseGlobalSlice";
+import {
+  useGetSuiviPreparationsQuery,
+  useGetProformasAPreparerQuery,
+  useSetUrgencePreparationMutation,
+} from "../../slices/suiviPreparationApiSlice";
 // Briques d'affichage et feuille de style COMMUNES aux écrans de suivi
 // terrain (bipage, réappro, préparation).
 import { Val, Origine, Agent, Avancement } from "./SuiviTerrain";
@@ -73,11 +81,14 @@ const fmtInt = (v) =>
 
 const AdminSuiviPreparationScreen = () => {
   const nomDossierDBF = useSelector(selectGlobalDossier) || "";
+  const entrepriseId = useSelector(selectGlobalEntrepriseId) || "";
 
   const [etat, setEtat] = useState("tous");
   const [origine, setOrigine] = useState("tous");
   const [jours, setJours] = useState(15);
   const [search, setSearch] = useState("");
+  // Panneau « priorité » : recherche dans les commandes à préparer (ETAT 2).
+  const [searchPrio, setSearchPrio] = useState("");
 
   const { data, isFetching, refetch } = useGetSuiviPreparationsQuery(
     {
@@ -88,6 +99,22 @@ const AdminSuiviPreparationScreen = () => {
     },
     { skip: !nomDossierDBF, refetchOnMountOrArgChange: true },
   );
+
+  // La MÊME liste que l'app mobile (urgentes en tête, drapeau `urgent`).
+  const { data: aPreparer, isFetching: prioFetching } =
+    useGetProformasAPreparerQuery(
+      { nomDossierDBF, search: searchPrio.trim() || undefined },
+      { skip: !nomDossierDBF },
+    );
+  const [setUrgence] = useSetUrgencePreparationMutation();
+
+  const changerPriorite = async (numpro, urgent) => {
+    try {
+      await setUrgence({ entrepriseId, numpro, urgent }).unwrap();
+    } catch (e) {
+      alert(e?.data?.message || "Changement de priorité impossible");
+    }
+  };
 
   const lignes = useMemo(() => data?.lignes || [], [data]);
   const totaux = data?.totaux;
@@ -203,6 +230,99 @@ const AdminSuiviPreparationScreen = () => {
         </label>
       </div>
 
+      {/* ── Priorité des commandes à préparer (17/11/2026) ──
+          La MÊME liste que l'app mobile (proformas ETAT 2). Passer une
+          commande en « Urgente » la fait sortir EN TÊTE et EN ROUGE sur le
+          collecteur. */}
+      <div className="st-prio-panel">
+        <h2 className="st-prio-titre">
+          <HiExclamation /> Commandes à préparer — priorité
+        </h2>
+        <p className="st-intro">
+          La même liste que l'app mobile. Une commande passée en{" "}
+          <b>Urgente</b> sort <b>en tête et en rouge</b> sur le collecteur des
+          préparateurs.
+        </p>
+        <div className="st-search st-prio-search">
+          <HiSearch />
+          <input
+            value={searchPrio}
+            onChange={(e) => setSearchPrio(e.target.value)}
+            placeholder="N° proforma, client…"
+          />
+        </div>
+        <div className="st-table-wrap">
+          <table className="st-table">
+            <thead>
+              <tr>
+                <th>Commande</th>
+                <th>Client</th>
+                <th>Vendeur</th>
+                <th>Date</th>
+                <th>Priorité</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(aPreparer?.proformas || []).length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="st-empty">
+                    {prioFetching
+                      ? "Chargement…"
+                      : "Aucune commande à préparer (état 2)."}
+                  </td>
+                </tr>
+              ) : (
+                (aPreparer?.proformas || []).map((p) => (
+                  <tr
+                    key={p.numfact}
+                    className={p.urgent ? "st-row-urgent" : ""}
+                  >
+                    <td>
+                      <span className="st-libelle">{p.numfact}</span>
+                      {p.urgent && (
+                        <span
+                          className="st-chip-urgent"
+                          title={
+                            p.urgentParNom
+                              ? `Passée en urgence par ${p.urgentParNom}`
+                              : "Commande urgente"
+                          }
+                        >
+                          URGENT
+                        </span>
+                      )}
+                    </td>
+                    <td>{p.clientNom || "—"}</td>
+                    <td>{p.vendeurNom || p.vendeurCode || "—"}</td>
+                    <td>
+                      {p.datfact
+                        ? new Date(p.datfact).toLocaleDateString("fr-FR")
+                        : "—"}
+                    </td>
+                    <td>
+                      <select
+                        className="st-prio-select"
+                        value={p.urgent ? "urgente" : "normale"}
+                        onChange={(e) =>
+                          changerPriorite(
+                            p.numfact,
+                            e.target.value === "urgente",
+                          )
+                        }
+                        title="Priorité de préparation : « Urgente » fait sortir la commande en tête et en rouge sur le collecteur."
+                      >
+                        <option value="normale">Normale</option>
+                        <option value="urgente">🔴 Urgente</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="st-table-wrap">
         <table className="st-table">
           <thead>
@@ -231,7 +351,10 @@ const AdminSuiviPreparationScreen = () => {
               </tr>
             ) : (
               filtrees.map((l) => (
-                <tr key={`${l.origine}-${l.id}`}>
+                <tr
+                  key={`${l.origine}-${l.id}`}
+                  className={l.urgent ? "st-row-urgent" : ""}
+                >
                   <td>
                     <Origine mobile={l.origine === "scannee"}>
                       {l.origine === "scannee" ? "Collecteur" : "Fiche papier"}
@@ -244,6 +367,9 @@ const AdminSuiviPreparationScreen = () => {
                     >
                       {l.numpro} · {l.client || "—"}
                     </span>
+                    {l.urgent && (
+                      <span className="st-chip-urgent">URGENT</span>
+                    )}
                     <span className="st-comment">
                       {[l.typeDoc, l.vendeur && `vendeur ${l.vendeur}`]
                         .filter(Boolean)

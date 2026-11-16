@@ -646,3 +646,74 @@
     min-width: 150px;
   }
 }
+
+/* ── Priorité URGENTE des commandes à préparer (suivi préparation, 17/11/2026) ──
+   Fond de ligne OPAQUE (règle du fichier : pas de transparence sur les fonds
+   de ligne), rouge sombre pour rester lisible avec le texte clair. */
+tr.st-row-urgent td {
+  background: #2d1620;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.st-table tbody tr.st-row-urgent:hover td {
+  background: #3a1c29;
+}
+
+.st-chip-urgent {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  vertical-align: middle;
+}
+
+.st-prio-panel {
+  margin: 18px 0 24px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+}
+
+.st-prio-titre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.st-prio-titre svg {
+  color: #ef4444;
+}
+
+.st-prio-search {
+  margin-bottom: 10px;
+}
+
+/* Le panneau garde une hauteur raisonnable : la liste défile dedans. */
+.st-prio-panel .st-table-wrap {
+  max-height: 320px;
+}
+
+.st-prio-select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+tr.st-row-urgent .st-prio-select {
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #ef4444;
+  font-weight: 600;
+}

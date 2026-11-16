@@ -43,6 +43,8 @@ export const apiSlice = createApi({
     "AppRelease",
     // ========== TAGS LISTES DE RÉAPPRO ==========
     "DemandeReappro",
+    // ========== TAGS PRÉPARATION (urgences + suivi) ==========
+    "PreparationUrgence",
     // ========== TAGS ABONNEMENTS RAPPORTS ==========
     "ReportSubscription",
     // ========== TAGS ÉQUIPES ==========

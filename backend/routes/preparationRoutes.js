@@ -4,6 +4,7 @@ import {
   // Sélection
   getProformasAPreparer,
   getReservationsAPreparer,
+  setUrgencePreparation,
   // Sessions
   createPreparation,
   getPreparationsEnCours,
@@ -47,11 +48,14 @@ router.post(
 // ==========================================
 // SÉLECTION — proformas à préparer (ETAT 2)
 // ==========================================
+// Lecture ouverte aussi à `prep_commande_manuelle` : l'écran web « Suivi des
+// préparations » (commun aux deux modules) liste ces commandes pour poser la
+// priorité urgente.
 router.get(
   "/a-preparer/:nomDossierDBF",
   protect,
   checkEntrepriseAccess,
-  checkModuleAccess("prep_commande", "read"),
+  checkModuleAccess(["prep_commande", "prep_commande_manuelle"], "read"),
   getProformasAPreparer,
 );
 
@@ -62,8 +66,20 @@ router.get(
   "/reservations/:nomDossierDBF",
   protect,
   checkEntrepriseAccess,
-  checkModuleAccess("prep_commande", "read"),
+  checkModuleAccess(["prep_commande", "prep_commande_manuelle"], "read"),
   getReservationsAPreparer,
+);
+
+// ==========================================
+// PRIORITÉ URGENTE (menu déroulant du suivi web)
+// ==========================================
+// Une commande urgente sort EN TÊTE et EN ROUGE sur l'app mobile.
+router.put(
+  "/urgence/:entrepriseId",
+  protect,
+  checkEntrepriseAccess,
+  checkModuleAccess(["prep_commande", "prep_commande_manuelle"], "write"),
+  setUrgencePreparation,
 );
 
 // ==========================================

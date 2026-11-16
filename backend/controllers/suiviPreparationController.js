@@ -20,6 +20,7 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import Preparation from "../models/PreparationModel.js";
 import FichePreparation from "../models/FichePreparationModel.js";
+import PreparationUrgence from "../models/PreparationUrgenceModel.js";
 
 const nomAgent = (u) =>
   [u?.prenom, u?.nom].filter(Boolean).join(" ") || u?.email || "";
@@ -144,10 +145,27 @@ const getSuiviPreparations = asyncHandler(async (req, res) => {
       .lean(),
   ]);
 
+  // Commandes marquées URGENTES (depuis ce même écran) : badge rouge sur les
+  // lignes correspondantes. `req.entreprise` est posé par checkEntrepriseAccess.
+  let urgentes = new Set();
+  if (req.entreprise?._id) {
+    try {
+      const docs = await PreparationUrgence.find({
+        entreprise: req.entreprise._id,
+      })
+        .select("numpro")
+        .lean();
+      urgentes = new Set(docs.map((u) => String(u.numpro).trim()));
+    } catch {
+      urgentes = new Set();
+    }
+  }
+
   const lignesScannees = scannees.map((p) => ({
     id: String(p._id),
     origine: "scannee",
     numpro: p.numpro,
+    urgent: urgentes.has(String(p.numpro || "").trim()),
     client: p.proformaInfo?.clientNom || "",
     vendeur: p.proformaInfo?.vendeurNom || p.proformaInfo?.vendeurCode || "",
     typeDoc: p.type === "reservation" ? "Réservation" : "Proforma",
@@ -176,6 +194,7 @@ const getSuiviPreparations = asyncHandler(async (req, res) => {
       id: String(f._id),
       origine: "manuelle",
       numpro: f.numfact,
+      urgent: urgentes.has(String(f.numfact || "").trim()),
       client: f.proformaInfo?.clientNom || "",
       vendeur: f.proformaInfo?.vendeurNom || f.proformaInfo?.vendeurCode || "",
       typeDoc: "Proforma",

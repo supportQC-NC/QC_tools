@@ -1,6 +1,7 @@
 // backend/controllers/preparationController.js
 import asyncHandler from "../middleware/asyncHandler.js";
 import Preparation from "../models/PreparationModel.js";
+import PreparationUrgence from "../models/PreparationUrgenceModel.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import User from "../models/UserModel.js";
 import articleCacheService from "../services/articleService.js";
@@ -73,10 +74,42 @@ const totalPrepare = (l) =>
 // ===========================================
 
 /**
- * @desc    Liste des proformas à préparer (ETAT = 2).
+ * Marque les proformas URGENTES (drapeau posé depuis le suivi web, modèle
+ * PreparationUrgence) et les remonte EN TÊTE de liste — l'ordre relatif du
+ * reste ne change pas. L'app mobile les affiche en rouge.
+ */
+const marquerUrgences = async (entreprise, proformas) => {
+  const urgences = await PreparationUrgence.find({
+    entreprise: entreprise._id,
+  })
+    .select("numpro parNom createdAt")
+    .lean();
+  if (!urgences.length) {
+    return proformas.map((p) => ({ ...p, urgent: false }));
+  }
+  const parNumpro = new Map(urgences.map((u) => [safeTrim(u.numpro), u]));
+  const marquees = proformas.map((p) => {
+    const u = parNumpro.get(safeTrim(p.numfact));
+    return {
+      ...p,
+      urgent: !!u,
+      urgentParNom: u?.parNom || "",
+      urgentAt: u?.createdAt || null,
+    };
+  });
+  // Tri STABLE : urgentes d'abord, chacune des deux moitiés dans son ordre.
+  return [
+    ...marquees.filter((p) => p.urgent),
+    ...marquees.filter((p) => !p.urgent),
+  ];
+};
+
+/**
+ * @desc    Liste des proformas à préparer (ETAT = 2). Les commandes marquées
+ *          URGENTES sortent en tête, avec `urgent: true`.
  * @route   GET /api/preparations/a-preparer/:nomDossierDBF
  * @query   search, page, limit
- * @access  Private (prep_commande, read)
+ * @access  Private (prep_commande ou prep_commande_manuelle, read)
  */
 const getProformasAPreparer = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
@@ -94,15 +127,16 @@ const getProformasAPreparer = asyncHandler(async (req, res) => {
   res.json({
     entreprise: formatEntreprise(entreprise),
     pagination,
-    proformas,
+    proformas: await marquerUrgences(entreprise, proformas),
   });
 });
 
 /**
  * @desc    Liste des réservations / commandes spéciales à préparer (ETAT < 2).
+ *          Même marquage d'urgence que les proformas.
  * @route   GET /api/preparations/reservations/:nomDossierDBF
  * @query   search, page, limit
- * @access  Private (prep_commande, read)
+ * @access  Private (prep_commande ou prep_commande_manuelle, read)
  */
 const getReservationsAPreparer = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
@@ -120,8 +154,51 @@ const getReservationsAPreparer = asyncHandler(async (req, res) => {
   res.json({
     entreprise: formatEntreprise(entreprise),
     pagination,
-    proformas,
+    proformas: await marquerUrgences(entreprise, proformas),
   });
+});
+
+/**
+ * @desc    Poser / lever l'URGENCE d'une commande à préparer (17/11/2026).
+ *          Menu déroulant de l'écran web « Suivi des préparations » : une
+ *          commande urgente sort EN TÊTE et EN ROUGE sur l'app mobile.
+ *          Présence du document = urgente ; repasser en « normale » le
+ *          supprime.
+ * @route   PUT /api/preparations/urgence/:entrepriseId
+ * @body    { numpro, urgent }
+ * @access  Private (prep_commande ou prep_commande_manuelle, write)
+ */
+const setUrgencePreparation = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const numpro = safeTrim(req.body.numpro);
+  const urgent = !!req.body.urgent;
+  if (!numpro) {
+    res.status(400);
+    throw new Error("Numéro de commande requis.");
+  }
+
+  if (urgent) {
+    await PreparationUrgence.findOneAndUpdate(
+      { entreprise: entreprise._id, numpro },
+      {
+        $set: {
+          par: req.user._id,
+          parNom:
+            [req.user.prenom, req.user.nom].filter(Boolean).join(" ") ||
+            req.user.email ||
+            "",
+        },
+      },
+      { upsert: true },
+    );
+  } else {
+    await PreparationUrgence.deleteOne({
+      entreprise: entreprise._id,
+      numpro,
+    });
+  }
+
+  res.json({ numpro, urgent });
 });
 
 // ===========================================
@@ -658,6 +735,7 @@ export {
   // Sélection
   getProformasAPreparer,
   getReservationsAPreparer,
+  setUrgencePreparation,
   // Sessions
   createPreparation,
   getPreparationsEnCours,
