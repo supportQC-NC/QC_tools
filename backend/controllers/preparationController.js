@@ -616,6 +616,8 @@ const genererRapport = asyncHandler(async (req, res) => {
     emailTo: sorties.rapport.emailTo,
     emailSentAt: sorties.rapport.emailSentAt,
     emailError: sorties.rapport.emailError,
+    // Trace de l'email « commande prête » au commercial de la proforma.
+    emailCommercial: sorties.rapport.emailCommercial,
   };
   prep.fichierTransfert = {
     fileName: sorties.transfert.fileName || "",

@@ -470,6 +470,7 @@
 import fs from "fs";
 import path from "path";
 import sendEmail from "../utils/sendEmail.js";
+import { getCommercialEmail } from "./commerciauxEmailService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
 import {
   deposerDocumentFtp,
@@ -868,6 +869,54 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     }
   }
 
+  // ---- Email au COMMERCIAL de la proforma (demande client du 17/11/2026) ----
+  // Le vendeur (proforma.REPRES, figé sur proformaInfo) est prévenu que la
+  // commande de SON client est prête : date/heure de préparation, préparation
+  // complète ou non, colisage — rapport PDF en pièce jointe. Son adresse vient
+  // du classeur `<cheminBase>\commerciaux.xlsx` (un onglet par trigramme),
+  // tenu à la main par le client — voir commerciauxEmailService.
+  // Best-effort : un vendeur absent du classeur ou un fichier illisible ne
+  // bloque jamais la fin de préparation, l'échec est tracé sur le rapport.
+  const emailCommercial = { to: [], nom: "", sentAt: null, error: "" };
+  try {
+    const repres = safeTrim(preparation.proformaInfo?.vendeurCode);
+    if (!repres) {
+      emailCommercial.error = "Proforma sans code vendeur (REPRES).";
+    } else {
+      const ficheCommercial = await getCommercialEmail(entreprise, repres);
+      emailCommercial.nom =
+        ficheCommercial?.nom ||
+        safeTrim(preparation.proformaInfo?.vendeurNom) ||
+        `Vendeur ${repres}`;
+      if (!ficheCommercial || ficheCommercial.emails.length === 0) {
+        emailCommercial.error = `Aucune adresse pour le vendeur ${repres} dans commerciaux.xlsx (onglet ${safeTrim(
+          entreprise.trigramme,
+        )}).`;
+      } else {
+        emailCommercial.to = ficheCommercial.emails;
+        await sendEmail({
+          module: "rapports",
+          email: ficheCommercial.emails,
+          subject: `Commande prête — ${refLabel} ${header.numpro} (${header.client})`,
+          html: buildEmailCommercialHtml({
+            nomCommercial: emailCommercial.nom,
+            refLabel,
+            header,
+            stats,
+            colisage,
+            commentaire: preparation.commentaire,
+          }),
+          attachments: [{ filename: fileName, path: filePath }],
+        });
+        emailCommercial.sentAt = new Date();
+      }
+    }
+  } catch (error) {
+    emailCommercial.error =
+      error.message || "Échec de l'envoi de l'email au commercial";
+    console.error("Erreur envoi email commercial préparation:", error);
+  }
+
   const rapport = {
     fileName,
     filePath,
@@ -876,6 +925,7 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
     emailTo: destinataires,
     emailSentAt,
     emailError,
+    emailCommercial,
     stats,
   };
 
@@ -973,6 +1023,63 @@ const buildEmailHtml = (header, stats, preparation) => `
     <p style="color:#666;">Le détail est en pièce jointe (PDF).</p>
   </div>
 `;
+
+// Email au COMMERCIAL de la proforma : sa commande est prête. Plus court que
+// le rapport interne — l'essentiel (client, date/heure, complet ou non,
+// colisage), le détail reste dans le PDF joint.
+const buildEmailCommercialHtml = ({
+  nomCommercial,
+  refLabel,
+  header,
+  stats,
+  colisage,
+  commentaire,
+}) => {
+  const incomplets =
+    num(stats.nbManquants) + num(stats.nbIntrouvables) + num(stats.nbSurplus);
+  const detailEcarts = [
+    stats.nbManquants ? `${stats.nbManquants} manquant(s)` : "",
+    stats.nbIntrouvables ? `${stats.nbIntrouvables} introuvable(s)` : "",
+    stats.nbSurplus ? `${stats.nbSurplus} surplus` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const statut = incomplets
+    ? `<p style="margin:12px 0; padding:8px 12px; background:#fdf3e3; border-left:4px solid #e8a33d;">
+        ⚠ <b>Préparation incomplète</b> : ${detailEcarts} sur ${stats.totalLignes} ligne(s). Le détail est dans le PDF joint.
+      </p>`
+    : `<p style="margin:12px 0; padding:8px 12px; background:#eaf6ea; border-left:4px solid #3d9b3d;">
+        ✓ <b>Tous les articles de la commande ont été préparés</b> (${stats.totalLignes} ligne(s)).
+      </p>`;
+  return `
+  <div style="font-family: Arial, sans-serif; font-size: 14px; color: #222;">
+    <p style="margin:0 0 12px;">Bonjour ${nomCommercial},</p>
+    <p style="margin:0 0 12px;">
+      La commande de la <b>${refLabel.toLowerCase()} ${header.numpro}</b> pour votre client
+      <b>${header.clientCode ? `N° ${header.clientCode} — ` : ""}${header.client}</b>
+      est <b>prête</b> : elle a été préparée le <b>${header.datePrepa}</b>${
+        header.operateur ? ` par ${header.operateur}` : ""
+      }.
+    </p>
+    ${statut}
+    <table style="border-collapse:collapse;">
+      <tr><td style="padding:2px 8px;"><b>${refLabel}</b></td><td style="padding:2px 8px;">${header.numpro}</td></tr>
+      <tr><td style="padding:2px 8px;"><b>Client</b></td><td style="padding:2px 8px;">${header.clientCode ? `${header.clientCode} — ` : ""}${header.client}</td></tr>
+      <tr><td style="padding:2px 8px;"><b>Date ${refLabel.toLowerCase()}</b></td><td style="padding:2px 8px;">${header.dateProforma}</td></tr>
+      <tr><td style="padding:2px 8px;"><b>Préparée le</b></td><td style="padding:2px 8px;">${header.datePrepa}</td></tr>
+      <tr><td style="padding:2px 8px;"><b>Colisage</b></td><td style="padding:2px 8px;">${colisage?.total || "—"}</td></tr>
+    </table>
+    ${
+      commentaire
+        ? `<p style="margin:12px 0 0;"><b>Commentaire du préparateur :</b><br/>${String(
+            commentaire,
+          ).replace(/</g, "&lt;")}</p>`
+        : ""
+    }
+    <p style="color:#666; margin-top:12px;">Le rapport de préparation complet est en pièce jointe (PDF).</p>
+  </div>
+`;
+};
 
 export default {
   genererSorties,

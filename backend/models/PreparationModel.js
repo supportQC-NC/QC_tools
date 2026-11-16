@@ -174,6 +174,15 @@ const preparationSchema = new mongoose.Schema(
       emailTo: { type: [String], default: [] },
       emailSentAt: { type: Date, default: null },
       emailError: { type: String, default: "" },
+      // Email au COMMERCIAL de la proforma (17/11/2026) : « votre commande
+      // est prête ». Adresse(s) lues dans `<cheminBase>\commerciaux.xlsx`
+      // (commerciauxEmailService) à partir de proformaInfo.vendeurCode.
+      emailCommercial: {
+        to: { type: [String], default: [] },
+        nom: { type: String, default: "" },
+        sentAt: { type: Date, default: null },
+        error: { type: String, default: "" },
+      },
     },
 
     // Feuilles de colisage générées (une par colis / palette / longueur) (§13).
