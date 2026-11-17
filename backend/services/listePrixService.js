@@ -25,12 +25,16 @@ import { resolveLogoBuffer } from "./etiquetteService.js";
 const safeTrim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
 // Article vendu AU MÈTRE : par convention ERP, sa DÉSIGNATION se termine par
-// « AU M » — ou ses variantes « AU ML » / « LE M », incluses à la demande du
-// client (18/11/2026 — pouvoir n'imprimer que ceux-là). « AU »/« LE » doivent
-// être des mots entiers : « …NIVEAU M » ou « …SIGMA LEM » ne comptent pas.
-// « /M » reste EXCLU : presque que des faux amis (« 100% COTON 190Gr/m »).
-const estVenduAuMetre = (design) =>
-  /(^|\s)(AU\s+ML?|LE\s+M)\.?$/i.test(safeTrim(design));
+// « AU M » — ou ses variantes « AU ML » / « LE M » — ou COMMENCE par « M »
+// suivi d'un espace (« M CHAINE GALVA… », « M CABLE ELECT… »), toutes incluses
+// à la demande du client (18/11/2026 — pouvoir n'imprimer que ceux-là).
+// « AU »/« LE » doivent être des mots entiers : « …NIVEAU M » ou
+// « …SIGMA LEM » ne comptent pas. « /M » reste EXCLU : presque que des faux
+// amis (« 100% COTON 190Gr/m »).
+const estVenduAuMetre = (design) => {
+  const d = safeTrim(design);
+  return /^M\s/i.test(d) || /(^|\s)(AU\s+ML?|LE\s+M)\.?$/i.test(d);
+};
 
 // Montants XPF : entiers, séparateur de milliers = espace (rendu PDF sûr).
 const fmtXpf = (n) => {

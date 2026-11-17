@@ -1445,8 +1445,8 @@ const AdminEtiquettesScreen = () => {
                   onChange={(e) => setLpAuMetre(e.target.checked)}
                 />
                 N&apos;imprimer que les articles vendus au mètre (désignation
-                terminée par «&nbsp;AU M&nbsp;», «&nbsp;AU ML&nbsp;» ou
-                «&nbsp;LE M&nbsp;»)
+                commençant par «&nbsp;M&nbsp;» ou terminée par
+                «&nbsp;AU M&nbsp;», «&nbsp;AU ML&nbsp;», «&nbsp;LE M&nbsp;»)
               </label>
               {lpMsg && <div className="etiq-error">{lpMsg}</div>}
             </>
