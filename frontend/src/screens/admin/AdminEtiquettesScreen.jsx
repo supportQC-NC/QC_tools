@@ -315,6 +315,9 @@ const AdminEtiquettesScreen = () => {
   const [lpGroupe, setLpGroupe] = useState("");
   const [lpFamille, setLpFamille] = useState("");
   const [lpSousFamille, setLpSousFamille] = useState("");
+  // N'imprimer QUE les articles vendus au mètre (DESIGN terminé par « AU M »,
+  // demande client du 18/11/2026).
+  const [lpAuMetre, setLpAuMetre] = useState(false);
   const [lpBusy, setLpBusy] = useState(false);
   const [lpMsg, setLpMsg] = useState("");
 
@@ -323,6 +326,7 @@ const AdminEtiquettesScreen = () => {
     setLpGroupe("");
     setLpFamille("");
     setLpSousFamille("");
+    setLpAuMetre(false);
     setLpMsg("");
     if (!nomDossierDBF) return undefined;
     let actif = true;
@@ -357,6 +361,7 @@ const AdminEtiquettesScreen = () => {
       const params = new URLSearchParams({ groupe: lpGroupe });
       if (lpFamille) params.set("famille", lpFamille);
       if (lpSousFamille) params.set("sousFamille", lpSousFamille);
+      if (lpAuMetre) params.set("auMetre", "1");
       const res = await fetch(
         `${BASE_URL}/api/etiquettes/${nomDossierDBF}/liste-prix?${params.toString()}`,
         { credentials: "include" },
@@ -371,7 +376,7 @@ const AdminEtiquettesScreen = () => {
       a.href = url;
       a.download = `liste_prix_${(lpSousFamille || lpFamille || lpGroupe)
         .replace(/[^\w-]+/g, "_")
-        .slice(0, 60)}.pdf`;
+        .slice(0, 60)}${lpAuMetre ? "_au_metre" : ""}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -1433,6 +1438,16 @@ const AdminEtiquettesScreen = () => {
                   {lpBusy ? "Génération…" : "💰 Liste de prix (PDF)"}
                 </button>
               </div>
+              <label className="etiq-lp-aumetre">
+                <input
+                  type="checkbox"
+                  checked={lpAuMetre}
+                  onChange={(e) => setLpAuMetre(e.target.checked)}
+                />
+                N&apos;imprimer que les articles vendus au mètre (désignation
+                terminée par «&nbsp;AU M&nbsp;», «&nbsp;AU ML&nbsp;» ou
+                «&nbsp;LE M&nbsp;»)
+              </label>
               {lpMsg && <div className="etiq-error">{lpMsg}</div>}
             </>
           )}

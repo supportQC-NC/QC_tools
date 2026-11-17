@@ -602,6 +602,21 @@
   white-space: nowrap;
 }
 
+/* Filtre « articles vendus au mètre » (DESIGN terminé par « AU M »). */
+.etiq-liste-prix .etiq-lp-aumetre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.etiq-liste-prix .etiq-lp-aumetre input {
+  cursor: pointer;
+}
+
 /* Société sans artplus.dbf : la fonctionnalité est GRISÉE, pas cachée —
    l'utilisateur doit comprendre qu'elle existe mais n'est pas disponible ici. */
 .etiq-liste-prix--off {

@@ -646,7 +646,7 @@ const getClassementListePrix = asyncHandler(async (req, res) => {
  *          d'artplus.dbf — logo en en-tête, nom du niveau choisi centré,
  *          tableau NART | RÉFÉRENCE | DÉSIGNATION | GENCOD | PRIX TTC, date
  *          de génération en bas à droite.
- * @route   GET /api/etiquettes/:nomDossierDBF/liste-prix?groupe=&famille=&sousFamille=
+ * @route   GET /api/etiquettes/:nomDossierDBF/liste-prix?groupe=&famille=&sousFamille=&auMetre=1
  * @access  Private (etiquettes, read)
  */
 const genererListePrix = asyncHandler(async (req, res) => {
@@ -654,6 +654,9 @@ const genererListePrix = asyncHandler(async (req, res) => {
   const groupe = safeTrim(req.query.groupe);
   const famille = safeTrim(req.query.famille);
   const sousFamille = safeTrim(req.query.sousFamille);
+  // Ne garder que les articles vendus au mètre (DESIGN terminé par « AU M »,
+  // demande client du 18/11/2026).
+  const auMetre = ["1", "true"].includes(safeTrim(req.query.auMetre).toLowerCase());
 
   let rows;
   try {
@@ -661,6 +664,7 @@ const genererListePrix = asyncHandler(async (req, res) => {
       groupe,
       famille,
       sousFamille,
+      auMetre,
     });
   } catch (error) {
     res.status(error.status || 500);
@@ -668,7 +672,11 @@ const genererListePrix = asyncHandler(async (req, res) => {
   }
   if (rows.length === 0) {
     res.status(404);
-    throw new Error("Aucun article pour cette sélection.");
+    throw new Error(
+      auMetre
+        ? "Aucun article vendu au mètre (DESIGN terminé par « AU M ») dans cette sélection."
+        : "Aucun article pour cette sélection.",
+    );
   }
 
   // Droits « champ par champ » : les exports PDF filtrent À LA SOURCE.
@@ -681,10 +689,17 @@ const genererListePrix = asyncHandler(async (req, res) => {
   // Décodés pour l'affichage (« À » au lieu de « Aÿ ») — les filtres, eux,
   // ont utilisé les valeurs brutes du DBF.
   const titre = libelleDos(sousFamille || famille || groupe);
-  const sousTitre = [groupe, famille]
+  let sousTitre = [groupe, famille]
     .filter((v) => v && v !== (sousFamille || famille || groupe))
     .map(libelleDos)
     .join(" › ");
+  // Le filtre « au mètre » s'annonce sur la fiche : sans ça, un lecteur
+  // croirait la liste incomplète.
+  if (auMetre) {
+    sousTitre = sousTitre
+      ? `${sousTitre} — Articles vendus au mètre`
+      : "Articles vendus au mètre";
+  }
 
   const tmp = path.join(
     os.tmpdir(),
@@ -692,7 +707,7 @@ const genererListePrix = asyncHandler(async (req, res) => {
   );
   await ecrirePdfListePrix({ entreprise, titre, sousTitre, rows, outPath: tmp });
 
-  const nomFichier = `liste_prix_${titre.replace(/[^\w-]+/g, "_").slice(0, 60) || "selection"}.pdf`;
+  const nomFichier = `liste_prix_${titre.replace(/[^\w-]+/g, "_").slice(0, 60) || "selection"}${auMetre ? "_au_metre" : ""}.pdf`;
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${nomFichier}"`);
   const stream = fs.createReadStream(tmp);

@@ -24,6 +24,14 @@ import { resolveLogoBuffer } from "./etiquetteService.js";
 
 const safeTrim = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
+// Article vendu AU MÈTRE : par convention ERP, sa DÉSIGNATION se termine par
+// « AU M » — ou ses variantes « AU ML » / « LE M », incluses à la demande du
+// client (18/11/2026 — pouvoir n'imprimer que ceux-là). « AU »/« LE » doivent
+// être des mots entiers : « …NIVEAU M » ou « …SIGMA LEM » ne comptent pas.
+// « /M » reste EXCLU : presque que des faux amis (« 100% COTON 190Gr/m »).
+const estVenduAuMetre = (design) =>
+  /(^|\s)(AU\s+ML?|LE\s+M)\.?$/i.test(safeTrim(design));
+
 // Montants XPF : entiers, séparateur de milliers = espace (rendu PDF sûr).
 const fmtXpf = (n) => {
   const r = Math.round(Number(n) || 0);
@@ -34,11 +42,13 @@ const fmtXpf = (n) => {
  * Articles d'un groupe / famille / sous-famille, prêts pour la liste de prix.
  * Les trois filtres se CUMULENT (famille dans le groupe, sous-famille dans la
  * famille) : deux familles homonymes de groupes différents ne se mélangent pas.
+ * `auMetre` restreint en plus aux articles vendus au mètre (DESIGN terminé par
+ * « AU M »).
  * @returns {Promise<Array<{nart, refer, design, gencod, prix}>>}
  */
 export const construireLignesListePrix = async (
   entreprise,
-  { groupe = "", famille = "", sousFamille = "" },
+  { groupe = "", famille = "", sousFamille = "", auMetre = false },
 ) => {
   const index = await artplusService.getIndex(entreprise);
   if (!index.present) {
@@ -76,6 +86,7 @@ export const construireLignesListePrix = async (
     if (!rec) continue;
     // Fiche renvoyée : la fiche ACTIVE porte le prix, pas celle-ci.
     if (safeTrim(rec.GENDOUBL)) continue;
+    if (auMetre && !estVenduAuMetre(rec.DESIGN)) continue;
     rows.push({
       nart: safeTrim(rec.NART),
       refer: safeTrim(rec.REFER),
