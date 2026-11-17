@@ -1382,9 +1382,11 @@ const AdminEtiquettesScreen = () => {
                   }}
                 >
                   <option value="">— Groupe —</option>
+                  {/* Libellé DÉCODÉ à l'affichage (« À » au lieu de « Aÿ ») ;
+                      la value reste l'écriture EXACTE du DBF (clé de filtre). */}
                   {classementLP.groupes.map((g) => (
                     <option key={g.valeur} value={g.valeur}>
-                      {g.valeur} ({g.nbArticles})
+                      {g.libelle || g.valeur} ({g.nbArticles})
                     </option>
                   ))}
                 </select>
@@ -1400,7 +1402,7 @@ const AdminEtiquettesScreen = () => {
                   <option value="">— Toute la famille (optionnel) —</option>
                   {(lpGroupeSel?.familles || []).map((f) => (
                     <option key={f.valeur} value={f.valeur}>
-                      {f.valeur} ({f.nbArticles})
+                      {f.libelle || f.valeur} ({f.nbArticles})
                     </option>
                   ))}
                 </select>
@@ -1413,7 +1415,7 @@ const AdminEtiquettesScreen = () => {
                   <option value="">— Toute la sous-famille (optionnel) —</option>
                   {(lpFamilleSel?.sousFamilles || []).map((sf) => (
                     <option key={sf.valeur} value={sf.valeur}>
-                      {sf.valeur} ({sf.nbArticles})
+                      {sf.libelle || sf.valeur} ({sf.nbArticles})
                     </option>
                   ))}
                 </select>

@@ -27,6 +27,7 @@ import {
   construireLignesListePrix,
   ecrirePdfListePrix,
 } from "../services/listePrixService.js";
+import { libelleDos } from "../utils/texteDos.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 
@@ -617,7 +618,26 @@ const exporterComptageGisements = asyncHandler(async (req, res) => {
  */
 const getClassementListePrix = asyncHandler(async (req, res) => {
   const classement = await artplusService.getClassement(req.entreprise);
-  res.json(classement);
+  // `libelle` = la valeur DÉCODÉE pour l'affichage (« OUTILLAGE À MAIN ») ;
+  // `valeur` reste l'écriture EXACTE du DBF (« OUTILLAGE Aÿ MAIN ») — c'est
+  // elle que l'écran renvoie en filtre, le décodage ne casse jamais la
+  // correspondance. Décoré ICI et pas dans artplusService : le classement de
+  // l'API partenaire reste tel quel.
+  const decorerSf = (sf) => ({ ...sf, libelle: libelleDos(sf.valeur) });
+  const decorerF = (f) => ({
+    ...f,
+    libelle: libelleDos(f.valeur),
+    sousFamilles: (f.sousFamilles || []).map(decorerSf),
+  });
+  const decorerG = (g) => ({
+    ...g,
+    libelle: libelleDos(g.valeur),
+    familles: (g.familles || []).map(decorerF),
+  });
+  res.json({
+    ...classement,
+    groupes: (classement.groupes || []).map(decorerG),
+  });
 });
 
 /**
@@ -658,9 +678,12 @@ const genererListePrix = asyncHandler(async (req, res) => {
   }
 
   // Titre = le niveau le plus fin choisi ; chemin parent en sous-titre.
-  const titre = sousFamille || famille || groupe;
+  // Décodés pour l'affichage (« À » au lieu de « Aÿ ») — les filtres, eux,
+  // ont utilisé les valeurs brutes du DBF.
+  const titre = libelleDos(sousFamille || famille || groupe);
   const sousTitre = [groupe, famille]
-    .filter((v) => v && v !== titre)
+    .filter((v) => v && v !== (sousFamille || famille || groupe))
+    .map(libelleDos)
     .join(" › ");
 
   const tmp = path.join(

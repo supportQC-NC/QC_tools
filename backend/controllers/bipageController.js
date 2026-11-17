@@ -28,6 +28,7 @@ import {
 import os from "os";
 import fournissCacheService from "../services/fournissCacheService.js";
 import artplusService from "../services/artplusService.js";
+import { libelleDos } from "../utils/texteDos.js";
 import {
   readDictionnaire,
   buildIndexRayons,
@@ -1106,7 +1107,10 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     }
     for (const r of rowsFiltres) {
       const attrs = index.parNart.get(String(r.nart || "").trim().toUpperCase());
-      r.artplusKey = String((attrs && attrs[role]) || "").trim();
+      // La clé ne sert QU'À l'affichage (bandeau de groupe) : on la DÉCODE
+      // (« OUTILLAGE À MAIN » au lieu de « OUTILLAGE Aÿ MAIN ») — deux
+      // écritures ERP qui décodent pareil fusionnent, c'est voulu.
+      r.artplusKey = libelleDos(String((attrs && attrs[role]) || "").trim());
     }
   }
 
