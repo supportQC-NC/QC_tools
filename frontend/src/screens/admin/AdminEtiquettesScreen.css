@@ -2,13 +2,10 @@
 
 .etiq-screen {
   padding: 24px;
-  max-width: 920px;
-  margin: 0 auto;
-}
-
-/* Type « personnalisé » : on prend toute la largeur pour voir un A4 en entier. */
-.etiq-screen--wide {
+  /* Toute la largeur utile (demande client du 18/11/2026) : l'écran était
+     bridé à 920px et perdait les côtés. Même plafond que l'ex-mode « wide ». */
   max-width: min(1680px, calc(100vw - 40px));
+  margin: 0 auto;
 }
 
 /* En-tête */

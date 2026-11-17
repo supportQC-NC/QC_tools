@@ -784,7 +784,7 @@ const AdminEtiquettesScreen = () => {
   }
 
   return (
-    <div className={`etiq-screen ${type === "custom" ? "etiq-screen--wide" : ""}`}>
+    <div className="etiq-screen">
       <div className="etiq-header">
         <h1>
           <HiTag /> Générateur d'étiquettes

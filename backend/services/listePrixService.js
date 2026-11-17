@@ -106,12 +106,14 @@ export const construireLignesListePrix = async (
 /**
  * Écrit le PDF de la liste de prix.
  * `titre` = le nom du niveau choisi (centré) ; `sousTitre` = le chemin parent
- * (« GROUPE › FAMILLE »), vide pour un groupe.
+ * (« GROUPE › FAMILLE »), vide pour un groupe ; `mention` = ligne centrée
+ * supplémentaire (« Articles vendus au mètre »), vide sans filtre.
  */
 export const ecrirePdfListePrix = async ({
   entreprise,
   titre,
   sousTitre,
+  mention = "",
   rows,
   outPath,
 }) => {
@@ -121,7 +123,15 @@ export const ecrirePdfListePrix = async ({
   const PDFDocument = mod.default;
 
   const margin = 36;
-  const doc = new PDFDocument({ size: "A4", margin, autoFirstPage: false });
+  // `bufferPages` : la pagination « n/N » (demande client du 18/11/2026) exige
+  // de connaître le nombre TOTAL de pages — les pieds de page sont donc posés
+  // en une dernière passe, une fois toutes les lignes écrites.
+  const doc = new PDFDocument({
+    size: "A4",
+    margin,
+    autoFirstPage: false,
+    bufferPages: true,
+  });
   const stream = fs.createWriteStream(outPath);
   doc.pipe(stream);
 
@@ -157,28 +167,10 @@ export const ecrirePdfListePrix = async ({
 
   let y = margin;
 
-  // Pied de page : la DATE DE GÉNÉRATION en bas à droite (demande client),
-  // posée sur CHAQUE page au moment où on la quitte.
-  // ⚠️ Écrire SOUS la marge basse fait créer une page AUTOMATIQUE à pdfkit
-  // (la date sortait en haut d'une page blanche) : on annule la marge basse le
-  // temps d'écrire le pied, puis on la restaure.
-  const drawFooter = () => {
-    const margeBasse = doc.page.margins.bottom;
-    doc.page.margins.bottom = 0;
-    doc
-      .font("Helvetica")
-      .fontSize(8)
-      .fillColor("#666")
-      .text(`Généré le ${dateGen}`, left, doc.page.height - 26, {
-        width: tableW,
-        align: "right",
-        lineBreak: false,
-      })
-      .fillColor("#000");
-    doc.page.margins.bottom = margeBasse;
-  };
-
-  // En-tête de la PREMIÈRE page : logo + titre centré + sous-titre.
+  // En-tête de la PREMIÈRE page : logo + titre centré + sous-titre(s).
+  // Le sous-titre (chemin parent) et la mention (« Articles vendus au mètre »)
+  // sont DEUX lignes centrées distinctes : concaténés, la ligne débordait sur
+  // le logo (demande client du 18/11/2026).
   const drawEnTete = () => {
     if (logoBuf) {
       try {
@@ -187,23 +179,21 @@ export const ecrirePdfListePrix = async ({
         /* logo illisible : on continue sans */
       }
     }
+    const lignesSousTitre = [sousTitre, mention].filter(Boolean);
     doc
       .font("Helvetica-Bold")
       .fontSize(20)
       .fillColor("#000")
-      .text(titre || "Liste de prix", left, y + (sousTitre ? 10 : 20), {
+      .text(titre || "Liste de prix", left, y + (lignesSousTitre.length ? 6 : 20), {
         width: tableW,
         align: "center",
       });
-    if (sousTitre) {
-      doc
-        .font("Helvetica")
-        .fontSize(10)
-        .fillColor("#555")
-        .text(sousTitre, left, y + 38, { width: tableW, align: "center" })
-        .fillColor("#000");
-    }
-    y += 72;
+    doc.font("Helvetica").fontSize(10).fillColor("#555");
+    lignesSousTitre.forEach((ligne, i) => {
+      doc.text(ligne, left, y + 34 + i * 14, { width: tableW, align: "center" });
+    });
+    doc.fillColor("#000");
+    y += lignesSousTitre.length > 1 ? 84 : 72;
     doc
       .font("Helvetica")
       .fontSize(8)
@@ -232,6 +222,16 @@ export const ecrirePdfListePrix = async ({
   const nouvellePage = () => {
     doc.addPage();
     y = margin;
+    // Le logo est RAPPELÉ sur chaque page (demande client du 18/11/2026),
+    // en plus petit que sur la page de titre.
+    if (logoBuf) {
+      try {
+        doc.image(logoBuf, left, y, { fit: [90, 36] });
+        y += 44;
+      } catch {
+        /* logo illisible : on continue sans */
+      }
+    }
   };
 
   doc.addPage();
@@ -240,7 +240,6 @@ export const ecrirePdfListePrix = async ({
 
   rows.forEach((r, i) => {
     if (y + rowH > doc.page.height - margin - 14) {
-      drawFooter();
       nouvellePage();
       drawHeaderRow();
     }
@@ -266,7 +265,29 @@ export const ecrirePdfListePrix = async ({
     y += rowH;
   });
 
-  drawFooter();
+  // Pieds de page en DERNIÈRE passe (bufferPages) : numéro « n/N » en bas à
+  // GAUCHE, date de génération en bas à droite — le total de pages n'est
+  // connu qu'ici.
+  // ⚠️ Écrire SOUS la marge basse fait créer une page AUTOMATIQUE à pdfkit
+  // (le pied sortait en haut d'une page blanche) : on annule la marge basse le
+  // temps d'écrire, puis on la restaure.
+  const pages = doc.bufferedPageRange();
+  for (let p = pages.start; p < pages.start + pages.count; p++) {
+    doc.switchToPage(p);
+    const margeBasse = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc.font("Helvetica").fontSize(8).fillColor("#666");
+    doc.text(`${p + 1}/${pages.count}`, left, doc.page.height - 26, {
+      lineBreak: false,
+    });
+    doc.text(`Généré le ${dateGen}`, left, doc.page.height - 26, {
+      width: tableW,
+      align: "right",
+      lineBreak: false,
+    });
+    doc.fillColor("#000");
+    doc.page.margins.bottom = margeBasse;
+  }
   doc.end();
   await new Promise((resolve, reject) => {
     stream.on("finish", resolve);

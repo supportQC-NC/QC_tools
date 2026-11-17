@@ -689,23 +689,27 @@ const genererListePrix = asyncHandler(async (req, res) => {
   // Décodés pour l'affichage (« À » au lieu de « Aÿ ») — les filtres, eux,
   // ont utilisé les valeurs brutes du DBF.
   const titre = libelleDos(sousFamille || famille || groupe);
-  let sousTitre = [groupe, famille]
+  const sousTitre = [groupe, famille]
     .filter((v) => v && v !== (sousFamille || famille || groupe))
     .map(libelleDos)
     .join(" › ");
   // Le filtre « au mètre » s'annonce sur la fiche : sans ça, un lecteur
-  // croirait la liste incomplète.
-  if (auMetre) {
-    sousTitre = sousTitre
-      ? `${sousTitre} — Articles vendus au mètre`
-      : "Articles vendus au mètre";
-  }
+  // croirait la liste incomplète. Sur sa PROPRE ligne centrée (demande client
+  // du 18/11/2026) — concaténée au sous-titre, elle mordait sur le logo.
+  const mention = auMetre ? "Articles vendus au mètre" : "";
 
   const tmp = path.join(
     os.tmpdir(),
     `liste_prix_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`,
   );
-  await ecrirePdfListePrix({ entreprise, titre, sousTitre, rows, outPath: tmp });
+  await ecrirePdfListePrix({
+    entreprise,
+    titre,
+    sousTitre,
+    mention,
+    rows,
+    outPath: tmp,
+  });
 
   const nomFichier = `liste_prix_${titre.replace(/[^\w-]+/g, "_").slice(0, 60) || "selection"}${auMetre ? "_au_metre" : ""}.pdf`;
   res.setHeader("Content-Type", "application/pdf");
