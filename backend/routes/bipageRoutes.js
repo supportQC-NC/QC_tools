@@ -14,6 +14,7 @@ import {
   getContexteControle,
   resoudreArticleControle,
   ajouterLigneControle,
+  ficheViergeControle,
   exportCsv,
   recommencerZone,
   setStockFige,
@@ -113,6 +114,9 @@ router.post("/:entrepriseId/import-excel", protect, canWriteImport, checkEntrepr
 router.get("/:entrepriseId/controle-contexte", protect, canRead, checkEntrepriseAccess, getContexteControle);
 router.get("/:entrepriseId/resoudre-article", protect, canRead, checkEntrepriseAccess, resoudreArticleControle);
 router.post("/:entrepriseId/ligne-controle", protect, canWrite, checkEntrepriseAccess, ajouterLigneControle);
+// Fiche de saisie VIERGE (A4 paysage téléchargé) : à remplir au stylo en
+// rayon avant la saisie dans l'écran.
+router.get("/:entrepriseId/fiche-controle-vierge", protect, canRead, checkEntrepriseAccess, ficheViergeControle);
 
 router.get("/:entrepriseId", protect, canRead, checkEntrepriseAccess, getBipages);
 

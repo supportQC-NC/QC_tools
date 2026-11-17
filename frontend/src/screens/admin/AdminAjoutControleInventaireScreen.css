@@ -29,6 +29,23 @@
   color: #8b5cf6;
 }
 
+.acinv-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.acinv-pages-select {
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
 /* Boutons / tableau : repris des conventions de l'écran Détail des bipages,
    mais SCOPÉS ici — ces classes ne sont pas définies globalement, l'écran doit
    se suffire à lui-même quel que soit l'ordre de chargement des CSS. */

@@ -14,6 +14,7 @@ import {
   HiRefresh,
   HiPlus,
   HiExclamation,
+  HiPrinter,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
@@ -22,6 +23,7 @@ import {
   useLazyResoudreArticleControleQuery,
   useAjouterLigneControleMutation,
 } from "../../slices/bipageApiSlice";
+import { BASE_URL } from "../../constants";
 import "./AdminAjoutControleInventaireScreen.css";
 
 /** Quantités à 3 décimales max (articles au mètre), même règle que partout. */
@@ -83,6 +85,37 @@ const AdminAjoutControleInventaireScreen = () => {
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
     useAjouterLigneControleMutation();
 
+  // Fiche de saisie VIERGE (A4 paysage) : téléchargée pour impression, à
+  // remplir au stylo en rayon avant la saisie dans ce formulaire.
+  const [fichePages, setFichePages] = useState(1);
+  const [ficheEnCours, setFicheEnCours] = useState(false);
+  const telechargerFicheVierge = async () => {
+    if (!selectedEntreprise || ficheEnCours) return;
+    setFicheEnCours(true);
+    setMsg(null);
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/bipages/${selectedEntreprise}/fiche-controle-vierge?pages=${fichePages}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Génération impossible (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "fiche_ajout_controle_inventaire.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e2) {
+      setMsg({ type: "err", text: e2.message || "Génération impossible." });
+    } finally {
+      setFicheEnCours(false);
+    }
+  };
+
   const active = contexte?.active;
   const types = contexte?.types || [];
   const zonesEmplacement = (contexte?.zones || []).filter(
@@ -135,6 +168,28 @@ const AdminAjoutControleInventaireScreen = () => {
           <HiClipboardCheck /> Ajout contrôle inventaire
         </h1>
         <div className="acinv-actions">
+          {/* Fiche papier à remplir au stylo (téléchargée pour impression). */}
+          <select
+            className="acinv-pages-select"
+            value={fichePages}
+            onChange={(e) => setFichePages(Number(e.target.value))}
+            disabled={!selectedEntreprise}
+            title="Nombre de feuilles vierges"
+          >
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n} feuille{n > 1 ? "s" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn-secondary"
+            onClick={telechargerFicheVierge}
+            disabled={!selectedEntreprise || ficheEnCours}
+            title="Télécharger la fiche de saisie vierge (A4 paysage) à imprimer"
+          >
+            <HiPrinter /> {ficheEnCours ? "Génération…" : "Fiche vierge (PDF)"}
+          </button>
           <button
             className="btn-icon"
             onClick={refetch}

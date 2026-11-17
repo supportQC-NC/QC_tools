@@ -20,6 +20,7 @@ import {
   ecrirePDF,
 } from "../services/ficheControleService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
+import { ecrireFicheAjoutControleVierge } from "../services/ficheAjoutControleService.js";
 import { ZipArchive } from "archiver";
 import {
   deposerFichierInventaireFtp,
@@ -1791,6 +1792,53 @@ const ajouterLigneControle = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Fiche de saisie VIERGE du module « Ajout contrôle inventaire » :
+ *          A4 paysage téléchargé, lignes vides reprenant les champs du
+ *          formulaire (code, désignation, qté, emplacement, zone, observation)
+ *          — le contrôleur la remplit au stylo en rayon, la saisie se fait
+ *          ensuite dans l'écran. `?pages=` feuilles identiques (1 à 10).
+ * @route   GET /api/bipages/:entrepriseId/fiche-controle-vierge?pages=1
+ * @access  Private (module bipage, read)
+ */
+const ficheViergeControle = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  })
+    .select("nom")
+    .lean();
+
+  const tmp = path.join(
+    os.tmpdir(),
+    `fiche_controle_vierge_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`,
+  );
+  await ecrireFicheAjoutControleVierge({
+    entreprise,
+    sessionNom: session?.nom || "",
+    pages: req.query.pages,
+    outPath: tmp,
+  });
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    'attachment; filename="fiche_ajout_controle_inventaire.pdf"',
+  );
+  const stream = fs.createReadStream(tmp);
+  const nettoyer = () => {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+  };
+  stream.on("close", nettoyer);
+  stream.on("error", nettoyer);
+  stream.pipe(res);
+});
+
+/**
  * @desc    Export CSV (séparateur ;) des lignes bipées (mêmes filtres que la liste)
  * @route   GET /api/bipages/:entrepriseId/export?zone=&type=&search=
  * @access  Private/Admin
@@ -2593,6 +2641,7 @@ export {
   getContexteControle,
   resoudreArticleControle,
   ajouterLigneControle,
+  ficheViergeControle,
   setEcartQteZone,
   purgerCorrectionsEcarts,
   getArtplusGroupes,
