@@ -8,6 +8,7 @@ import {
   exportEcartsBipage,
   setEcartQteZone,
   purgerCorrectionsEcarts,
+  getArtplusGroupes,
   updateBipage,
   ajouterLigneBipage,
   exportCsv,
@@ -61,6 +62,10 @@ router.get("/:entrepriseId/export", protect, canRead, checkEntrepriseAccess, exp
 // Feuille d'écarts (PDF / Excel, ou format=json pour le mode « Calcul des
 // écarts » de l'écran) — MÊME document que l'inventaire proforma.
 router.get("/:entrepriseId/ecarts", protect, canReadImport, checkEntrepriseAccess, exportEcartsBipage);
+
+// Attributs artplus disponibles (groupe/famille/sous-famille) : conditionne
+// les options « Regrouper par » de la feuille d'écarts.
+router.get("/:entrepriseId/artplus-groupes", protect, canReadImport, checkEntrepriseAccess, getArtplusGroupes);
 
 // Correction du TOTAL bipé d'un article dans UN gisement, depuis le mode
 // « Calcul des écarts » (la différence est appliquée à la ligne la plus

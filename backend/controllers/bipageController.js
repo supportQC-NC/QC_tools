@@ -27,6 +27,7 @@ import {
 } from "../services/inventaireFtpService.js";
 import os from "os";
 import fournissCacheService from "../services/fournissCacheService.js";
+import artplusService from "../services/artplusService.js";
 import {
   readDictionnaire,
   buildIndexRayons,
@@ -775,12 +776,24 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     throw new Error("Aucun inventaire actif.");
   }
 
-  const groupBy = req.query.groupBy === "fournisseur" ? "fournisseur" : "famille";
+  // Regroupement : famille (2 1ers car. NART, historique), fournisseur, ou —
+  // quand la société a un artplus.dbf — groupe / famille / sous-famille
+  // artplus (demande client du 17/11/2026, mêmes rôles que l'API partenaire).
+  const GROUP_BY = [
+    "famille",
+    "fournisseur",
+    "ap_groupe",
+    "ap_famille",
+    "ap_sousfamille",
+  ];
+  const groupBy = GROUP_BY.includes(req.query.groupBy)
+    ? req.query.groupBy
+    : "famille";
   const seuil = Math.max(0, Number(req.query.seuil) || 0);
   const toutLeStock = req.query.perimetre === "stock";
-  // Tri DANS les groupes : NART (historique) ou désignation alphabétique
-  // (demande client 16/11/2026).
-  const ordre = req.query.ordre === "design" ? "design" : "nart";
+  // Tri DANS les groupes : DÉSIGNATION par défaut (demande client du
+  // 17/11/2026 — remplace le NART historique), `?ordre=nart` pour l'ancien tri.
+  const ordre = req.query.ordre === "nart" ? "nart" : "design";
   // Filtre par TYPE D'ANOMALIE (demande client 16/11/2026) : ne garder que les
   // manquants (diff < 0), les excédents (diff > 0), les articles comptés dans
   // PLUSIEURS zones (repère D) ou les articles INCONNUS du catalogue. Appliqué
@@ -799,9 +812,24 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   // recherche), pour que le document reflète ce que l'utilisateur regarde.
   const lignes = await LigneBipage.find(buildFilter(session, req.query))
     .select(
-      "nart eanArticle qteScan designation zoneCode zoneType modifie modifieAt modifieParNom correctionPurgee",
+      "nart eanArticle qteScan designation zoneCode zoneType ordre datFileName modifie modifieAt modifieParNom correctionPurgee",
     )
     .lean();
+
+  // Nombre de lignes de CHAQUE fiche de contrôle (datFileName) sur TOUTE la
+  // session : sert au repère « ligne 12/125 » affiché à côté du gisement —
+  // le contrôleur retrouve ainsi l'article sur la fiche papier sans la
+  // parcourir. Compté hors filtres d'écran, le total est celui de la fiche.
+  const taillesFiches = new Map();
+  try {
+    const comptes = await LigneBipage.aggregate([
+      { $match: { session: session._id } },
+      { $group: { _id: "$datFileName", n: { $sum: 1 } } },
+    ]);
+    for (const c of comptes) taillesFiches.set(String(c._id || ""), c.n);
+  } catch {
+    /* repère absent, la feuille reste utilisable */
+  }
 
   // Cumul par article. Clé = NART résolu, repli sur le code scanné : deux zones
   // qui comptent le même article doivent s'additionner, pas se doubler.
@@ -831,6 +859,13 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
       qte: 0,
     };
     pz.qte += Number(l.qteScan) || 0;
+    // Repère « ligne X/Y » de la fiche de contrôle : on retient la PREMIÈRE
+    // ligne (ordre le plus petit) qui porte l'article dans cette zone.
+    const ordreLigne = Number(l.ordre) || 0;
+    if (ordreLigne > 0 && (!pz.ligne || ordreLigne < pz.ligne)) {
+      pz.ligne = ordreLigne;
+      pz.lignesFiche = taillesFiches.get(String(l.datFileName || "")) || 0;
+    }
     // Ligne CORRIGÉE (et pas encore purgée) : l'article restera affiché sur la
     // feuille même sous le seuil (demande client 17/11/2026). On retient la
     // correction la plus récente pour l'infobulle « corrigée par X ».
@@ -998,7 +1033,11 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
   for (const r of rowsFiltres) {
     if (Array.isArray(r.zonesBipees) && r.zonesBipees.length) {
       r.detail = r.zonesBipees.map((z) => ({
-        texte: `Gisement ${z.code}${z.type ? ` · ${z.type}` : ""}`,
+        // « ligne 12/125 » = position de l'article sur la fiche de contrôle
+        // bipage de cette zone : le contrôleur va droit à la bonne ligne.
+        texte: `Gisement ${z.code}${z.type ? ` · ${z.type}` : ""}${
+          z.ligne ? ` · ligne ${z.ligne}${z.lignesFiche ? `/${z.lignesFiche}` : ""}` : ""
+        }`,
         numfact: "",
         qte: z.qte,
       }));
@@ -1048,6 +1087,29 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
     r.fournNom = nomFournByCode.get(code);
   }
 
+  // Regroupement ARTPLUS : la clé de groupe de chaque article est son attribut
+  // groupe / famille / sous-famille (artplusService, mêmes rôles que l'API
+  // partenaire). Société sans artplus ou sans l'attribut demandé → 400 clair
+  // (l'écran n'affiche ces options que quand elles existent).
+  if (groupBy.startsWith("ap_")) {
+    const index = await artplusService.getIndex(entreprise);
+    const role = {
+      ap_groupe: index.roles?.groupe,
+      ap_famille: index.roles?.famille,
+      ap_sousfamille: index.roles?.sousFamille,
+    }[groupBy];
+    if (!index.present || !role) {
+      res.status(400);
+      throw new Error(
+        "Ce regroupement nécessite un fichier artplus.dbf avec l'attribut correspondant — indisponible pour cette société.",
+      );
+    }
+    for (const r of rowsFiltres) {
+      const attrs = index.parNart.get(String(r.nart || "").trim().toUpperCase());
+      r.artplusKey = String((attrs && attrs[role]) || "").trim();
+    }
+  }
+
   const { groupes, grandTotal, groupLabel } = grouperEcarts(
     rowsFiltres,
     groupBy,
@@ -1079,8 +1141,15 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
           { dateStyle: "short", timeStyle: "short" },
         )}`
       : "";
+  const GROUP_BY_LABELS = {
+    famille: "famille",
+    fournisseur: "fournisseur",
+    ap_groupe: "groupe (artplus)",
+    ap_famille: "famille (artplus)",
+    ap_sousfamille: "sous-famille (artplus)",
+  };
   const titre = `Écarts d'inventaire — ${session.nom} — par ${
-    groupBy === "fournisseur" ? "fournisseur" : "famille"
+    GROUP_BY_LABELS[groupBy] || "famille"
   }${filtreLabel ? ` — ${filtreLabel}` : ""} — ${perimetreLabel}${
     seuil ? ` (|écart| > ${fmtNum(seuil)} XPF)` : ""
   }${figeLabel}`;
@@ -1330,6 +1399,31 @@ const setEcartQteZone = asyncHandler(async (req, res) => {
     ligneAjustee: ligne._id,
     modifie: true,
   });
+});
+
+/**
+ * @desc    Attributs ARTPLUS disponibles pour la société (groupe / famille /
+ *          sous-famille) : conditionne les options « Regrouper par » de la
+ *          feuille d'écarts. Tout à false quand la société n'a pas
+ *          d'artplus.dbf — l'écran n'affiche alors que famille/fournisseur.
+ * @route   GET /api/bipages/:entrepriseId/artplus-groupes
+ * @access  Private (module inventaire ou bipage, read)
+ */
+const getArtplusGroupes = asyncHandler(async (req, res) => {
+  let dispo = { groupe: false, famille: false, sousFamille: false };
+  try {
+    const index = await artplusService.getIndex(req.entreprise);
+    if (index.present) {
+      dispo = {
+        groupe: !!index.roles?.groupe,
+        famille: !!index.roles?.famille,
+        sousFamille: !!index.roles?.sousFamille,
+      };
+    }
+  } catch {
+    /* artplus illisible = indisponible, sans erreur à l'écran */
+  }
+  res.json(dispo);
 });
 
 /**
@@ -2275,6 +2369,7 @@ export {
   exportEcartsBipage,
   setEcartQteZone,
   purgerCorrectionsEcarts,
+  getArtplusGroupes,
   updateBipage,
   ajouterLigneBipage,
   exportCsv,

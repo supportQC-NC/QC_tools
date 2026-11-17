@@ -1033,3 +1033,10 @@
   font-size: 12px;
   color: #ef4444;
 }
+
+/* Repère « ligne 12/125 » : position de l'article sur la fiche de contrôle
+   bipage de la zone — le contrôleur va droit à la bonne ligne du papier. */
+.ecart-zone-ligne {
+  color: var(--text-muted);
+  font-size: 11px;
+}

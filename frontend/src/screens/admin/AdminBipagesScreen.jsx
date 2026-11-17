@@ -23,6 +23,7 @@ import {
   useGetEcartsBipageQuery,
   useSetEcartQteZoneMutation,
   usePurgerCorrectionsEcartsMutation,
+  useGetArtplusGroupesQuery,
   getBipagesCsvUrl,
 } from "../../slices/bipageApiSlice";
 import { useSelector } from "react-redux";
@@ -156,11 +157,14 @@ const AdminBipagesScreen = () => {
   const [exporting, setExporting] = useState(false);
   // Feuille d'écarts : mêmes réglages que l'écran Inventaire proforma, le
   // document produit étant le même (générateur commun côté serveur).
-  const [groupBy, setGroupBy] = useState("famille"); // famille | fournisseur
+  // famille | fournisseur | ap_groupe | ap_famille | ap_sousfamille (artplus,
+  // options affichées seulement quand la société a l'attribut correspondant).
+  const [groupBy, setGroupBy] = useState("famille");
   const [seuil, setSeuil] = useState(""); // seuil |écart| en XPF
   const [perimetre, setPerimetre] = useState("comptes"); // comptes | stock
   // Tri DANS les groupes (document ET mode écarts) : NART ou désignation.
-  const [ordre, setOrdre] = useState("nart"); // nart | design
+  // Tri DANS les groupes : DÉSIGNATION par défaut (demande client 17/11/2026).
+  const [ordre, setOrdre] = useState("design"); // design | nart
   // Filtre par TYPE D'ANOMALIE, appliqué côté serveur : écran, sous-totaux et
   // document imprimé disent la même chose.
   // "" | manquant | excedent | multizone | inconnu
@@ -256,6 +260,24 @@ const AdminBipagesScreen = () => {
   const [setEcartQteZone] = useSetEcartQteZoneMutation();
   const [purgerCorrections, { isLoading: purgeEnCours }] =
     usePurgerCorrectionsEcartsMutation();
+
+  // Attributs artplus de la société : conditionne les options « Regrouper
+  // par » (groupe / famille / sous-famille artplus). Tout à false sans
+  // artplus.dbf — seules famille (NART) et fournisseur restent proposées.
+  const { data: artplusDispo } = useGetArtplusGroupesQuery(selectedEntreprise, {
+    skip: !selectedEntreprise,
+  });
+  useEffect(() => {
+    // Changement de société : un regroupement artplus qui n'existe plus
+    // retombe sur la famille NART plutôt que de produire une erreur 400.
+    if (!groupBy.startsWith("ap_") || !artplusDispo) return;
+    const ok = {
+      ap_groupe: artplusDispo.groupe,
+      ap_famille: artplusDispo.famille,
+      ap_sousfamille: artplusDispo.sousFamille,
+    }[groupBy];
+    if (!ok) setGroupBy("famille");
+  }, [artplusDispo, groupBy]);
 
   const [updateBipage] = useUpdateBipageMutation();
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
@@ -717,6 +739,15 @@ const AdminBipagesScreen = () => {
               >
                 <option value="famille">Famille (2 1ers car. NART)</option>
                 <option value="fournisseur">Fournisseur</option>
+                {artplusDispo?.groupe && (
+                  <option value="ap_groupe">Groupe (artplus)</option>
+                )}
+                {artplusDispo?.famille && (
+                  <option value="ap_famille">Famille (artplus)</option>
+                )}
+                {artplusDispo?.sousFamille && (
+                  <option value="ap_sousfamille">Sous-famille (artplus)</option>
+                )}
               </select>
             </label>
 
@@ -1339,6 +1370,18 @@ const AdminBipagesScreen = () => {
                                         >
                                           ↳ Gisement <b>{z.code}</b>
                                           {z.type ? ` · ${z.type}` : ""}
+                                          {z.ligne ? (
+                                            <span
+                                              className="ecart-zone-ligne"
+                                              title="Position de l'article sur la fiche de contrôle bipage de cette zone"
+                                            >
+                                              {" "}
+                                              · ligne {z.ligne}
+                                              {z.lignesFiche
+                                                ? `/${z.lignesFiche}`
+                                                : ""}
+                                            </span>
+                                          ) : null}
                                           {z.corrige && (
                                             <span
                                               className="ecart-zone-corrigee"

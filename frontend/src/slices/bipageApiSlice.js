@@ -144,6 +144,14 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // Attributs artplus (groupe/famille/sous-famille) de la société :
+    // conditionne les options « Regrouper par » de la feuille d'écarts.
+    // Tout à false quand la société n'a pas d'artplus.dbf.
+    getArtplusGroupes: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/artplus-groupes`,
+      keepUnusedDataFor: 600,
+    }),
+
     // Purge de l'affichage « corrigé » de la feuille d'écarts : les lignes
     // corrigées (affichées même sous le seuil) redeviennent soumises aux
     // filtres normaux. Portée = les filtres COURANTS de l'écran. La trace de
@@ -247,6 +255,7 @@ export const {
   useGetEcartsBipageQuery,
   useSetEcartQteZoneMutation,
   usePurgerCorrectionsEcartsMutation,
+  useGetArtplusGroupesQuery,
   useGetGisementsEmplacementQuery,
   useLazyGetProformasBipageQuery,
   useApercuImportProformasMutation,

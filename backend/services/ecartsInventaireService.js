@@ -302,10 +302,27 @@ export const dessinerDocInventaire = async ({
  * les désignations identiques pour un ordre stable).
  * @returns { groupes, grandTotal, groupLabel }
  */
+// Regroupements ARTPLUS (17/11/2026, écarts bipage seulement) : l'appelant a
+// pré-rempli `r.artplusKey` (valeur de l'attribut groupe/famille/ss-famille de
+// l'article) — ce service n'ouvre jamais artplus lui-même.
+const LABELS_ARTPLUS = {
+  ap_groupe: "Groupe",
+  ap_famille: "Famille",
+  ap_sousfamille: "Sous-famille",
+};
+
 export const grouperEcarts = (rows, groupBy, ordre = "nart") => {
   const parFournisseur = groupBy === "fournisseur";
+  const parArtplus = Object.prototype.hasOwnProperty.call(
+    LABELS_ARTPLUS,
+    groupBy,
+  );
   const keyOf = (r) =>
-    parFournisseur ? r.fourn || "—" : (r.nart || "").slice(0, 2) || "—";
+    parArtplus
+      ? r.artplusKey || "(non classé)"
+      : parFournisseur
+        ? r.fourn || "—"
+        : (r.nart || "").slice(0, 2) || "—";
 
   const groupsMap = new Map();
   for (const r of rows) {
@@ -335,7 +352,11 @@ export const grouperEcarts = (rows, groupBy, ordre = "nart") => {
   return {
     groupes,
     grandTotal: rows.reduce((a, r) => a + r.diffval, 0),
-    groupLabel: parFournisseur ? "Fournisseur" : "Famille",
+    groupLabel: parArtplus
+      ? LABELS_ARTPLUS[groupBy]
+      : parFournisseur
+        ? "Fournisseur"
+        : "Famille",
   };
 };
 
