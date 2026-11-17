@@ -20,6 +20,7 @@ import { useSelector } from "react-redux";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
   useGetContexteControleQuery,
+  useGetBipagesQuery,
   useLazyResoudreArticleControleQuery,
   useAjouterLigneControleMutation,
 } from "../../slices/bipageApiSlice";
@@ -53,11 +54,22 @@ const AdminAjoutControleInventaireScreen = () => {
   const [zoneCode, setZoneCode] = useState("");
   const [observation, setObservation] = useState("");
   const [msg, setMsg] = useState(null); // { type: "ok"|"err", text }
-  // Lignes ajoutées PENDANT cette visite de l'écran (récap local — le Détail
-  // des bipages reste la vue complète).
-  const [ajouts, setAjouts] = useState([]);
 
   const codeRef = useRef(null);
+
+  // TOUS les ajouts contrôle de la session active, TOUS utilisateurs — lus au
+  // serveur (filtre provenance « controle » du Détail des bipages), pas un
+  // récap local : la liste doit survivre au rechargement de la page
+  // (demande client du 18/11/2026). La mutation d'ajout invalide « Bipage »,
+  // la liste se rafraîchit donc toute seule.
+  const { data: dataAjouts, isFetching: chargementAjouts } = useGetBipagesQuery(
+    { entrepriseId: selectedEntreprise, marque: "controle" },
+    { skip: !selectedEntreprise },
+  );
+  // Du plus récent au plus ancien : on vient vérifier ce qu'on a saisi.
+  const ajouts = [...(dataAjouts?.lignes || [])].sort(
+    (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+  );
 
   // Résolution dynamique de la désignation pendant la saisie du code.
   const [resoudre, { data: article, isFetching: resolution }] =
@@ -79,7 +91,6 @@ const AdminAjoutControleInventaireScreen = () => {
     setZoneCode("");
     setObservation("");
     setMsg(null);
-    setAjouts([]);
   }, [selectedEntreprise]);
 
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
@@ -140,7 +151,6 @@ const AdminAjoutControleInventaireScreen = () => {
           observation: observation.trim(),
         },
       }).unwrap();
-      setAjouts((prev) => [ligne, ...prev]);
       setMsg({
         type: "ok",
         text: `Bipage ajouté : ${ligne.designation || ligne.nart || code} — ${fmtQte(
@@ -374,17 +384,26 @@ const AdminAjoutControleInventaireScreen = () => {
             </div>
           </form>
 
-          {ajouts.length > 0 && (
-            <div className="acinv-recap">
-              <h2>
-                Bipages ajoutés ({ajouts.length}) — retrouvez-les dans le
-                Détail des bipages (provenance « Ajouts contrôle »)
-              </h2>
+          <div className="acinv-recap">
+            <h2>
+              Bipages de contrôle de l'inventaire ({ajouts.length}
+              {chargementAjouts ? "…" : ""}) — tous utilisateurs ; aussi
+              visibles dans le Détail des bipages (provenance « Ajouts
+              contrôle »)
+            </h2>
+            {ajouts.length === 0 ? (
+              <p className="acinv-hint">
+                {chargementAjouts
+                  ? "Chargement…"
+                  : "Aucun ajout de contrôle sur cet inventaire pour l'instant."}
+              </p>
+            ) : (
               <div className="acinv-recap-table">
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Heure</th>
+                      <th>Date</th>
+                      <th>Saisi par</th>
                       <th>Zone</th>
                       <th>Emplacement</th>
                       <th>Code saisi</th>
@@ -398,14 +417,19 @@ const AdminAjoutControleInventaireScreen = () => {
                     {ajouts.map((l) => (
                       <tr key={l._id} className={l.found ? "" : "row-unknown"}>
                         <td>
-                          {new Date(l.createdAt).toLocaleTimeString("fr-FR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {l.createdAt
+                            ? new Date(l.createdAt).toLocaleString("fr-FR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "—"}
                         </td>
+                        <td>{l.agentNom || "—"}</td>
                         <td>{l.zoneCode}</td>
                         <td>{l.zoneType}</td>
-                        <td className="mono">{l.codeScanne}</td>
+                        <td className="mono">{l.codeScanne || l.eanArticle}</td>
                         <td className="mono">{l.nart || "—"}</td>
                         <td>{l.designation}</td>
                         <td className="acinv-num">{fmtQte(l.qteScan)}</td>
@@ -415,8 +439,8 @@ const AdminAjoutControleInventaireScreen = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
     </div>
