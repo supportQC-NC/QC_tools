@@ -766,8 +766,52 @@ const updateColisage = asyncHandler(async (req, res) => {
 const genererRapport = asyncHandler(async (req, res) => {
   const prep = await loadPreparationOwned(req.params.id, req, res);
 
+  // ── IDEMPOTENCE (17/11/2026) : constaté en production, le rapport ET le
+  // mail commercial partaient EN DOUBLE — la route est rappelée (re-tap, ou
+  // retry de l'app quand la génération dépasse son timeout : PDF + 2 emails +
+  // dépôts FTP) et rien n'empêchait de tout régénérer et tout réexpédier. Le
+  // second envoi pouvait en plus viser un AUTRE commercial, le REPRES de la
+  // proforma ayant bougé dans l'ERP entre-temps. Un rapport déjà généré est
+  // donc RENVOYÉ tel quel : aucun email ne repart, le commercial reste celui
+  // du premier envoi.
+  const dejaGenere = (p) =>
+    res.json({
+      message: "Rapport déjà généré — aucun nouvel envoi.",
+      preparation: p,
+      rapport: p.rapport,
+      transfert: p.fichierTransfert,
+      colisage: null,
+      dejaGenere: true,
+    });
+  if (prep.status === "termine" && prep.rapport?.generatedAt) {
+    return dejaGenere(prep);
+  }
+
+  // VERROU anti-appels SIMULTANÉS : un seul appel gagne le droit de générer
+  // (bascule ATOMIQUE en_cours → termine) ; l'appel jumeau arrivé pendant la
+  // génération est rejeté proprement au lieu de doubler les envois.
+  const gagne = await Preparation.findOneAndUpdate(
+    { _id: prep._id, status: "en_cours" },
+    { $set: { status: "termine" } },
+  );
+  if (!gagne) {
+    const actuel = await Preparation.findById(prep._id);
+    if (actuel?.status === "termine" && actuel?.rapport?.generatedAt) {
+      return dejaGenere(actuel);
+    }
+    res.status(409);
+    throw new Error(
+      "La génération du rapport est déjà en cours pour cette préparation.",
+    );
+  }
+
   const entreprise = await Entreprise.findById(prep.entreprise);
   if (!entreprise) {
+    // Verrou rendu : la préparation redevient clôturable.
+    await Preparation.updateOne(
+      { _id: prep._id },
+      { $set: { status: "en_cours" } },
+    ).catch(() => {});
     res.status(404);
     throw new Error("Entreprise non trouvée");
   }
@@ -789,6 +833,12 @@ const genererRapport = asyncHandler(async (req, res) => {
       operateur,
     );
   } catch (error) {
+    // Échec AVANT toute sortie : on rend le verrou pour permettre un nouvel
+    // essai — sans ça la préparation resterait « terminée » sans rapport.
+    await Preparation.updateOne(
+      { _id: prep._id },
+      { $set: { status: "en_cours" } },
+    ).catch(() => {});
     res.status(400);
     throw new Error(`Génération des sorties impossible: ${error.message}`);
   }
