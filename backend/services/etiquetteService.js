@@ -272,7 +272,7 @@ const bufferFromLogoDataUrl = (logo) => {
  *    point de montage en CONSERVANT les sous-dossiers après "STOCK".
  * Écrit un message explicite dans les logs si le logo est ignoré.
  */
-const resolveLogoBuffer = (entreprise) => {
+export const resolveLogoBuffer = (entreprise) => {
   // 1) Logo uploadé (base64) prioritaire.
   const uploaded = bufferFromLogoDataUrl(entreprise && entreprise.logo);
   if (uploaded) return uploaded;

@@ -471,6 +471,8 @@ import fs from "fs";
 import path from "path";
 import sendEmail from "../utils/sendEmail.js";
 import { getCommercialEmail } from "./commerciauxEmailService.js";
+import proformaCacheService from "./proformaCacheService.js";
+import clientCacheService from "./clientCacheService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
 import {
   deposerDocumentFtp,
@@ -877,9 +879,44 @@ export const genererSorties = async (preparation, entreprise, operateur) => {
   // tenu à la main par le client — voir commerciauxEmailService.
   // Best-effort : un vendeur absent du classeur ou un fichier illisible ne
   // bloque jamais la fin de préparation, l'échec est tracé sur le rapport.
-  const emailCommercial = { to: [], nom: "", sentAt: null, error: "" };
+  const emailCommercial = { to: [], nom: "", code: "", sentAt: null, error: "" };
   try {
-    const repres = safeTrim(preparation.proformaInfo?.vendeurCode);
+    // ── Quel REPRES ? Celui du CRÉATEUR de la proforma (décision client du
+    // 17/11/2026) = CE QUE LE DBF PORTE AU MOMENT DE L'ENVOI. Constaté sur
+    // 0306274 : le document portait le code 20 à l'ouverture de la
+    // préparation (re-enregistrement intermédiaire dans l'ERP) et le 10 — son
+    // créateur — à la clôture : le snapshot d'ouverture avait envoyé le mail
+    // à la mauvaise personne. Le commercial ATTITRÉ du client (client.REPRES)
+    // ne peut PAS servir d'arbitre : sur ce même cas il vaut 60, un code qui
+    // n'a créé ni ce document ni probablement aucun autre. Ordre retenu :
+    //   1. REPRES actuel du DBF (le créateur, tel que l'ERP l'affiche) ;
+    //   2. repli : snapshot d'ouverture (document devenu illisible) ;
+    //   3. dernier recours : client.REPRES (commercial attitré du client).
+    const snapshot = safeTrim(preparation.proformaInfo?.vendeurCode);
+    let actuel = "";
+    try {
+      const cache = await proformaCacheService.getProformas(entreprise);
+      const idx = cache.indexByNumfact.get(safeTrim(preparation.numpro));
+      const rec = idx !== undefined ? cache.proformaRecords[idx] : null;
+      actuel = rec ? safeTrim(rec.REPRES) : "";
+    } catch {
+      /* DBF illisible : on fera sans */
+    }
+    let attitre = "";
+    if (!actuel && !snapshot) {
+      try {
+        const tiers = preparation.proformaInfo?.clientCode;
+        if (tiers != null && tiers !== "") {
+          const cli = await clientCacheService.findByTiers(entreprise, tiers);
+          if (cli) attitre = safeTrim(cli.REPRES);
+        }
+      } catch {
+        /* client introuvable : on fera sans */
+      }
+    }
+
+    const repres = actuel || snapshot || attitre;
+    emailCommercial.code = repres;
     if (!repres) {
       emailCommercial.error = "Proforma sans code vendeur (REPRES).";
     } else {

@@ -582,3 +582,28 @@
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* ── Liste de prix (artplus) ──────────────────────────────────────────── */
+.etiq-liste-prix .etiq-lp-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.etiq-liste-prix .etiq-lp-selects select {
+  min-width: 220px;
+  flex: 1 1 220px;
+}
+
+.etiq-lp-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Société sans artplus.dbf : la fonctionnalité est GRISÉE, pas cachée —
+   l'utilisateur doit comprendre qu'elle existe mais n'est pas disponible ici. */
+.etiq-liste-prix--off {
+  opacity: 0.55;
+}

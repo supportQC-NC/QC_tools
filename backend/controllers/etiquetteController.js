@@ -22,6 +22,11 @@ import { comparerCodeGisement } from "../services/preparationService.js";
 import { construireClasseurComptageGisements } from "../services/gisementsComptageExcelService.js";
 import { envoyerClasseur } from "../utils/envoyerClasseur.js";
 import { champMasque } from "../middleware/masquerChampsDbf.js";
+import artplusService from "../services/artplusService.js";
+import {
+  construireLignesListePrix,
+  ecrirePdfListePrix,
+} from "../services/listePrixService.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 
@@ -602,4 +607,88 @@ const exporterComptageGisements = asyncHandler(async (req, res) => {
   );
 });
 
-export { genererEtiquettes, controlerGencod, exporterComptageGisements };
+/**
+ * @desc    Arbre groupe > famille > sous-famille d'artplus.dbf, pour le bloc
+ *          « Liste de prix » de l'écran étiquettes. `disponible: false` quand
+ *          la société n'a pas d'artplus (ou pas d'attributs de classement) —
+ *          l'écran GRISE alors la fonctionnalité.
+ * @route   GET /api/etiquettes/:nomDossierDBF/liste-prix/classement
+ * @access  Private (etiquettes, read)
+ */
+const getClassementListePrix = asyncHandler(async (req, res) => {
+  const classement = await artplusService.getClassement(req.entreprise);
+  res.json(classement);
+});
+
+/**
+ * @desc    LISTE DE PRIX PDF (demande client du 17/11/2026) : tous les
+ *          articles d'un groupe / d'une famille / d'une sous-famille
+ *          d'artplus.dbf — logo en en-tête, nom du niveau choisi centré,
+ *          tableau NART | RÉFÉRENCE | DÉSIGNATION | GENCOD | PRIX TTC, date
+ *          de génération en bas à droite.
+ * @route   GET /api/etiquettes/:nomDossierDBF/liste-prix?groupe=&famille=&sousFamille=
+ * @access  Private (etiquettes, read)
+ */
+const genererListePrix = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const groupe = safeTrim(req.query.groupe);
+  const famille = safeTrim(req.query.famille);
+  const sousFamille = safeTrim(req.query.sousFamille);
+
+  let rows;
+  try {
+    rows = await construireLignesListePrix(entreprise, {
+      groupe,
+      famille,
+      sousFamille,
+    });
+  } catch (error) {
+    res.status(error.status || 500);
+    throw error;
+  }
+  if (rows.length === 0) {
+    res.status(404);
+    throw new Error("Aucun article pour cette sélection.");
+  }
+
+  // Droits « champ par champ » : les exports PDF filtrent À LA SOURCE.
+  if (champMasque(req, "PVTETTC")) {
+    res.status(403);
+    throw new Error("Le prix de vente est masqué pour votre profil.");
+  }
+
+  // Titre = le niveau le plus fin choisi ; chemin parent en sous-titre.
+  const titre = sousFamille || famille || groupe;
+  const sousTitre = [groupe, famille]
+    .filter((v) => v && v !== titre)
+    .join(" › ");
+
+  const tmp = path.join(
+    os.tmpdir(),
+    `liste_prix_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`,
+  );
+  await ecrirePdfListePrix({ entreprise, titre, sousTitre, rows, outPath: tmp });
+
+  const nomFichier = `liste_prix_${titre.replace(/[^\w-]+/g, "_").slice(0, 60) || "selection"}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${nomFichier}"`);
+  const stream = fs.createReadStream(tmp);
+  const nettoyer = () => {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+  };
+  stream.on("close", nettoyer);
+  stream.on("error", nettoyer);
+  stream.pipe(res);
+});
+
+export {
+  genererEtiquettes,
+  controlerGencod,
+  exporterComptageGisements,
+  getClassementListePrix,
+  genererListePrix,
+};

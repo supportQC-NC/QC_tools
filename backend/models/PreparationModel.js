@@ -190,6 +190,9 @@ const preparationSchema = new mongoose.Schema(
       emailCommercial: {
         to: { type: [String], default: [] },
         nom: { type: String, default: "" },
+        // Code REPRES retenu pour l'envoi (après arbitrage snapshot / DBF
+        // actuel / commercial attitré du client) — pour le diagnostic.
+        code: { type: String, default: "" },
         sentAt: { type: Date, default: null },
         error: { type: String, default: "" },
       },

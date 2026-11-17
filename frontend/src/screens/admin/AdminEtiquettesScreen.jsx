@@ -308,6 +308,79 @@ const AdminEtiquettesScreen = () => {
     },
   );
 
+  // ── Liste de prix (artplus.dbf) ────────────────────────────────────────
+  // Classement groupe > famille > sous-famille, chargé une fois par société.
+  // `disponible: false` (société sans artplus) → le bloc est GRISÉ.
+  const [classementLP, setClassementLP] = useState(null); // null = chargement
+  const [lpGroupe, setLpGroupe] = useState("");
+  const [lpFamille, setLpFamille] = useState("");
+  const [lpSousFamille, setLpSousFamille] = useState("");
+  const [lpBusy, setLpBusy] = useState(false);
+  const [lpMsg, setLpMsg] = useState("");
+
+  useEffect(() => {
+    setClassementLP(null);
+    setLpGroupe("");
+    setLpFamille("");
+    setLpSousFamille("");
+    setLpMsg("");
+    if (!nomDossierDBF) return undefined;
+    let actif = true;
+    fetch(
+      `${BASE_URL}/api/etiquettes/${nomDossierDBF}/liste-prix/classement`,
+      { credentials: "include" },
+    )
+      .then((r) => (r.ok ? r.json() : { disponible: false, groupes: [] }))
+      .then((d) => {
+        if (actif) setClassementLP(d);
+      })
+      .catch(() => {
+        if (actif) setClassementLP({ disponible: false, groupes: [] });
+      });
+    return () => {
+      actif = false;
+    };
+  }, [nomDossierDBF]);
+
+  const lpGroupeSel = (classementLP?.groupes || []).find(
+    (g) => g.valeur === lpGroupe,
+  );
+  const lpFamilleSel = (lpGroupeSel?.familles || []).find(
+    (f) => f.valeur === lpFamille,
+  );
+
+  const genererListePrix = async () => {
+    if (!nomDossierDBF || !lpGroupe) return;
+    setLpBusy(true);
+    setLpMsg("");
+    try {
+      const params = new URLSearchParams({ groupe: lpGroupe });
+      if (lpFamille) params.set("famille", lpFamille);
+      if (lpSousFamille) params.set("sousFamille", lpSousFamille);
+      const res = await fetch(
+        `${BASE_URL}/api/etiquettes/${nomDossierDBF}/liste-prix?${params.toString()}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Génération impossible (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `liste_prix_${(lpSousFamille || lpFamille || lpGroupe)
+        .replace(/[^\w-]+/g, "_")
+        .slice(0, 60)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setLpMsg(e.message || "Génération impossible");
+    } finally {
+      setLpBusy(false);
+    }
+  };
+
   // Templates de la société (visibles/utilisables par tous les users y ayant accès).
   const { data: templates = [] } = useGetEtiquetteTemplatesQuery(nomDossierDBF, {
     skip: !nomDossierDBF,
@@ -1269,6 +1342,100 @@ const AdminEtiquettesScreen = () => {
               : "🏷️ Générer les étiquettes"}
         </button>
       </div>
+
+      {/* ── Liste de prix (artplus) : tous les articles d'un groupe / d'une
+          famille / d'une sous-famille, en PDF A4 (logo + titre centré + tableau
+          NART, référence, désignation, gencod, prix TTC). GRISÉ quand la
+          société n'a pas d'artplus.dbf. */}
+      {selectedEntreprise && (
+        <div
+          className={`etiq-card etiq-liste-prix ${
+            classementLP && !classementLP.disponible ? "etiq-liste-prix--off" : ""
+          }`}
+        >
+          <label className="etiq-label">
+            <HiDocumentText /> Liste de prix (groupe / famille / sous-famille)
+          </label>
+          {classementLP === null ? (
+            <p className="etiq-hint">Chargement du classement artplus…</p>
+          ) : !classementLP.disponible ? (
+            <p className="etiq-hint">
+              Indisponible : cette société n'a pas de fichier artplus.dbf (ou
+              pas d'attributs groupe / famille / sous-famille).
+            </p>
+          ) : (
+            <>
+              <p className="etiq-hint">
+                Choisissez un groupe — et, si besoin, une famille puis une
+                sous-famille — pour générer la liste de prix PDF des articles
+                concernés (logo, titre centré, NART / référence / désignation /
+                gencod / prix TTC, date de génération).
+              </p>
+              <div className="etiq-lp-selects">
+                <select
+                  className="etiq-input"
+                  value={lpGroupe}
+                  onChange={(e) => {
+                    setLpGroupe(e.target.value);
+                    setLpFamille("");
+                    setLpSousFamille("");
+                  }}
+                >
+                  <option value="">— Groupe —</option>
+                  {classementLP.groupes.map((g) => (
+                    <option key={g.valeur} value={g.valeur}>
+                      {g.valeur} ({g.nbArticles})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="etiq-input"
+                  value={lpFamille}
+                  disabled={!lpGroupeSel}
+                  onChange={(e) => {
+                    setLpFamille(e.target.value);
+                    setLpSousFamille("");
+                  }}
+                >
+                  <option value="">— Toute la famille (optionnel) —</option>
+                  {(lpGroupeSel?.familles || []).map((f) => (
+                    <option key={f.valeur} value={f.valeur}>
+                      {f.valeur} ({f.nbArticles})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="etiq-input"
+                  value={lpSousFamille}
+                  disabled={!lpFamilleSel}
+                  onChange={(e) => setLpSousFamille(e.target.value)}
+                >
+                  <option value="">— Toute la sous-famille (optionnel) —</option>
+                  {(lpFamilleSel?.sousFamilles || []).map((sf) => (
+                    <option key={sf.valeur} value={sf.valeur}>
+                      {sf.valeur} ({sf.nbArticles})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="etiq-generate etiq-lp-btn"
+                  onClick={genererListePrix}
+                  disabled={!lpGroupe || lpBusy}
+                  title={
+                    !lpGroupe
+                      ? "Choisissez au moins un groupe"
+                      : "Télécharger la liste de prix (PDF)"
+                  }
+                >
+                  {lpBusy ? "Génération…" : "💰 Liste de prix (PDF)"}
+                </button>
+              </div>
+              {lpMsg && <div className="etiq-error">{lpMsg}</div>}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Articles sans code-barres : la question n'est posée QUE s'il y en a,
           et une seule fois, juste avant la génération. */}

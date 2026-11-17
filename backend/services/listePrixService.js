@@ -1,0 +1,266 @@
+// backend/services/listePrixService.js
+//
+// LISTE DE PRIX par groupe / famille / sous-famille (module étiquettes,
+// demande client du 17/11/2026).
+//
+// La sélection vient d'ARTPLUS.DBF (compléments article, voir artplusService) :
+// l'utilisateur choisit un groupe, puis éventuellement une famille et une
+// sous-famille, et obtient un PDF A4 portrait :
+//   - en-tête : logo de la société (même résolution que les étiquettes :
+//     logo uploadé prioritaire, repli cheminLogoEtiquettes) + le NOM du niveau
+//     choisi CENTRÉ (chemin parent en sous-titre) ;
+//   - tableau : NART | RÉFÉRENCE | DÉSIGNATION | GENCOD | PRIX TTC
+//     (article.dbf : REFER, DESIGN, GENCOD, PVTETTC), trié par désignation ;
+//   - pied de page : date de génération EN BAS À DROITE (chaque page).
+//
+// ⚠️ Une société SANS artplus.dbf (ou sans attributs groupe/famille/ss-famille)
+// n'a pas cette fonctionnalité : l'écran la grise via le même
+// `getClassement().disponible` que l'API partenaire. Les articles RENVOYÉS
+// (GENDOUBL rempli) sont écartés : leur fiche active porte le prix.
+import fs from "fs";
+import artplusService from "./artplusService.js";
+import articleCacheService from "./articleService.js";
+import { resolveLogoBuffer } from "./etiquetteService.js";
+
+const safeTrim = (v) => (v === null || v === undefined ? "" : String(v).trim());
+
+// Montants XPF : entiers, séparateur de milliers = espace (rendu PDF sûr).
+const fmtXpf = (n) => {
+  const r = Math.round(Number(n) || 0);
+  return `${r.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} XPF`;
+};
+
+/**
+ * Articles d'un groupe / famille / sous-famille, prêts pour la liste de prix.
+ * Les trois filtres se CUMULENT (famille dans le groupe, sous-famille dans la
+ * famille) : deux familles homonymes de groupes différents ne se mélangent pas.
+ * @returns {Promise<Array<{nart, refer, design, gencod, prix}>>}
+ */
+export const construireLignesListePrix = async (
+  entreprise,
+  { groupe = "", famille = "", sousFamille = "" },
+) => {
+  const index = await artplusService.getIndex(entreprise);
+  if (!index.present) {
+    const err = new Error(
+      "artplus.dbf indisponible pour cette société : la liste de prix ne peut pas être générée.",
+    );
+    err.status = 400;
+    throw err;
+  }
+  const { roles, parNart } = index;
+  const g = safeTrim(groupe);
+  const f = safeTrim(famille);
+  const sf = safeTrim(sousFamille);
+  if (!g && !f && !sf) {
+    const err = new Error("Choisissez au moins un groupe, une famille ou une sous-famille.");
+    err.status = 400;
+    throw err;
+  }
+
+  const narts = [];
+  for (const [nart, attrs] of parNart) {
+    if (g && safeTrim(roles.groupe ? attrs[roles.groupe] : "") !== g) continue;
+    if (f && safeTrim(roles.famille ? attrs[roles.famille] : "") !== f) continue;
+    if (sf && safeTrim(roles.sousFamille ? attrs[roles.sousFamille] : "") !== sf)
+      continue;
+    narts.push(nart);
+  }
+
+  const cache = await articleCacheService.getArticles(entreprise);
+  const rows = [];
+  for (const nart of narts) {
+    const idx = articleCacheService.lookupNart(cache, nart);
+    if (idx === undefined) continue;
+    const rec = cache.records[idx];
+    if (!rec) continue;
+    // Fiche renvoyée : la fiche ACTIVE porte le prix, pas celle-ci.
+    if (safeTrim(rec.GENDOUBL)) continue;
+    rows.push({
+      nart: safeTrim(rec.NART),
+      refer: safeTrim(rec.REFER),
+      design: safeTrim(rec.DESIGN),
+      gencod: safeTrim(rec.GENCOD),
+      prix: Number(rec.PVTETTC) || 0,
+    });
+  }
+
+  rows.sort(
+    (a, b) =>
+      a.design.localeCompare(b.design, "fr") || a.nart.localeCompare(b.nart, "fr"),
+  );
+  return rows;
+};
+
+/**
+ * Écrit le PDF de la liste de prix.
+ * `titre` = le nom du niveau choisi (centré) ; `sousTitre` = le chemin parent
+ * (« GROUPE › FAMILLE »), vide pour un groupe.
+ */
+export const ecrirePdfListePrix = async ({
+  entreprise,
+  titre,
+  sousTitre,
+  rows,
+  outPath,
+}) => {
+  const mod = await import("pdfkit").catch(() => {
+    throw new Error("Module 'pdfkit' introuvable. Lancez : npm i pdfkit (backend).");
+  });
+  const PDFDocument = mod.default;
+
+  const margin = 36;
+  const doc = new PDFDocument({ size: "A4", margin, autoFirstPage: false });
+  const stream = fs.createWriteStream(outPath);
+  doc.pipe(stream);
+
+  const logoBuf = resolveLogoBuffer(entreprise);
+  const dateGen = new Date().toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // ⚠️ Somme des largeurs = 523 pt (A4 595,28 − 2 × 36).
+  const COLS = [
+    { key: "nart", label: "NART", w: 55, align: "left" },
+    { key: "refer", label: "RÉFÉRENCE", w: 95, align: "left" },
+    { key: "design", label: "DÉSIGNATION", w: 225, align: "left" },
+    { key: "gencod", label: "GENCOD", w: 80, align: "left" },
+    { key: "prixFmt", label: "PRIX TTC", w: 68, align: "right" },
+  ];
+  const left = margin;
+  const tableW = COLS.reduce((s, c) => s + c.w, 0);
+  const rowH = 15;
+
+  const fitText = (text, maxWidth) => {
+    const str = text == null ? "" : String(text);
+    if (!str) return "";
+    if (doc.widthOfString(str) <= maxWidth) return str;
+    let t = str;
+    while (t.length > 1 && doc.widthOfString(t + "…") > maxWidth) t = t.slice(0, -1);
+    return t + "…";
+  };
+
+  let y = margin;
+
+  // Pied de page : la DATE DE GÉNÉRATION en bas à droite (demande client),
+  // posée sur CHAQUE page au moment où on la quitte.
+  // ⚠️ Écrire SOUS la marge basse fait créer une page AUTOMATIQUE à pdfkit
+  // (la date sortait en haut d'une page blanche) : on annule la marge basse le
+  // temps d'écrire le pied, puis on la restaure.
+  const drawFooter = () => {
+    const margeBasse = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor("#666")
+      .text(`Généré le ${dateGen}`, left, doc.page.height - 26, {
+        width: tableW,
+        align: "right",
+        lineBreak: false,
+      })
+      .fillColor("#000");
+    doc.page.margins.bottom = margeBasse;
+  };
+
+  // En-tête de la PREMIÈRE page : logo + titre centré + sous-titre.
+  const drawEnTete = () => {
+    if (logoBuf) {
+      try {
+        doc.image(logoBuf, left, y, { fit: [120, 60] });
+      } catch {
+        /* logo illisible : on continue sans */
+      }
+    }
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(20)
+      .fillColor("#000")
+      .text(titre || "Liste de prix", left, y + (sousTitre ? 10 : 20), {
+        width: tableW,
+        align: "center",
+      });
+    if (sousTitre) {
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("#555")
+        .text(sousTitre, left, y + 38, { width: tableW, align: "center" })
+        .fillColor("#000");
+    }
+    y += 72;
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor("#666")
+      .text(`${rows.length} article${rows.length > 1 ? "s" : ""}`, left, y, {
+        width: tableW,
+        align: "right",
+        lineBreak: false,
+      })
+      .fillColor("#000");
+    y += 12;
+  };
+
+  const drawHeaderRow = () => {
+    let x = left;
+    doc.rect(left, y, tableW, rowH).fillAndStroke("#333", "#333");
+    doc.fillColor("#fff").font("Helvetica-Bold").fontSize(8);
+    COLS.forEach((c) => {
+      doc.text(c.label, x + 3, y + 4, { width: c.w - 6, align: c.align });
+      x += c.w;
+    });
+    doc.fillColor("#000");
+    y += rowH;
+  };
+
+  const nouvellePage = () => {
+    doc.addPage();
+    y = margin;
+  };
+
+  doc.addPage();
+  drawEnTete();
+  drawHeaderRow();
+
+  rows.forEach((r, i) => {
+    if (y + rowH > doc.page.height - margin - 14) {
+      drawFooter();
+      nouvellePage();
+      drawHeaderRow();
+    }
+    // Zébrage une ligne sur deux : la liste se lit en rayon, loin de l'écran.
+    if (i % 2) {
+      doc.save();
+      doc.rect(left, y, tableW, rowH).fill("#f2f2f2");
+      doc.restore();
+    }
+    let x = left;
+    doc.strokeColor("#ccc");
+    doc.font("Helvetica").fontSize(8).fillColor("#000");
+    const vals = { ...r, prixFmt: fmtXpf(r.prix) };
+    COLS.forEach((c) => {
+      doc.rect(x, y, c.w, rowH).stroke();
+      doc.text(fitText(String(vals[c.key] ?? ""), c.w - 6), x + 3, y + 4, {
+        width: c.w - 6,
+        align: c.align,
+        lineBreak: false,
+      });
+      x += c.w;
+    });
+    y += rowH;
+  });
+
+  drawFooter();
+  doc.end();
+  await new Promise((resolve, reject) => {
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+  });
+};
+
+export default { construireLignesListePrix, ecrirePdfListePrix };

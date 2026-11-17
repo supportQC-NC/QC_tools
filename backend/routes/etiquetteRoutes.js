@@ -4,6 +4,8 @@ import {
   genererEtiquettes,
   controlerGencod,
   exporterComptageGisements,
+  getClassementListePrix,
+  genererListePrix,
 } from "../controllers/etiquetteController.js";
 import {
   getTemplates,
@@ -49,6 +51,24 @@ router.get(
   checkEntrepriseAccess,
   canRead,
   exporterComptageGisements,
+);
+
+// Liste de prix (artplus.dbf) : classement groupe > famille > sous-famille
+// (disponible: false quand la société n'a pas d'artplus → l'écran grise le
+// bloc), puis génération du PDF.
+router.get(
+  "/:nomDossierDBF/liste-prix/classement",
+  protect,
+  checkEntrepriseAccess,
+  canRead,
+  getClassementListePrix,
+);
+router.get(
+  "/:nomDossierDBF/liste-prix",
+  protect,
+  checkEntrepriseAccess,
+  canRead,
+  genererListePrix,
 );
 
 // Templates d'étiquettes personnalisées (SCOPÉS SOCIÉTÉ, partagés entre users).
