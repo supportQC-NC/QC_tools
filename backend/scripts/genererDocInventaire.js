@@ -1014,9 +1014,15 @@ const contenu = (r) => {
     ],
     [
       ["D", "Doublon : l'article apparait plusieurs fois dans le meme comptage. Verifiez qu'il n'a pas ete compte deux fois."],
-      ["XX", "La quantite comptee depasse le stock theorique. Surplus a confirmer."],
-      ["A", "Attention : le stock theorique depasse la quantite comptee, ou l'article est inconnu du catalogue."],
+      ["X", "La quantite comptee depasse le stock theorique. Surplus a confirmer."],
+      ["A", "Article inconnu du catalogue : une ligne vierge est imprimee dessous pour ecrire la correction a la main."],
+      ["R", "Renvoi : le code bipe a ete renvoye vers une autre fiche (colonne R, a cote du code bipe). La ligne porte l'article ACTIF du catalogue."],
     ],
+  );
+  r.p(
+    "Les signaux se cumulent sur une meme ligne : un surplus sur un article compte dans deux zones s'ecrit « X D ». " +
+      "En fin de fiche, le tableau AJOUT (4 lignes vierges) permet de noter les bipages oublies decouverts au controle : " +
+      "ils sont ensuite saisis dans l'ecran Ajout controle inventaire.",
   );
   r.encadre(
     "Si une fiche ne sort pas de l'imprimante",

@@ -239,9 +239,11 @@ export const parseDat = (content) => {
 /**
  * @returns { rows, stats }
  * row = { n, code, nart, att, designation, reference, qte, stock, rouge, nonTrouve }
- * ATT : A = article inconnu du catalogue, XX = surplus de stock (qté bipée >
- * stock), D = doublon dans le fichier. « stock > qté bipée » n'est plus une
- * anomalie (12/11/2026) : trop fréquent, il noyait les trois autres.
+ * ATT : A = article inconnu du catalogue, X = surplus de stock (qté bipée >
+ * stock, « XX » raccourci en « X » le 18/11/2026), D = doublon dans le
+ * fichier — l'anomalie s'écrit AVANT le D (« X D », « A D »). « stock > qté
+ * bipée » n'est plus une anomalie (12/11/2026) : trop fréquent, il noyait les
+ * trois autres.
  *
  * ⚠️ La colonne CODE de la fiche porte le **GENCOD du catalogue** (demande
  * client du 10/11/2026), PAS le code brut bipé ni le NART — ce dernier a sa
@@ -339,12 +341,14 @@ export const construireLignes = async (entreprise, lignesDat) => {
   const rows = entries.map((e, i) => {
     const flags = [];
     const estDoublon = counts.get(e.dupKey) > 1;
-    if (estDoublon) flags.push("D");
 
     // TROIS anomalies, et trois seulement :
-    //   A  = article INCONNU du catalogue ;
-    //   XX = surplus de stock (quantité bipée > stock théorique) ;
-    //   D  = doublon (même article compté ≥ 2 fois dans la zone).
+    //   A = article INCONNU du catalogue ;
+    //   X = surplus de stock (quantité bipée > stock théorique — un seul
+    //       caractère depuis le 18/11/2026, « XX » n'apportait rien) ;
+    //   D = doublon (même article compté ≥ 2 fois dans la zone).
+    // L'anomalie s'écrit AVANT le D (demande client du 18/11/2026) : surplus
+    // + doublon = « X D », inconnu + doublon = « A D ».
     //
     // ⚠️ « stock > qté bipée » N'EST PLUS une anomalie (demande client du
     // 12/11/2026). C'était le cas le plus FRÉQUENT — tout article dont il
@@ -355,11 +359,12 @@ export const construireLignes = async (entreprise, lignesDat) => {
     if (e.nonTrouve) {
       flags.push("A");
     } else if (e.qte > e.stock) {
-      flags.push("XX");
+      flags.push("X");
     }
+    if (estDoublon) flags.push("D");
 
     if (estDoublon) doublons += 1;
-    if (flags.includes("XX")) excedent += 1;
+    if (flags.includes("X")) excedent += 1;
     // `attention` compte les lignes marquées A, donc désormais exactement les
     // articles inconnus : les deux compteurs sont égaux, et `attention` est
     // conservé parce que FicheControle.stats et les écrans le lisent déjà.
@@ -667,12 +672,12 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     .font("Helvetica")
     .text(
       legende ||
-        "   A = Article inconnu | XX = Surplus de stock | D = Doublon | R = Renvoi (code bipé → fiche active) | Grisé = Contrôle prioritaire",
+        "   A = Article inconnu | X = Surplus de stock | D = Doublon | R = Renvoi (code bipé → fiche active) | Grisé = Contrôle prioritaire",
     );
   y += 20;
 
   // ---- Tableau AJOUT (demande client du 18/11/2026) ----
-  // 15 lignes VIERGES entre la légende et le visa : le contrôleur y note les
+  // 4 lignes VIERGES entre la légende et le visa : le contrôleur y note les
   // articles OUBLIÉS découverts pendant son contrôle (NL, NART ou gencode,
   // désignation, quantité) — ils seront ressaisis dans l'écran « Ajout
   // contrôle inventaire ». Bloc insécable : saut de page s'il ne tient pas.
@@ -684,7 +689,8 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
   ];
   // Lignes hautes (18 pt) : ce tableau se remplit AU STYLO.
   const ajoutRowH = 18;
-  const ajoutNbLignes = 15;
+  // 4 lignes (demande client du 18/11/2026 — 15 au premier jet, trop).
+  const ajoutNbLignes = 4;
   const ajoutTitreH = 16;
   const ajoutH = ajoutTitreH + rowH + ajoutNbLignes * ajoutRowH;
   y += 10;
