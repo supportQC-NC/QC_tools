@@ -60,9 +60,14 @@ const ligneBipageSchema = new mongoose.Schema(
     // "excel" : importée depuis un fichier Excel.
     // "manuel" : ligne AJOUTEE a la main depuis l'ecran, pour une zone deja
     // filtree (code + emplacement) — elle ne vient d'aucun fichier.
+    // "controle" : ligne ajoutee depuis l'ecran « Ajout contrôle inventaire »
+    // (bipage oublié découvert au CONTRÔLE, 18/11/2026) — zone facultative à
+    // la saisie, repliée sur la pseudo-zone "CONTROLE". Provenance distincte
+    // de "manuel" (demande client) : on doit pouvoir relire les ajouts de
+    // contrôle séparément des reprises faites zone par zone.
     source: {
       type: String,
-      enum: ["dat", "proforma", "excel", "manuel"],
+      enum: ["dat", "proforma", "excel", "manuel", "controle"],
       default: "dat",
     },
     // N° de proforma ou nom du fichier Excel d'origine.

@@ -167,6 +167,13 @@ export const moduleMenuStructure = [
         icon: HiClipboardList,
       },
       {
+        // Saisie des bipages OUBLIÉS découverts au contrôle d'une zone
+        // (NART/gencode + quantité + emplacement, zone facultative).
+        label: "Ajout contrôle inventaire",
+        path: "/admin/ajout-controle-inventaire",
+        icon: HiClipboardCheck,
+      },
+      {
         label: "Fiches de contrôle",
         path: "/admin/fiches-controle",
         icon: HiDocumentReport,
@@ -708,6 +715,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/factures": "Factures clients.",
   "/admin/demandes-bipage": "Demandes d'articles à biper (collecteur).",
   "/admin/bipages": "Détail des bipages remontés.",
+  "/admin/ajout-controle-inventaire":
+    "Ajouter les bipages oubliés découverts au contrôle (zone facultative).",
   "/admin/suivi-receptions": "Suivi des réceptions de marchandises.",
   "/reception-manuelle":
     "Imprimer les fiches de contrôle papier des commandes à réceptionner.",

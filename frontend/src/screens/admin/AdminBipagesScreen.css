@@ -920,6 +920,18 @@
   border-color: rgba(59, 130, 246, 0.35);
 }
 
+/* Bipage ajouté depuis l'écran « Ajout contrôle inventaire » : provenance
+   distincte de l'ajout manuel (demande client du 18/11/2026). */
+.src-badge.controle {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.marq-controle {
+  color: #22c55e;
+}
+
 /* ── Ajout manuel d'une ligne ──────────────────────────────────────────── */
 .ajout-bar {
   display: flex;

@@ -88,15 +88,22 @@ const buildFilter = (session, query) => {
   }
 
   // Provenance : ne garder que ce qui a été touché à la main.
-  //   ajoutees   : lignes créées depuis l'écran (source "manuel") ;
+  //   ajoutees   : lignes créées depuis un écran (source "manuel" OU
+  //                "controle" — les deux sont des saisies à la main) ;
+  //   controle   : seulement les ajouts de l'écran « Ajout contrôle
+  //                inventaire » (provenance distincte, demande client) ;
   //   modifiees  : lignes issues du terrain dont le NART ou la quantité a été
   //                corrigé ;
-  //   touchees   : les deux à la fois — « tout ce qui n'est pas brut de
+  //   touchees   : le tout — « tout ce qui n'est pas brut de
   //                collecteur », la question qu'on se pose en fin d'inventaire.
-  if (query.marque === "ajoutees") clauses.push({ source: "manuel" });
+  if (query.marque === "ajoutees")
+    clauses.push({ source: { $in: ["manuel", "controle"] } });
+  else if (query.marque === "controle") clauses.push({ source: "controle" });
   else if (query.marque === "modifiees") clauses.push({ modifie: true });
   else if (query.marque === "touchees") {
-    clauses.push({ $or: [{ source: "manuel" }, { modifie: true }] });
+    clauses.push({
+      $or: [{ source: { $in: ["manuel", "controle"] } }, { modifie: true }],
+    });
   }
 
   if (clauses.length === 1) Object.assign(filter, clauses[0]);
@@ -249,7 +256,8 @@ const ordonnerCommeLesFiches = (lignes) => {
   // re-bipée, cumul recalculé), donc ses lignes peuvent être PLUS RÉCENTES
   // que la ligne manuelle — et celle-ci remontait alors en tête de zone.
   // La règle est explicite, elle ne dépend plus d'un horodatage.
-  const estManuel = (l) => l.source === "manuel" || !l.datFileName;
+  const estManuel = (l) =>
+    l.source === "manuel" || l.source === "controle" || !l.datFileName;
 
   const anciennete = new Map();
   for (const l of lignes) {
@@ -1573,6 +1581,215 @@ const ajouterLigneBipage = asyncHandler(async (req, res) => {
   res.status(201).json(ligne);
 });
 
+// ─── Ajout contrôle inventaire ──────────────────────────────────────────────
+// Écran dédié (18/11/2026) : au CONTRÔLE d'une zone, on découvre des bipages
+// oubliés — on les saisit ici (NART ou GENCOD, quantité, emplacement, zone
+// FACULTATIVE) et ils rejoignent le Détail des bipages et le calcul des écarts
+// comme n'importe quelle ligne de la session.
+
+// Zone de repli quand l'utilisateur ne précise pas où l'article a été trouvé :
+// une pseudo-zone visible et filtrable partout, plutôt qu'une zone vide.
+const ZONE_CONTROLE = "CONTROLE";
+
+/**
+ * Résout un code saisi (GENCOD ou NART, zéros de tête tolérés) vers la fiche
+ * ACTIVE du catalogue : même suivi des renvois GENDOUBL que la fiche de
+ * contrôle (10 sauts max, arrêt sur la dernière fiche trouvée).
+ */
+const resoudreArticleActif = async (entreprise, code) => {
+  let record = null;
+  try {
+    record = await articleCacheService.findByCode(entreprise, code);
+  } catch {
+    record = null;
+  }
+  let renvoye = false;
+  if (record) {
+    let sauts = 0;
+    while (sauts < 10) {
+      const gendoubl = String(record.GENDOUBL || "").trim();
+      if (!gendoubl) break;
+      let suivant = null;
+      try {
+        suivant = await articleCacheService.findByNart(entreprise, gendoubl);
+      } catch {
+        suivant = null;
+      }
+      if (!suivant) break;
+      record = suivant;
+      renvoye = true;
+      sauts += 1;
+    }
+  }
+  return { record, renvoye };
+};
+
+/**
+ * @desc    Contexte du formulaire « Ajout contrôle inventaire » : session
+ *          active, zones de l'inventaire (code, libellé, emplacement) et
+ *          liste des emplacements — les MÊMES types que le filtre du Détail
+ *          des bipages (dictionnaire des rayons + types présents dans les
+ *          lignes, jamais les dépôts S1..S5).
+ * @route   GET /api/bipages/:entrepriseId/controle-contexte
+ * @access  Private (module bipage, read)
+ */
+const getContexteControle = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    return res.json({ active: false, zones: [], types: [], zoneControle: ZONE_CONTROLE });
+  }
+
+  await backfillZoneType(session);
+  const { types } = await buildZonesMeta(session, entreprise);
+
+  // Zones proposées : celles de l'inventaire en cours, hors zones neutralisées
+  // (elles sont sorties du périmètre, y rattacher un bipage n'a pas de sens).
+  const zones = (session.zones || [])
+    .filter((z) => !z.neutralisee)
+    .map((z) => ({
+      code: z.code,
+      libelle: z.libelle || "",
+      type: String(z.type || "").trim(),
+    }))
+    .sort(
+      (a, b) =>
+        a.type.localeCompare(b.type, "fr") ||
+        a.code.localeCompare(b.code, "fr", { numeric: true }),
+    );
+
+  res.json({ active: true, zones, types, zoneControle: ZONE_CONTROLE });
+});
+
+/**
+ * @desc    Résolution dynamique du code saisi dans le formulaire : désignation,
+ *          NART, gencode et stock de la fiche ACTIVE (renvois GENDOUBL suivis).
+ *          `found: false` = aucun article du catalogue ne porte ce code.
+ * @route   GET /api/bipages/:entrepriseId/resoudre-article?code=
+ * @access  Private (module bipage, read)
+ */
+const resoudreArticleControle = asyncHandler(async (req, res) => {
+  const code = String(req.query.code || "").trim();
+  if (!code) {
+    res.status(400);
+    throw new Error("Code (NART ou gencode) requis.");
+  }
+  const { record, renvoye } = await resoudreArticleActif(req.entreprise, code);
+  if (!record) {
+    return res.json({ found: false, code });
+  }
+  res.json({
+    found: true,
+    code,
+    renvoye,
+    nart: String(record.NART || "").trim(),
+    gencod: String(record.GENCOD || "").trim(),
+    designation: String(record.DESIGN || "").trim(),
+    refer: String(record.REFER || "").trim(),
+    stock: articleCacheService.calculateStockTotal(record),
+  });
+});
+
+/**
+ * @desc    Ajout d'une ligne de bipage depuis l'écran « Ajout contrôle
+ *          inventaire ». Code = NART ou GENCOD (résolu vers la fiche active,
+ *          renvois GENDOUBL suivis) ; zone FACULTATIVE — sans elle, la ligne
+ *          porte la pseudo-zone CONTROLE à l'emplacement choisi. Un code
+ *          inconnu du catalogue est ACCEPTÉ (comme un bipage terrain) : il
+ *          sort en « Article non trouvé » dans le détail et les écarts.
+ * @route   POST /api/bipages/:entrepriseId/ligne-controle
+ * @access  Private (module bipage, write)
+ */
+const ajouterLigneControle = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+
+  const code = String(req.body.code || "").trim();
+  const zoneType = String(req.body.zoneType || "").trim();
+  let zoneCode = String(req.body.zoneCode || "").trim();
+  const observation = String(req.body.observation || "").trim();
+  const qteScan = Number(req.body.qteScan);
+
+  if (!code) {
+    res.status(400);
+    throw new Error("Code (NART ou gencode) obligatoire.");
+  }
+  if (!zoneType) {
+    res.status(400);
+    throw new Error("Emplacement obligatoire.");
+  }
+  if (!Number.isFinite(qteScan) || qteScan === 0) {
+    // Même règle que l'ajout manuel : 0 n'apporte rien, le négatif reste
+    // permis (convention des déductions).
+    res.status(400);
+    throw new Error("Quantité obligatoire, et différente de 0.");
+  }
+
+  if (!zoneCode) {
+    zoneCode = ZONE_CONTROLE;
+  } else if (zoneCode !== ZONE_CONTROLE) {
+    // Une zone désignée doit exister dans l'inventaire EN COURS (même règle
+    // que l'ajout manuel) ; seule la pseudo-zone CONTROLE y échappe.
+    const zone = (session.zones || []).find(
+      (z) => z.code === zoneCode && String(z.type || "").trim() === zoneType,
+    );
+    if (!zone) {
+      res.status(400);
+      throw new Error(`Zone ${zoneCode} (${zoneType}) absente de cet inventaire.`);
+    }
+  }
+
+  const { record } = await resoudreArticleActif(entreprise, code);
+
+  // La ligne se range à la suite de celles de sa zone (pseudo-zone comprise).
+  const derniere = await LigneBipage.findOne({
+    session: session._id,
+    zoneCode,
+    zoneType,
+  })
+    .sort({ ordre: -1 })
+    .select("ordre")
+    .lean();
+
+  const ligne = await LigneBipage.create({
+    entreprise: entreprise._id,
+    session: session._id,
+    // Aucun fichier derrière cette ligne : comme un ajout manuel, elle se
+    // range en fin de zone au tri des fiches.
+    datFileName: "",
+    zoneCode,
+    zoneType,
+    ordre: (Number(derniere?.ordre) || 0) + 1,
+    // La saisie brute tient lieu de « code bipé » — c'est la seule trace de ce
+    // que le contrôleur a réellement lu sur l'étiquette.
+    eanArticle: code,
+    codeScanne: code,
+    qteScan,
+    nart: record ? String(record.NART || "").trim() : "",
+    observation,
+    designation: record ? (record.DESIGN || "").trim() : "Article non trouvé",
+    gencod: record ? (record.GENCOD || "").trim() : "",
+    stock: record ? articleCacheService.calculateStockTotal(record) : null,
+    found: !!record,
+    source: "controle",
+    sourceRef: "",
+    // L'« agent » d'un ajout de contrôle est celui qui l'a saisi.
+    agentNom: nomUtilisateur(req.user),
+  });
+
+  res.status(201).json(ligne);
+});
+
 /**
  * @desc    Export CSV (séparateur ;) des lignes bipées (mêmes filtres que la liste)
  * @route   GET /api/bipages/:entrepriseId/export?zone=&type=&search=
@@ -2073,7 +2290,9 @@ const getStatsZonesRetouchees = asyncHandler(async (req, res) => {
         _id: { type: "$zoneType", code: "$zoneCode" },
         lignes: { $sum: 1 },
         ajoutees: {
-          $sum: { $cond: [{ $eq: ["$source", "manuel"] }, 1, 0] },
+          $sum: {
+            $cond: [{ $in: ["$source", ["manuel", "controle"]] }, 1, 0],
+          },
         },
         modifiees: {
           $sum: { $cond: [{ $eq: ["$modifie", true] }, 1, 0] },
@@ -2086,7 +2305,7 @@ const getStatsZonesRetouchees = asyncHandler(async (req, res) => {
             $cond: [
               {
                 $or: [
-                  { $eq: ["$source", "manuel"] },
+                  { $in: ["$source", ["manuel", "controle"]] },
                   { $eq: ["$modifie", true] },
                 ],
               },
@@ -2371,6 +2590,9 @@ export {
   getStatsProformasZones,
   ficheProformaImportee,
   exportEcartsBipage,
+  getContexteControle,
+  resoudreArticleControle,
+  ajouterLigneControle,
   setEcartQteZone,
   purgerCorrectionsEcarts,
   getArtplusGroupes,

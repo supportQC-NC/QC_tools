@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   HiClipboardList,
+  HiClipboardCheck,
   HiDownload,
   HiDocumentReport,
   HiTable,
@@ -83,7 +84,9 @@ const CelluleCodeBipe = ({ ligne }) => {
         title={
           ligne.source === "manuel"
             ? "Saisi à la main depuis cet écran"
-            : "Code réellement bipé par le collecteur"
+            : ligne.source === "controle"
+              ? "Saisi depuis l'écran Ajout contrôle inventaire"
+              : "Code réellement bipé par le collecteur"
         }
       >
         {scanne}
@@ -1054,6 +1057,7 @@ const AdminBipagesScreen = () => {
             >
               <option value="">Toutes les lignes</option>
               <option value="ajoutees">Ajoutées à la main</option>
+              <option value="controle">Ajouts contrôle</option>
               <option value="modifiees">Modifiées</option>
               <option value="touchees">Ajoutées + modifiées</option>
             </select>
@@ -1480,9 +1484,11 @@ const AdminBipagesScreen = () => {
                       key={l._id}
                       className={`${l.found ? "" : "row-unknown"} ${
                         l.modeImport === "deduction" ? "row-deduction" : ""
-                      } ${l.source === "manuel" ? "row-manuelle" : ""} ${
-                        l.modifie ? "row-modifiee" : ""
-                      }`.trim()}
+                      } ${
+                        l.source === "manuel" || l.source === "controle"
+                          ? "row-manuelle"
+                          : ""
+                      } ${l.modifie ? "row-modifiee" : ""}`.trim()}
                     >
                       {/* Repères de la ligne. L'infobulle de la correction dit
                           CE QUI a changé : « corrigée » seul obligerait à
@@ -1492,6 +1498,14 @@ const AdminBipagesScreen = () => {
                           <HiPlusCircle
                             className="marq marq-manuelle"
                             title={`Ligne ajoutée à la main${
+                              l.agentNom ? ` par ${l.agentNom}` : ""
+                            }`}
+                          />
+                        )}
+                        {l.source === "controle" && (
+                          <HiClipboardCheck
+                            className="marq marq-controle"
+                            title={`Bipage ajouté au CONTRÔLE (écran Ajout contrôle inventaire)${
                               l.agentNom ? ` par ${l.agentNom}` : ""
                             }`}
                           />
@@ -1554,14 +1568,20 @@ const AdminBipagesScreen = () => {
                             {l.source && l.source !== "dat" && (
                               <span
                                 className={`src-badge${
-                                  l.source === "manuel" ? " manuel" : ""
+                                  l.source === "manuel"
+                                    ? " manuel"
+                                    : l.source === "controle"
+                                      ? " controle"
+                                      : ""
                                 }`}
                               >
                                 {l.source === "proforma"
                                   ? "proforma"
                                   : l.source === "manuel"
                                     ? "ajout manuel"
-                                    : "excel"}
+                                    : l.source === "controle"
+                                      ? "contrôle"
+                                      : "excel"}
                               </span>
                             )}
                             {l.modeImport === "deduction" && (

@@ -145,6 +145,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/suivi-bipage", key: "inventaire" },
   { path: "/admin/agents-inventaire", key: "inventaire" },
   { path: "/admin/bipages", key: "bipage" },
+  { path: "/admin/ajout-controle-inventaire", key: "bipage" },
   { path: "/admin/demandes-bipage", key: "bipage" },
   { path: "/admin/suivi-demandes-bipage", key: "bipage" },
   { path: "/admin/reappros", key: "reapro" },

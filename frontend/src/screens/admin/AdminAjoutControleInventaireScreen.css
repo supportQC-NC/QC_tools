@@ -1,0 +1,288 @@
+/* src/screens/admin/AdminAjoutControleInventaireScreen.css
+   Formulaire « Ajout contrôle inventaire » — mêmes conventions (variables,
+   boutons) que l'écran Détail des bipages, dont il est le compagnon. */
+
+.acinv-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acinv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.acinv-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.acinv-header h1 svg {
+  color: #8b5cf6;
+}
+
+/* Boutons / tableau : repris des conventions de l'écran Détail des bipages,
+   mais SCOPÉS ici — ces classes ne sont pas définies globalement, l'écran doit
+   se suffire à lui-même quel que soit l'ordre de chargement des CSS. */
+.acinv-screen .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.acinv-screen .btn-icon:hover:not(:disabled) {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.acinv-screen .btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.acinv-screen .btn-primary,
+.acinv-screen .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.acinv-screen .btn-primary {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+.acinv-screen .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.acinv-screen .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.acinv-screen .btn-secondary {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+.acinv-screen .admin-loading {
+  padding: 32px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.acinv-screen .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.acinv-screen .admin-table th,
+.acinv-screen .admin-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.acinv-screen .admin-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.acinv-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.acinv-placeholder svg {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+.acinv-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 860px;
+}
+
+.acinv-form {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.acinv-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.acinv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 180px;
+  min-width: 180px;
+}
+
+.acinv-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.acinv-field input,
+.acinv-field select {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.acinv-field select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.acinv-field-code {
+  flex: 2 1 260px;
+}
+
+.acinv-field-code input {
+  font-family: "Consolas", "Menlo", monospace;
+}
+
+.acinv-field-qte {
+  flex: 0 1 120px;
+  min-width: 100px;
+}
+
+.acinv-field-obs {
+  flex: 2 1 260px;
+}
+
+/* Résolution dynamique de l'article : vert = trouvé, ambre = inconnu. */
+.acinv-article {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.acinv-article-ok {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: var(--text-primary);
+}
+
+.acinv-article-ok strong {
+  color: #22c55e;
+}
+
+.acinv-article-inconnu {
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #f59e0b;
+}
+
+.acinv-article-inconnu svg,
+.acinv-article-renvoi svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+.acinv-article-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.acinv-article-renvoi {
+  font-size: 12px;
+  color: #f59e0b;
+}
+
+.acinv-submit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.acinv-msg {
+  font-size: 13px;
+}
+
+.acinv-msg-ok {
+  color: #22c55e;
+}
+
+.acinv-msg-err {
+  color: #ef4444;
+}
+
+/* Récap des lignes ajoutées pendant la visite de l'écran. */
+.acinv-recap h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.acinv-recap-table {
+  overflow-x: auto;
+}
+
+.acinv-recap .mono {
+  font-family: "Consolas", "Menlo", monospace;
+  font-size: 12px;
+}
+
+.acinv-num {
+  text-align: right;
+}
+
+/* Article inconnu du catalogue : même teinte que le Détail des bipages. */
+.acinv-recap .row-unknown td {
+  color: #f59e0b;
+}

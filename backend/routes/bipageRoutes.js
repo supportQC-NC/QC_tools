@@ -11,6 +11,9 @@ import {
   getArtplusGroupes,
   updateBipage,
   ajouterLigneBipage,
+  getContexteControle,
+  resoudreArticleControle,
+  ajouterLigneControle,
   exportCsv,
   recommencerZone,
   setStockFige,
@@ -102,6 +105,14 @@ router.get("/:entrepriseId/proformas/:numfact/fiche-pdf", protect, canReadImport
 // ─── Import depuis un fichier Excel ───────────────────────────────────────
 router.get("/:entrepriseId/modele-excel", protect, canReadImport, checkEntrepriseAccess, modeleExcelBipage);
 router.post("/:entrepriseId/import-excel", protect, canWriteImport, checkEntrepriseAccess, uploadExcel, importExcelBipage);
+
+// ─── Ajout contrôle inventaire ────────────────────────────────────────────
+// Formulaire dédié aux bipages OUBLIÉS découverts au contrôle : contexte
+// (zones + emplacements de la session), résolution dynamique du code saisi,
+// et création de la ligne (source "controle", zone facultative → CONTROLE).
+router.get("/:entrepriseId/controle-contexte", protect, canRead, checkEntrepriseAccess, getContexteControle);
+router.get("/:entrepriseId/resoudre-article", protect, canRead, checkEntrepriseAccess, resoudreArticleControle);
+router.post("/:entrepriseId/ligne-controle", protect, canWrite, checkEntrepriseAccess, ajouterLigneControle);
 
 router.get("/:entrepriseId", protect, canRead, checkEntrepriseAccess, getBipages);
 

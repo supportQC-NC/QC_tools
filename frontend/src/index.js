@@ -38,6 +38,7 @@ import AdminZonesScreen from "./screens/admin/AdminZonesScreen";
 import AdminInventaireProgressionScreen from "./screens/admin/AdminInventaireProgressionScreen";
 import AdminFichesControleScreen from "./screens/admin/AdminFichesControleScreen";
 import AdminBipagesScreen from "./screens/admin/AdminBipagesScreen";
+import AdminAjoutControleInventaireScreen from "./screens/admin/AdminAjoutControleInventaireScreen";
 import AdminDemandesBipageScreen from "./screens/admin/AdminDemandesBipageScreen";
 import AdminInventaireProformaScreen from "./screens/admin/AdminInventaireProformaScreen";
 import AdminEtiquettesScreen from "./screens/admin/AdminEtiquettesScreen";
@@ -497,6 +498,12 @@ const router = createBrowserRouter(
           element={<AdminSuiviDemandesBipageScreen />}
         />
         <Route path="/admin/bipages" element={<AdminBipagesScreen />} />
+        {/* Ajout des bipages OUBLIÉS découverts au contrôle (zone facultative
+            → pseudo-zone CONTROLE) : ils rejoignent le Détail des bipages. */}
+        <Route
+          path="/admin/ajout-controle-inventaire"
+          element={<AdminAjoutControleInventaireScreen />}
+        />
       </Route>
 
       {/* Données · Réappros (admin) -> module "reapro" */}

@@ -74,6 +74,34 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // ─── Ajout contrôle inventaire ────────────────────────────────────────
+    // Contexte du formulaire : session active, zones de l'inventaire et
+    // emplacements (mêmes types que le filtre du Détail des bipages).
+    getContexteControle: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/controle-contexte`,
+      providesTags: ["Bipage"],
+    }),
+
+    // Résolution dynamique du code saisi (NART ou gencode, renvois GENDOUBL
+    // suivis vers la fiche active) : désignation, NART, gencode, stock.
+    resoudreArticleControle: builder.query({
+      query: ({ entrepriseId, code }) =>
+        `${BASE}/${entrepriseId}/resoudre-article?code=${encodeURIComponent(code)}`,
+      keepUnusedDataFor: 30,
+    }),
+
+    // Ajout d'une ligne de bipage « contrôle » (zone facultative → CONTROLE).
+    // Invalide la liste : la ligne doit apparaître dans le Détail des bipages
+    // et dans le calcul des écarts.
+    ajouterLigneControle: builder.mutation({
+      query: ({ entrepriseId, body }) => ({
+        url: `${BASE}/${entrepriseId}/ligne-controle`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Bipage"],
+    }),
+
     // « Recommencer » une zone : efface lignes + statut imprimé + fichiers .DAT/PDF,
     // et réautorise le re-bipage. Invalide la liste pour rafraîchir l'écran.
     recommencerZone: builder.mutation({
@@ -250,6 +278,9 @@ export const {
   useGetStatsProformasZonesQuery,
   useUpdateBipageMutation,
   useAjouterLigneBipageMutation,
+  useGetContexteControleQuery,
+  useLazyResoudreArticleControleQuery,
+  useAjouterLigneControleMutation,
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
   useGetEcartsBipageQuery,
