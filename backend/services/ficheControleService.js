@@ -270,6 +270,11 @@ export const construireLignes = async (entreprise, lignesDat) => {
     // plafonnée que `suivreChaineRenvois` (scan collecteur) : 10 sauts max, et
     // un renvoi vers une fiche disparue s'arrête sur la dernière trouvée.
     // La colonne CODE BIPÉ, elle, garde le code brut (`l.code`), comme avant.
+    // `renvoye` : au moins un saut GENDOUBL a été suivi — la fiche imprimée
+    // porte alors un « R » à côté du code bipé (demande client du 18/11/2026),
+    // pour que le contrôleur sache que l'étiquette lue n'est pas celle de la
+    // fiche active.
+    let renvoye = false;
     if (record) {
       let sauts = 0;
       while (sauts < 10) {
@@ -283,6 +288,7 @@ export const construireLignes = async (entreprise, lignesDat) => {
         }
         if (!suivant) break;
         record = suivant;
+        renvoye = true;
         sauts += 1;
       }
     }
@@ -297,6 +303,7 @@ export const construireLignes = async (entreprise, lignesDat) => {
         qte: l.quantite,
         stock: null,
         nonTrouve: true,
+        renvoye: false,
         dupKey: `CODE:${l.code}`,
       });
     } else {
@@ -313,6 +320,7 @@ export const construireLignes = async (entreprise, lignesDat) => {
         qte: l.quantite,
         stock,
         nonTrouve: false,
+        renvoye,
         dupKey: nart ? `NART:${nart}` : `GENCOD:${(record.GENCOD || "").trim()}`,
       });
     }
@@ -363,6 +371,10 @@ export const construireLignes = async (entreprise, lignesDat) => {
       // CODE = le code-barres du CATALOGUE ; repli sur le code bipé quand
       // l'article n'a pas de gencod (ou est inconnu). Voir l'en-tête.
       code: e.gencod || e.code,
+      // « R » = le code bipé a été RENVOYÉ (chaîne GENDOUBL suivie jusqu'à la
+      // fiche active) : petite colonne à côté du code bipé sur la fiche.
+      renvoi: e.renvoye ? "R" : "",
+      renvoye: !!e.renvoye,
       nart: e.nart,
       gencod: e.gencod || "",
       // Code réellement bipé, SANS résolution : il a sa propre colonne dans la
@@ -395,11 +407,12 @@ export const construireLignes = async (entreprise, lignesDat) => {
 // ===========================================
 // ⚠️ La somme des largeurs DOIT valoir 535 pt : A4 portrait (595,28) moins les
 // deux marges de 30. Toute colonne ajoutée se prend sur les autres.
-// Total actuel : 26+62+62+46+28+144+60+34+40+33 = 535.
+// Total actuel : 26+62+14+62+46+28+130+60+34+40+33 = 535.
 // Les deux colonnes de code sont calées au plus juste : un GENCOD est un C(13),
-// soit 54,2 pt en Helvetica 7,5 — 58 pt utiles suffisent. Tout ce qui a été
-// gagné est rendu à DÉSIGNATION, la seule colonne qui souffre vraiment d'être
-// tronquée (c'est elle qui permet de reconnaître l'article en rayon).
+// soit 54,2 pt en Helvetica 7,5 — 58 pt utiles suffisent. La DÉSIGNATION n'est
+// PLUS tronquée (18/11/2026) : quand elle ne tient pas sur une ligne, elle
+// passe à la ligne et la LIGNE S'AGRANDIT — réduire sa colonne de 14 pt pour
+// la colonne « R » ne fait donc plus perdre d'information.
 const COLS = [
   { key: "n", label: "N°", w: 26, align: "center" },
   // CODE BIPÉ = ce que l'agent a réellement douché ou saisi, SANS résolution :
@@ -408,6 +421,10 @@ const COLS = [
   // fausse, c'est presque toujours ici que ça se voit (code d'un autre
   // article, zéro de tête absent, renvoi GENDOUBL suivi vers une autre fiche).
   { key: "codeScanne", label: "CODE BIPÉ", w: 62, align: "left" },
+  // « R » = le code bipé est un RENVOI (GENDOUBL suivi jusqu'à la fiche
+  // active) : l'étiquette lue en rayon n'est pas celle de la fiche dont la
+  // ligne porte le NART/GENCODE (demande client du 18/11/2026).
+  { key: "renvoi", label: "R", w: 14, align: "center" },
   // Intitulé « GENCODE » et pas « CODE » (demande client du 10/11/2026) : la
   // colonne porte le code-barres du catalogue — celui de l'étiquette en rayon —
   // obtenu par RÉSOLUTION du code bipé, et pas une référence interne (NART,
@@ -415,7 +432,7 @@ const COLS = [
   { key: "code", label: "GENCODE", w: 62, align: "left" },
   { key: "nart", label: "NART", w: 46, align: "left" },
   { key: "att", label: "ATT", w: 28, align: "center" },
-  { key: "designation", label: "DÉSIGNATION", w: 144, align: "left" },
+  { key: "designation", label: "DÉSIGNATION", w: 130, align: "left" },
   { key: "reference", label: "RÉFÉRENCE", w: 60, align: "left" },
   { key: "qte", label: "QTÉ", w: 34, align: "center" },
   { key: "stock", label: "STOCK", w: 40, align: "center" },
@@ -545,11 +562,34 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
 
   drawHeader();
 
+  const designCol = COLS.find((c) => c.key === "designation");
+
   rows.forEach((r) => {
+    // Police posée AVANT la mesure : heightOfString mesure avec la police
+    // courante (drawHeader la laisse en gras après un saut de page).
+    doc.font("Helvetica").fontSize(7.5);
+
+    // HAUTEUR DE LIGNE VARIABLE (demande client du 18/11/2026) : la
+    // DÉSIGNATION n'est plus tronquée — quand elle ne tient pas, elle passe à
+    // la ligne et la ligne s'agrandit. DESIGN est un C(50) : deux lignes
+    // suffisent presque toujours, mais la hauteur suit le texte réel.
+    const design = r.designation == null ? "" : String(r.designation);
+    // Une désignation qui TIENT sur une ligne garde la hauteur historique
+    // (16 pt) : heightOfString d'une ligne unique dépasserait déjà le seuil
+    // et toutes les lignes sortaient à 18 pt.
+    const designDeborde =
+      design && doc.widthOfString(design) > designCol.w - 4;
+    const h = designDeborde
+      ? Math.max(
+          rowH,
+          Math.ceil(doc.heightOfString(design, { width: designCol.w - 4 })) + 9,
+        )
+      : rowH;
+
     // Une ligne INCONNUE (A) est suivie d'une ligne VIERGE de correction : on
     // réserve la place des deux d'un coup pour qu'elles ne soient jamais
     // séparées par un saut de page.
-    ensureSpace(r.nonTrouve ? rowH * 2 : rowH);
+    ensureSpace(r.nonTrouve ? h + rowH : h);
     // Après un saut de page, drawHeader laisse la police en GRAS : on la
     // repose à chaque ligne (et avant fitText, qui mesure avec la police
     // courante) — les pages 2+ sortaient entièrement en gras.
@@ -559,35 +599,45 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     // Ligne en défaut : fond gris (texte noir, compatible impression N&B)
     if (r.rouge) {
       doc.save();
-      doc.rect(left, y, tableWidth, rowH).fill("#d9d9d9");
+      doc.rect(left, y, tableWidth, h).fill("#d9d9d9");
       doc.restore();
     }
 
     doc.strokeColor("#999");
     COLS.forEach((c) => {
-      doc.rect(x, y, c.w, rowH).stroke();
-      const raw =
-        c.key === "ctl"
-          ? ""
-          : r[c.key] === null || r[c.key] === undefined
-            ? ""
-            : // Quantités/stocks décimaux (articles au mètre) : virgule
-              // française, "1.5" imprimé « 1,5 ».
-              (c.key === "qte" || c.key === "stock") &&
-                typeof r[c.key] === "number"
-              ? String(Math.round(r[c.key] * 1000) / 1000).replace(".", ",")
-              : String(r[c.key]);
-      const val = fitText(doc, raw, c.w - 4);
-      doc
-        .fillColor("#000")
-        .text(val, x + 2, y + 5, {
+      doc.rect(x, y, c.w, h).stroke();
+      if (c.key === "designation") {
+        // Pas de fitText ici : le texte COMPLET, avec retour à la ligne —
+        // la hauteur `h` a été calculée pour lui.
+        doc.fillColor("#000").text(design, x + 2, y + 5, {
           width: c.w - 4,
           align: c.align,
-          lineBreak: false,
+          height: h - 5,
         });
+      } else {
+        const raw =
+          c.key === "ctl"
+            ? ""
+            : r[c.key] === null || r[c.key] === undefined
+              ? ""
+              : // Quantités/stocks décimaux (articles au mètre) : virgule
+                // française, "1.5" imprimé « 1,5 ».
+                (c.key === "qte" || c.key === "stock") &&
+                  typeof r[c.key] === "number"
+                ? String(Math.round(r[c.key] * 1000) / 1000).replace(".", ",")
+                : String(r[c.key]);
+        const val = fitText(doc, raw, c.w - 4);
+        doc
+          .fillColor("#000")
+          .text(val, x + 2, y + 5, {
+            width: c.w - 4,
+            align: c.align,
+            lineBreak: false,
+          });
+      }
       x += c.w;
     });
-    y += rowH;
+    y += h;
 
     // Article inconnu (A) : ligne VIERGE juste en dessous, pour que l'agent
     // écrive la correction à la main (demande client du 17/11/2026). Mêmes
@@ -617,9 +667,61 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     .font("Helvetica")
     .text(
       legende ||
-        "   A = Article inconnu | XX = Surplus de stock (qté bipée > stock) | D = Doublon | Lignes grisées = Contrôle prioritaire",
+        "   A = Article inconnu | XX = Surplus de stock | D = Doublon | R = Renvoi (code bipé → fiche active) | Grisé = Contrôle prioritaire",
     );
   y += 20;
+
+  // ---- Tableau AJOUT (demande client du 18/11/2026) ----
+  // 15 lignes VIERGES entre la légende et le visa : le contrôleur y note les
+  // articles OUBLIÉS découverts pendant son contrôle (NL, NART ou gencode,
+  // désignation, quantité) — ils seront ressaisis dans l'écran « Ajout
+  // contrôle inventaire ». Bloc insécable : saut de page s'il ne tient pas.
+  const AJOUT_COLS = [
+    { label: "NL", w: 30 },
+    { label: "NART / GENCODE", w: 120 },
+    { label: "DÉSIGNATION", w: 305 },
+    { label: "QTÉ", w: 80 },
+  ];
+  // Lignes hautes (18 pt) : ce tableau se remplit AU STYLO.
+  const ajoutRowH = 18;
+  const ajoutNbLignes = 15;
+  const ajoutTitreH = 16;
+  const ajoutH = ajoutTitreH + rowH + ajoutNbLignes * ajoutRowH;
+  y += 10;
+  if (y + ajoutH > doc.page.height - margin) {
+    doc.addPage();
+    y = margin;
+  }
+  doc.strokeColor("#000").rect(left, y, tableWidth, ajoutTitreH).fillAndStroke("#e8e8e8", "#000");
+  doc
+    .fillColor("#000")
+    .font("Helvetica-Bold")
+    .fontSize(8)
+    .text(
+      "AJOUT — bipages oubliés constatés au contrôle (à saisir ensuite dans l'écran « Ajout contrôle inventaire »)",
+      left + 4,
+      y + 4,
+      { width: tableWidth - 8, lineBreak: false },
+    );
+  y += ajoutTitreH;
+  let xa = left;
+  doc.rect(left, y, tableWidth, rowH).fillAndStroke("#e8e8e8", "#000");
+  doc.fillColor("#000").font("Helvetica-Bold").fontSize(7.5);
+  AJOUT_COLS.forEach((c) => {
+    doc.text(c.label, xa + 2, y + 5, { width: c.w - 4, align: "left" });
+    xa += c.w;
+  });
+  y += rowH;
+  doc.strokeColor("#999");
+  for (let i = 0; i < ajoutNbLignes; i += 1) {
+    let xv = left;
+    AJOUT_COLS.forEach((c) => {
+      doc.rect(xv, y, c.w, ajoutRowH).stroke();
+      xv += c.w;
+    });
+    y += ajoutRowH;
+  }
+  doc.strokeColor("#000");
 
   // ---- VISA CONTRÔLE (fin de fiche, 17/11/2026) ----
   // L'agent qui a CONTRÔLÉ la zone écrit son nom et signe ici — l'ancien
