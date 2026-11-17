@@ -14,6 +14,8 @@ import {
   getContexteControle,
   resoudreArticleControle,
   ajouterLigneControle,
+  modifierLigneControle,
+  supprimerLigneControle,
   ficheViergeControle,
   exportCsv,
   recommencerZone,
@@ -114,6 +116,11 @@ router.post("/:entrepriseId/import-excel", protect, canWriteImport, checkEntrepr
 router.get("/:entrepriseId/controle-contexte", protect, canRead, checkEntrepriseAccess, getContexteControle);
 router.get("/:entrepriseId/resoudre-article", protect, canRead, checkEntrepriseAccess, resoudreArticleControle);
 router.post("/:entrepriseId/ligne-controle", protect, canWrite, checkEntrepriseAccess, ajouterLigneControle);
+// Correction / suppression d'un ajout de contrôle saisi par erreur — réservées
+// aux lignes « source: controle » (PAS de marquage « corrigée » : voir le
+// contrôleur).
+router.put("/:entrepriseId/ligne-controle/:id", protect, canWrite, checkEntrepriseAccess, modifierLigneControle);
+router.delete("/:entrepriseId/ligne-controle/:id", protect, canWrite, checkEntrepriseAccess, supprimerLigneControle);
 // Fiche de saisie VIERGE (A4 paysage téléchargé) : à remplir au stylo en
 // rayon avant la saisie dans l'écran.
 router.get("/:entrepriseId/fiche-controle-vierge", protect, canRead, checkEntrepriseAccess, ficheViergeControle);

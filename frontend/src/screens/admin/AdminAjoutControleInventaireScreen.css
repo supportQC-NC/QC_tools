@@ -303,3 +303,41 @@
 .acinv-recap .row-unknown td {
   color: #f59e0b;
 }
+
+/* ── Modification / suppression d'un ajout ────────────────────────────── */
+.acinv-form-edition {
+  border-color: #f59e0b;
+}
+
+.acinv-edition-banniere {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #f59e0b;
+}
+
+.acinv-edition-annuler {
+  margin-left: auto;
+}
+
+.acinv-actions-cell {
+  white-space: nowrap;
+}
+
+.acinv-screen .acinv-btn-ligne {
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
+}
+
+.acinv-screen .acinv-btn-suppr:hover:not(:disabled) {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+/* Ligne rechargée dans le formulaire : repère visuel (filet à gauche). */
+.acinv-recap .acinv-row-edition td:first-child {
+  box-shadow: inset 3px 0 0 #f59e0b;
+}

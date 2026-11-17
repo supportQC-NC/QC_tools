@@ -102,6 +102,27 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["Bipage"],
     }),
 
+    // Correction d'un ajout de contrôle saisi par erreur (code re-résolu,
+    // zone/emplacement/quantité/observation) — lignes « controle » seulement,
+    // sans marquage « corrigée ».
+    modifierLigneControle: builder.mutation({
+      query: ({ entrepriseId, id, body }) => ({
+        url: `${BASE}/${entrepriseId}/ligne-controle/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["Bipage"],
+    }),
+
+    // Suppression d'un ajout de contrôle saisi par erreur.
+    supprimerLigneControle: builder.mutation({
+      query: ({ entrepriseId, id }) => ({
+        url: `${BASE}/${entrepriseId}/ligne-controle/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Bipage"],
+    }),
+
     // « Recommencer » une zone : efface lignes + statut imprimé + fichiers .DAT/PDF,
     // et réautorise le re-bipage. Invalide la liste pour rafraîchir l'écran.
     recommencerZone: builder.mutation({
@@ -281,6 +302,8 @@ export const {
   useGetContexteControleQuery,
   useLazyResoudreArticleControleQuery,
   useAjouterLigneControleMutation,
+  useModifierLigneControleMutation,
+  useSupprimerLigneControleMutation,
   useRecommencerZoneMutation,
   useSetStockFigeMutation,
   useGetEcartsBipageQuery,

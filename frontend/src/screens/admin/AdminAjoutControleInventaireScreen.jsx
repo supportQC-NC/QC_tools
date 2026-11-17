@@ -15,6 +15,9 @@ import {
   HiPlus,
   HiExclamation,
   HiPrinter,
+  HiPencilAlt,
+  HiTrash,
+  HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
@@ -23,6 +26,8 @@ import {
   useGetBipagesQuery,
   useLazyResoudreArticleControleQuery,
   useAjouterLigneControleMutation,
+  useModifierLigneControleMutation,
+  useSupprimerLigneControleMutation,
 } from "../../slices/bipageApiSlice";
 import { BASE_URL } from "../../constants";
 import "./AdminAjoutControleInventaireScreen.css";
@@ -54,6 +59,9 @@ const AdminAjoutControleInventaireScreen = () => {
   const [zoneCode, setZoneCode] = useState("");
   const [observation, setObservation] = useState("");
   const [msg, setMsg] = useState(null); // { type: "ok"|"err", text }
+  // Ligne en cours de MODIFICATION (rechargée dans le formulaire) — null = le
+  // formulaire ajoute une nouvelle ligne.
+  const [edition, setEdition] = useState(null);
 
   const codeRef = useRef(null);
 
@@ -91,10 +99,57 @@ const AdminAjoutControleInventaireScreen = () => {
     setZoneCode("");
     setObservation("");
     setMsg(null);
+    setEdition(null);
   }, [selectedEntreprise]);
 
   const [ajouterLigne, { isLoading: ajoutEnCours }] =
     useAjouterLigneControleMutation();
+  const [modifierLigne, { isLoading: modifEnCours }] =
+    useModifierLigneControleMutation();
+  const [supprimerLigne] = useSupprimerLigneControleMutation();
+
+  const viderFormulaire = () => {
+    setCode("");
+    setQte("");
+    setObservation("");
+    setEdition(null);
+  };
+
+  // Recharge une ligne dans le formulaire pour la corriger.
+  const commencerEdition = (l) => {
+    setEdition(l);
+    setCode(l.codeScanne || l.eanArticle || "");
+    setQte(String(l.qteScan ?? ""));
+    setEmplacement(l.zoneType || "");
+    setZoneCode(l.zoneCode === "CONTROLE" ? "" : l.zoneCode || "");
+    setObservation(l.observation || "");
+    setMsg(null);
+    codeRef.current?.focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const supprimer = async (l) => {
+    // eslint-disable-next-line no-alert
+    if (
+      !window.confirm(
+        `Supprimer ce bipage de contrôle ?\n${l.designation || l.codeScanne} — ${fmtQte(
+          l.qteScan,
+        )} en ${l.zoneCode} (${l.zoneType})`,
+      )
+    )
+      return;
+    setMsg(null);
+    try {
+      await supprimerLigne({
+        entrepriseId: selectedEntreprise,
+        id: l._id,
+      }).unwrap();
+      if (edition?._id === l._id) viderFormulaire();
+      setMsg({ type: "ok", text: "Bipage de contrôle supprimé." });
+    } catch (err) {
+      setMsg({ type: "err", text: err?.data?.message || "Suppression impossible." });
+    }
+  };
 
   // Fiche de saisie VIERGE (A4 paysage) : téléchargée pour impression, à
   // remplir au stylo en rayon avant la saisie dans ce formulaire.
@@ -140,33 +195,40 @@ const AdminAjoutControleInventaireScreen = () => {
     e.preventDefault();
     setMsg(null);
     if (!code.trim() || !emplacement || !qte) return;
+    const body = {
+      code: code.trim(),
+      qteScan: Number(String(qte).replace(",", ".")),
+      zoneType: emplacement,
+      zoneCode,
+      observation: observation.trim(),
+    };
     try {
-      const ligne = await ajouterLigne({
-        entrepriseId: selectedEntreprise,
-        body: {
-          code: code.trim(),
-          qteScan: Number(String(qte).replace(",", ".")),
-          zoneType: emplacement,
-          zoneCode,
-          observation: observation.trim(),
-        },
-      }).unwrap();
+      const ligne = edition
+        ? await modifierLigne({
+            entrepriseId: selectedEntreprise,
+            id: edition._id,
+            body,
+          }).unwrap()
+        : await ajouterLigne({
+            entrepriseId: selectedEntreprise,
+            body,
+          }).unwrap();
       setMsg({
         type: "ok",
-        text: `Bipage ajouté : ${ligne.designation || ligne.nart || code} — ${fmtQte(
-          ligne.qteScan,
-        )} en ${ligne.zoneCode} (${ligne.zoneType}).`,
+        text: `Bipage ${edition ? "modifié" : "ajouté"} : ${
+          ligne.designation || ligne.nart || code
+        } — ${fmtQte(ligne.qteScan)} en ${ligne.zoneCode} (${ligne.zoneType}).`,
       });
       // Saisie en rafale : on garde emplacement et zone, on vide le reste et
       // on rend la main au champ code.
-      setCode("");
-      setQte("");
-      setObservation("");
+      viderFormulaire();
       codeRef.current?.focus();
     } catch (err) {
       setMsg({
         type: "err",
-        text: err?.data?.message || "Ajout impossible.",
+        text:
+          err?.data?.message ||
+          (edition ? "Modification impossible." : "Ajout impossible."),
       });
     }
   };
@@ -249,7 +311,31 @@ const AdminAjoutControleInventaireScreen = () => {
             immédiatement le Détail des bipages et le calcul des écarts.
           </p>
 
-          <form className="acinv-form" onSubmit={soumettre}>
+          <form
+            className={`acinv-form ${edition ? "acinv-form-edition" : ""}`}
+            onSubmit={soumettre}
+          >
+            {edition && (
+              <div className="acinv-edition-banniere">
+                <HiPencilAlt /> Modification du bipage saisi le{" "}
+                {edition.createdAt
+                  ? new Date(edition.createdAt).toLocaleString("fr-FR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "—"}
+                {edition.agentNom ? ` par ${edition.agentNom}` : ""}
+                <button
+                  type="button"
+                  className="btn-secondary acinv-edition-annuler"
+                  onClick={viderFormulaire}
+                >
+                  <HiX /> Annuler la modification
+                </button>
+              </div>
+            )}
             <div className="acinv-grid">
               <label className="acinv-field acinv-field-code">
                 <span>NART ou gencode *</span>
@@ -366,15 +452,28 @@ const AdminAjoutControleInventaireScreen = () => {
                 type="submit"
                 className="btn-primary"
                 disabled={
-                  ajoutEnCours || !code.trim() || !emplacement || !qte
+                  ajoutEnCours ||
+                  modifEnCours ||
+                  !code.trim() ||
+                  !emplacement ||
+                  !qte
                 }
                 title={
                   !code.trim() || !emplacement || !qte
                     ? "Code, quantité et emplacement sont obligatoires"
-                    : "Ajouter ce bipage"
+                    : edition
+                      ? "Enregistrer la correction"
+                      : "Ajouter ce bipage"
                 }
               >
-                <HiPlus /> {ajoutEnCours ? "Ajout…" : "Ajouter le bipage"}
+                {edition ? <HiPencilAlt /> : <HiPlus />}{" "}
+                {edition
+                  ? modifEnCours
+                    ? "Enregistrement…"
+                    : "Enregistrer la modification"
+                  : ajoutEnCours
+                    ? "Ajout…"
+                    : "Ajouter le bipage"}
               </button>
               {msg && (
                 <span className={`acinv-msg acinv-msg-${msg.type}`}>
@@ -411,11 +510,17 @@ const AdminAjoutControleInventaireScreen = () => {
                       <th>Désignation</th>
                       <th>Qté</th>
                       <th>Observation</th>
+                      <th aria-label="Actions" />
                     </tr>
                   </thead>
                   <tbody>
                     {ajouts.map((l) => (
-                      <tr key={l._id} className={l.found ? "" : "row-unknown"}>
+                      <tr
+                        key={l._id}
+                        className={`${l.found ? "" : "row-unknown"} ${
+                          edition?._id === l._id ? "acinv-row-edition" : ""
+                        }`.trim()}
+                      >
                         <td>
                           {l.createdAt
                             ? new Date(l.createdAt).toLocaleString("fr-FR", {
@@ -434,6 +539,24 @@ const AdminAjoutControleInventaireScreen = () => {
                         <td>{l.designation}</td>
                         <td className="acinv-num">{fmtQte(l.qteScan)}</td>
                         <td>{l.observation || "—"}</td>
+                        <td className="acinv-actions-cell">
+                          <button
+                            type="button"
+                            className="btn-icon acinv-btn-ligne"
+                            onClick={() => commencerEdition(l)}
+                            title="Corriger ce bipage (rechargé dans le formulaire)"
+                          >
+                            <HiPencilAlt />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-icon acinv-btn-ligne acinv-btn-suppr"
+                            onClick={() => supprimer(l)}
+                            title="Supprimer ce bipage"
+                          >
+                            <HiTrash />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

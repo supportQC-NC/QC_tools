@@ -1792,6 +1792,131 @@ const ajouterLigneControle = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Charge une ligne d'AJOUT CONTRÔLE de la session active, ou lève l'erreur
+ * adaptée. Les lignes des autres provenances (terrain, imports, ajout manuel
+ * par zone) ne passent pas par ici : l'écran dédié ne corrige que les siennes.
+ */
+const chargerLigneControle = async (req, res) => {
+  const entreprise = req.entreprise;
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
+  const ligne = await LigneBipage.findOne({
+    _id: req.params.id,
+    entreprise: entreprise._id,
+    session: session._id,
+  });
+  if (!ligne) {
+    res.status(404);
+    throw new Error("Ligne non trouvée sur l'inventaire actif.");
+  }
+  if (ligne.source !== "controle") {
+    res.status(400);
+    throw new Error(
+      "Seuls les ajouts de l'écran « Ajout contrôle inventaire » se modifient ici — les autres lignes passent par le Détail des bipages.",
+    );
+  }
+  return { session, ligne };
+};
+
+/**
+ * @desc    Modification d'un ajout de contrôle (erreur de saisie) : code,
+ *          quantité, emplacement, zone, observation — l'article est re-résolu
+ *          depuis le code. ⚠️ PAS de marquage « corrigée » (`modifie`) : la
+ *          ligne n'a jamais porté un comptage terrain, corriger sa propre
+ *          saisie n'a pas à la faire ressortir sur la feuille d'écarts.
+ * @route   PUT /api/bipages/:entrepriseId/ligne-controle/:id
+ * @access  Private (module bipage, write)
+ */
+const modifierLigneControle = asyncHandler(async (req, res) => {
+  const entreprise = req.entreprise;
+  const { session, ligne } = await chargerLigneControle(req, res);
+
+  const code = String(req.body.code || "").trim();
+  const zoneType = String(req.body.zoneType || "").trim();
+  let zoneCode = String(req.body.zoneCode || "").trim();
+  const observation = String(req.body.observation || "").trim();
+  const qteScan = Number(req.body.qteScan);
+
+  // Mêmes règles qu'à la création.
+  if (!code) {
+    res.status(400);
+    throw new Error("Code (NART ou gencode) obligatoire.");
+  }
+  if (!zoneType) {
+    res.status(400);
+    throw new Error("Emplacement obligatoire.");
+  }
+  if (!Number.isFinite(qteScan) || qteScan === 0) {
+    res.status(400);
+    throw new Error("Quantité obligatoire, et différente de 0.");
+  }
+  if (!zoneCode) {
+    zoneCode = ZONE_CONTROLE;
+  } else if (zoneCode !== ZONE_CONTROLE) {
+    const zone = (session.zones || []).find(
+      (z) => z.code === zoneCode && String(z.type || "").trim() === zoneType,
+    );
+    if (!zone) {
+      res.status(400);
+      throw new Error(`Zone ${zoneCode} (${zoneType}) absente de cet inventaire.`);
+    }
+  }
+
+  // Changement de zone : la ligne se range en fin de SA NOUVELLE zone.
+  if (zoneCode !== ligne.zoneCode || zoneType !== ligne.zoneType) {
+    const derniere = await LigneBipage.findOne({
+      session: session._id,
+      zoneCode,
+      zoneType,
+    })
+      .sort({ ordre: -1 })
+      .select("ordre")
+      .lean();
+    ligne.ordre = (Number(derniere?.ordre) || 0) + 1;
+    ligne.zoneCode = zoneCode;
+    ligne.zoneType = zoneType;
+  }
+
+  // L'article est TOUJOURS re-résolu depuis le code saisi : c'est lui qui
+  // fait foi, comme à la création.
+  const { record } = await resoudreArticleActif(entreprise, code);
+  ligne.eanArticle = code;
+  ligne.codeScanne = code;
+  ligne.nart = record ? String(record.NART || "").trim() : "";
+  ligne.designation = record
+    ? (record.DESIGN || "").trim()
+    : "Article non trouvé";
+  ligne.gencod = record ? (record.GENCOD || "").trim() : "";
+  ligne.stock = record ? articleCacheService.calculateStockTotal(record) : null;
+  ligne.found = !!record;
+  ligne.qteScan = qteScan;
+  ligne.observation = observation;
+  // Trace : le dernier à avoir touché la ligne en devient l'« agent ».
+  ligne.agentNom = nomUtilisateur(req.user);
+
+  await ligne.save();
+  res.json(ligne);
+});
+
+/**
+ * @desc    Suppression d'un ajout de contrôle saisi par erreur. Réservée aux
+ *          lignes « source: controle » de la session active.
+ * @route   DELETE /api/bipages/:entrepriseId/ligne-controle/:id
+ * @access  Private (module bipage, write)
+ */
+const supprimerLigneControle = asyncHandler(async (req, res) => {
+  const { ligne } = await chargerLigneControle(req, res);
+  await ligne.deleteOne();
+  res.json({ message: "Ajout de contrôle supprimé." });
+});
+
+/**
  * @desc    Fiche de saisie VIERGE du module « Ajout contrôle inventaire » :
  *          A4 paysage téléchargé, lignes vides reprenant les champs du
  *          formulaire (code, désignation, qté, emplacement, zone, observation)
@@ -2641,6 +2766,8 @@ export {
   getContexteControle,
   resoudreArticleControle,
   ajouterLigneControle,
+  modifierLigneControle,
+  supprimerLigneControle,
   ficheViergeControle,
   setEcartQteZone,
   purgerCorrectionsEcarts,
