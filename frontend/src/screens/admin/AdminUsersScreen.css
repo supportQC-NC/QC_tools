@@ -56,6 +56,39 @@
   margin-top: 4px;
 }
 
+/* Filtre par société */
+.entreprise-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.entreprise-filter:focus-within {
+  border-color: var(--accent);
+}
+
+.entreprise-filter svg {
+  color: var(--text-muted);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.entreprise-filter select {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 8px 0;
+  max-width: 220px;
+  cursor: pointer;
+}
+
 /* Search */
 .search-box {
   display: flex;
@@ -324,6 +357,13 @@
   background: var(--text-muted);
 }
 
+/* Sociétés (trigrammes de la permission, ou « Toutes ») */
+.societes-cell {
+  color: var(--text-secondary);
+  font-size: 11px;
+  max-width: 180px;
+}
+
 /* Date cell */
 .date-cell {
   color: var(--text-secondary);
@@ -433,8 +473,11 @@
     display: none;
   }
 
-  .admin-table th:nth-child(5),
-  .admin-table td:nth-child(5) {
+  /* Sociétés (4) et Dernière connexion (6) masquées sur petit écran */
+  .admin-table th:nth-child(4),
+  .admin-table td:nth-child(4),
+  .admin-table th:nth-child(6),
+  .admin-table td:nth-child(6) {
     display: none;
   }
 }
