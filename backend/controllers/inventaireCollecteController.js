@@ -1539,13 +1539,24 @@ const addLigneCollecte = asyncHandler(async (req, res) => {
   // plutôt que de mentir, la fiche retombe alors sur l'ancien comportement).
   const brutScanne = String(codeScanne || "").trim();
 
-  // Cumul si l'article est déjà présent dans la zone
-  const ligneExistante = collecte.lignes.find(
-    (l) =>
-      // Écritures d'ERP tolérées (« 12345 »/« 012345 », UPC-A/EAN-13) :
-      // sans ça un même article scanné deux fois crée deux lignes.
-      memeNart(l.nart, nart) || (gencod && memeCodeBarres(l.gencod, gencod)),
-  );
+  // Cumul UNIQUEMENT sur des bips CONSÉCUTIFS du même article (demande client
+  // du 18/11/2026) : si un AUTRE produit a été bipé entre deux, le re-bip crée
+  // une NOUVELLE ligne — la fiche de contrôle doit montrer chaque séquence de
+  // comptage avec sa quantité, marquée D (l'ancien comportement fusionnait
+  // tout l'historique de la zone en une ligne et le second comptage devenait
+  // invisible). Le cumul consécutif reste : enchaîner deux bips du même
+  // article, c'est compléter la saisie en cours, pas recompter.
+  const derniereLigne = collecte.lignes.length
+    ? collecte.lignes[collecte.lignes.length - 1]
+    : null;
+  const ligneExistante =
+    derniereLigne &&
+    // Écritures d'ERP tolérées (« 12345 »/« 012345 », UPC-A/EAN-13) :
+    // sans ça un même article scanné deux fois crée deux lignes.
+    (memeNart(derniereLigne.nart, nart) ||
+      (gencod && memeCodeBarres(derniereLigne.gencod, gencod)))
+      ? derniereLigne
+      : null;
 
   if (ligneExistante) {
     ligneExistante.quantite = round3(ligneExistante.quantite + round3(quantite));
@@ -2455,9 +2466,9 @@ const getRecapZonePdf = asyncHandler(async (req, res) => {
   }
 
   // Lignes au format attendu par construireLignes ({ code, quantite }).
-  // ⚠️ Les collectes de la zone sont FUSIONNÉES par article : une zone bipée en
-  // plusieurs fois (re-bipage, cf. inventaireCumulService) sortait autrement
-  // deux lignes pour le même article au lieu de la quantité totale.
+  // Depuis le 18/11/2026 la fusion CONSERVE chaque séquence de comptage
+  // (inventaireCumulService) : un article recompté sort en plusieurs lignes,
+  // marquées D sur la fiche — même rendu que la fiche du watcher.
   let zoneLibelle = "";
   let zoneType = "";
   for (const collecte of collectes) {

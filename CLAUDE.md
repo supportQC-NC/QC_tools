@@ -146,11 +146,17 @@ aux chemins du système de fichiers (`cheminBase`, `cheminExportInventaire`,
   bipages **S'AJOUTENT**. La collecte déposée n'est **jamais réouverte** : la
   reprise crée une collecte de PLUS (`estComplement`), pour que le suivi bipage
   crédite chaque agent de SON travail. C'est au dépôt que la zone est
-  recomposée — `services/inventaireCumulService.js` fusionne **toutes** les
-  collectes déposées de la zone (code + emplacement, session courante),
-  quantités additionnées par article avec la même tolérance d'écriture ERP que
-  `addLigneCollecte`. Le `.dat` écrase le précédent (même nom `stock.dat
-  <zone>`) avec le TOTAL, et `inventaireWatchService` relit le même cumul :
+  recomposée — `services/inventaireCumulService.js` concatène **toutes** les
+  collectes déposées de la zone (code + emplacement, session courante).
+  ⚠️ **Plus AUCUN cumul par article depuis le 18/11/2026** (remplace
+  l'arbitrage du 10/11) : chaque séquence de comptage reste UNE ligne — un
+  article re-bipé (autre produit bipé entre deux, ou complément d'un second
+  agent) sort en PLUSIEURS lignes sur le `.dat` et la fiche, chacune avec sa
+  quantité, marquées `D` ; le `X` de surplus se juge sur le TOTAL de l'article
+  (`construireLignes` somme par dupKey). `addLigneCollecte` ne cumule plus que
+  les bips CONSÉCUTIFS du même article ; les écarts, eux, cumulent toujours
+  par article (totaux inchangés). Le `.dat` écrase le précédent (même nom
+  `stock.dat <zone>`) et `inventaireWatchService` relit la même liste :
   la fiche de contrôle complète est régénérée et réimprimée, `LigneBipage`
   porte l'agent **par ligne**. ⚠️ « Recommencer la zone » reste une table rase :
   elle marque les collectes `annulee`, exclues du cumul, du récap et des écarts

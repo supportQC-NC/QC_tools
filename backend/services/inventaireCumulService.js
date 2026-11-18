@@ -20,15 +20,19 @@
 // (écran Détail des bipages) est une table rase, ses lignes ne doivent pas
 // ressusciter au prochain bipage.
 //
-// ⚠️ La FUSION des lignes se fait par article, quantités ADDITIONNÉES — même
-// règle que `addLigneCollecte` à l'intérieur d'une collecte (un article bipé
-// deux fois cumule). Sans elle, le .DAT porterait deux lignes pour le même NART
-// et la fiche afficherait un doublon là où l'agent a simplement complété son
-// comptage.
+// ⚠️ La FUSION ne cumule PLUS par article (demande client du 18/11/2026,
+// remplace l'arbitrage du 10/11/2026) : chaque ligne de chaque collecte est
+// CONSERVÉE telle quelle, dans l'ordre des dépôts. Un article compté deux fois
+// — par le même agent (autre produit bipé entre les deux) ou par l'agent du
+// complément — sort donc en DEUX lignes sur le .DAT et la fiche, chacune avec
+// SA quantité, marquées D (et X quand le TOTAL de l'article dépasse le stock :
+// construireLignes somme par article avant de poser le X). C'est ce que le
+// contrôleur veut voir : chaque séquence de comptage, pas un total opaque.
+// Les écarts, eux, cumulent toujours par article (getRecapZones, feuille
+// d'écarts) : les totaux ne changent pas.
 
 import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import User from "../models/UserModel.js";
-import { memeNart, memeCodeBarres } from "../utils/codeBarres.js";
 
 const safe = (v) => (v == null ? "" : String(v)).trim();
 const round3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
@@ -41,7 +45,9 @@ const nomAgent = (u) => {
 };
 
 /**
- * Fusionne les lignes de plusieurs collectes en UNE liste par article.
+ * Concatène les lignes de plusieurs collectes, SANS les fusionner par article
+ * (demande client du 18/11/2026 — voir l'en-tête) : chaque séquence de
+ * comptage reste une ligne, avec SA quantité et SON agent.
  *
  * `collectes` : dans l'ordre chronologique de dépôt (la plus ancienne d'abord) —
  * c'est cet ordre que la fiche de contrôle restitue, l'agent qui complète voit
@@ -62,33 +68,9 @@ export const fusionnerLignesCollectes = (collectes = []) => {
 
     for (const l of c?.lignes || []) {
       lignesBrutes += 1;
-      const nart = safe(l.nart);
-      const gencod = safe(l.gencod);
-      // Même tolérance que addLigneCollecte : les écritures d'ERP équivalentes
-      // (« 12345 »/« 012345 », UPC-A/EAN-13) désignent le même article.
-      const existante = lignes.find(
-        (x) =>
-          (nart && memeNart(x.nart, nart)) ||
-          (gencod && memeCodeBarres(x.gencod, gencod)),
-      );
-      if (existante) {
-        existante.quantite = round3(existante.quantite + round3(l.quantite));
-        // On garde le PREMIER code bipé / la première désignation : la fiche ne
-        // doit pas changer d'aspect selon l'ordre des reprises.
-        if (!existante.codeScanne && safe(l.codeScanne)) {
-          existante.codeScanne = safe(l.codeScanne);
-        }
-        if (!existante.designation && safe(l.designation)) {
-          existante.designation = safe(l.designation);
-        }
-        if (agent && !existante.agents.includes(agent)) {
-          existante.agents.push(agent);
-        }
-        continue;
-      }
       lignes.push({
-        nart,
-        gencod,
+        nart: safe(l.nart),
+        gencod: safe(l.gencod),
         codeScanne: safe(l.codeScanne),
         designation: safe(l.designation),
         quantite: round3(l.quantite),
@@ -100,9 +82,9 @@ export const fusionnerLignesCollectes = (collectes = []) => {
     }
   }
 
-  // `agentNom` d'une ligne : le ou les agents qui l'ont comptée. Une ligne
-  // reprise par un second agent porte les deux (colonne « Agent » du Détail
-  // des bipages), sinon le superviseur croit que le premier a tout fait.
+  // `agentNom` d'une ligne : l'agent qui l'a comptée (colonne « Agent » du
+  // Détail des bipages). Chaque ligne n'ayant plus qu'un comptage, elle n'a
+  // plus qu'un agent — le tableau est conservé pour les consommateurs.
   for (const l of lignes) l.agentNom = l.agents.join(" / ");
 
   return { lignes, agents, collectes: collectes.length, lignesBrutes };

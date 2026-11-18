@@ -328,9 +328,17 @@ export const construireLignes = async (entreprise, lignesDat) => {
     }
   }
 
-  // 2) Détection des doublons (même article ≥ 2 fois)
+  // 2) Détection des doublons (même article ≥ 2 fois) + TOTAL bipé par
+  // article : depuis le 18/11/2026 un article recompté sort en PLUSIEURS
+  // lignes (une par séquence de bipage) — le surplus « X » se juge donc sur la
+  // SOMME de ses lignes, pas sur chaque ligne isolée (5 puis 3 pour un stock
+  // de 6 : aucune ligne ne dépasse seule, le total si — les deux portent X).
   const counts = new Map();
-  entries.forEach((e) => counts.set(e.dupKey, (counts.get(e.dupKey) || 0) + 1));
+  const sommes = new Map();
+  entries.forEach((e) => {
+    counts.set(e.dupKey, (counts.get(e.dupKey) || 0) + 1);
+    sommes.set(e.dupKey, (sommes.get(e.dupKey) || 0) + (Number(e.qte) || 0));
+  });
 
   // 3) Construction des lignes + flags
   let doublons = 0;
@@ -358,7 +366,10 @@ export const construireLignes = async (entreprise, lignesDat) => {
     // sa place : la feuille d'écarts.
     if (e.nonTrouve) {
       flags.push("A");
-    } else if (e.qte > e.stock) {
+    } else if ((sommes.get(e.dupKey) ?? e.qte) > e.stock) {
+      // Surplus jugé sur le TOTAL bipé de l'article (toutes ses lignes du
+      // fichier) : un article recompté en plusieurs lignes ne doit pas faire
+      // disparaître le X que portait son cumul.
       flags.push("X");
     }
     if (estDoublon) flags.push("D");
