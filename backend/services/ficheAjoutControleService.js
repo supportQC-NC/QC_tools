@@ -30,9 +30,9 @@ export const ecrireFicheAjoutControleVierge = async ({
   const PDFDocument = mod.default;
 
   const margin = 28;
+  // PORTRAIT (demande client du 18/11/2026 — le premier jet était en paysage).
   const doc = new PDFDocument({
     size: "A4",
-    layout: "landscape",
     margin,
     autoFirstPage: false,
     bufferPages: true,
@@ -49,17 +49,17 @@ export const ecrireFicheAjoutControleVierge = async ({
     minute: "2-digit",
   });
 
-  // A4 paysage : 841,89 × 595,28. Largeur utile = 786.
-  // OBSERVATION absorbe le reste ; QTÉ et ZONE restent assez larges pour une
-  // écriture manuscrite.
+  // A4 portrait : 595,28 × 841,89. Largeur utile = 539.
+  // DÉSIGNATION absorbe l'essentiel ; QTÉ, EMPLACEMENT et ZONE restent assez
+  // larges pour une écriture manuscrite.
   const COLS = [
-    { key: "n", label: "N°", w: 28 },
-    { key: "code", label: "NART / GENCODE", w: 140 },
-    { key: "design", label: "DÉSIGNATION", w: 240 },
-    { key: "qte", label: "QTÉ", w: 60 },
-    { key: "empl", label: "EMPLACEMENT", w: 100 },
-    { key: "zone", label: "ZONE (facultatif)", w: 100 },
-    { key: "obs", label: "OBSERVATION", w: 118 },
+    { key: "n", label: "N°", w: 26 },
+    { key: "code", label: "NART / GENCODE", w: 105 },
+    { key: "design", label: "DÉSIGNATION", w: 160 },
+    { key: "qte", label: "QTÉ", w: 45 },
+    { key: "empl", label: "EMPLACEMENT", w: 70 },
+    { key: "zone", label: "ZONE (facult.)", w: 70 },
+    { key: "obs", label: "OBSERVATION", w: 63 },
   ];
   const left = margin;
   const tableW = COLS.reduce((s, c) => s + c.w, 0);
@@ -78,27 +78,30 @@ export const ecrireFicheAjoutControleVierge = async ({
         /* logo illisible : on continue sans */
       }
     }
+    // Titre court (le portrait est plus étroit : le long titre du premier jet
+    // mordait sur le logo) ; « Fiche de saisie » passe dans le sous-titre.
     doc
       .font("Helvetica-Bold")
       .fontSize(16)
       .fillColor("#000")
-      .text("AJOUT CONTRÔLE INVENTAIRE — FICHE DE SAISIE", left, y + 4, {
+      .text("AJOUT CONTRÔLE INVENTAIRE", left, y + 4, {
         width: tableW,
         align: "center",
       });
-    const sousTitre = [entreprise?.nom, sessionNom].filter(Boolean).join(" — ");
-    if (sousTitre) {
-      doc
-        .font("Helvetica")
-        .fontSize(10)
-        .fillColor("#555")
-        .text(sousTitre, left, y + 26, { width: tableW, align: "center" })
-        .fillColor("#000");
-    }
+    const sousTitre = ["Fiche de saisie", entreprise?.nom, sessionNom]
+      .filter(Boolean)
+      .join(" — ");
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor("#555")
+      .text(sousTitre, left, y + 26, { width: tableW, align: "center" })
+      .fillColor("#000");
     y += 48;
 
     // Identité du contrôleur, par FEUILLE : plusieurs personnes peuvent se
-    // partager les pages.
+    // partager les pages. La mention « zone facultative » passe SOUS cette
+    // ligne (à droite elle ne tient plus en portrait).
     doc
       .font("Helvetica")
       .fontSize(10)
@@ -108,17 +111,18 @@ export const ecrireFicheAjoutControleVierge = async ({
         y,
         { lineBreak: false },
       );
+    y += 14;
     doc
       .fontSize(8)
       .fillColor("#666")
       .text(
         "Zone facultative : sans zone, la saisie sera rattachée à CONTROLE.",
         left,
-        y + 2,
-        { width: tableW, align: "right", lineBreak: false },
+        y,
+        { lineBreak: false },
       )
       .fillColor("#000");
-    y += 20;
+    y += 14;
 
     // En-tête du tableau.
     let x = left;
