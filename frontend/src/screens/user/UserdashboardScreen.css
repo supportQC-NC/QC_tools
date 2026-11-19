@@ -1,34 +1,70 @@
 /* ═══════════════════════════════════════════════════════
-   UserDashboardScreen.css — Mobile-first dashboard cards
-   Inspiré du style AdminDashboard existant
+   UserDashboardScreen.css — accueil minimal, refonte visuelle 11/2026
+   Hero (salutation + horloge) → société active → tuiles d'accès rapides
+   teintées (--tc / --tc-bg posées par tuile dans le JSX).
    ═══════════════════════════════════════════════════════ */
 
-/* =============================================
-   DASHBOARD CONTAINER
-   ============================================= */
 .user-dashboard {
-  padding: 16px 20px;
+  padding: 16px 20px 28px;
   width: 100%;
-  max-width: 100%;
-  margin: 0;
+  max-width: 1240px;
+  margin: 0 auto;
 }
 
 /* =============================================
-   HEADER
+   HERO — salutation, date, horloge
    ============================================= */
-.ud-header {
+.ud-hero {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background:
+    radial-gradient(
+      600px 220px at 0% 0%,
+      rgba(77, 166, 255, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      500px 200px at 100% 100%,
+      rgba(139, 92, 246, 0.08),
+      transparent 60%
+    ),
+    var(--bg-secondary);
 }
 
-.ud-header-left {
+.ud-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ud-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, #4da6ff, #8b5cf6);
+  box-shadow: 0 4px 14px rgba(77, 166, 255, 0.25);
+}
+
+.ud-hero-textes {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .ud-title {
@@ -36,43 +72,202 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  line-height: 1.2;
 }
 
-.ud-welcome {
-  font-size: 17px;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.ud-welcome strong {
-  color: var(--text-primary);
-}
-
-.ud-header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.ud-prenom {
+  background: linear-gradient(90deg, #4da6ff, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .ud-date {
-  font-size: 11px;
-  color: var(--text-secondary);
-  text-transform: capitalize;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.ud-date::first-letter {
+  text-transform: uppercase;
 }
 
 .ud-time {
-  font-size: 11px;
-  font-weight: 600;
+  align-self: flex-start;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   background: var(--bg-tertiary);
-  padding: 6px 12px;
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 10px;
   white-space: nowrap;
 }
 
 /* =============================================
-   CARDS GRID — Mobile first: 2 colonnes
+   SOCIÉTÉ ACTIVE
+   ============================================= */
+.ud-societe {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 22px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-left: 3px solid #6366f1;
+  border-radius: 12px;
+}
+
+.ud-societe-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: rgba(99, 102, 241, 0.14);
+  color: #818cf8;
+}
+
+.ud-societe-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ud-societe-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.ud-societe-nom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ud-trigramme {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.14);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.ud-societe-nom.vide {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.ud-societe-select {
+  max-width: 260px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.ud-societe-select:hover,
+.ud-societe-select:focus {
+  border-color: #6366f1;
+  outline: none;
+}
+
+.ud-societe-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* =============================================
+   ACCÈS RAPIDES — entête de section
+   ============================================= */
+.ud-section-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ud-section-tete h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+.ud-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  background: rgba(77, 166, 255, 0.14);
+}
+
+.ud-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ud-btn:hover {
+  border-color: var(--accent);
+}
+
+.ud-btn.primaire {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+}
+
+.ud-spacer {
+  flex: 1;
+}
+
+/* =============================================
+   GRILLE DE TUILES — mobile first : 2 colonnes
    ============================================= */
 .ud-grid {
   display: grid;
@@ -80,10 +275,11 @@
   gap: 10px;
 }
 
-/* =============================================
-   CARD
-   ============================================= */
+/* Tuile : icône teintée (--tc / --tc-bg posées en inline par le JSX),
+   libellé, flèche au survol. */
 .ud-card {
+  --tc: var(--accent);
+  --tc-bg: rgba(77, 166, 255, 0.14);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -93,13 +289,16 @@
   padding: 18px 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--text-primary);
-  transition: all 0.2s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
   -webkit-tap-highlight-color: transparent;
   cursor: pointer;
-  min-height: 100px;
+  min-height: 104px;
   overflow: hidden;
   opacity: 0;
   animation: fadeInUp 0.3s ease forwards;
@@ -110,12 +309,12 @@
 }
 
 .ud-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  border-color: var(--tc);
 }
 
-/* Staggered animation delays */
+/* Entrée en cascade (plafonnée : au-delà, délai max) */
 .ud-card:nth-child(1) { animation-delay: 0.03s; }
 .ud-card:nth-child(2) { animation-delay: 0.06s; }
 .ud-card:nth-child(3) { animation-delay: 0.09s; }
@@ -125,31 +324,27 @@
 .ud-card:nth-child(7) { animation-delay: 0.21s; }
 .ud-card:nth-child(8) { animation-delay: 0.24s; }
 .ud-card:nth-child(9) { animation-delay: 0.27s; }
-.ud-card:nth-child(10) { animation-delay: 0.30s; }
-.ud-card:nth-child(11) { animation-delay: 0.33s; }
-.ud-card:nth-child(12) { animation-delay: 0.36s; }
-.ud-card:nth-child(13) { animation-delay: 0.39s; }
-.ud-card:nth-child(14) { animation-delay: 0.42s; }
-.ud-card:nth-child(15) { animation-delay: 0.45s; }
-.ud-card:nth-child(16) { animation-delay: 0.48s; }
+.ud-card:nth-child(10) { animation-delay: 0.3s; }
+.ud-card:nth-child(n + 11) { animation-delay: 0.33s; }
 
-/* =============================================
-   CARD ICON
-   ============================================= */
 .ud-card-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   font-size: 20px;
   flex-shrink: 0;
+  color: var(--tc);
+  background: var(--tc-bg);
+  transition: transform 0.18s ease;
 }
 
-/* =============================================
-   CARD LABEL
-   ============================================= */
+.ud-card:hover .ud-card-icon {
+  transform: scale(1.08);
+}
+
 .ud-card-label {
   font-size: 11px;
   font-weight: 600;
@@ -158,23 +353,30 @@
   color: var(--text-secondary);
 }
 
-/* =============================================
-   CARD ARROW
-   ============================================= */
+.ud-card:hover .ud-card-label {
+  color: var(--text-primary);
+}
+
 .ud-card-arrow {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
+  font-size: 16px;
+  color: var(--tc);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transform: translateX(-4px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
 }
 
 .ud-card:hover .ud-card-arrow {
   opacity: 1;
+  transform: translateX(0);
 }
 
 /* =============================================
-   EMPTY STATE
+   ÉTAT VIDE
    ============================================= */
 .ud-empty {
   display: flex;
@@ -186,8 +388,8 @@
   text-align: center;
   color: var(--text-muted);
   background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
 }
 
 .ud-empty svg {
@@ -202,25 +404,20 @@
   color: var(--text-primary);
 }
 
-.ud-empty span {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
 /* =============================================
-   SECURITY NOTICE
+   RAPPEL DÉCONNEXION
    ============================================= */
 .ud-notice {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 24px;
   padding: 12px 16px;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 12px;
   animation: fadeInUp 0.3s ease forwards;
-  animation-delay: 0.5s;
+  animation-delay: 0.45s;
   opacity: 0;
 }
 
@@ -256,245 +453,17 @@
   }
 }
 
-/* =============================================
-   RESPONSIVE — Tablette petite (>= 480px) : 3 col
-   ============================================= */
-@media (min-width: 480px) {
-  .ud-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
-  .ud-card {
-    padding: 20px 14px;
-    min-height: 110px;
-  }
-
-  .ud-card-icon {
-    width: 44px;
-    height: 44px;
-  }
-}
-
-/* =============================================
-   RESPONSIVE — Tablette (>= 640px) : header horizontal
-   ============================================= */
-@media (min-width: 640px) {
-  .ud-header {
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
-  }
-
-  .ud-header-right {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-  }
-}
-
-/* =============================================
-   RESPONSIVE — Desktop (>= 768px) : 4 col
-   ============================================= */
-@media (min-width: 768px) {
-  .ud-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-
-  .ud-card {
-    padding: 24px 16px;
-    min-height: 120px;
-  }
-
-  .ud-card-icon {
-    width: 46px;
-    height: 46px;
-    font-size: 22px;
-  }
-
-  .ud-card-label {
-    font-size: 12px;
-  }
-}
-
-/* =============================================
-   RESPONSIVE — Grand écran (>= 1200px) : 5 col
-   ============================================= */
-@media (min-width: 1200px) {
-  .ud-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 14px;
-  }
-
-  .ud-card {
-    padding: 28px 16px;
-    min-height: 130px;
-  }
-}
-
-/* =============================================
-   RESPONSIVE — Très petit écran (< 360px) : liste
-   ============================================= */
-@media (max-width: 359px) {
-  .user-dashboard {
-    padding: 10px;
-  }
-
-  .ud-title {
-    font-size: 18px;
-  }
-
-  .ud-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .ud-card {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 12px;
-    padding: 14px;
-    min-height: auto;
-  }
-
-  .ud-card-label {
-    text-align: left;
-    font-size: 12px;
-    flex: 1;
-  }
-
-  .ud-card-arrow {
+@media (prefers-reduced-motion: reduce) {
+  .ud-card,
+  .ud-notice {
+    animation: none;
     opacity: 1;
-    position: static;
   }
 }
 
-/* ═══════════════════════════════════════════════════════
-   SOCIÉTÉ ACTIVE
-   ═══════════════════════════════════════════════════════ */
-.ud-societe {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.ud-societe-icone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  font-size: 20px;
-  flex-shrink: 0;
-  background: rgba(99, 102, 241, 0.14);
-  color: #6366f1;
-}
-
-.ud-societe-corps {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.ud-societe-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-muted);
-}
-
-.ud-societe-nom {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ud-societe-nom.vide {
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.ud-societe-select {
-  max-width: 260px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.ud-societe-note {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* ═══════════════════════════════════════════════════════
-   ACCÈS RAPIDES : entête de section + bouton
-   ═══════════════════════════════════════════════════════ */
-.ud-section-tete {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.ud-section-tete h2 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-secondary);
-}
-
-.ud-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.ud-btn:hover {
-  border-color: var(--accent);
-}
-
-.ud-btn.primaire {
-  background: #6366f1;
-  border-color: #6366f1;
-  color: #fff;
-}
-
-.ud-spacer {
-  flex: 1;
-}
-
-/* ═══════════════════════════════════════════════════════
+/* =============================================
    MODALE « CHOISIR MES ACCÈS RAPIDES »
-   ═══════════════════════════════════════════════════════ */
+   ============================================= */
 .ud-modal {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -554,9 +523,72 @@
   margin-top: 18px;
 }
 
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+@media (min-width: 480px) {
+  .ud-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .ud-card {
+    padding: 20px 14px;
+    min-height: 112px;
+  }
+}
+
 @media (min-width: 640px) {
+  .ud-hero {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ud-time {
+    align-self: center;
+  }
+
   .ud-choix-liste {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 768px) {
+  .ud-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .ud-card {
+    padding: 24px 16px;
+    min-height: 122px;
+  }
+
+  .ud-card-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+  }
+
+  .ud-card-label {
+    font-size: 12px;
+  }
+
+  .ud-title {
+    font-size: 22px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .ud-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+
+  .ud-card {
+    padding: 26px 16px;
+    min-height: 128px;
   }
 }
 
@@ -568,5 +600,41 @@
   .ud-societe-select {
     max-width: 100%;
     width: 100%;
+  }
+}
+
+@media (max-width: 359px) {
+  .user-dashboard {
+    padding: 10px;
+  }
+
+  .ud-title {
+    font-size: 18px;
+  }
+
+  .ud-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .ud-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 14px;
+    min-height: auto;
+  }
+
+  .ud-card-label {
+    text-align: left;
+    font-size: 12px;
+    flex: 1;
+  }
+
+  .ud-card-arrow {
+    position: static;
+    opacity: 1;
+    transform: none;
   }
 }

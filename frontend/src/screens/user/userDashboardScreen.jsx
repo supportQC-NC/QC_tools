@@ -22,6 +22,7 @@ import {
   HiCheck,
   HiX,
   HiRefresh,
+  HiArrowSmRight,
 } from "react-icons/hi";
 import { getMenuCatalog, catalogItemVisible } from "../../config/menuConfig";
 import {
@@ -39,6 +40,34 @@ import "./UserdashboardScreen.css";
 
 const nomSociete = (e) =>
   e ? e.nomComplet || e.nom || e.nomDossierDBF || "" : "";
+
+// Salutation selon l'heure — purement cosmétique.
+const salutation = (d) => {
+  const h = d.getHours();
+  if (h < 5) return "Bonsoir";
+  if (h < 12) return "Bonjour";
+  if (h < 18) return "Bon après-midi";
+  return "Bonsoir";
+};
+
+// Teinte des tuiles d'accès rapide : une couleur STABLE par chemin (hachage
+// simple), purement décorative — aucune signification métier.
+const TUILE_COULEURS = [
+  { c: "#4da6ff", bg: "rgba(77, 166, 255, 0.14)" },
+  { c: "#8b5cf6", bg: "rgba(139, 92, 246, 0.14)" },
+  { c: "#10b981", bg: "rgba(16, 185, 129, 0.14)" },
+  { c: "#f59e0b", bg: "rgba(245, 158, 11, 0.14)" },
+  { c: "#ec4899", bg: "rgba(236, 72, 153, 0.14)" },
+  { c: "#06b6d4", bg: "rgba(6, 182, 212, 0.14)" },
+  { c: "#f97316", bg: "rgba(249, 115, 22, 0.14)" },
+  { c: "#14b8a6", bg: "rgba(20, 184, 166, 0.14)" },
+];
+const couleurTuile = (path = "") => {
+  let h = 0;
+  for (let i = 0; i < path.length; i += 1)
+    h = (h * 31 + path.charCodeAt(i)) % 997;
+  return TUILE_COULEURS[h % TUILE_COULEURS.length];
+};
 
 // ── Choix des raccourcis (modale) ───────────────────────────────────────────
 // Liste tous les onglets AUTORISÉS ; cocher = épingler sur l'accueil.
@@ -147,18 +176,23 @@ const UserDashboard = () => {
 
   return (
     <div className="user-dashboard">
-      <div className="ud-header">
-        <div className="ud-header-left">
-          <h1 className="ud-title">Tableau de bord</h1>
-          <p className="ud-welcome">
-            Bonjour, <strong>{userInfo?.prenom || "Utilisateur"}</strong>
-          </p>
+      <header className="ud-hero">
+        <div className="ud-hero-main">
+          <span className="ud-avatar" aria-hidden="true">
+            {(userInfo?.prenom?.charAt(0) || "") + (userInfo?.nom?.charAt(0) || "") || "·"}
+          </span>
+          <div className="ud-hero-textes">
+            <h1 className="ud-title">
+              {salutation(now)},{" "}
+              <span className="ud-prenom">{userInfo?.prenom || "Utilisateur"}</span>
+            </h1>
+            <p className="ud-date">{dateStr}</p>
+          </div>
         </div>
-        <div className="ud-header-right">
-          <span className="ud-date">{dateStr}</span>
-          <span className="ud-time">{timeStr}</span>
+        <div className="ud-time" title="Heure locale">
+          {timeStr}
         </div>
-      </div>
+      </header>
 
       {/* ── Société active ───────────────────────────────────────────────── */}
       <section className="ud-societe">
@@ -169,7 +203,9 @@ const UserDashboard = () => {
           <span className="ud-societe-label">Société active</span>
           {societe ? (
             <span className="ud-societe-nom">
-              {societe.trigramme ? `${societe.trigramme} · ` : ""}
+              {societe.trigramme ? (
+                <span className="ud-trigramme">{societe.trigramme}</span>
+              ) : null}
               {nomSociete(societe)}
             </span>
           ) : (
@@ -203,7 +239,12 @@ const UserDashboard = () => {
       {/* ── Accès rapides ────────────────────────────────────────────────── */}
       <section className="ud-raccourcis">
         <div className="ud-section-tete">
-          <h2>Accès rapides</h2>
+          <h2>
+            Accès rapides
+            {raccourcis.length > 0 && (
+              <span className="ud-count">{raccourcis.length}</span>
+            )}
+          </h2>
           <button
             type="button"
             className="ud-btn"
@@ -225,12 +266,19 @@ const UserDashboard = () => {
           <div className="ud-grid">
             {raccourcis.map((c) => {
               const Icone = c.icon || HiViewGrid;
+              const teinte = couleurTuile(c.path);
               return (
-                <Link key={c.path} to={c.path} className="ud-card">
+                <Link
+                  key={c.path}
+                  to={c.path}
+                  className="ud-card"
+                  style={{ "--tc": teinte.c, "--tc-bg": teinte.bg }}
+                >
                   <span className="ud-card-icon">
                     <Icone />
                   </span>
                   <span className="ud-card-label">{c.label}</span>
+                  <HiArrowSmRight className="ud-card-arrow" />
                 </Link>
               );
             })}
