@@ -176,13 +176,14 @@ const fmtDate = (d) =>
       })
     : "—";
 
-/** Compteur principal. `ton` colore la barre de gauche. */
+/** Compteur principal. `ton` teinte la pastille d'icône (accent/ok/warn). */
 const Kpi = ({ label, valeur, ton = "", icone, aide }) => (
   <div className={`invd-kpi ${ton ? `invd-kpi-${ton}` : ""}`.trim()} title={aide || ""}>
-    <span className="invd-kpi-lbl">
-      {icone} {label}
+    <span className="invd-kpi-ico">{icone || <HiChartPie />}</span>
+    <span className="invd-kpi-corps">
+      <span className="invd-kpi-val">{valeur}</span>
+      <span className="invd-kpi-lbl">{label}</span>
     </span>
-    <span className="invd-kpi-val">{valeur}</span>
   </div>
 );
 
@@ -426,32 +427,47 @@ const AdminInventaireDashboardScreen = () => {
 
   return (
     <div className="invd-screen">
-      <div className="invd-head">
-        <h1>
-          <HiChartPie /> Tableau de bord de l'inventaire
-        </h1>
-        <button
-          className="invd-icon-btn"
-          onClick={rafraichir}
-          title="Rafraîchir"
-          aria-label="Rafraîchir"
+      {/* ── Hero : identité de l'inventaire + avancement global ──────────── */}
+      <header className="invd-hero">
+        <div className="invd-hero-ligne">
+          <span className="invd-hero-ico">
+            <HiChartPie />
+          </span>
+          <div className="invd-hero-textes">
+            <h1>Tableau de bord de l'inventaire</h1>
+            <p className="invd-sous">
+              <b>{doc.nom || "Inventaire en cours"}</b> · démarré le{" "}
+              {fmtDate(doc.createdAt)}
+            </p>
+          </div>
+          <button
+            className="invd-icon-btn"
+            onClick={rafraichir}
+            title="Rafraîchir"
+            aria-label="Rafraîchir"
+          >
+            <HiRefresh className={enCours ? "invd-spin" : ""} />
+          </button>
+        </div>
+        <div
+          className="invd-hero-prog"
+          title="Part des phases faites sur l'ensemble des zones (3 phases par zone)."
         >
-          <HiRefresh className={enCours ? "invd-spin" : ""} />
-        </button>
-      </div>
-      <p className="invd-sous">
-        <b>{doc.nom || "Inventaire en cours"}</b> · démarré le{" "}
-        {fmtDate(doc.createdAt)}
-      </p>
+          <div className="invd-hero-prog-tete">
+            <span>Avancement global</span>
+            <b>{stats.pct} %</b>
+          </div>
+          <span className="invd-bar invd-hero-bar">
+            <span
+              className="invd-bar-fill invd-hero-fill"
+              style={{ width: `${Math.max(0, Math.min(100, stats.pct))}%` }}
+            />
+          </span>
+        </div>
+      </header>
 
       {/* ── Compteurs principaux ─────────────────────────────────────────── */}
       <div className="invd-kpis">
-        <Kpi
-          label="Avancement"
-          valeur={`${stats.pct} %`}
-          ton="accent"
-          aide="Part des phases faites sur l'ensemble des zones (3 phases par zone)."
-        />
         <Kpi
           label="Zones complètes"
           valeur={`${fmtInt(stats.completes)} / ${fmtInt(stats.total)}`}

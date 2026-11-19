@@ -1,5 +1,8 @@
 /* Tableau de bord de l'inventaire — mêmes codes visuels que les autres écrans
    admin (variables --admin-* définies globalement dans index.css).
+   Refonte visuelle 11/2026 : hero avec avancement global, KPI à pastille
+   d'icône teintée, cartes et liens retravaillés. Les COULEURS DES GRAPHIQUES
+   ne bougent pas (validées contre le daltonisme le 30/10/2026, voir le JSX).
 
    ⚠️ Toutes les classes sont préfixées `invd-` et les rares noms génériques
    sont scopés sous `.invd-screen`. Le CSS de CRA est GLOBAL : une règle
@@ -9,24 +12,74 @@
 .invd-screen {
   padding: 20px 24px 40px;
   color: var(--admin-text);
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
-.invd-head {
+/* ── Hero : identité + avancement global ─────────────────────────────────── */
+.invd-hero {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background:
+    radial-gradient(
+      620px 220px at 0% 0%,
+      rgba(77, 166, 255, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      520px 200px at 100% 100%,
+      rgba(139, 92, 246, 0.08),
+      transparent 60%
+    ),
+    var(--admin-bg-secondary);
 }
 
-.invd-head h1 {
+.invd-hero-ligne {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+}
+
+.invd-hero-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  flex-shrink: 0;
   font-size: 22px;
-  margin: 0;
+  color: #fff;
+  background: linear-gradient(135deg, #4da6ff, #8b5cf6);
+  box-shadow: 0 4px 14px rgba(77, 166, 255, 0.25);
 }
 
-.invd-head h1 svg {
-  color: var(--admin-primary);
+.invd-hero-textes {
+  min-width: 0;
+}
+
+.invd-hero-textes h1 {
+  font-size: 20px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.invd-sous {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--admin-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invd-sous b {
+  color: var(--admin-text);
 }
 
 .invd-icon-btn {
@@ -34,14 +87,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--admin-radius-sm);
   border: 1px solid var(--admin-border);
   background: var(--admin-bg-tertiary);
   color: var(--admin-text-secondary);
+  font-size: 17px;
   cursor: pointer;
   transition: var(--admin-transition);
+  flex-shrink: 0;
 }
 
 .invd-icon-btn:hover {
@@ -59,70 +114,115 @@
   }
 }
 
-.invd-sous {
-  margin: 6px 0 16px;
-  font-size: 13px;
+.invd-hero-prog-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.invd-hero-prog-tete span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--admin-text-muted);
 }
 
-.invd-sous b {
+.invd-hero-prog-tete b {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--admin-text);
+}
+
+.invd-hero-bar {
+  height: 10px;
+}
+
+.invd-hero-fill {
+  background: linear-gradient(90deg, #4da6ff, #8b5cf6);
+  border-radius: 999px;
 }
 
 /* ── Compteurs ───────────────────────────────────────────────────────────── */
 .invd-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
   margin-bottom: 18px;
 }
 
 .invd-kpi {
-  position: relative;
-  overflow: hidden;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px 12px 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius);
   background: var(--admin-bg-secondary);
+  transition: var(--admin-transition);
 }
 
-.invd-kpi::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: transparent;
+.invd-kpi:hover {
+  border-color: var(--admin-primary);
+  transform: translateY(-1px);
 }
 
-.invd-kpi-accent::before {
-  background: var(--admin-primary);
+/* Pastille d'icône : neutre par défaut, teintée par `ton`. */
+.invd-kpi-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 18px;
+  flex-shrink: 0;
+  color: var(--admin-text-secondary);
+  background: var(--admin-bg-tertiary);
 }
 
-.invd-kpi-ok::before {
-  background: #22c55e;
+.invd-kpi-accent .invd-kpi-ico {
+  color: var(--admin-primary);
+  background: rgba(77, 166, 255, 0.14);
+}
+
+.invd-kpi-ok .invd-kpi-ico {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.invd-kpi-warn .invd-kpi-ico {
+  color: var(--admin-warning);
+  background: var(--admin-warning-light);
+}
+
+.invd-kpi-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.invd-kpi-val {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .invd-kpi-lbl {
-  display: flex;
-  align-items: center;
-  gap: 5px;
   font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--admin-text-muted);
-}
-
-.invd-kpi-val {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Cartes ──────────────────────────────────────────────────────────────── */
@@ -134,11 +234,16 @@
 }
 
 .invd-carte {
-  padding: 14px 16px 12px;
+  padding: 16px 18px 14px;
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius);
   background: var(--admin-bg-secondary);
   box-shadow: var(--admin-shadow);
+  transition: box-shadow 0.18s ease;
+}
+
+.invd-carte:hover {
+  box-shadow: var(--admin-shadow-lg);
 }
 
 /* Le bloc des agents porte un tableau : il lui faut toute la largeur. */
@@ -146,10 +251,23 @@
   grid-column: 1 / -1;
 }
 
+/* Titre de carte : petit repère dégradé à gauche, même langage que le hero. */
 .invd-carte h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 700;
+}
+
+.invd-carte h2::before {
+  content: "";
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #4da6ff, #8b5cf6);
+  flex-shrink: 0;
 }
 
 .invd-carte-aide {
@@ -264,6 +382,12 @@
   padding: 10px 6px;
   border-radius: var(--admin-radius-sm);
   background: var(--admin-bg-tertiary);
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.invd-rep:hover {
+  border-color: var(--admin-border);
 }
 
 .invd-rep-val {
@@ -282,7 +406,7 @@
   text-align: center;
 }
 
-/* ── Tableau des agents ──────────────────────────────────────────────────── */
+/* ── Tableaux ────────────────────────────────────────────────────────────── */
 .invd-table {
   width: 100%;
   border-collapse: separate;
@@ -334,20 +458,34 @@
   margin-top: 2px;
 }
 
-/* ── Liens de renvoi ─────────────────────────────────────────────────────── */
+/* ── Liens de renvoi : pastilles cliquables ──────────────────────────────── */
 .invd-lien {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   margin-top: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--admin-primary);
+  background: rgba(77, 166, 255, 0.1);
+  border: 1px solid transparent;
   text-decoration: none;
+  transition: var(--admin-transition);
 }
 
 .invd-lien:hover {
-  text-decoration: underline;
+  border-color: var(--admin-primary);
+  text-decoration: none;
+}
+
+.invd-lien svg {
+  transition: transform 0.15s ease;
+}
+
+.invd-lien:hover svg {
+  transform: translateX(2px);
 }
 
 .invd-attente {
@@ -365,19 +503,19 @@
   padding: 70px 20px;
   color: var(--admin-text-muted);
   text-align: center;
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
 }
 
 .invd-screen .invd-vide svg {
   font-size: 40px;
+  opacity: 0.5;
 }
 
 /* ── Zones les plus retouchées ────────────────────────────────────────────
    Une colonne par emplacement (DOCK / MAGASIN) : la comparaison côte à côte
    est tout l'intérêt — elle dit d'un coup d'œil de quel côté ça coince. */
-.invd-kpi-warn::before {
-  background: var(--admin-warning);
-}
-
 .invd-empl-grille {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -466,7 +604,7 @@
 .invd-liens {
   display: flex;
   flex-wrap: wrap;
-  gap: 18px;
+  gap: 10px;
 }
 
 /* ── Écarts de stock ──────────────────────────────────────────────────────
@@ -499,4 +637,14 @@
   letter-spacing: 0.04em;
   color: var(--admin-primary);
   white-space: nowrap;
+}
+
+/* ── Accessibilité : animations coupées sur demande du système ───────────── */
+@media (prefers-reduced-motion: reduce) {
+  .invd-kpi,
+  .invd-carte,
+  .invd-lien svg,
+  .invd-bar-fill {
+    transition: none;
+  }
 }
