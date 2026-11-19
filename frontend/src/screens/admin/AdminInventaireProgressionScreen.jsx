@@ -15,6 +15,7 @@ import {
   HiDownload,
   HiEye,
   HiEyeOff,
+  HiExclamation,
 } from "react-icons/hi";
 import {
   useGetActiveSessionQuery,
@@ -161,6 +162,12 @@ const AdminInventaireProgressionScreen = () => {
   // "rcommun" = partage STOCK (défaut, seul dossier que l'agent d'impression
   // surveille) ; "collect_sec" = le chemin d'export de la société.
   const [initDestination, setInitDestination] = useState("rcommun");
+  // Garde-fous des actions destructrices (zone de danger) : réinitialiser un
+  // inventaire EN COURS exige une case cochée en connaissance de cause, et
+  // l'annulation exige la saisie du trigramme de la société — un clic de trop
+  // ne doit jamais suffire à perdre le travail des agents.
+  const [initConfirmCoche, setInitConfirmCoche] = useState(false);
+  const [annulerConfirmTexte, setAnnulerConfirmTexte] = useState("");
   const [showAnnulerConfirm, setShowAnnulerConfirm] = useState(false);
   const [showHistorique, setShowHistorique] = useState(false);
   // Confirmation de neutralisation d'une zone qui porte DÉJÀ du travail
@@ -297,7 +304,35 @@ const AdminInventaireProgressionScreen = () => {
     [zonesEmplacement],
   );
 
+  // Avancement PAR TYPE DE ZONE. Les types viennent des fiches d'inventaire
+  // elles-mêmes (`zone.type`), jamais d'une liste en dur : une société dont le
+  // dictionnaire déclare RESERVE, QUAI ou SAV voit chacun de ses types, pas
+  // seulement magasin et dock. Les zones sans type sont regroupées sous
+  // « Sans emplacement » plutôt que d'être invisibles de la ventilation.
+  const progressParType = useMemo(() => {
+    const groupes = new Map();
+    zones.forEach((z) => {
+      const key = (z.type || "").trim();
+      if (!groupes.has(key)) groupes.set(key, []);
+      groupes.get(key).push(z);
+    });
+    return [...groupes.entries()]
+      .map(([key, lot]) => ({ key, ...calculerProgression(lot) }))
+      .sort((a, b) => a.key.localeCompare(b.key, "fr", { numeric: true }));
+  }, [zones]);
+
+  // La ventilation n'apporte rien quand toutes les zones partagent le même
+  // type (ou n'en ont aucun) : on ne l'affiche qu'à partir de deux types.
+  const afficherParType = progressParType.length > 1;
+
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
+
+  // Mot exigé pour confirmer l'ANNULATION : le trigramme de la société — le
+  // taper force à relire QUELLE société va perdre son inventaire. Repli
+  // générique tant que la liste des sociétés n'est pas chargée.
+  const motAnnulation = (entrepriseObj?.trigramme || "SUPPRIMER").toUpperCase();
+  const annulationConfirmee =
+    annulerConfirmTexte.trim().toUpperCase() === motAnnulation;
 
   // Auto-focus du champ bip dès qu'une session active est présente
   useEffect(() => {
@@ -318,10 +353,18 @@ const AdminInventaireProgressionScreen = () => {
     setAgentsSocieteSeuls(true);
     setDernierAgentId("");
     setInitDestination("rcommun");
+    setShowInitConfirm(false);
+    setShowAnnulerConfirm(false);
+    setInitConfirmCoche(false);
+    setAnnulerConfirmTexte("");
   }, [selectedEntreprise]);
 
   const handleConfirmInit = async () => {
+    // Un inventaire EN COURS ne se réinitialise pas sans la case cochée (le
+    // bouton est désactivé, ceci n'est qu'un garde-fou de cohérence).
+    if (session && !initConfirmCoche) return;
     setShowInitConfirm(false);
+    setInitConfirmCoche(false);
     setBipFeedback(null);
     try {
       await initInventaire({
@@ -338,7 +381,11 @@ const AdminInventaireProgressionScreen = () => {
   };
 
   const handleConfirmAnnuler = async () => {
+    // L'annulation supprime tout : elle n'est jouée que si le trigramme a
+    // bien été saisi (le bouton est désactivé, garde-fou de cohérence).
+    if (!annulationConfirmee) return;
     setShowAnnulerConfirm(false);
+    setAnnulerConfirmTexte("");
     setBipFeedback(null);
     try {
       const res = await annulerInventaire(selectedEntreprise).unwrap();
@@ -737,21 +784,10 @@ const AdminInventaireProgressionScreen = () => {
               >
                 <HiArchive /> Historique
               </button>
-              <button
-                className="btn-primary"
-                onClick={() => setShowInitConfirm(true)}
-                disabled={initializing}
-              >
-                <HiRefresh /> Réinitialiser
-              </button>
-              <button
-                className="btn-danger"
-                onClick={() => setShowAnnulerConfirm(true)}
-                disabled={annulating}
-                title="Supprime le dossier de dépôt et l'inventaire actif"
-              >
-                <HiTrash /> Annuler l'inventaire
-              </button>
+              {/* Réinitialiser et Annuler ne vivent plus ici : ces actions
+                  détruisent ou archivent l'inventaire EN COURS, elles sont
+                  reléguées dans la zone de danger en bas d'écran, loin des
+                  gestes du quotidien. */}
             </div>
           </div>
 
@@ -817,6 +853,7 @@ const AdminInventaireProgressionScreen = () => {
           {/* Progression — du périmètre affiché, avec rappel du total quand un
               emplacement est isolé. */}
           {progress && (
+            <>
             <div className="prog-cards">
               <div className="prog-global">
                 <div className="prog-global-pct">{progressFiltre.pct}%</div>
@@ -859,6 +896,81 @@ const AdminInventaireProgressionScreen = () => {
                 ))}
               </div>
             </div>
+
+            {/* Avancement PAR TYPE DE ZONE — les types sont ceux des fiches
+                d'inventaire (tous les emplacements du dictionnaire, pas
+                seulement magasin/dock). Chaque carte est cliquable et pose le
+                filtre d'emplacement du tableau. */}
+            {afficherParType && (
+              <div className="prog-types">
+                <div className="prog-types-head">
+                  Avancement par type de zone
+                  <span>
+                    cliquer sur un type filtre le tableau et les compteurs
+                  </span>
+                </div>
+                <div className="prog-types-grid">
+                  {progressParType.map((t) => {
+                    const filtreKey = t.key || SANS_EMPLACEMENT;
+                    const actif = emplacement === filtreKey;
+                    return (
+                      <button
+                        key={filtreKey}
+                        type="button"
+                        className={`prog-type-card${actif ? " actif" : ""}`}
+                        onClick={() => setEmplacement(actif ? "" : filtreKey)}
+                        title={
+                          actif
+                            ? "Retirer le filtre (tous les emplacements)"
+                            : `N'afficher que les zones « ${
+                                t.key || "sans emplacement"
+                              } »`
+                        }
+                      >
+                        <div className="prog-type-head">
+                          <span className="prog-type-nom">
+                            {t.key || "Sans emplacement"}
+                          </span>
+                          <span className="prog-type-pct">{t.pct}%</span>
+                        </div>
+                        <div className="prog-track">
+                          <div
+                            className="prog-fill"
+                            style={{
+                              width: `${t.pct}%`,
+                              background: "#8b5cf6",
+                            }}
+                          />
+                        </div>
+                        <div className="prog-type-meta">
+                          {t.faites}/{t.totalPhases} phases · {t.totalZones}{" "}
+                          zone{t.totalZones > 1 ? "s" : ""}
+                          {t.zonesNeutralisees > 0 &&
+                            ` · ${t.zonesNeutralisees} neutralisée${
+                              t.zonesNeutralisees > 1 ? "s" : ""
+                            }`}
+                        </div>
+                        <div className="prog-type-phases">
+                          {PHASES.map((ph) => (
+                            <span
+                              key={ph}
+                              className="prog-type-phase"
+                              title={`${PHASE_META[ph].label} : ${t.parPhase[ph].faites}/${t.parPhase[ph].total}`}
+                            >
+                              <i
+                                style={{ background: PHASE_META[ph].color }}
+                              />
+                              {t.parPhase[ph].faites}/{t.parPhase[ph].total}
+                            </span>
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </>
           )}
 
           {/* Filtres du tableau */}
@@ -1011,6 +1123,64 @@ const AdminInventaireProgressionScreen = () => {
               </tbody>
             </table>
           </div>
+
+          {/* ZONE DE DANGER — réinitialisation et annulation de l'inventaire
+              EN COURS. Volontairement isolée en bas d'écran, cerclée de rouge
+              et doublée de confirmations renforcées : ni l'une ni l'autre ne
+              doit pouvoir être déclenchée par erreur pendant un inventaire. */}
+          <div className="danger-zone">
+            <div className="danger-zone-head">
+              <h2>
+                <HiExclamation /> Zone de danger
+              </h2>
+              <p>
+                Ces actions touchent l'inventaire <strong>en cours</strong> de{" "}
+                <strong>{entrepriseObj?.trigramme}</strong>. Elles sont
+                irréversibles ou font perdre le fil du travail des agents : ne
+                les utilisez qu'en connaissance de cause.
+              </p>
+            </div>
+            <div className="danger-zone-row">
+              <div className="danger-zone-texte">
+                <strong>Réinitialiser l'inventaire</strong>
+                <small>
+                  Archive l'inventaire en cours et en recrée un nouveau à
+                  partir des zones actuelles. L'avancement repart de zéro ;
+                  l'inventaire archivé reste consultable dans l'historique.
+                </small>
+              </div>
+              <button
+                className="btn-danger-outline"
+                onClick={() => {
+                  setInitConfirmCoche(false);
+                  setShowInitConfirm(true);
+                }}
+                disabled={initializing}
+              >
+                <HiRefresh /> Réinitialiser…
+              </button>
+            </div>
+            <div className="danger-zone-row">
+              <div className="danger-zone-texte">
+                <strong>Annuler l'inventaire</strong>
+                <small>
+                  Supprime <strong>définitivement</strong> l'inventaire actif :
+                  dossier réseau (.dat et fiches PDF), collectes, bipages et
+                  fiches de contrôle. Aucun historique n'est conservé.
+                </small>
+              </div>
+              <button
+                className="btn-danger-outline"
+                onClick={() => {
+                  setAnnulerConfirmTexte("");
+                  setShowAnnulerConfirm(true);
+                }}
+                disabled={annulating}
+              >
+                <HiTrash /> Annuler l'inventaire…
+              </button>
+            </div>
+          </div>
         </>
       )}
 
@@ -1018,9 +1188,12 @@ const AdminInventaireProgressionScreen = () => {
       {showInitConfirm && (
         <div className="modal-backdrop" onClick={() => setShowInitConfirm(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+            <div className={`modal-header${session ? " modal-header-danger" : ""}`}>
               <h2>
-                <HiPlay /> Initialiser un inventaire
+                {session ? <HiExclamation /> : <HiPlay />}{" "}
+                {session
+                  ? "Réinitialiser l'inventaire"
+                  : "Initialiser un inventaire"}
               </h2>
               <button
                 className="btn-close-modal"
@@ -1034,13 +1207,37 @@ const AdminInventaireProgressionScreen = () => {
                 Un nouvel inventaire sera créé pour{" "}
                 <strong>{entrepriseObj?.trigramme}</strong> à partir des zones
                 actuelles.
-                {session && (
-                  <>
-                    {" "}
-                    L'inventaire actif sera <strong>archivé</strong>.
-                  </>
-                )}
               </p>
+
+              {/* Un inventaire est EN COURS : on rappelle ce qui va être
+                  archivé (nom + avancement réel) et on exige une coche
+                  explicite — réinitialiser au milieu d'un comptage fait
+                  repartir tout l'avancement de zéro. */}
+              {session && (
+                <div className="danger-encart">
+                  <p>
+                    <HiExclamation /> L'inventaire en cours{" "}
+                    <strong>{session.nom}</strong>
+                    {progress
+                      ? ` (avancé à ${progress.pct} %, ${progress.faites}/${progress.totalPhases} phases)`
+                      : ""}{" "}
+                    sera <strong>archivé</strong> : l'avancement, le scan des
+                    coupons et les dépôts des collecteurs repartiront de zéro
+                    sur le nouvel inventaire.
+                  </p>
+                  <label className="danger-coche">
+                    <input
+                      type="checkbox"
+                      checked={initConfirmCoche}
+                      onChange={(e) => setInitConfirmCoche(e.target.checked)}
+                    />
+                    <span>
+                      Je comprends que l'inventaire en cours sera archivé et
+                      que l'avancement repartira de zéro.
+                    </span>
+                  </label>
+                </div>
+              )}
 
               {/* DESTINATION du dossier de l'inventaire. Le choix est définitif
                   pour cet inventaire : dépôt des .dat, surveillance par
@@ -1152,11 +1349,20 @@ const AdminInventaireProgressionScreen = () => {
             </div>
             <div className="modal-footer">
               <button
-                className="btn-primary"
+                className={session ? "btn-danger" : "btn-primary"}
                 onClick={handleConfirmInit}
-                disabled={initializing}
+                disabled={initializing || (session && !initConfirmCoche)}
+                title={
+                  session && !initConfirmCoche
+                    ? "Cochez la case de confirmation pour réinitialiser"
+                    : undefined
+                }
               >
-                {initializing ? "Initialisation…" : "Initialiser"}
+                {initializing
+                  ? "Initialisation…"
+                  : session
+                    ? "Réinitialiser l'inventaire"
+                    : "Initialiser"}
               </button>
               <button
                 className="btn-secondary"
@@ -1402,9 +1608,9 @@ const AdminInventaireProgressionScreen = () => {
           onClick={() => setShowAnnulerConfirm(false)}
         >
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+            <div className="modal-header modal-header-danger">
               <h2>
-                <HiTrash /> Annuler l'inventaire
+                <HiExclamation /> Annuler l'inventaire
               </h2>
               <button
                 className="btn-close-modal"
@@ -1415,9 +1621,13 @@ const AdminInventaireProgressionScreen = () => {
             </div>
             <div className="modal-content">
               <p>
-                L'inventaire actif de{" "}
-                <strong>{entrepriseObj?.trigramme}</strong> sera{" "}
-                <strong>définitivement supprimé</strong> :
+                L'inventaire actif{" "}
+                {session?.nom && <strong>{session.nom} </strong>}de{" "}
+                <strong>{entrepriseObj?.trigramme}</strong>
+                {progress
+                  ? ` (avancé à ${progress.pct} %, ${progress.faites}/${progress.totalPhases} phases)`
+                  : ""}{" "}
+                sera <strong>définitivement supprimé</strong> :
               </p>
               <ul>
                 <li>
@@ -1430,15 +1640,43 @@ const AdminInventaireProgressionScreen = () => {
                 </li>
                 <li>aucun historique ne sera conservé.</li>
               </ul>
-              <p>Cette action est irréversible.</p>
+              <p>
+                Cette action est <strong>irréversible</strong>. Pour archiver
+                l'inventaire en gardant sa trace dans l'historique, utilisez
+                plutôt « Réinitialiser ».
+              </p>
+              {/* Confirmation par saisie du trigramme : un clic réflexe sur
+                  « Oui » ne doit pas pouvoir détruire un inventaire en cours. */}
+              <div className="danger-encart">
+                <label className="danger-saisie">
+                  <span>
+                    Tapez <strong>{motAnnulation}</strong> pour confirmer la
+                    suppression :
+                  </span>
+                  <input
+                    type="text"
+                    value={annulerConfirmTexte}
+                    onChange={(e) => setAnnulerConfirmTexte(e.target.value)}
+                    placeholder={motAnnulation}
+                    autoFocus
+                  />
+                </label>
+              </div>
             </div>
             <div className="modal-footer">
               <button
                 className="btn-danger"
                 onClick={handleConfirmAnnuler}
-                disabled={annulating}
+                disabled={annulating || !annulationConfirmee}
+                title={
+                  !annulationConfirmee
+                    ? `Tapez ${motAnnulation} pour activer ce bouton`
+                    : undefined
+                }
               >
-                {annulating ? "Annulation…" : "Oui, annuler l'inventaire"}
+                {annulating
+                  ? "Annulation…"
+                  : "Supprimer définitivement l'inventaire"}
               </button>
               <button
                 className="btn-secondary"

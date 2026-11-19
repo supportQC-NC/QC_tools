@@ -868,6 +868,273 @@
   opacity: 0.85;
 }
 
+/* ── Avancement par type de zone ─────────────────────────────────────────────
+   Une carte par type porté par les fiches d'inventaire (magasin, dock,
+   réserve, SAV… — tout ce que le dictionnaire déclare). Cliquer pose le
+   filtre d'emplacement du tableau. */
+.prog-types {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.prog-types-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prog-types-head span {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.prog-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.prog-type-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.prog-type-card:hover {
+  border-color: #8b5cf6;
+}
+
+.prog-type-card.actif {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.prog-type-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prog-type-nom {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.prog-type-pct {
+  font-size: 17px;
+  font-weight: 800;
+  color: #8b5cf6;
+}
+
+.prog-type-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.prog-type-phases {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.prog-type-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.prog-type-phase i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ── Zone de danger ──────────────────────────────────────────────────────────
+   Réinitialiser / annuler l'inventaire EN COURS : isolées en bas d'écran,
+   cerclées de rouge, pour qu'aucun geste du quotidien ne passe par là. */
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--bg-secondary);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  border-radius: 10px;
+}
+
+.danger-zone-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--danger, #ef4444);
+}
+
+.danger-zone-head p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.danger-zone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 11px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.danger-zone-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 220px;
+  flex: 1;
+}
+
+.danger-zone-texte strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.danger-zone-texte small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* Bouton de danger « à froid » : contour rouge, il ne devient plein que dans
+   la modale de confirmation (.btn-danger). */
+.btn-danger-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--danger, #ef4444);
+  border: 1px solid var(--danger, #ef4444);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background: var(--danger, #ef4444);
+  color: #fff;
+}
+
+.btn-danger-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* En-tête de modale « danger » : l'icône et le liseré passent au rouge. */
+.modal-header-danger {
+  border-bottom-color: rgba(239, 68, 68, 0.45);
+}
+
+.modal-header-danger h2 svg {
+  color: var(--danger, #ef4444);
+}
+
+/* Encart rouge dans les modales de confirmation (coche ou saisie exigée). */
+.danger-encart {
+  margin: 12px 0;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+}
+
+.danger-encart p {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.danger-encart p svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 16px;
+  color: var(--danger, #ef4444);
+}
+
+.danger-coche {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.danger-coche input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--danger, #ef4444);
+}
+
+.danger-saisie {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.danger-saisie input {
+  padding: 9px 12px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.danger-saisie input:focus {
+  outline: none;
+  border-color: var(--danger, #ef4444);
+}
+
 /* Emplacement rappelé à côté du libellé de la zone. */
 .zone-type {
   display: inline-block;
