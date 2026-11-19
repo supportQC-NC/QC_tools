@@ -31,7 +31,8 @@ import {
   HiClock,
   HiCalendar,
   HiCog,
-  HiPhotograph
+  HiPhotograph,
+  HiPresentationChartBar
 } from "react-icons/hi";
 import { moduleForPath, estCommercial } from "./adminModules";
 
@@ -182,6 +183,13 @@ export const moduleMenuStructure = [
         label: "Récap par zone",
         path: "/admin/recap-zones",
         icon: HiViewGrid,
+      },
+      {
+        // Affichage MURAL (TV) : avancement global + par emplacement, en
+        // plein écran, auto-actualisé — aucune action possible dessus.
+        label: "Suivi inventaire",
+        path: "/admin/suivi-inventaire",
+        icon: HiPresentationChartBar,
       },
       {
         // « Suivi bipage » tout court se confondait avec le bipage TERRAIN
@@ -739,6 +747,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/zones": "Fiches d'inventaire par zone.",
   "/admin/inventaire-progression": "Progression de l'inventaire en cours.",
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
+  "/admin/suivi-inventaire":
+    "Affichage mural plein écran : avancement de l'inventaire par emplacement, actualisé en continu.",
   "/admin/suivi-bipage":
     "INVENTAIRE : qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
   "/admin/suivi-demandes-bipage":

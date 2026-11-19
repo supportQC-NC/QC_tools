@@ -22,6 +22,7 @@ import { useSelector } from "react-redux";
 import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
+import { progressionParEmplacement } from "../../utils/progressionInventaire";
 import "./AdminRecapZonesScreen.css";
 
 const POLL = 5000;
@@ -49,6 +50,37 @@ const zoneStatut = (z) => {
   if (bip) return "comptage";
   if (pap) return "papillonnage";
   return "todo";
+};
+
+// Ce que chaque statut veut dire SUR LE TERRAIN : affiché dans la légende et
+// en infobulle des compteurs — le seul code couleur ne se devine pas.
+const STATUT_EXPLICATIONS = {
+  todo: "aucune phase validée, la zone reste entièrement à faire",
+  papillonnage: "étiquettes posées (papillonnage fait), comptage à venir",
+  comptage: "zone comptée (bipage fait), reste le contrôle",
+  complet: "les 3 phases sont validées, la zone est terminée",
+};
+
+// « Fait par X le … » d'une phase : le serveur peuple `by`, les phases
+// anciennes (avant la désignation d'agent) n'ont personne.
+const detailPhase = (p) => {
+  const u = p?.by;
+  const nom =
+    u && typeof u === "object"
+      ? `${u.prenom || ""} ${u.nom || ""}`.trim() || u.email || ""
+      : "";
+  const date = p?.at
+    ? new Date(p.at).toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+  if (nom && date) return `par ${nom} le ${date}`;
+  if (nom) return `par ${nom}`;
+  if (date) return `le ${date}`;
+  return "";
 };
 
 const AdminRecapZonesScreen = () => {
@@ -106,9 +138,16 @@ const AdminRecapZonesScreen = () => {
     );
   }, [zonesAvecStatut]);
 
+  // Avancement par emplacement (mêmes règles que le serveur) : affiché dans
+  // le bandeau pour lire d'un coup d'œil où en est CHAQUE emplacement.
+  const parEmplacement = useMemo(
+    () => progressionParEmplacement(zones),
+    [zones],
+  );
+
   const zonesFiltrees = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return zonesAvecStatut.filter(({ z, statut }) => {
+    const lot = zonesAvecStatut.filter(({ z, statut }) => {
       if (filtre !== "tous" && statut !== filtre) return false;
       if (emplFiltre !== "tous" && emplOf(z) !== emplFiltre) return false;
       if (!q) return true;
@@ -116,6 +155,14 @@ const AdminRecapZonesScreen = () => {
         (v || "").toLowerCase().includes(q),
       );
     });
+    // Tri par code dans l'ordre NATUREL du magasin (A_1, A_2d, A_9, A_10) :
+    // sans lui, les cartes sortent dans l'ordre d'initialisation de la
+    // session et une zone ajoutée après coup se retrouve en fin de grille.
+    return [...lot].sort((a, b) =>
+      String(a.z.code || "").localeCompare(String(b.z.code || ""), "fr", {
+        numeric: true,
+      }),
+    );
   }, [zonesAvecStatut, search, filtre, emplFiltre]);
 
   return (
@@ -157,7 +204,9 @@ const AdminRecapZonesScreen = () => {
             <div className="rz-summary-info">
               <strong>{session.nom}</strong>
               <span>
-                {zones.length} zone(s) · {progress?.pct ?? 0}% complété
+                {zones.length} zone{zones.length > 1 ? "s" : ""} ·{" "}
+                {progress?.faites ?? 0}/{progress?.totalPhases ?? 0} phases
+                validées · {progress?.pct ?? 0}% de l'inventaire
               </span>
               <div className="rz-progress">
                 <div
@@ -168,17 +217,79 @@ const AdminRecapZonesScreen = () => {
             </div>
             <div className="rz-counts">
               {ORDRE_STATUTS.map((k) => (
-                <div key={k} className="rz-count">
+                <button
+                  key={k}
+                  className={`rz-count${filtre === k ? " on" : ""}`}
+                  onClick={() => setFiltre(filtre === k ? "tous" : k)}
+                  title={`${STATUTS[k].label} : ${STATUT_EXPLICATIONS[k]}. Cliquer pour ${
+                    filtre === k ? "retirer le filtre" : "filtrer les cartes"
+                  }.`}
+                >
                   <span
                     className="rz-count-dot"
                     style={{ background: STATUTS[k].color }}
                   />
                   <span className="rz-count-n">{compteurs[k]}</span>
                   <span className="rz-count-lbl">{STATUTS[k].label}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
+
+          {/* Avancement PAR EMPLACEMENT (types des fiches d'inventaire :
+              magasin, dock, réserve…) — cliquer filtre la grille. Inutile
+              quand tout l'inventaire est sur un seul emplacement. */}
+          {parEmplacement.length > 1 && (
+            <div className="rz-empl-bars">
+              {parEmplacement.map((t) => {
+                const key = t.key || "—";
+                const actif = emplFiltre === key;
+                return (
+                  <button
+                    key={key}
+                    className={`rz-empl-bar${actif ? " on" : ""}`}
+                    onClick={() => setEmplFiltre(actif ? "tous" : key)}
+                    title={`${t.key || "Sans emplacement"} : ${t.faites}/${
+                      t.totalPhases
+                    } phases validées sur ${t.totalZones} zone${
+                      t.totalZones > 1 ? "s" : ""
+                    }. Cliquer pour ${
+                      actif ? "retirer le filtre" : "n'afficher que ces zones"
+                    }.`}
+                  >
+                    <span className="rz-empl-bar-head">
+                      <span className="rz-empl-bar-nom">
+                        {t.key || "Sans emplacement"}
+                      </span>
+                      <span className="rz-empl-bar-pct">{t.pct}%</span>
+                    </span>
+                    <span className="rz-progress">
+                      <span
+                        className="rz-progress-fill"
+                        style={{ width: `${t.pct}%` }}
+                      />
+                    </span>
+                    <span className="rz-empl-bar-detail">
+                      {t.faites}/{t.totalPhases} phases · {t.totalZones} zone
+                      {t.totalZones > 1 ? "s" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Légende : le code couleur suit l'ordre du parcours terrain. */}
+          <p className="rz-legende">
+            Une zone passe du <b style={{ color: STATUTS.todo.color }}>rouge</b>{" "}
+            (pas commencé) à l'
+            <b style={{ color: STATUTS.papillonnage.color }}>orange</b>{" "}
+            (papillonnage fait), puis au{" "}
+            <b style={{ color: STATUTS.comptage.color }}>violet</b> (zone
+            comptée) et enfin au{" "}
+            <b style={{ color: STATUTS.complet.color }}>vert</b> quand les 3
+            phases — papillonnage, comptage, contrôle — sont validées.
+          </p>
 
           {/* Filtres + recherche */}
           <div className="rz-toolbar">
@@ -243,6 +354,14 @@ const AdminRecapZonesScreen = () => {
             </div>
           </div>
 
+          {/* Compteur du périmètre affiché : un filtre actif se voit. */}
+          {zonesFiltrees.length !== zones.length && (
+            <p className="rz-filtre-compte">
+              {zonesFiltrees.length} zone{zonesFiltrees.length > 1 ? "s" : ""}{" "}
+              affichée{zonesFiltrees.length > 1 ? "s" : ""} sur {zones.length}.
+            </p>
+          )}
+
           {/* Grille de cartes */}
           {zonesFiltrees.length === 0 ? (
             <div className="rz-placeholder">
@@ -254,7 +373,9 @@ const AdminRecapZonesScreen = () => {
                 const color = STATUTS[statut].color;
                 return (
                   <div
-                    key={z.code}
+                    /* code + emplacement : le même code peut exister au
+                       magasin ET au dock. */
+                    key={`${z.code}||${z.type || ""}`}
                     className="rz-card"
                     style={{
                       borderColor: color,
@@ -266,6 +387,7 @@ const AdminRecapZonesScreen = () => {
                       <span
                         className="rz-card-statut"
                         style={{ background: color }}
+                        title={STATUT_EXPLICATIONS[statut]}
                       >
                         {STATUTS[statut].label}
                       </span>
@@ -277,11 +399,16 @@ const AdminRecapZonesScreen = () => {
                     <div className="rz-card-phases">
                       {PHASES.map((p) => {
                         const fait = !!z[p.key]?.fait;
+                        const detail = fait ? detailPhase(z[p.key]) : "";
                         return (
                           <span
                             key={p.key}
                             className={`rz-phase ${fait ? "done" : ""}`}
-                            title={`${p.label} : ${fait ? "fait" : "à faire"}`}
+                            title={
+                              fait
+                                ? `${p.label} : fait${detail ? ` ${detail}` : ""}`
+                                : `${p.label} : à faire`
+                            }
                           >
                             {fait ? <HiCheck /> : "○"} {p.label}
                           </span>

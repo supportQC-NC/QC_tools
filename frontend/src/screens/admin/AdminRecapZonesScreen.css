@@ -94,10 +94,28 @@
   flex-wrap: wrap;
 }
 
+/* Compteurs par statut : désormais CLIQUABLES (ils posent le filtre). */
 .rz-count {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rz-count:hover {
+  border-color: var(--border);
+  background: var(--bg-tertiary);
+}
+
+.rz-count.on {
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
 }
 
 .rz-count-dot {
@@ -114,6 +132,91 @@
 .rz-count-lbl {
   color: var(--text-secondary);
   font-size: 0.8rem;
+}
+
+/* ── Avancement par emplacement (types des fiches d'inventaire) ── */
+.rz-empl-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.rz-empl-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.rz-empl-bar:hover,
+.rz-empl-bar.on {
+  border-color: var(--accent);
+}
+
+.rz-empl-bar.on {
+  background: var(--bg-tertiary);
+}
+
+.rz-empl-bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rz-empl-bar-nom {
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+
+.rz-empl-bar-pct {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La barre et son remplissage sont ici des <span> (dans un <button>) : il
+   leur faut un display explicite. */
+.rz-empl-bar .rz-progress {
+  display: block;
+  width: 100%;
+  margin-top: 0;
+}
+
+.rz-empl-bar .rz-progress-fill {
+  display: block;
+}
+
+.rz-empl-bar-detail {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Légende du code couleur : l'ordre du parcours terrain. */
+.rz-legende {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Compteur du périmètre affiché quand un filtre est actif. */
+.rz-filtre-compte {
+  margin: -6px 0 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
 /* ── Barre filtres + recherche ── */

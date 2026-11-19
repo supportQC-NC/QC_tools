@@ -1,0 +1,317 @@
+/* src/screens/admin/AdminSuiviInventaireScreen.css
+   Suivi inventaire : écran d'affichage mural. Tailles en clamp() pour rester
+   lisible de loin en plein écran sans casser l'affichage fenêtré. */
+
+.suivi-inv {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.5vh, 28px);
+  padding: 20px 16px 40px;
+  color: var(--text-primary);
+  /* En plein écran l'élément a son propre fond (noir par défaut) : on repose
+     le fond de l'application. */
+  background: var(--bg-primary);
+  min-height: 100%;
+}
+
+.suivi-inv.si-fs {
+  padding: clamp(24px, 4vh, 56px) clamp(24px, 4vw, 72px);
+  overflow: auto;
+}
+
+/* ── Bandeau ── */
+.si-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.si-topbar h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: clamp(18px, 2.4vw, 30px);
+  font-weight: 800;
+}
+
+.si-topbar h1 svg {
+  color: #8b5cf6;
+}
+
+.si-societe {
+  padding: 2px 12px;
+  border: 1px solid #8b5cf6;
+  border-radius: 999px;
+  font-size: 0.6em;
+  font-weight: 700;
+  color: #8b5cf6;
+  letter-spacing: 0.06em;
+}
+
+.si-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Pastille « en direct » : montre que l'écran s'actualise tout seul. */
+.si-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: clamp(11px, 1vw, 14px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--success, #4ade80);
+}
+
+.si-live i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--success, #4ade80);
+  animation: si-pulse 2s ease-in-out infinite;
+}
+
+@keyframes si-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 5px rgba(74, 222, 128, 0);
+  }
+}
+
+.si-horloge {
+  font-size: clamp(16px, 2vw, 28px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.si-fs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.si-fs-btn:hover {
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.si-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 70px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: clamp(14px, 1.6vw, 22px);
+}
+
+.si-placeholder svg {
+  font-size: clamp(40px, 5vw, 72px);
+  color: var(--text-muted);
+}
+
+/* ── Avancement global ── */
+.si-global {
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 3.5vw, 56px);
+  flex-wrap: wrap;
+  padding: clamp(16px, 2.5vh, 32px) clamp(16px, 2.5vw, 36px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.si-ring {
+  width: clamp(150px, 18vw, 280px);
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.si-ring-bg {
+  fill: none;
+  stroke: var(--bg-tertiary);
+}
+
+.si-ring-val {
+  fill: none;
+  stroke: #8b5cf6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.si-ring-text {
+  fill: var(--text-primary);
+  font-size: 42px;
+  font-weight: 800;
+}
+
+.si-global-infos {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.4vh, 16px);
+  flex: 1;
+  min-width: 260px;
+}
+
+.si-session-nom {
+  font-size: clamp(16px, 1.8vw, 26px);
+  font-weight: 800;
+}
+
+.si-global-detail {
+  font-size: clamp(12px, 1.3vw, 18px);
+  color: var(--text-secondary);
+}
+
+.si-global-phases {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1vh, 12px);
+}
+
+.si-phase-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(12px, 1.2vw, 17px);
+  margin-bottom: 4px;
+}
+
+.si-phase-head span:first-child {
+  font-weight: 700;
+}
+
+.si-phase-head span:last-child {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.si-track {
+  height: clamp(8px, 1.2vh, 14px);
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.si-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #8b5cf6;
+  transition: width 0.6s ease;
+}
+
+.si-statuts {
+  display: flex;
+  gap: clamp(12px, 1.6vw, 26px);
+  flex-wrap: wrap;
+}
+
+.si-statut {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: clamp(12px, 1.2vw, 17px);
+  color: var(--text-secondary);
+}
+
+.si-statut b {
+  color: var(--text-primary);
+  font-size: 1.15em;
+}
+
+.si-statut i {
+  width: clamp(10px, 0.9vw, 14px);
+  height: clamp(10px, 0.9vw, 14px);
+  border-radius: 50%;
+}
+
+/* ── Cartes par emplacement ── */
+.si-empl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(240px, 24vw, 360px), 1fr));
+  gap: clamp(12px, 1.6vw, 22px);
+}
+
+.si-empl-card {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.2vh, 14px);
+  padding: clamp(14px, 2vh, 26px) clamp(14px, 1.6vw, 24px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.si-empl-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.si-empl-nom {
+  font-size: clamp(14px, 1.6vw, 24px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.si-empl-pct {
+  font-size: clamp(22px, 2.8vw, 44px);
+  font-weight: 800;
+  color: #8b5cf6;
+  font-variant-numeric: tabular-nums;
+}
+
+.si-track-lg {
+  height: clamp(10px, 1.6vh, 18px);
+}
+
+.si-empl-detail {
+  font-size: clamp(11px, 1.1vw, 16px);
+  color: var(--text-secondary);
+}
+
+.si-empl-phases {
+  display: flex;
+  gap: clamp(10px, 1.4vw, 20px);
+  flex-wrap: wrap;
+}
+
+.si-empl-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(11px, 1.1vw, 16px);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.si-empl-phase i {
+  width: clamp(9px, 0.8vw, 12px);
+  height: clamp(9px, 0.8vw, 12px);
+  border-radius: 50%;
+}

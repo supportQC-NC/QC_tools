@@ -56,6 +56,7 @@ import AssistantIAScreen from "./screens/user/AssistantIAScreen";
 import VeilleScreen from "./screens/user/VeilleScreen";
 import MediathequeScreen from "./screens/user/MediathequeScreen";
 import AdminRecapZonesScreen from "./screens/admin/AdminRecapZonesScreen";
+import AdminSuiviInventaireScreen from "./screens/admin/AdminSuiviInventaireScreen";
 import AdminSuiviBipageScreen from "./screens/admin/AdminSuiviBipageScreen";
 import AdminSuiviDemandesBipageScreen from "./screens/admin/AdminSuiviDemandesBipageScreen";
 import AdminSuiviReapproScreen from "./screens/admin/AdminSuiviReapproScreen";
@@ -464,6 +465,11 @@ const router = createBrowserRouter(
           element={<AdminEcartsZonesScreen />}
         />
         <Route path="/admin/recap-zones" element={<AdminRecapZonesScreen />} />
+        {/* Affichage mural (plein écran, auto-actualisé) de l'inventaire. */}
+        <Route
+          path="/admin/suivi-inventaire"
+          element={<AdminSuiviInventaireScreen />}
+        />
         <Route path="/admin/suivi-bipage" element={<AdminSuiviBipageScreen />} />
         <Route
           path="/admin/agents-inventaire"
