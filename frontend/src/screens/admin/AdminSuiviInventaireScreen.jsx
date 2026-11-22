@@ -21,6 +21,7 @@ import {
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
+import { useGetSuiviBipageQuery } from "../../slices/inventaireCollecteApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -36,6 +37,31 @@ import "./AdminSuiviInventaireScreen.css";
 // Polling un peu plus lent que les écrans de pilotage : l'écran tourne toute
 // la journée, 10 s suffisent largement pour un mur d'affichage.
 const POLL = 10000;
+
+// Le suivi bipage (bandeau « En zone maintenant ») est plus lourd que /active
+// — il relit les collectes — : on le sonde trois fois moins souvent.
+const POLL_BIPAGE = 30000;
+
+// Durées : minutes tant que c'est lisible, puis heures — même règle que les
+// autres écrans de suivi.
+const fmtDuree = (ms) => {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const reste = min % 60;
+  if (h < 24) return reste ? `${h} h ${reste} min` : `${h} h`;
+  return `${Math.floor(h / 24)} j ${h % 24} h`;
+};
+
+// Durée relative « vivante » : en dessous de la minute, « il y a 0 min » n'a
+// pas de sens — on dit « à l'instant ».
+const fmtDepuis = (ms) =>
+  !Number.isFinite(ms) || ms < 0
+    ? "—"
+    : ms < 60000
+      ? "à l'instant"
+      : `il y a ${fmtDuree(ms)}`;
 
 /** Anneau SVG de pourcentage (l'élément central du mur d'affichage). */
 const AnneauPct = ({ pct, size = 180 }) => {
@@ -96,6 +122,15 @@ const AdminSuiviInventaireScreen = () => {
     },
   );
 
+  // Les collectes (dont celles encore ouvertes) pour « En zone maintenant ».
+  const { data: bipageData } = useGetSuiviBipageQuery(
+    { entrepriseId: selectedEntreprise },
+    {
+      skip: !selectedEntreprise,
+      pollingInterval: selectedEntreprise ? POLL_BIPAGE : 0,
+    },
+  );
+
   const session = activeData?.active || null;
   const zones = useMemo(() => session?.zones || [], [session]);
 
@@ -106,6 +141,94 @@ const AdminSuiviInventaireScreen = () => {
     () => progressionParEmplacement(zones),
     [zones],
   );
+
+  // Minute courante : les durées relatives et l'ETA n'ont pas besoin de bouger
+  // à la seconde — caler leurs useMemo sur l'horloge brute les recalculerait
+  // 60 fois par minute pour rien.
+  const minute = Math.floor(horloge.getTime() / 60000);
+
+  // ── Projection de fin ──
+  // Date de complétion d'une zone = le moment où sa DERNIÈRE phase a été faite
+  // (max des trois `at`). Le rythme est pris sur les 7 derniers jours
+  // calendaires, jours creux compris : c'est une date calendaire qu'on
+  // projette, un week-end sans comptage retarde réellement la fin. Repli sur
+  // le rythme depuis le début quand la semaine écoulée est vide.
+  const eta = useMemo(() => {
+    const actives = zones.filter((z) => !z.neutralisee);
+    if (!actives.length) return null;
+    const maintenant = minute * 60000;
+
+    const completions = [];
+    let completes = 0;
+    for (const z of actives) {
+      let n = 0;
+      let dernier = 0;
+      for (const ph of PHASES) {
+        if (!z[ph]?.fait) continue;
+        n += 1;
+        const t = z[ph]?.at ? new Date(z[ph].at).getTime() : 0;
+        if (t > dernier) dernier = t;
+      }
+      if (n === PHASES.length) {
+        completes += 1;
+        if (dernier) completions.push(dernier);
+      }
+    }
+    const restantes = actives.length - completes;
+    if (restantes <= 0) return { terminee: true };
+    // Pas encore de zone complète : plutôt que de cacher la ligne (l'écran
+    // semblerait amputé en début d'inventaire), on annonce la projection.
+    if (!completions.length) return { enAttente: true };
+
+    const JOUR_MS = 24 * 3600 * 1000;
+    const sur7j = completions.filter((t) => t >= maintenant - 7 * JOUR_MS).length;
+    let rythme = sur7j / 7;
+    if (!rythme) {
+      const depuisJours = Math.max(
+        1,
+        (maintenant - Math.min(...completions)) / JOUR_MS,
+      );
+      rythme = completions.length / depuisJours;
+    }
+    if (!rythme) return null;
+
+    const joursRestants = Math.ceil(restantes / rythme);
+    // Au-delà d'un an, la date n'informe plus personne.
+    if (joursRestants > 365) return { rythme, horsPortee: true };
+    return { rythme, date: new Date(maintenant + joursRestants * JOUR_MS) };
+  }, [zones, minute]);
+
+  // ── En zone maintenant ──
+  // Les collectes encore OUVERTES sur un collecteur : qui est en zone, depuis
+  // quand, et depuis combien de temps plus rien n'a été scanné — une zone
+  // longtemps silencieuse est souvent une zone oubliée (son verrou empêche les
+  // autres de la reprendre). Activité la plus récente d'abord.
+  const zonesEnCours = useMemo(() => {
+    const maintenant = minute * 60000;
+    return (bipageData?.bipages || [])
+      .filter((b) => b.status === "en_cours" && !b.annulee)
+      .map((b) => {
+        const dernierEvt = b.dernierScanAt || b.debutAt;
+        const silenceMs = dernierEvt
+          ? maintenant - new Date(dernierEvt).getTime()
+          : null;
+        return {
+          ...b,
+          ouvertureMs: b.debutAt
+            ? maintenant - new Date(b.debutAt).getTime()
+            : null,
+          silenceMs,
+          aScanne: !!b.dernierScanAt,
+          etat:
+            silenceMs != null && silenceMs < 5 * 60000
+              ? "actif"
+              : silenceMs != null && silenceMs >= 30 * 60000
+                ? "silence"
+                : "pause",
+        };
+      })
+      .sort((a, b) => (a.silenceMs ?? Infinity) - (b.silenceMs ?? Infinity));
+  }, [bipageData, minute]);
 
   // Horloge du mur d'affichage : elle montre aussi que l'écran est vivant.
   useEffect(() => {
@@ -233,7 +356,95 @@ const AdminSuiviInventaireScreen = () => {
                   </span>
                 ))}
               </div>
+              {/* Projection de fin : LE chiffre mobilisateur du mur. */}
+              {eta && (
+                <div
+                  className="si-eta"
+                  title="Projection calculée sur le rythme de zones complétées des 7 derniers jours (jours sans comptage compris). Repli sur le rythme depuis le début si la semaine écoulée est vide."
+                >
+                  {eta.terminee ? (
+                    <>Toutes les zones sont complètes.</>
+                  ) : eta.enAttente ? (
+                    <>
+                      Fin estimée : calculée dès les premières zones complètes.
+                    </>
+                  ) : eta.horsPortee ? (
+                    <>Rythme actuel trop faible pour estimer une date de fin.</>
+                  ) : (
+                    <>
+                      Au rythme actuel (
+                      {eta.rythme.toLocaleString("fr-FR", {
+                        maximumFractionDigits: 1,
+                      })}{" "}
+                      zone{eta.rythme >= 2 ? "s" : ""} complète
+                      {eta.rythme >= 2 ? "s" : ""}/jour), fin estimée{" "}
+                      <b>
+                        {eta.date.toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                        })}
+                      </b>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* ── En zone maintenant ──
+              La vie du terrain en temps réel : pastille verte = ça bipe,
+              ambre = pause, rouge = plus rien depuis 30 min (zone probablement
+              oubliée, que son verrou empêche les autres de reprendre). La
+              section reste affichée à vide : « personne en zone » est une
+              information en soi sur un mur d'affichage. */}
+          <div className="si-live-section">
+            <div className="si-live-titre">
+              En zone maintenant
+              {zonesEnCours.length > 0 && (
+                <span className="si-live-nb">{zonesEnCours.length}</span>
+              )}
+            </div>
+            {zonesEnCours.length === 0 ? (
+              <p className="si-live-vide">
+                Personne en zone pour l'instant — les collectes ouvertes
+                s'afficheront ici.
+              </p>
+            ) : (
+              <div className="si-live-grid">
+                {zonesEnCours.map((z) => (
+                  <div key={z._id} className={`si-live-card si-live-${z.etat}`}>
+                    <div className="si-live-zone">
+                      {z.zoneCode}
+                      {z.estComplement && (
+                        <span className="si-live-tag">complément</span>
+                      )}
+                    </div>
+                    {(z.zoneLibelle || z.zoneType) && (
+                      <div className="si-live-lib">
+                        {z.zoneLibelle || ""}
+                        {z.zoneLibelle && z.zoneType ? " · " : ""}
+                        {z.zoneType || ""}
+                      </div>
+                    )}
+                    <div className="si-live-agent">{z.agent?.nom || "—"}</div>
+                    <div className="si-live-meta">
+                      {z.totalArticles || 0} article
+                      {(z.totalArticles || 0) > 1 ? "s" : ""} · ouverte depuis{" "}
+                      {fmtDuree(z.ouvertureMs)}
+                    </div>
+                    <div className="si-live-etat">
+                      <i />
+                      {z.etat === "actif"
+                        ? "En activité"
+                        : z.aScanne
+                          ? `Dernier scan ${fmtDepuis(z.silenceMs)}`
+                          : "Aucun scan depuis l'ouverture"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Avancement par emplacement ── */}

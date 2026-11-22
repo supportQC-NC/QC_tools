@@ -315,7 +315,9 @@ const AdminInventaireDashboardScreen = () => {
       }
       if (n === PHASES.length && dernier) completions.push(dernier);
     }
-    if (!completions.length) return null;
+    // Pas encore de zone complète : on annonce la projection plutôt que de
+    // cacher la ligne en début d'inventaire.
+    if (!completions.length) return { enAttente: true };
 
     const JOUR_MS = 24 * 3600 * 1000;
     const sur7j = completions.filter((t) => t >= maintenant - 7 * JOUR_MS).length;
@@ -558,6 +560,8 @@ const AdminInventaireDashboardScreen = () => {
             >
               {eta.terminee ? (
                 <>Toutes les zones sont complètes.</>
+              ) : eta.enAttente ? (
+                <>Fin estimée : calculée dès les premières zones complètes.</>
               ) : eta.horsPortee ? (
                 <>Rythme actuel trop faible pour estimer une date de fin.</>
               ) : (
