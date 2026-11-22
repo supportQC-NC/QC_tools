@@ -41,13 +41,13 @@ import "./AdminSuiviInventaireScreen.css";
 // la journée, 10 s suffisent largement pour un mur d'affichage.
 const POLL = 10000;
 
-// Le suivi bipage (bandeau « Zones en cours de bipage ») est plus lourd que
-// /active — il relit les collectes — : on le sonde trois fois moins souvent.
-const POLL_BIPAGE = 30000;
-
-// Les agents (top 3 par phase) bougent encore moins vite : une phase validée
-// est un événement rare à l'échelle de la minute.
-const POLL_AGENTS = 60000;
+// Le suivi bipage (« Zones en cours de bipage ») et les agents (top 3 par
+// phase) sont plus lourds que /active — ils relisent les collectes — : on les
+// sonde un peu moins souvent. 15 s reste imperceptible sur un mur d'affichage,
+// et le top est EN PLUS resynchronisé dès que la progression bouge (voir le
+// useEffect sur `global.faites`) : valider un coupon se voit sans recharger.
+const POLL_BIPAGE = 15000;
+const POLL_AGENTS = 15000;
 
 // Durées : minutes tant que c'est lisible, puis heures — même règle que les
 // autres écrans de suivi.
@@ -140,13 +140,14 @@ const AdminSuiviInventaireScreen = () => {
   );
 
   // Les agents de l'inventaire (compteur de phases par agent) pour le top 3.
-  const { data: agentsData } = useGetAgentsInventaireQuery(
-    { entrepriseId: selectedEntreprise },
-    {
-      skip: !selectedEntreprise,
-      pollingInterval: selectedEntreprise ? POLL_AGENTS : 0,
-    },
-  );
+  const { data: agentsData, refetch: refetchAgents } =
+    useGetAgentsInventaireQuery(
+      { entrepriseId: selectedEntreprise },
+      {
+        skip: !selectedEntreprise,
+        pollingInterval: selectedEntreprise ? POLL_AGENTS : 0,
+      },
+    );
 
   const session = activeData?.active || null;
   const zones = useMemo(() => session?.zones || [], [session]);
@@ -158,6 +159,23 @@ const AdminSuiviInventaireScreen = () => {
     () => progressionParEmplacement(zones),
     [zones],
   );
+
+  // Une phase vient d'être validée quelque part : le total de phases faites a
+  // bougé dans /active (sondé toutes les 10 s), donc les compteurs par agent
+  // ont forcément bougé aussi. On resynchronise le top IMMÉDIATEMENT plutôt
+  // que d'attendre le prochain tick de POLL_AGENTS — c'est ce qui rend le
+  // podium vivant sans jamais recharger la page. Le premier rendu est ignoré :
+  // la requête initiale part déjà toute seule.
+  const totalPhasesFaites = global.faites;
+  const premierSyncAgents = useRef(true);
+  useEffect(() => {
+    if (premierSyncAgents.current) {
+      premierSyncAgents.current = false;
+      return;
+    }
+    if (!selectedEntreprise) return;
+    refetchAgents();
+  }, [totalPhasesFaites, selectedEntreprise, refetchAgents]);
 
   // Minute courante : les durées relatives et l'ETA n'ont pas besoin de bouger
   // à la seconde — caler leurs useMemo sur l'horloge brute les recalculerait
