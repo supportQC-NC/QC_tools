@@ -5,7 +5,7 @@
 .suivi-inv {
   display: flex;
   flex-direction: column;
-  gap: clamp(16px, 2.5vh, 28px);
+  gap: clamp(12px, 1.6vh, 20px);
   padding: 20px 16px 40px;
   color: var(--text-primary);
   /* En plein écran l'élément a son propre fond (noir par défaut) : on repose
@@ -15,7 +15,7 @@
 }
 
 .suivi-inv.si-fs {
-  padding: clamp(24px, 4vh, 56px) clamp(24px, 4vw, 72px);
+  padding: clamp(14px, 2vh, 32px) clamp(20px, 2.5vw, 48px);
   overflow: auto;
 }
 
@@ -136,16 +136,16 @@
 .si-global {
   display: flex;
   align-items: center;
-  gap: clamp(20px, 3.5vw, 56px);
+  gap: clamp(18px, 2.5vw, 40px);
   flex-wrap: wrap;
-  padding: clamp(16px, 2.5vh, 32px) clamp(16px, 2.5vw, 36px);
+  padding: clamp(12px, 1.6vh, 22px) clamp(14px, 2vw, 28px);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 14px;
 }
 
 .si-ring {
-  width: clamp(150px, 18vw, 280px);
+  width: clamp(130px, 13vw, 210px);
   height: auto;
   flex: 0 0 auto;
 }
@@ -171,7 +171,7 @@
 .si-global-infos {
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.4vh, 16px);
+  gap: clamp(6px, 1vh, 12px);
   flex: 1;
   min-width: 260px;
 }
@@ -189,7 +189,7 @@
 .si-global-phases {
   display: flex;
   flex-direction: column;
-  gap: clamp(6px, 1vh, 12px);
+  gap: clamp(5px, 0.8vh, 9px);
 }
 
 .si-phase-head {
@@ -209,7 +209,7 @@
 }
 
 .si-track {
-  height: clamp(8px, 1.2vh, 14px);
+  height: clamp(7px, 1vh, 11px);
   background: var(--bg-tertiary);
   border-radius: 999px;
   overflow: hidden;
@@ -265,7 +265,22 @@
 .si-live-section {
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.4vh, 16px);
+  gap: clamp(8px, 1.1vh, 12px);
+}
+
+/* Rangée basse : zones en cours + podiums côte à côte dès que l'écran le
+   permet — c'est ce qui fait tenir la page entière sur une TV 1080p. */
+.si-bas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(12px, 1.6vw, 22px);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .si-bas {
+    grid-template-columns: 1fr;
+  }
 }
 
 .si-live-titre {
@@ -293,15 +308,15 @@
 
 .si-live-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(220px, 20vw, 320px), 1fr));
-  gap: clamp(10px, 1.4vw, 18px);
+  grid-template-columns: repeat(auto-fill, minmax(clamp(200px, 16vw, 280px), 1fr));
+  gap: clamp(8px, 1vw, 14px);
 }
 
 .si-live-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: clamp(12px, 1.6vh, 20px) clamp(12px, 1.4vw, 20px);
+  gap: 3px;
+  padding: clamp(10px, 1.3vh, 16px) clamp(11px, 1.2vw, 16px);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-left-width: 4px;
@@ -401,20 +416,20 @@
 .si-top-section {
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.4vh, 16px);
+  gap: clamp(8px, 1.1vh, 12px);
 }
 
 .si-top-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(clamp(220px, 24vw, 340px), 1fr));
-  gap: clamp(12px, 1.6vw, 22px);
+  grid-template-columns: repeat(auto-fit, minmax(clamp(185px, 13vw, 250px), 1fr));
+  gap: clamp(8px, 1vw, 14px);
 }
 
 .si-top-card {
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.2vh, 14px);
-  padding: clamp(14px, 2vh, 24px) clamp(14px, 1.6vw, 24px);
+  gap: clamp(6px, 1vh, 10px);
+  padding: clamp(10px, 1.3vh, 16px) clamp(11px, 1.2vw, 16px);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -440,7 +455,7 @@
 .si-top-liste {
   display: flex;
   flex-direction: column;
-  gap: clamp(6px, 1vh, 10px);
+  gap: clamp(5px, 0.8vh, 8px);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -511,8 +526,8 @@
 .si-empl-card {
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.2vh, 14px);
-  padding: clamp(14px, 2vh, 26px) clamp(14px, 1.6vw, 24px);
+  gap: clamp(6px, 1vh, 10px);
+  padding: clamp(10px, 1.4vh, 18px) clamp(12px, 1.4vw, 20px);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -534,14 +549,14 @@
 }
 
 .si-empl-pct {
-  font-size: clamp(22px, 2.8vw, 44px);
+  font-size: clamp(20px, 2.2vw, 34px);
   font-weight: 800;
   color: #8b5cf6;
   font-variant-numeric: tabular-nums;
 }
 
 .si-track-lg {
-  height: clamp(10px, 1.6vh, 18px);
+  height: clamp(9px, 1.2vh, 14px);
 }
 
 .si-empl-detail {

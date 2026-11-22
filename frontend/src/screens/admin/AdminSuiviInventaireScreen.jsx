@@ -466,6 +466,9 @@ const AdminSuiviInventaireScreen = () => {
             ))}
           </div>
 
+          {/* Rangée basse : zones en cours + podiums côte à côte sur écran
+              large, pour que tout tienne dans le plein écran d'une TV. */}
+          <div className="si-bas">
           {/* ── Zones en cours de bipage ──
               La vie du terrain en temps réel : pastille verte = ça bipe,
               ambre = pause, rouge = plus rien depuis 30 min (zone probablement
@@ -556,6 +559,7 @@ const AdminSuiviInventaireScreen = () => {
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </>
       )}
