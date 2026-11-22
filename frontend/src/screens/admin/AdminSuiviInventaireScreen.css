@@ -395,6 +395,112 @@
   background: #ff6b6b;
 }
 
+/* ── Top 3 des agents par phase ──
+   Un podium par phase, rangs or / argent / bronze. Même langage de cartes que
+   le reste de l'écran, tailles en clamp() pour la lecture de loin. */
+.si-top-section {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.4vh, 16px);
+}
+
+.si-top-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(220px, 24vw, 340px), 1fr));
+  gap: clamp(12px, 1.6vw, 22px);
+}
+
+.si-top-card {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.2vh, 14px);
+  padding: clamp(14px, 2vh, 24px) clamp(14px, 1.6vw, 24px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.si-top-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(13px, 1.4vw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.si-top-head i {
+  width: clamp(10px, 0.9vw, 14px);
+  height: clamp(10px, 0.9vw, 14px);
+  border-radius: 50%;
+  flex: none;
+}
+
+.si-top-liste {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1vh, 10px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.si-top-liste li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.si-top-rang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(22px, 1.9vw, 30px);
+  height: clamp(22px, 1.9vw, 30px);
+  border-radius: 50%;
+  flex: none;
+  font-size: clamp(11px, 1vw, 15px);
+  font-weight: 800;
+  color: #1a1a24;
+  background: var(--bg-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.si-top-rang-1 .si-top-rang {
+  background: #fbbf24;
+}
+
+.si-top-rang-2 .si-top-rang {
+  background: #c0c7d1;
+}
+
+.si-top-rang-3 .si-top-rang {
+  background: #d08a4e;
+}
+
+.si-top-nom {
+  flex: 1;
+  min-width: 0;
+  font-size: clamp(13px, 1.3vw, 19px);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le premier en un peu plus grand : c'est un podium, pas une liste. */
+.si-top-rang-1 .si-top-nom {
+  font-size: clamp(14px, 1.5vw, 22px);
+}
+
+.si-top-nb {
+  font-size: clamp(12px, 1.2vw, 17px);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* ── Cartes par emplacement ── */
 .si-empl-grid {
   display: grid;

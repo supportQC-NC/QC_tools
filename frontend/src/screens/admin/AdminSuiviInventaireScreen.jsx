@@ -21,7 +21,10 @@ import {
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
-import { useGetSuiviBipageQuery } from "../../slices/inventaireCollecteApiSlice";
+import {
+  useGetSuiviBipageQuery,
+  useGetAgentsInventaireQuery,
+} from "../../slices/inventaireCollecteApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import {
@@ -38,9 +41,13 @@ import "./AdminSuiviInventaireScreen.css";
 // la journée, 10 s suffisent largement pour un mur d'affichage.
 const POLL = 10000;
 
-// Le suivi bipage (bandeau « En zone maintenant ») est plus lourd que /active
-// — il relit les collectes — : on le sonde trois fois moins souvent.
+// Le suivi bipage (bandeau « Zones en cours de bipage ») est plus lourd que
+// /active — il relit les collectes — : on le sonde trois fois moins souvent.
 const POLL_BIPAGE = 30000;
+
+// Les agents (top 3 par phase) bougent encore moins vite : une phase validée
+// est un événement rare à l'échelle de la minute.
+const POLL_AGENTS = 60000;
 
 // Durées : minutes tant que c'est lisible, puis heures — même règle que les
 // autres écrans de suivi.
@@ -122,12 +129,22 @@ const AdminSuiviInventaireScreen = () => {
     },
   );
 
-  // Les collectes (dont celles encore ouvertes) pour « En zone maintenant ».
+  // Les collectes (dont celles encore ouvertes) pour « Zones en cours de
+  // bipage ».
   const { data: bipageData } = useGetSuiviBipageQuery(
     { entrepriseId: selectedEntreprise },
     {
       skip: !selectedEntreprise,
       pollingInterval: selectedEntreprise ? POLL_BIPAGE : 0,
+    },
+  );
+
+  // Les agents de l'inventaire (compteur de phases par agent) pour le top 3.
+  const { data: agentsData } = useGetAgentsInventaireQuery(
+    { entrepriseId: selectedEntreprise },
+    {
+      skip: !selectedEntreprise,
+      pollingInterval: selectedEntreprise ? POLL_AGENTS : 0,
     },
   );
 
@@ -229,6 +246,27 @@ const AdminSuiviInventaireScreen = () => {
       })
       .sort((a, b) => (a.silenceMs ?? Infinity) - (b.silenceMs ?? Infinity));
   }, [bipageData, minute]);
+
+  // ── Top 3 des agents par phase ──
+  // Qui a validé le plus de zones dans chaque phase (crédit du coupon :
+  // `zone.<phase>.by`, la même source que le récap de progression). Les agents
+  // à zéro ne sont pas listés — un podium vide vaut mieux qu'un podium forcé.
+  const topParPhase = useMemo(() => {
+    const agents = agentsData?.agents || [];
+    const tops = {};
+    for (const ph of PHASES) {
+      tops[ph] = agents
+        .filter((a) => (a.phases?.[ph] || 0) > 0)
+        .sort(
+          (x, y) =>
+            (y.phases[ph] || 0) - (x.phases[ph] || 0) ||
+            x.nom.localeCompare(y.nom),
+        )
+        .slice(0, 3)
+        .map((a) => ({ nom: a.nom, nb: a.phases[ph] }));
+    }
+    return tops;
+  }, [agentsData]);
 
   // Horloge du mur d'affichage : elle montre aussi que l'écran est vivant.
   useEffect(() => {
@@ -481,6 +519,43 @@ const AdminSuiviInventaireScreen = () => {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* ── Top 3 des agents par phase ──
+              Un podium par phase (papillonnage / comptage / contrôle), compté
+              en zones validées. L'émulation douce du mur d'affichage : chacun
+              voit où il en est, personne n'est pointé du doigt — seuls les
+              trois premiers apparaissent. */}
+          <div className="si-top-section">
+            <div className="si-live-titre">Top agents par phase</div>
+            <div className="si-top-grid">
+              {PHASES.map((ph) => (
+                <div key={ph} className="si-top-card">
+                  <div
+                    className="si-top-head"
+                    style={{ color: PHASE_META[ph].color }}
+                  >
+                    <i style={{ background: PHASE_META[ph].color }} />
+                    {PHASE_META[ph].label}
+                  </div>
+                  {!topParPhase[ph]?.length ? (
+                    <p className="si-live-vide">Personne pour l'instant.</p>
+                  ) : (
+                    <ol className="si-top-liste">
+                      {topParPhase[ph].map((a, i) => (
+                        <li key={a.nom} className={`si-top-rang-${i + 1}`}>
+                          <span className="si-top-rang">{i + 1}</span>
+                          <span className="si-top-nom">{a.nom}</span>
+                          <span className="si-top-nb">
+                            {a.nb} zone{a.nb > 1 ? "s" : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}
