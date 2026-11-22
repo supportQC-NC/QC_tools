@@ -33,7 +33,7 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: clamp(18px, 2.4vw, 30px);
+  font-size: clamp(16px, 1.8vw, 24px);
   font-weight: 800;
 }
 
@@ -90,7 +90,7 @@
 }
 
 .si-horloge {
-  font-size: clamp(16px, 2vw, 28px);
+  font-size: clamp(14px, 1.6vw, 22px);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -177,7 +177,7 @@
 }
 
 .si-session-nom {
-  font-size: clamp(16px, 1.8vw, 26px);
+  font-size: clamp(14px, 1.5vw, 21px);
   font-weight: 800;
 }
 
@@ -195,8 +195,8 @@
 .si-phase-head {
   display: flex;
   justify-content: space-between;
-  font-size: clamp(12px, 1.2vw, 17px);
-  margin-bottom: 4px;
+  font-size: clamp(11px, 1.1vw, 15px);
+  margin-bottom: 3px;
 }
 
 .si-phase-head span:first-child {
@@ -287,7 +287,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: clamp(14px, 1.6vw, 24px);
+  font-size: clamp(13px, 1.3vw, 19px);
   font-weight: 800;
 }
 
@@ -359,8 +359,9 @@
 }
 
 .si-live-agent {
-  font-size: clamp(13px, 1.3vw, 18px);
+  font-size: clamp(11.5px, 1.05vw, 15px);
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .si-live-meta {
@@ -439,7 +440,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: clamp(13px, 1.4vw, 20px);
+  font-size: clamp(12px, 1.2vw, 17px);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -497,16 +498,16 @@
 .si-top-nom {
   flex: 1;
   min-width: 0;
-  font-size: clamp(13px, 1.3vw, 19px);
+  font-size: clamp(11px, 1.05vw, 15px);
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Nom + prénom EN ENTIER (demande client) : pas d'ellipse, on passe à la
+     ligne si la carte est étroite. */
+  overflow-wrap: anywhere;
 }
 
 /* Le premier en un peu plus grand : c'est un podium, pas une liste. */
 .si-top-rang-1 .si-top-nom {
-  font-size: clamp(14px, 1.5vw, 22px);
+  font-size: clamp(12px, 1.15vw, 17px);
 }
 
 .si-top-nb {
@@ -541,7 +542,7 @@
 }
 
 .si-empl-nom {
-  font-size: clamp(14px, 1.6vw, 24px);
+  font-size: clamp(12px, 1.3vw, 19px);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
