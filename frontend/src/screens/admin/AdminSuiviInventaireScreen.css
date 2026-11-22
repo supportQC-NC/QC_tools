@@ -267,22 +267,6 @@
   flex-direction: column;
   gap: clamp(8px, 1.1vh, 12px);
 }
-
-/* Rangée basse : zones en cours + podiums côte à côte dès que l'écran le
-   permet — c'est ce qui fait tenir la page entière sur une TV 1080p. */
-.si-bas {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(12px, 1.6vw, 22px);
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .si-bas {
-    grid-template-columns: 1fr;
-  }
-}
-
 .si-live-titre {
   display: flex;
   align-items: center;

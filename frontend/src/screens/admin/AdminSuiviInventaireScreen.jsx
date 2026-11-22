@@ -466,10 +466,44 @@ const AdminSuiviInventaireScreen = () => {
             ))}
           </div>
 
-          {/* Rangée basse : zones en cours + podiums côte à côte sur écran
-              large, pour que tout tienne dans le plein écran d'une TV. */}
-          <div className="si-bas">
-          {/* ── Zones en cours de bipage ──
+          {/* ── Top 3 des agents par phase ──
+              Un podium par phase (papillonnage / comptage / contrôle), compté
+              en zones validées. L'émulation douce du mur d'affichage : chacun
+              voit où il en est, personne n'est pointé du doigt — seuls les
+              trois premiers apparaissent. */}
+          <div className="si-top-section">
+            <div className="si-live-titre">Top agents par phase</div>
+            <div className="si-top-grid">
+              {PHASES.map((ph) => (
+                <div key={ph} className="si-top-card">
+                  <div
+                    className="si-top-head"
+                    style={{ color: PHASE_META[ph].color }}
+                  >
+                    <i style={{ background: PHASE_META[ph].color }} />
+                    {PHASE_META[ph].label}
+                  </div>
+                  {!topParPhase[ph]?.length ? (
+                    <p className="si-live-vide">Personne pour l'instant.</p>
+                  ) : (
+                    <ol className="si-top-liste">
+                      {topParPhase[ph].map((a, i) => (
+                        <li key={a.nom} className={`si-top-rang-${i + 1}`}>
+                          <span className="si-top-rang">{i + 1}</span>
+                          <span className="si-top-nom">{a.nom}</span>
+                          <span className="si-top-nb">
+                            {a.nb} zone{a.nb > 1 ? "s" : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Zones en cours de bipage (sous le classement, demande client) ──
               La vie du terrain en temps réel : pastille verte = ça bipe,
               ambre = pause, rouge = plus rien depuis 30 min (zone probablement
               oubliée, que son verrou empêche les autres de reprendre). La
@@ -522,44 +556,6 @@ const AdminSuiviInventaireScreen = () => {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* ── Top 3 des agents par phase ──
-              Un podium par phase (papillonnage / comptage / contrôle), compté
-              en zones validées. L'émulation douce du mur d'affichage : chacun
-              voit où il en est, personne n'est pointé du doigt — seuls les
-              trois premiers apparaissent. */}
-          <div className="si-top-section">
-            <div className="si-live-titre">Top agents par phase</div>
-            <div className="si-top-grid">
-              {PHASES.map((ph) => (
-                <div key={ph} className="si-top-card">
-                  <div
-                    className="si-top-head"
-                    style={{ color: PHASE_META[ph].color }}
-                  >
-                    <i style={{ background: PHASE_META[ph].color }} />
-                    {PHASE_META[ph].label}
-                  </div>
-                  {!topParPhase[ph]?.length ? (
-                    <p className="si-live-vide">Personne pour l'instant.</p>
-                  ) : (
-                    <ol className="si-top-liste">
-                      {topParPhase[ph].map((a, i) => (
-                        <li key={a.nom} className={`si-top-rang-${i + 1}`}>
-                          <span className="si-top-rang">{i + 1}</span>
-                          <span className="si-top-nom">{a.nom}</span>
-                          <span className="si-top-nb">
-                            {a.nb} zone{a.nb > 1 ? "s" : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
           </div>
         </>
       )}
