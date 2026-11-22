@@ -392,7 +392,43 @@ const AdminSuiviInventaireScreen = () => {
             </div>
           </div>
 
-          {/* ── En zone maintenant ──
+          {/* ── Avancement par emplacement ── */}
+          <div className="si-empl-grid">
+            {parEmplacement.map((t) => (
+              <div key={t.key || "__sans__"} className="si-empl-card">
+                <div className="si-empl-head">
+                  <span className="si-empl-nom">
+                    {t.key || "Sans emplacement"}
+                  </span>
+                  <span className="si-empl-pct">{t.pct}%</span>
+                </div>
+                <div className="si-track si-track-lg">
+                  <div
+                    className="si-fill"
+                    style={{ width: `${t.pct}%` }}
+                  />
+                </div>
+                <div className="si-empl-detail">
+                  {t.faites}/{t.totalPhases} phases · {t.totalZones} zone
+                  {t.totalZones > 1 ? "s" : ""}
+                </div>
+                <div className="si-empl-phases">
+                  {PHASES.map((ph) => (
+                    <span
+                      key={ph}
+                      className="si-empl-phase"
+                      title={`${PHASE_META[ph].label} : ${t.parPhase[ph].faites}/${t.parPhase[ph].total}`}
+                    >
+                      <i style={{ background: PHASE_META[ph].color }} />
+                      {t.parPhase[ph].faites}/{t.parPhase[ph].total}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Zones en cours de bipage ──
               La vie du terrain en temps réel : pastille verte = ça bipe,
               ambre = pause, rouge = plus rien depuis 30 min (zone probablement
               oubliée, que son verrou empêche les autres de reprendre). La
@@ -400,7 +436,7 @@ const AdminSuiviInventaireScreen = () => {
               information en soi sur un mur d'affichage. */}
           <div className="si-live-section">
             <div className="si-live-titre">
-              En zone maintenant
+              Zones en cours de bipage
               {zonesEnCours.length > 0 && (
                 <span className="si-live-nb">{zonesEnCours.length}</span>
               )}
@@ -445,42 +481,6 @@ const AdminSuiviInventaireScreen = () => {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* ── Avancement par emplacement ── */}
-          <div className="si-empl-grid">
-            {parEmplacement.map((t) => (
-              <div key={t.key || "__sans__"} className="si-empl-card">
-                <div className="si-empl-head">
-                  <span className="si-empl-nom">
-                    {t.key || "Sans emplacement"}
-                  </span>
-                  <span className="si-empl-pct">{t.pct}%</span>
-                </div>
-                <div className="si-track si-track-lg">
-                  <div
-                    className="si-fill"
-                    style={{ width: `${t.pct}%` }}
-                  />
-                </div>
-                <div className="si-empl-detail">
-                  {t.faites}/{t.totalPhases} phases · {t.totalZones} zone
-                  {t.totalZones > 1 ? "s" : ""}
-                </div>
-                <div className="si-empl-phases">
-                  {PHASES.map((ph) => (
-                    <span
-                      key={ph}
-                      className="si-empl-phase"
-                      title={`${PHASE_META[ph].label} : ${t.parPhase[ph].faites}/${t.parPhase[ph].total}`}
-                    >
-                      <i style={{ background: PHASE_META[ph].color }} />
-                      {t.parPhase[ph].faites}/{t.parPhase[ph].total}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
         </>
       )}
