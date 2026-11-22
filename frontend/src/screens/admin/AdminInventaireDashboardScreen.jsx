@@ -18,7 +18,7 @@
 // le suivi bipage est le plus lourd (il relit les collectes), la progression
 // arrive tout de suite. Une page qui attendrait tout resterait vide plusieurs
 // secondes alors que l'essentiel est déjà connu.
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   HiChartPie,
@@ -146,6 +146,15 @@ const fmtDuree = (ms) => {
   return `${Math.floor(h / 24)} j ${h % 24} h`;
 };
 
+// Durée relative « vivante » (carte Activité en direct) : en dessous de la
+// minute, « il y a 0 min » n'a pas de sens — on dit « à l'instant ».
+const fmtDepuis = (ms) =>
+  !Number.isFinite(ms) || ms < 0
+    ? "—"
+    : ms < 60000
+      ? "à l'instant"
+      : `il y a ${fmtDuree(ms)}`;
+
 // Montant en francs. Pas de décimale : le XPF n'en a pas, et un écart
 // d'inventaire se lit en milliers, pas à la virgule près.
 const fmtXpf = (v) => {
@@ -202,7 +211,23 @@ const AdminInventaireDashboardScreen = () => {
 
   const session = useGetActiveSessionQuery(entrepriseId, skip);
   const agents = useGetAgentsInventaireQuery({ entrepriseId }, skip);
-  const bipage = useGetSuiviBipageQuery({ entrepriseId }, skip);
+  // Le suivi bipage alimente AUSSI la carte « Activité en direct » : sans
+  // rafraîchissement automatique, un écran mural montrerait toute la journée
+  // les zones ouvertes du matin. 60 s suffisent — c'est une lecture Mongo des
+  // collectes, pas un scan DBF. Les autres requêtes restent au bouton.
+  const bipage = useGetSuiviBipageQuery(
+    { entrepriseId },
+    { skip: !entrepriseId, pollingInterval: 60_000 },
+  );
+
+  // Horloge locale (30 s) : les durées relatives (« dernier scan il y a
+  // 4 min ») doivent vieillir entre deux arrivées de données, sinon elles
+  // mentent la moitié du temps.
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
   // Agrégat à part : c'est un $group Mongo sur les lignes bipées, pas un
   // recoupement des autres réponses.
   const retouches = useGetStatsZonesRetoucheesQuery({ entrepriseId }, skip);
@@ -267,6 +292,47 @@ const AdminInventaireDashboardScreen = () => {
     };
   }, [zones]);
 
+  // ── Projection de fin ──
+  // Date de complétion d'une zone = le moment où sa DERNIÈRE phase a été faite
+  // (max des trois `at`). Le rythme est pris sur les 7 derniers jours
+  // calendaires, jours creux compris : c'est une date calendaire qu'on projette,
+  // un week-end sans comptage retarde réellement la fin. Repli sur le rythme
+  // depuis le début de l'inventaire quand la semaine écoulée est vide.
+  const eta = useMemo(() => {
+    if (!stats.total) return null;
+    const restantes = stats.total - stats.completes;
+    if (restantes <= 0) return { terminee: true };
+
+    const completions = [];
+    for (const z of zones) {
+      let n = 0;
+      let dernier = 0;
+      for (const p of PHASES) {
+        if (!z[p.cle]?.fait) continue;
+        n += 1;
+        const t = z[p.cle]?.at ? new Date(z[p.cle].at).getTime() : 0;
+        if (t > dernier) dernier = t;
+      }
+      if (n === PHASES.length && dernier) completions.push(dernier);
+    }
+    if (!completions.length) return null;
+
+    const JOUR_MS = 24 * 3600 * 1000;
+    const sur7j = completions.filter((t) => t >= maintenant - 7 * JOUR_MS).length;
+    let rythme = sur7j / 7;
+    if (!rythme) {
+      const depuisJours = Math.max(1, (maintenant - Math.min(...completions)) / JOUR_MS);
+      rythme = completions.length / depuisJours;
+    }
+    if (!rythme) return null;
+
+    const joursRestants = Math.ceil(restantes / rythme);
+    // Au-delà d'un an, la date n'informe plus personne : on dit seulement que
+    // le rythme ne permet pas d'estimer.
+    if (joursRestants > 365) return { rythme, horsPortee: true };
+    return { rythme, date: new Date(maintenant + joursRestants * JOUR_MS) };
+  }, [zones, stats, maintenant]);
+
   const tAgents = agents.data?.totaux;
   const tBipage = bipage.data?.totaux;
   // Top 5 : le serveur trie déjà par production décroissante.
@@ -330,6 +396,26 @@ const AdminInventaireDashboardScreen = () => {
       .sort((a, b) => a.jour.localeCompare(b.jour))
       .map((x) => ({ ...x, label: fmtJourCourt(x.jour) }));
   }, [bipage.data]);
+
+  // ── Activité en direct ──
+  // Les collectes encore OUVERTES sur un collecteur : qui est en zone, depuis
+  // quand, et surtout depuis combien de temps plus rien n'a été scanné — une
+  // zone longtemps silencieuse est souvent une zone oubliée (verrou qui
+  // traîne). Triées par activité la plus récente d'abord.
+  const zonesEnCours = useMemo(() => {
+    return (bipage.data?.bipages || [])
+      .filter((b) => b.status === "en_cours" && !b.annulee)
+      .map((b) => {
+        const dernierEvt = b.dernierScanAt || b.debutAt;
+        return {
+          ...b,
+          ouvertureMs: b.debutAt ? maintenant - new Date(b.debutAt).getTime() : null,
+          silenceMs: dernierEvt ? maintenant - new Date(dernierEvt).getTime() : null,
+          aScanne: !!b.dernierScanAt,
+        };
+      })
+      .sort((a, b) => (a.silenceMs ?? Infinity) - (b.silenceMs ?? Infinity));
+  }, [bipage.data, maintenant]);
 
   // ── Avancement par emplacement (MAGASIN / DOCK / entrepôts) ──
   const parEmplacement = useMemo(() => {
@@ -463,6 +549,36 @@ const AdminInventaireDashboardScreen = () => {
               style={{ width: `${Math.max(0, Math.min(100, stats.pct))}%` }}
             />
           </span>
+          {/* Projection de fin : LE chiffre mobilisateur sur un écran partagé.
+              Rythme = zones complètes des 7 derniers jours (voir le useMemo). */}
+          {eta && (
+            <p
+              className="invd-hero-eta"
+              title="Projection calculée sur le rythme de zones complétées des 7 derniers jours (jours sans comptage compris). Repli sur le rythme depuis le début si la semaine écoulée est vide."
+            >
+              {eta.terminee ? (
+                <>Toutes les zones sont complètes.</>
+              ) : eta.horsPortee ? (
+                <>Rythme actuel trop faible pour estimer une date de fin.</>
+              ) : (
+                <>
+                  Au rythme actuel (
+                  {eta.rythme.toLocaleString("fr-FR", {
+                    maximumFractionDigits: 1,
+                  })}{" "}
+                  zone{eta.rythme >= 2 ? "s" : ""} complète
+                  {eta.rythme >= 2 ? "s" : ""}/jour), fin estimée{" "}
+                  <b>
+                    {eta.date.toLocaleDateString("fr-FR", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                    })}
+                  </b>
+                </>
+              )}
+            </p>
+          )}
         </div>
       </header>
 
@@ -520,6 +636,101 @@ const AdminInventaireDashboardScreen = () => {
       </div>
 
       <div className="invd-grille">
+        {/* ── Activité en direct ────────────────────────────────────────────
+            Les zones ouvertes MAINTENANT sur un collecteur. C'est la carte qui
+            rend l'écran mural vivant : pastille verte = ça bipe, ambre = pause,
+            rouge = plus rien depuis 30 min (zone probablement oubliée, le
+            verrou empêche les autres de la reprendre). Données rafraîchies par
+            le polling du suivi bipage (60 s), libellés par l'horloge locale. */}
+        <section className="invd-carte invd-carte-large">
+          <h2>
+            Activité en direct
+            <span className="invd-live-compte">
+              {zonesEnCours.length
+                ? `${fmtInt(zonesEnCours.length)} zone${
+                    zonesEnCours.length > 1 ? "s" : ""
+                  } ouverte${zonesEnCours.length > 1 ? "s" : ""}`
+                : "actualisé toutes les 60 s"}
+            </span>
+          </h2>
+          <p className="invd-carte-aide">
+            Zones actuellement ouvertes sur un collecteur, activité la plus
+            récente d'abord. Une zone <b>silencieuse</b> n'a rien scanné depuis
+            plus de 30 min : souvent une zone oubliée, que son verrou empêche
+            les autres de reprendre. Actualisé automatiquement toutes les 60 s.
+          </p>
+          {bipage.isLoading ? (
+            <p className="invd-attente">Chargement…</p>
+          ) : zonesEnCours.length === 0 ? (
+            <p className="invd-attente">
+              Aucune zone ouverte sur un collecteur en ce moment.
+            </p>
+          ) : (
+            <table className="invd-table">
+              <thead>
+                <tr>
+                  <th>Zone</th>
+                  <th>Agent</th>
+                  <th className="invd-num">Articles</th>
+                  <th className="invd-num">Unités</th>
+                  <th className="invd-num">Ouverte depuis</th>
+                  <th>Dernière activité</th>
+                </tr>
+              </thead>
+              <tbody>
+                {zonesEnCours.map((z) => {
+                  const etat =
+                    z.silenceMs == null
+                      ? "pause"
+                      : z.silenceMs < 5 * 60000
+                        ? "actif"
+                        : z.silenceMs < 30 * 60000
+                          ? "pause"
+                          : "silence";
+                  return (
+                    <tr key={z._id}>
+                      <td>
+                        <span className="invd-zone-code">
+                          {z.zoneCode}
+                          {z.estComplement && (
+                            <span className="invd-live-tag">complément</span>
+                          )}
+                        </span>
+                        {(z.zoneLibelle || z.zoneType) && (
+                          <span className="invd-zone-lib">
+                            {z.zoneLibelle || ""}
+                            {z.zoneLibelle && z.zoneType ? " · " : ""}
+                            {z.zoneType || ""}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="invd-agent">{z.agent?.nom || "—"}</span>
+                      </td>
+                      <td className="invd-num">{fmtInt(z.totalArticles)}</td>
+                      <td className="invd-num">{fmtInt(z.totalQuantite)}</td>
+                      <td className="invd-num">{fmtDuree(z.ouvertureMs)}</td>
+                      <td>
+                        <span className={`invd-live-etat invd-live-${etat}`}>
+                          <span className="invd-live-dot" />
+                          {etat === "actif"
+                            ? "En activité"
+                            : z.aScanne
+                              ? `Dernier scan ${fmtDepuis(z.silenceMs)}`
+                              : "Aucun scan depuis l'ouverture"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          <Link className="invd-lien" to="/admin/suivi-bipage">
+            Voir le suivi du bipage <HiArrowRight />
+          </Link>
+        </section>
+
         {/* ── Progression dans le temps ─────────────────────────────────────
             La question du pilotage : avance-t-on, et à quel rythme ? Trois
             courbes cumulées (une par phase), un point par jour. Un plateau se

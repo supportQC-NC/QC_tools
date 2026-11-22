@@ -145,6 +145,19 @@
   border-radius: 999px;
 }
 
+/* Projection de fin sous la barre d'avancement : une phrase, pas un KPI — la
+   date en gras est le seul mot que l'écran mural doit faire retenir. */
+.invd-hero-eta {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--admin-text-secondary);
+}
+
+.invd-hero-eta b {
+  font-weight: 800;
+  color: var(--admin-text);
+}
+
 /* ── Compteurs ───────────────────────────────────────────────────────────── */
 .invd-kpis {
   display: grid;
@@ -607,6 +620,76 @@
   gap: 10px;
 }
 
+/* ── Activité en direct ───────────────────────────────────────────────────
+   Trois états, pastille colorée : vert = ça bipe (pulse), ambre = pause,
+   rouge = silencieuse depuis 30 min (zone probablement oubliée). Le rouge est
+   assumé : contrairement à une zone « pas commencée », une zone verrouillée
+   qui dort bloque les autres agents. */
+.invd-live-compte {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.invd-live-tag {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-secondary);
+  background: var(--admin-bg-tertiary);
+  vertical-align: middle;
+}
+
+.invd-live-etat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.invd-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+
+.invd-live-actif {
+  color: #22c55e;
+}
+
+.invd-live-actif .invd-live-dot {
+  animation: invd-pulse 1.8s ease-in-out infinite;
+}
+
+.invd-live-pause {
+  color: #f59e0b;
+}
+
+.invd-live-silence {
+  color: #ef4444;
+}
+
+@keyframes invd-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0);
+  }
+}
+
 /* ── Écarts de stock ──────────────────────────────────────────────────────
    Le SIGNE est l'information : manquant en rouge, excédent en vert. Les deux
    sont des anomalies — le vert ne veut pas dire « bon », seulement « en plus ».
@@ -646,5 +729,9 @@
   .invd-lien svg,
   .invd-bar-fill {
     transition: none;
+  }
+
+  .invd-live-actif .invd-live-dot {
+    animation: none;
   }
 }
