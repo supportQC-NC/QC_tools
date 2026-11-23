@@ -137,6 +137,42 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["InventaireZone"],
     }),
+
+    // ─── Bilans de clôture ───────────────────────────────────────────────
+    // Figer le bilan de l'inventaire actif (+ clôture optionnelle : la
+    // session passe en archive sans rien purger).
+    genererBilanInventaire: builder.mutation({
+      query: ({ entrepriseId, cloturer }) => ({
+        url: `${BASE}/${entrepriseId}/bilan`,
+        method: "POST",
+        body: { ...(cloturer && { cloturer: true }) },
+      }),
+      invalidatesTags: ["InventaireBilan", "InventaireZone"],
+    }),
+
+    getBilansInventaire: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/bilans`,
+      providesTags: ["InventaireBilan"],
+    }),
+
+    // Comparaison inter-inventaires par zone (rayons chroniquement faux).
+    getComparaisonBilans: builder.query({
+      query: (entrepriseId) => `${BASE}/${entrepriseId}/bilans/comparaison`,
+      providesTags: ["InventaireBilan"],
+    }),
+
+    getBilanInventaire: builder.query({
+      query: ({ entrepriseId, id }) => `${BASE}/${entrepriseId}/bilans/${id}`,
+      providesTags: ["InventaireBilan"],
+    }),
+
+    deleteBilanInventaire: builder.mutation({
+      query: ({ entrepriseId, id }) => ({
+        url: `${BASE}/${entrepriseId}/bilans/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["InventaireBilan"],
+    }),
   }),
 });
 
@@ -152,4 +188,9 @@ export const {
   useSetPhaseManuelleMutation,
   useSetZoneNeutraliseeMutation,
   useDeleteZoneSessionMutation,
+  useGenererBilanInventaireMutation,
+  useGetBilansInventaireQuery,
+  useGetComparaisonBilansQuery,
+  useGetBilanInventaireQuery,
+  useDeleteBilanInventaireMutation,
 } = inventaireZoneApiSlice;

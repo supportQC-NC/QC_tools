@@ -143,6 +143,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/ecarts-zones", key: "inventaire" },
   { path: "/admin/recap-zones", key: "inventaire" },
   { path: "/admin/suivi-inventaire", key: "inventaire" },
+  { path: "/admin/inventaire-bilans", key: "inventaire" },
   { path: "/admin/suivi-bipage", key: "inventaire" },
   { path: "/admin/agents-inventaire", key: "inventaire" },
   { path: "/admin/bipages", key: "bipage" },

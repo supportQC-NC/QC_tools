@@ -20,6 +20,7 @@ import {
   ecrirePDF,
 } from "../services/ficheControleService.js";
 import { fmtQteDat } from "../utils/qteDat.js";
+import { emitInventaireMaj } from "../socket/inventaireEvents.js";
 import { ecrireFicheAjoutControleVierge } from "../services/ficheAjoutControleService.js";
 import { ZipArchive } from "archiver";
 import {
@@ -2157,6 +2158,10 @@ const recommencerZone = asyncHandler(async (req, res) => {
     session.markModified("zones");
     await session.save();
   }
+
+  // Temps réel : la zone recule dans la progression et ses collectes sortent
+  // des compteurs — le mur se met à jour sans attendre son polling.
+  emitInventaireMaj(entreprise._id, "phase");
 
   res.json({
     message: `Zone ${code} réinitialisée — elle peut être re-bipée.`,

@@ -63,6 +63,7 @@ import AdminSuiviReapproScreen from "./screens/admin/AdminSuiviReapproScreen";
 import AdminSuiviPreparationScreen from "./screens/admin/AdminSuiviPreparationScreen";
 import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
 import AdminInventaireDashboardScreen from "./screens/admin/AdminInventaireDashboardScreen";
+import AdminInventaireBilansScreen from "./screens/admin/AdminInventaireBilansScreen";
 import AdminZonesRetoucheesScreen from "./screens/admin/AdminZonesRetoucheesScreen";
 import AdminEcartsZonesScreen from "./screens/admin/AdminEcartsZonesScreen";
 import AdminReapprosScreen from "./screens/admin/AdminReapproScreen";
@@ -451,6 +452,12 @@ const router = createBrowserRouter(
         <Route
           path="/admin/inventaire-dashboard"
           element={<AdminInventaireDashboardScreen />}
+        />
+        {/* Bilans de clôture : synthèse figée de chaque inventaire + comparaison
+            inter-inventaires par zone. */}
+        <Route
+          path="/admin/inventaire-bilans"
+          element={<AdminInventaireBilansScreen />}
         />
         {/* Classement complet des zones retouchées. Pas au menu : on y arrive
             depuis le tableau de bord. */}

@@ -32,7 +32,8 @@ import {
   HiCalendar,
   HiCog,
   HiPhotograph,
-  HiPresentationChartBar
+  HiPresentationChartBar,
+  HiArchive
 } from "react-icons/hi";
 import { moduleForPath, estCommercial } from "./adminModules";
 
@@ -198,6 +199,13 @@ export const moduleMenuStructure = [
         label: "Suivi bipage inventaire",
         path: "/admin/suivi-bipage",
         icon: HiClock,
+      },
+      {
+        // Synthèses FIGÉES des inventaires (la réinitialisation purge tout le
+        // reste) + comparaison des zones d'un inventaire à l'autre.
+        label: "Bilans d'inventaire",
+        path: "/admin/inventaire-bilans",
+        icon: HiArchive,
       },
       // « Agents de l'inventaire » ne figure PLUS au menu (décision du
       // 11/09/2026) : on y accède depuis le tableau de bord de l'inventaire,
@@ -749,6 +757,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
   "/admin/suivi-inventaire":
     "Affichage mural plein écran : avancement de l'inventaire par emplacement, actualisé en continu.",
+  "/admin/inventaire-bilans":
+    "Bilans figés des inventaires (progression, agents, écarts valorisés) et comparaison des zones d'un inventaire à l'autre.",
   "/admin/suivi-bipage":
     "INVENTAIRE : qui a bipé quelle zone, quand, en combien de temps, avec ses observations.",
   "/admin/suivi-demandes-bipage":

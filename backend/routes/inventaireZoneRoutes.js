@@ -14,6 +14,15 @@ import {
   deleteSession,
   telechargerDossierZip,
 } from "../controllers/inventaireZoneController.js";
+import {
+  genererBilan,
+  getBilans,
+  getBilan,
+  getBilanExcel,
+  getBilanPdf,
+  getComparaisonBilans,
+  deleteBilan,
+} from "../controllers/inventaireBilanController.js";
 import { protect, admin } from "../middleware/authMiddleware.js";
 import { checkEntrepriseAccess } from "../middleware/checkEntrepriseAccess.js";
 
@@ -103,6 +112,59 @@ router.get(
   admin,
   checkEntrepriseAccess,
   getHistorique,
+);
+
+// ─── Bilans de clôture ────────────────────────────────────────────────────
+// Figer le bilan de l'inventaire actif (+ clôture optionnelle de la session)
+router.post(
+  "/:entrepriseId/bilan",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  genererBilan,
+);
+// ⚠️ « comparaison » AVANT "/bilans/:id" : sinon elle matcherait comme un id.
+router.get(
+  "/:entrepriseId/bilans/comparaison",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  getComparaisonBilans,
+);
+router.get(
+  "/:entrepriseId/bilans",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  getBilans,
+);
+router.get(
+  "/:entrepriseId/bilans/:id",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  getBilan,
+);
+router.get(
+  "/:entrepriseId/bilans/:id/excel",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  getBilanExcel,
+);
+router.get(
+  "/:entrepriseId/bilans/:id/pdf",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  getBilanPdf,
+);
+router.delete(
+  "/:entrepriseId/bilans/:id",
+  protect,
+  admin,
+  checkEntrepriseAccess,
+  deleteBilan,
 );
 
 // Neutraliser / réactiver une zone (rayon qui n'existe plus physiquement).

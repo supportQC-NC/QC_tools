@@ -1,0 +1,350 @@
+/* Bilans d'inventaire — mêmes codes visuels que les écrans admin (variables
+   --admin-* globales). Classes préfixées `invb-` : le CSS de CRA est global. */
+
+.invb-screen {
+  padding: 20px 24px 40px;
+  color: var(--admin-text);
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invb-tete {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.invb-tete h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 20px;
+}
+
+.invb-tete h1 svg {
+  color: var(--admin-primary);
+}
+
+.invb-sous {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--admin-text-muted);
+  max-width: 760px;
+}
+
+.invb-icon-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 17px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.invb-icon-btn:hover {
+  color: var(--admin-text);
+  border-color: var(--admin-primary);
+}
+
+.invb-spin {
+  animation: invb-rot 0.9s linear infinite;
+}
+
+@keyframes invb-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.invb-carte {
+  padding: 16px 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.invb-carte h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.invb-carte h2::before {
+  content: "";
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--admin-primary);
+  flex-shrink: 0;
+}
+
+.invb-aide {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--admin-text-muted);
+}
+
+.invb-attente {
+  margin: 0;
+  font-size: 13px;
+  color: var(--admin-text-muted);
+}
+
+/* ── Inventaire actif ── */
+.invb-actif {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.invb-actif-infos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.invb-actif-infos b {
+  font-size: 14px;
+}
+
+.invb-actif-infos span {
+  font-size: 12px;
+  color: var(--admin-text-muted);
+}
+
+.invb-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.invb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--admin-radius-sm);
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.invb-btn:hover:not(:disabled) {
+  border-color: var(--admin-primary);
+}
+
+.invb-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.invb-btn-primaire {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+  color: #fff;
+}
+
+.invb-feedback {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--admin-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.invb-feedback-ok {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.invb-feedback-err {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ── Tableaux ── */
+.invb-table-wrap {
+  overflow-x: auto;
+}
+
+.invb-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.invb-table th {
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-secondary);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.invb-table td {
+  padding: 9px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.invb-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.invb-table tbody tr:hover td {
+  background: var(--admin-bg-hover);
+}
+
+.invb-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.invb-nom {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 650;
+}
+
+.invb-detail {
+  display: block;
+  font-size: 11px;
+  color: var(--admin-text-muted);
+  margin-top: 2px;
+}
+
+.invb-detail-num {
+  display: block;
+  font-size: 11px;
+  color: var(--admin-text-muted);
+}
+
+.invb-fort {
+  font-weight: 700;
+}
+
+.invb-moins {
+  color: #ef4444;
+}
+
+.invb-plus {
+  color: #22c55e;
+}
+
+.invb-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-text-secondary);
+  background: var(--admin-bg-tertiary);
+}
+
+.invb-tag-ok {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.invb-actions-cell {
+  white-space: nowrap;
+}
+
+.invb-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg-tertiary);
+  color: var(--admin-text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.invb-mini-btn:hover {
+  color: var(--admin-text);
+  border-color: var(--admin-primary);
+}
+
+.invb-mini-danger:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+/* ── Comparaison ── */
+.invb-filtre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--admin-text-secondary);
+  cursor: pointer;
+}
+
+.invb-ico-chronique {
+  color: var(--admin-warning, #f59e0b);
+  flex: none;
+}
+
+.invb-ligne-chronique td {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+/* ── État vide ── */
+.invb-screen .invb-vide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 70px 20px;
+  color: var(--admin-text-muted);
+  text-align: center;
+  border: 1px dashed var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg-secondary);
+}
+
+.invb-screen .invb-vide svg {
+  font-size: 40px;
+  opacity: 0.5;
+}

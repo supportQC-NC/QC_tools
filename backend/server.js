@@ -10,6 +10,7 @@ import { Server as SocketServer } from "socket.io";
 
 import connectDB from "./config/db.js";
 import initChat from "./socket/chatSocket.js";
+import { setInventaireIo } from "./socket/inventaireEvents.js";
 
 // Import des routes
 import userRoutes from "./routes/userRoutes.js";
@@ -363,6 +364,9 @@ const io = new SocketServer(server, {
 // req.app.get("io").
 app.set("io", io);
 initChat(io);
+// Événements temps réel de l'inventaire par zones : les SERVICES (watcher,
+// import bipage) n'ont pas de `req`, ils passent par ce registre.
+setInventaireIo(io);
 
 // Démarrage du serveur
 server.listen(PORT, () => {

@@ -33,6 +33,7 @@ import {
 } from "./inventaireFtpService.js";
 import { fusionnerLignesCollectes } from "./inventaireCumulService.js";
 import { deposerDocumentFtp } from "./documentsFtpService.js";
+import { emitInventaireMaj } from "../socket/inventaireEvents.js";
 import { enteteFicheImport } from "./bipageImportService.js";
 
 let isRunning = false;
@@ -486,6 +487,9 @@ const traiterFichier = async (
     if (!zoneSession.papillonnage?.fait) zoneSession.papillonnage = { ...credit };
     session.markModified("zones");
     await session.save();
+    // Temps réel (no-op dans le process print-agent, qui n'a pas de socket :
+    // là, le mur rattrape par son polling).
+    emitInventaireMaj(entreprise._id, "phase");
   }
 
   // Miroir FTP de RÉFÉRENCE (inventaire/<TRIG>/<slug>/<EMPLACEMENT>/) :

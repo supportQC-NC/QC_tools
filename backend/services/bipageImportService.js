@@ -29,6 +29,7 @@ import {
 } from "./ficheControleService.js";
 import Zone from "../models/ZoneModel.js";
 import LigneBipage from "../models/LigneBipageModel.js";
+import { emitInventaireMaj } from "../socket/inventaireEvents.js";
 import FicheControle from "../models/FicheControleModel.js";
 import InventaireCollecte from "../models/InventaireCollecteModel.js";
 import InventaireZoneSession from "../models/InventaireZoneSessionModel.js";
@@ -244,6 +245,9 @@ export const marquerPhasesImport = async (session, zone, userId) => {
   if (marquees.length) {
     session.markModified("zones");
     await session.save();
+    // Temps réel : le mur « Suivi inventaire » voit la zone passer au vert
+    // sans attendre son polling.
+    emitInventaireMaj(session.entreprise, "phase");
   }
   return marquees;
 };

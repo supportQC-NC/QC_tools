@@ -27,6 +27,7 @@ import {
 } from "../../slices/inventaireCollecteApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
+import { getSocket } from "../../socketClient";
 import {
   PHASES,
   PHASE_META,
@@ -121,17 +122,18 @@ const AdminSuiviInventaireScreen = () => {
   const { data: entreprises } = useGetMyEntreprisesQuery();
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
 
-  const { data: activeData, isLoading } = useGetActiveSessionQuery(
-    selectedEntreprise,
-    {
-      skip: !selectedEntreprise,
-      pollingInterval: selectedEntreprise ? POLL : 0,
-    },
-  );
+  const {
+    data: activeData,
+    isLoading,
+    refetch: refetchSession,
+  } = useGetActiveSessionQuery(selectedEntreprise, {
+    skip: !selectedEntreprise,
+    pollingInterval: selectedEntreprise ? POLL : 0,
+  });
 
   // Les collectes (dont celles encore ouvertes) pour « Zones en cours de
   // bipage ».
-  const { data: bipageData } = useGetSuiviBipageQuery(
+  const { data: bipageData, refetch: refetchBipage } = useGetSuiviBipageQuery(
     { entrepriseId: selectedEntreprise },
     {
       skip: !selectedEntreprise,
@@ -159,6 +161,41 @@ const AdminSuiviInventaireScreen = () => {
     () => progressionParEmplacement(zones),
     [zones],
   );
+
+  // ── Temps réel par socket ──
+  // Le backend émet `inventaire:maj` à chaque changement (phase validée,
+  // collecte ouverte/déposée, ligne bipée, init/annulation). On rafraîchit les
+  // requêtes concernées À LA SECONDE ; le polling ci-dessus reste le filet
+  // (reconnexion socket, et prod : le watcher tourne dans le process
+  // print-agent qui n'a pas de socket vers les navigateurs).
+  // ⚠️ Le type "scan" arrive à chaque bip d'article : il est DÉBOUNCÉ (2 s)
+  // et ne relance que le suivi bipage — sans ça, dix agents qui bipent
+  // déclencheraient une rafale de requêtes lourdes.
+  useEffect(() => {
+    if (!selectedEntreprise) return undefined;
+    const socket = getSocket();
+    let timerScan = null;
+    const onMaj = (evt) => {
+      if (!evt || String(evt.entrepriseId) !== String(selectedEntreprise))
+        return;
+      if (evt.type === "scan") {
+        if (timerScan) return;
+        timerScan = setTimeout(() => {
+          timerScan = null;
+          refetchBipage();
+        }, 2000);
+        return;
+      }
+      refetchSession();
+      refetchBipage();
+      refetchAgents();
+    };
+    socket.on("inventaire:maj", onMaj);
+    return () => {
+      socket.off("inventaire:maj", onMaj);
+      if (timerScan) clearTimeout(timerScan);
+    };
+  }, [selectedEntreprise, refetchSession, refetchBipage, refetchAgents]);
 
   // Une phase vient d'être validée quelque part : le total de phases faites a
   // bougé dans /active (sondé toutes les 10 s), donc les compteurs par agent
