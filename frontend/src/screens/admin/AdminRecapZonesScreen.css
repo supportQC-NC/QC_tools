@@ -27,6 +27,83 @@
   color: var(--accent);
 }
 
+/* Trigramme affiché à côté du titre en mode borne (le header de l'app,
+   qui porte le sélecteur de société, n'est plus visible en plein écran). */
+.rz-societe {
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 2px 10px;
+}
+
+.rz-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Pastille temps réel : verte quand le socket est connecté, grise sinon
+   (l'écran retombe alors sur le polling à 10 s). */
+.rz-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.rz-live i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.rz-live.on i {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.8);
+  animation: rz-pulse 2s ease-in-out infinite;
+}
+
+@keyframes rz-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.rz-horloge {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.rz-fs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.rz-fs-btn:hover {
+  border-color: var(--accent);
+}
+
 .rz-placeholder {
   display: flex;
   flex-direction: column;
@@ -279,6 +356,13 @@
   border-radius: 50%;
 }
 
+.rz-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .rz-search {
   display: flex;
   align-items: center;
@@ -288,6 +372,43 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   min-width: 220px;
+}
+
+.rz-search-clear {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.rz-search-clear:hover {
+  color: var(--text-primary);
+}
+
+/* « Réinitialiser » : n'apparaît que quand un filtre ou une recherche est
+   posé — un seul geste pour revenir à la vue complète. */
+.rz-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.rz-reset:hover {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
 }
 
 .rz-search svg {
@@ -391,4 +512,103 @@
 
 .rz-phase svg {
   font-size: 12px;
+}
+
+/* ── Mode borne (plein écran) ──
+   L'élément plein écran devient SON PROPRE conteneur de défilement (sans
+   overflow, rien ne défile) et le navigateur peint un fond noir derrière :
+   le fond doit être posé explicitement. Typographie en clamp() : lisible de
+   loin sur un iPad géant, sans casser un plein écran sur petit moniteur. */
+.recap-zones.rz-fs {
+  background: var(--bg-primary);
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 32px 60px;
+}
+
+.rz-fs .rz-header h1 {
+  font-size: clamp(1.5rem, 2.2vw, 2.2rem);
+}
+
+/* Filtres collants : la grille défile dessous, les filtres restent sous le
+   doigt. Collant SEULEMENT en plein écran — en mode normal, le haut de page
+   appartient au layout de l'app. */
+.rz-fs .rz-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-primary);
+  padding: 10px 0;
+  margin-bottom: 10px;
+}
+
+/* Cibles tactiles élargies : chips, compteurs et recherche au doigt. */
+.rz-fs .rz-chip {
+  padding: 10px 18px;
+  font-size: clamp(0.85rem, 1vw, 1.05rem);
+}
+
+.rz-fs .rz-count {
+  padding: 8px 14px;
+}
+
+.rz-fs .rz-count-n {
+  font-size: clamp(1.05rem, 1.4vw, 1.5rem);
+}
+
+.rz-fs .rz-count-lbl {
+  font-size: clamp(0.8rem, 0.95vw, 1rem);
+}
+
+.rz-fs .rz-search {
+  padding: 10px 14px;
+}
+
+.rz-fs .rz-search input {
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+}
+
+.rz-fs .rz-reset {
+  padding: 10px 14px;
+}
+
+.rz-fs .rz-summary-info strong {
+  font-size: clamp(1.05rem, 1.4vw, 1.5rem);
+}
+
+.rz-fs .rz-summary-info span,
+.rz-fs .rz-legende,
+.rz-fs .rz-filtre-compte {
+  font-size: clamp(0.85rem, 0.95vw, 1rem);
+}
+
+.rz-fs .rz-empl-bar-nom {
+  font-size: clamp(0.85rem, 1vw, 1.05rem);
+}
+
+.rz-fs .rz-empl-bar-pct {
+  font-size: clamp(1.05rem, 1.4vw, 1.5rem);
+}
+
+/* Cartes plus larges et plus lisibles de loin. */
+.rz-fs .rz-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.rz-fs .rz-card-code {
+  font-size: clamp(1.1rem, 1.5vw, 1.6rem);
+}
+
+.rz-fs .rz-card-lib {
+  font-size: clamp(0.88rem, 1.1vw, 1.15rem);
+  white-space: normal;
+}
+
+.rz-fs .rz-card-statut {
+  font-size: clamp(0.68rem, 0.85vw, 0.85rem);
+}
+
+.rz-fs .rz-phase {
+  font-size: clamp(0.72rem, 0.9vw, 0.95rem);
 }

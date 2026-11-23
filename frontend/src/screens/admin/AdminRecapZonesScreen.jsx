@@ -8,8 +8,16 @@
 //   vert   = complet (papillonnage + bipage + contrôle)
 // Données : session active (inventaireZoneApiSlice → getActiveSession), zones[] avec
 // les 3 sous-docs de phase { fait, at, by }.
+//
+// Pensé pour tourner aussi sur une BORNE (iPad géant / écran tactile) :
+//   - temps réel par socket `inventaire:maj` (même motif que le mur Suivi
+//     inventaire), le polling restant le filet — en prod le watcher tourne dans
+//     le process print-agent, sans socket vers les navigateurs ;
+//   - bouton « Plein écran » (API Fullscreen, préfixes webkit pour iPad) ;
+//   - en plein écran : typographie en clamp(), filtres agrandis pour le doigt,
+//     barre de filtres collante, horloge.
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   HiViewGrid,
@@ -17,15 +25,20 @@ import {
   HiSearch,
   HiClipboardCheck,
   HiCheck,
+  HiArrowsExpand,
+  HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useGetActiveSessionQuery } from "../../slices/inventaireZoneApiSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { progressionParEmplacement } from "../../utils/progressionInventaire";
+import { getSocket } from "../../socketClient";
 import "./AdminRecapZonesScreen.css";
 
-const POLL = 5000;
+// Filet derrière le socket (reconnexion, et PROD : les coches posées par le
+// watcher du print-agent n'arrivent QUE par ici). 10 s comme le mur.
+const POLL = 10000;
 
 const PHASES = [
   { key: "papillonnage", label: "Papillonnage" },
@@ -88,6 +101,10 @@ const AdminRecapZonesScreen = () => {
   const [search, setSearch] = useState("");
   const [filtre, setFiltre] = useState("tous"); // "tous" | clé de STATUTS
   const [emplFiltre, setEmplFiltre] = useState("tous"); // "tous" | "MAGASIN" | "DOCK"
+  const rootRef = useRef(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [enDirect, setEnDirect] = useState(false);
+  const [horloge, setHorloge] = useState(() => new Date());
 
   const { data: entreprises } = useGetMyEntreprisesQuery();
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
@@ -100,6 +117,73 @@ const AdminRecapZonesScreen = () => {
     skip: !selectedEntreprise,
     pollingInterval: selectedEntreprise ? POLL : 0,
   });
+
+  // ── Temps réel par socket ──
+  // `inventaire:maj` est émis à chaque changement (phase validée, init /
+  // annulation, neutralisation, dépôt de collecte…). On relit la session À LA
+  // SECONDE ; le polling ci-dessus reste le filet. Le type "scan" (une ligne
+  // bipée) ne change aucune phase : il est ignoré, sinon dix agents qui bipent
+  // déclencheraient une rafale de requêtes pour rien.
+  useEffect(() => {
+    if (!selectedEntreprise) return undefined;
+    const socket = getSocket();
+    const onMaj = (evt) => {
+      if (!evt || String(evt.entrepriseId) !== String(selectedEntreprise))
+        return;
+      if (evt.type === "scan") return;
+      refetch();
+    };
+    const onConnect = () => setEnDirect(true);
+    const onDisconnect = () => setEnDirect(false);
+    socket.on("inventaire:maj", onMaj);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    setEnDirect(socket.connected);
+    return () => {
+      socket.off("inventaire:maj", onMaj);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+    };
+  }, [selectedEntreprise, refetch]);
+
+  // ── Plein écran ──
+  // L'état réel du navigateur fait foi (Échap, F11…). Préfixes webkit : la
+  // borne cible est un iPad, où Safari ne connaît que webkitFullscreen*.
+  useEffect(() => {
+    const onChange = () => {
+      const el =
+        document.fullscreenElement || document.webkitFullscreenElement || null;
+      setFullscreen(el === rootRef.current);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    const actif =
+      document.fullscreenElement || document.webkitFullscreenElement;
+    if (actif) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(
+        document,
+      );
+    } else {
+      const el = rootRef.current;
+      if (!el) return;
+      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    }
+  };
+
+  // Horloge affichée en mode borne uniquement — pas de tick hors plein écran.
+  useEffect(() => {
+    if (!fullscreen) return undefined;
+    setHorloge(new Date());
+    const t = setInterval(() => setHorloge(new Date()), 1000);
+    return () => clearInterval(t);
+  }, [fullscreen]);
 
   const session = activeData?.active || null;
   const progress = activeData?.progress || null;
@@ -165,21 +249,64 @@ const AdminRecapZonesScreen = () => {
     );
   }, [zonesAvecStatut, search, filtre, emplFiltre]);
 
+  const filtreActif =
+    filtre !== "tous" || emplFiltre !== "tous" || search.trim() !== "";
+  const resetFiltres = () => {
+    setFiltre("tous");
+    setEmplFiltre("tous");
+    setSearch("");
+  };
+
+  const heure = horloge.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   return (
-    <div className="recap-zones">
+    <div className={`recap-zones${fullscreen ? " rz-fs" : ""}`} ref={rootRef}>
       {/* En-tête */}
       <div className="rz-header">
         <h1>
           <HiViewGrid /> Récap par zone
+          {fullscreen && entrepriseObj?.trigramme && (
+            <span className="rz-societe">{entrepriseObj.trigramme}</span>
+          )}
         </h1>
-        <button
-          className="btn-icon"
-          onClick={refetch}
-          disabled={!selectedEntreprise}
-          title="Rafraîchir"
-        >
-          <HiRefresh />
-        </button>
+        <div className="rz-header-actions">
+          {selectedEntreprise && (
+            <span
+              className={`rz-live${enDirect ? " on" : ""}`}
+              title={
+                enDirect
+                  ? "Temps réel actif : l'écran se met à jour tout seul."
+                  : "Temps réel coupé — mise à jour toutes les 10 s (polling)."
+              }
+            >
+              <i /> {enDirect ? "en direct" : "différé"}
+            </span>
+          )}
+          {fullscreen && <span className="rz-horloge">{heure}</span>}
+          <button
+            className="btn-icon"
+            onClick={refetch}
+            disabled={!selectedEntreprise}
+            title="Rafraîchir"
+          >
+            <HiRefresh />
+          </button>
+          <button
+            className="rz-fs-btn"
+            onClick={toggleFullscreen}
+            title={
+              fullscreen
+                ? "Quitter le plein écran (Échap)"
+                : "Afficher en plein écran (borne / écran mural)"
+            }
+          >
+            {fullscreen ? <HiX /> : <HiArrowsExpand />}
+            {fullscreen ? "Quitter" : "Plein écran"}
+          </button>
+        </div>
       </div>
 
       {!selectedEntreprise ? (
@@ -193,9 +320,11 @@ const AdminRecapZonesScreen = () => {
         <div className="rz-placeholder">
           <HiClipboardCheck />
           <p>Aucun inventaire actif pour {entrepriseObj?.trigramme}.</p>
-          <Link className="btn-primary" to="/admin/inventaire-progression">
-            Initialiser un inventaire
-          </Link>
+          {!fullscreen && (
+            <Link className="btn-primary" to="/admin/inventaire-progression">
+              Initialiser un inventaire
+            </Link>
+          )}
         </div>
       ) : (
         <>
@@ -291,7 +420,8 @@ const AdminRecapZonesScreen = () => {
             phases — papillonnage, comptage, contrôle — sont validées.
           </p>
 
-          {/* Filtres + recherche */}
+          {/* Filtres + recherche. Collante en plein écran : la grille défile
+              dessous, les filtres restent sous le doigt sur la borne. */}
           <div className="rz-toolbar">
             <div className="rz-filters">
               {/* Filtre par statut */}
@@ -306,10 +436,13 @@ const AdminRecapZonesScreen = () => {
                   <button
                     key={k}
                     className={`rz-chip ${filtre === k ? "on" : ""}`}
-                    onClick={() => setFiltre(k)}
+                    onClick={() => setFiltre(filtre === k ? "tous" : k)}
                     style={
                       filtre === k
-                        ? { borderColor: STATUTS[k].color, color: STATUTS[k].color }
+                        ? {
+                            borderColor: STATUTS[k].color,
+                            color: STATUTS[k].color,
+                          }
                         : undefined
                     }
                   >
@@ -335,7 +468,9 @@ const AdminRecapZonesScreen = () => {
                     <button
                       key={e}
                       className={`rz-chip ${emplFiltre === e ? "on" : ""}`}
-                      onClick={() => setEmplFiltre(e)}
+                      onClick={() =>
+                        setEmplFiltre(emplFiltre === e ? "tous" : e)
+                      }
                     >
                       {e} ({n})
                     </button>
@@ -343,14 +478,34 @@ const AdminRecapZonesScreen = () => {
                 </div>
               )}
             </div>
-            <div className="rz-search">
-              <HiSearch />
-              <input
-                type="text"
-                placeholder="Rechercher (code, libellé)…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div className="rz-toolbar-right">
+              <div className="rz-search">
+                <HiSearch />
+                <input
+                  type="text"
+                  placeholder="Rechercher (code, libellé)…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search !== "" && (
+                  <button
+                    className="rz-search-clear"
+                    onClick={() => setSearch("")}
+                    title="Effacer la recherche"
+                  >
+                    <HiX />
+                  </button>
+                )}
+              </div>
+              {filtreActif && (
+                <button
+                  className="rz-reset"
+                  onClick={resetFiltres}
+                  title="Retirer tous les filtres et la recherche"
+                >
+                  <HiX /> Réinitialiser
+                </button>
+              )}
             </div>
           </div>
 
