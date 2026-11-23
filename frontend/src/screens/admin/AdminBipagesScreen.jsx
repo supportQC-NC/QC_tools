@@ -1456,6 +1456,12 @@ const AdminBipagesScreen = () => {
                   <th className="marq-col" aria-label="Repères" />
                   <th>Zone</th>
                   <th>Emplacement</th>
+                  <th
+                    className="nl-col"
+                    title="Numéro de ligne sur la fiche de contrôle : la colonne NL du PDF. Il recommence à 1 à chaque zone."
+                  >
+                    NL
+                  </th>
                   <th title="Ce que le collecteur a réellement bipé : le code-barres s'il a douché une étiquette, le NART s'il l'a saisi. Aucune résolution.">
                     Code bipé
                   </th>
@@ -1473,7 +1479,7 @@ const AdminBipagesScreen = () => {
               <tbody>
                 {lignes.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="no-data">
+                    <td colSpan={12} className="no-data">
                       Aucune ligne. Les bipages apparaissent ici dès qu'un .DAT
                       est traité.
                     </td>
@@ -1519,6 +1525,13 @@ const AdminBipagesScreen = () => {
                       </td>
                       <td className="zone-cell">{l.zoneCode}</td>
                       <td className="zone-cell">{l.zoneType || "—"}</td>
+                      {/* NL = `ordre`, posé par le watcher depuis la numérotation
+                          de construireLignes (n = index + 1) : c'est LE numéro
+                          imprimé sur la fiche de contrôle. Les anciennes lignes
+                          sans ordre affichent « — » plutôt qu'un faux 0. */}
+                      <td className="nl-cell">
+                        {Number(l.ordre) > 0 ? l.ordre : "—"}
+                      </td>
                       <td className="mono">
                         <CelluleCodeBipe ligne={l} />
                       </td>

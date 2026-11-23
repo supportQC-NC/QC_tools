@@ -254,6 +254,18 @@
   white-space: nowrap;
 }
 
+/* NL : le numéro de ligne de la fiche de contrôle (colonne NL du PDF). */
+.nl-col {
+  width: 44px;
+}
+
+.nl-cell {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-text-muted, #a7a7b8);
+}
+
 .mono {
   font-family: "Courier New", monospace;
   white-space: nowrap;
