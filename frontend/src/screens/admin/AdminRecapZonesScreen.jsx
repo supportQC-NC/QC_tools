@@ -29,14 +29,14 @@ const POLL = 5000;
 
 const PHASES = [
   { key: "papillonnage", label: "Papillonnage" },
-  { key: "bipage", label: "Comptage" },
+  { key: "bipage", label: "Bipage" },
   { key: "controle", label: "Contrôle" },
 ];
 
 // Statut d'avancement d'une zone (évalué de haut en bas).
 const STATUTS = {
   complet: { label: "Complet", color: "#4ade80" },
-  comptage: { label: "Comptage", color: "#8b5cf6" },
+  comptage: { label: "Bipage", color: "#8b5cf6" },
   papillonnage: { label: "Papillonnage", color: "#f59e0b" },
   todo: { label: "Pas commencé", color: "#ff6b6b" },
 };

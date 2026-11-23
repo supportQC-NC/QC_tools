@@ -9,7 +9,9 @@ export const PHASES = ["papillonnage", "bipage", "controle"];
 
 export const PHASE_META = {
   papillonnage: { label: "Papillonnage", color: "#8b5cf6" },
-  bipage: { label: "Comptage", color: "#4da6ff" },
+  // « Bipage », pas « Comptage » (demande client 23/11/2026) : le terme que
+  // le terrain emploie, partout dans le module inventaire par zones.
+  bipage: { label: "Bipage", color: "#4da6ff" },
   controle: { label: "Contrôle", color: "#4ade80" },
 };
 
@@ -17,7 +19,7 @@ export const PHASE_META = {
 // bipage → comptage ; papillonnage seul → papillonnage ; sinon pas commencé.
 export const STATUTS = {
   complet: { label: "Complet", color: "#4ade80" },
-  comptage: { label: "Comptage", color: "#8b5cf6" },
+  comptage: { label: "Bipage", color: "#8b5cf6" },
   papillonnage: { label: "Papillonnage", color: "#f59e0b" },
   todo: { label: "Pas commencé", color: "#ff6b6b" },
 };

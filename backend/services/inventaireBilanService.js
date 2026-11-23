@@ -32,7 +32,8 @@ import {
 const PHASES = ["papillonnage", "bipage", "controle"];
 const PHASE_LABELS = {
   papillonnage: "Papillonnage",
-  bipage: "Comptage",
+  // « Bipage », pas « Comptage » : même vocabulaire que les écrans du module.
+  bipage: "Bipage",
   controle: "Contrôle",
 };
 const TOP_ANOMALIES = 50;

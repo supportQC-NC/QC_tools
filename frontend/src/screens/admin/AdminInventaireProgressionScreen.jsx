@@ -52,7 +52,7 @@ const PHASE_META = {
 // hors avancement.
 const STATUT_META = {
   complet: { label: "Complet", color: "#4ade80" },
-  comptage: { label: "Comptage", color: "#8b5cf6" },
+  comptage: { label: "Bipage", color: "#8b5cf6" },
   papillonnage: { label: "Papillonnage", color: "#f59e0b" },
   todo: { label: "Pas commencé", color: "#ff6b6b" },
   neutralisee: { label: "Neutralisée (hors inventaire)", color: "#6b7280" },

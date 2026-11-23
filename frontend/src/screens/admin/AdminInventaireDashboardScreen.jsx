@@ -60,7 +60,7 @@ import "./AdminInventaireDashboardScreen.css";
 
 const PHASES = [
   { cle: "papillonnage", label: "Papillonnage", couleur: "#f59e0b" },
-  { cle: "bipage", label: "Comptage", couleur: "#8b5cf6" },
+  { cle: "bipage", label: "Bipage", couleur: "#8b5cf6" },
   { cle: "controle", label: "Contrôle", couleur: "#22c55e" },
 ];
 
