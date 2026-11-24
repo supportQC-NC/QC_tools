@@ -184,34 +184,62 @@
   margin: 0 0 12px;
 }
 
-/* ── Synthèse ── */
+/* ── Fiche de l'article trouvé ── */
 .li-synthese {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 20px;
   align-items: flex-start;
-  padding: 14px 16px;
+  justify-content: space-between;
+  padding: 18px 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  margin-bottom: 14px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
 .li-article {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 220px;
+  gap: 10px;
+  min-width: 260px;
+  flex: 1;
 }
 
 .li-article strong {
-  font-size: 1.05rem;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
-.li-article span {
-  color: var(--text-secondary);
-  font-size: 0.82rem;
+/* Codes COMPLETS, étiquetés, en mono : faits pour être recopiés/rescannés. */
+.li-article-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.li-code-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.li-code-chip label {
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--accent);
 }
 
 .li-zones-resume {
@@ -223,80 +251,93 @@
 .li-zone-pill {
   display: flex;
   flex-direction: column;
-  padding: 8px 12px;
+  gap: 2px;
+  padding: 10px 14px;
   background: var(--bg-tertiary);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: 10px;
-  min-width: 120px;
+  min-width: 130px;
 }
 
 .li-zone-pill b {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 
 .li-zone-pill span {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .li-zone-pill em {
   font-style: normal;
-  font-size: 0.78rem;
-  color: var(--accent);
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
 }
 
-/* ── Occurrences (une carte par séquence de bipage) ── */
+/* ── Occurrences (une carte par séquence de bipage) ──
+   Cartes LARGES : les désignations et gencods sortent en entier, jamais
+   tronqués — c'est toute la valeur de l'écran. */
 .li-occurrences {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
+  gap: 16px;
 }
 
 .li-occ {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
 .li-occ-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border);
 }
 
 .li-occ-zone {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .li-occ-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
+  color: var(--accent);
 }
 
 .li-occ-lib {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
 .li-occ-empl {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-secondary);
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 2px 8px;
+  padding: 3px 10px;
 }
 
 .li-occ-meta {
@@ -304,50 +345,97 @@
   color: var(--text-secondary);
 }
 
-.li-occ-meta b {
-  color: var(--accent);
-  font-size: 0.95rem;
-}
-
-/* Les voisins de scan : liste ordonnée, la cible en surbrillance. */
+/* ── Voisins de scan : l'ordre du rayon, la cible au centre ──
+   Colonne de gauche = position relative (−3…+3) : de combien d'articles se
+   décaler sur l'étagère. Texte INTÉGRAL, retour à la ligne autorisé. */
 .li-voisins {
   list-style: none;
   margin: 0;
-  padding: 6px 0;
+  padding: 8px 0;
 }
 
 .li-voisins li {
   display: grid;
-  grid-template-columns: 70px 1fr auto;
-  gap: 10px;
-  align-items: baseline;
-  padding: 5px 14px;
-  font-size: 0.85rem;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
 }
 
-.li-voisins li.cible {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border-left: 3px solid var(--accent);
-  padding-left: 11px;
+.li-voisins li + li {
+  border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+
+.li-v-pos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
-.li-v-nart {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--text-secondary);
-}
-
-.li-voisins li.cible .li-v-nart {
-  color: var(--accent);
+.li-v-infos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 
 .li-v-des {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
-.li-v-qte {
-  font-variant-numeric: tabular-nums;
+.li-v-codes {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
   color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  overflow-wrap: anywhere;
+}
+
+.li-v-codes em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+/* La ligne CIBLE : l'article recherché, mis en évidence franche. */
+.li-voisins li.cible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-left: 3px solid var(--accent);
+  padding-left: 13px;
+  border-top-color: transparent;
+}
+
+.li-voisins li.cible + li {
+  border-top-color: transparent;
+}
+
+.li-voisins li.cible .li-v-pos {
+  background: var(--accent);
+  color: #0f0f1a;
+  font-size: 1rem;
+}
+
+.li-voisins li.cible .li-v-des {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.li-voisins li.cible .li-v-codes {
+  color: var(--text-primary);
 }

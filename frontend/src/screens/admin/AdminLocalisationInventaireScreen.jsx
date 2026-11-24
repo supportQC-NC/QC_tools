@@ -30,12 +30,6 @@ import {
 } from "../../slices/localisationInventaireApiSlice";
 import "./AdminLocalisationInventaireScreen.css";
 
-// Quantités à 3 décimales, zéros de fin supprimés (articles au mètre).
-const fmtQte = (n) => {
-  const v = Number(n) || 0;
-  return v.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
-};
-
 const fmtDate = (d) =>
   d
     ? new Date(d).toLocaleString("fr-FR", {
@@ -288,18 +282,25 @@ const AdminLocalisationInventaireScreen = () => {
                 </div>
               ) : (
                 <>
-                  {/* Synthèse : où, et combien au total par zone. */}
+                  {/* Fiche de l'article trouvé : codes COMPLETS, jamais
+                      tronqués — c'est ce que l'agent recopie ou rescanne. */}
                   <div className="li-synthese">
                     <div className="li-article">
                       <strong>
                         {resultat.occurrences[0].designation || "Article"}
                       </strong>
-                      <span>
-                        NART {resultat.occurrences[0].nart || "—"}
-                        {resultat.occurrences[0].gencod
-                          ? ` · ${resultat.occurrences[0].gencod}`
-                          : ""}
-                      </span>
+                      <div className="li-article-codes">
+                        <span className="li-code-chip">
+                          <label>NART</label>
+                          {resultat.occurrences[0].nart || "—"}
+                        </span>
+                        {resultat.occurrences[0].gencod && (
+                          <span className="li-code-chip">
+                            <label>GENCODE</label>
+                            {resultat.occurrences[0].gencod}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="li-zones-resume">
                       {resultat.totalParZone.map((z) => (
@@ -308,11 +309,8 @@ const AdminLocalisationInventaireScreen = () => {
                           className="li-zone-pill"
                         >
                           <b>{z.zoneCode}</b>
-                          <span>{z.zoneLibelle || z.zoneType}</span>
-                          <em>
-                            {fmtQte(z.totalQte)} pce
-                            {z.nbLignes > 1 ? ` · ${z.nbLignes} séquences` : ""}
-                          </em>
+                          <span>{z.zoneLibelle || "—"}</span>
+                          <em>{z.zoneType}</em>
                         </div>
                       ))}
                     </div>
@@ -324,7 +322,8 @@ const AdminLocalisationInventaireScreen = () => {
                     </p>
                   )}
 
-                  {/* Une carte par séquence de bipage, avec les voisins. */}
+                  {/* Une carte par séquence de bipage : la cible au milieu de
+                      ses voisins de scan (= ses voisins physiques de rayon). */}
                   <div className="li-occurrences">
                     {resultat.occurrences.map((o) => (
                       <div className="li-occ" key={o.ligneId}>
@@ -337,27 +336,47 @@ const AdminLocalisationInventaireScreen = () => {
                             <span className="li-occ-empl">{o.zoneType}</span>
                           </div>
                           <div className="li-occ-meta">
-                            <b>{fmtQte(o.qteScan)}</b> comptés
-                            {o.agentNom ? ` · ${o.agentNom}` : ""}
-                            {o.bipeAt ? ` · ${fmtDate(o.bipeAt)}` : ""}
+                            {[o.agentNom, o.bipeAt ? fmtDate(o.bipeAt) : ""]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </div>
                         </div>
-                        {/* Les voisins de scan : avant → cible → après. */}
+                        {/* Les voisins de scan, dans l'ordre du rayon. La
+                            position relative (−3…+3) dit à l'agent de combien
+                            d'articles se décaler sur l'étagère. */}
                         <ol className="li-voisins">
-                          {o.voisins.map((v) => (
-                            <li
-                              key={`${o.ligneId}-${v.ordre}`}
-                              className={v.cible ? "cible" : ""}
-                            >
-                              <span className="li-v-nart">{v.nart || "—"}</span>
-                              <span className="li-v-des">
-                                {v.designation || v.gencod || "—"}
-                              </span>
-                              <span className="li-v-qte">
-                                {fmtQte(v.qteScan)}
-                              </span>
-                            </li>
-                          ))}
+                          {o.voisins.map((v) => {
+                            const delta = (v.ordre || 0) - (o.ordre || 0);
+                            return (
+                              <li
+                                key={`${o.ligneId}-${v.ordre}`}
+                                className={v.cible ? "cible" : ""}
+                              >
+                                <span className="li-v-pos">
+                                  {v.cible ? (
+                                    <HiLocationMarker />
+                                  ) : delta > 0 ? (
+                                    `+${delta}`
+                                  ) : (
+                                    `−${Math.abs(delta)}`
+                                  )}
+                                </span>
+                                <span className="li-v-infos">
+                                  <span className="li-v-des">
+                                    {v.designation || "—"}
+                                  </span>
+                                  <span className="li-v-codes">
+                                    <em>NART</em> {v.nart || "—"}
+                                    {v.gencod && (
+                                      <>
+                                        <em>GENCODE</em> {v.gencod}
+                                      </>
+                                    )}
+                                  </span>
+                                </span>
+                              </li>
+                            );
+                          })}
                         </ol>
                       </div>
                     ))}
