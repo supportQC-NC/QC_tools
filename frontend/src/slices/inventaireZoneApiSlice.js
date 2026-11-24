@@ -140,13 +140,21 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ["InventaireZone"],
     }),
 
-    // Supprimer une session archivée
+    // Supprimer une session archivée. ⚠️ Cascade complète depuis le
+    // 24/11/2026 : ses collectes, LigneBipage, fiches et bilan partent avec —
+    // l'inventaire disparaît aussi de la Localisation et du suivi bipage.
     deleteZoneSession: builder.mutation({
       query: ({ entrepriseId, id }) => ({
         url: `${BASE}/${entrepriseId}/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["InventaireZone"],
+      invalidatesTags: [
+        "InventaireZone",
+        "InventaireBilan",
+        "Bipage",
+        "SuiviBipage",
+        "LocalisationInventaire",
+      ],
     }),
 
     // ─── Bilans de clôture ───────────────────────────────────────────────

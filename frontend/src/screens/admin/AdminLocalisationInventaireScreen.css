@@ -111,6 +111,11 @@
   color: var(--success);
 }
 
+.li-btn-ico.li-danger:hover {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
 /* ── Recherche ── */
 .li-recherche {
   display: flex;

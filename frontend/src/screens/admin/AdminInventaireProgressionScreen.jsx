@@ -639,6 +639,20 @@ const AdminInventaireProgressionScreen = () => {
   };
 
   const handleDeleteHisto = async (id) => {
+    // ⚠️ Depuis la conservation des bipages (24/11/2026), supprimer une
+    // session archivée emporte TOUTES ses données : lignes bipées, collectes,
+    // fiches, bilan — l'inventaire disparaît de la Localisation inventaire.
+    const s = (historiqueData?.sessions || []).find((x) => x._id === id);
+    if (
+      !window.confirm(
+        `Supprimer définitivement l'inventaire « ${s?.nom || "?"} » ?\n\n` +
+          "Toutes ses données partent avec : lignes bipées, collectes, fiches " +
+          "de contrôle et bilan. Il disparaîtra de la Localisation inventaire. " +
+          "Irréversible.",
+      )
+    ) {
+      return;
+    }
     try {
       await deleteZoneSession({ entrepriseId: selectedEntreprise, id }).unwrap();
     } catch {
@@ -1758,14 +1772,16 @@ const AdminInventaireProgressionScreen = () => {
                           >
                             <HiDownload />
                           </button>
-                          <button
-                            className="btn-icon danger"
-                            onClick={() => handleDeleteHisto(s._id)}
-                            disabled={deletingSession}
-                            title="Supprimer"
-                          >
-                            <HiTrash />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              className="btn-icon danger"
+                              onClick={() => handleDeleteHisto(s._id)}
+                              disabled={deletingSession}
+                              title="Supprimer cet inventaire et toutes ses données (bipages, fiches, bilan)"
+                            >
+                              <HiTrash />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

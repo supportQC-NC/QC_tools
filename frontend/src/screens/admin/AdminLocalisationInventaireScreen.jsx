@@ -18,6 +18,7 @@ import {
   HiPencil,
   HiCheck,
   HiX,
+  HiTrash,
   HiExclamationCircle,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
@@ -28,6 +29,7 @@ import {
   useLazyRechercherLocalisationQuery,
   useRenommerInventaireLocalisationMutation,
 } from "../../slices/localisationInventaireApiSlice";
+import { useDeleteZoneSessionMutation } from "../../slices/inventaireZoneApiSlice";
 import "./AdminLocalisationInventaireScreen.css";
 
 const fmtDate = (d) =>
@@ -45,6 +47,10 @@ const AdminLocalisationInventaireScreen = () => {
   const entrepriseId = useSelector(selectGlobalEntrepriseId) || "";
   const { data: entreprises } = useGetMyEntreprisesQuery();
   const entrepriseObj = entreprises?.find((e) => e._id === entrepriseId);
+  // Suppression d'un inventaire archivé (ménage des tests) : ADMIN seulement,
+  // le serveur refuse de toute façon (route adminOnly + cascade complète).
+  const { userInfo } = useSelector((state) => state.auth);
+  const isAdmin = userInfo?.role === "admin";
 
   const [sessionId, setSessionId] = useState("");
   const [code, setCode] = useState("");
@@ -81,6 +87,31 @@ const AdminLocalisationInventaireScreen = () => {
     useLazyRechercherLocalisationQuery();
   const [renommer, { isLoading: renommageEnCours }] =
     useRenommerInventaireLocalisationMutation();
+  const [supprimerSession, { isLoading: suppressionEnCours }] =
+    useDeleteZoneSessionMutation();
+
+  const supprimerInventaire = async () => {
+    if (!inventaire || inventaire.statut === "actif") return;
+    if (
+      !window.confirm(
+        `Supprimer définitivement l'inventaire « ${
+          inventaire.nom || "?"
+        } — ${inventaire.annee} » ?\n\n` +
+          "Toutes ses données partent avec : lignes bipées, collectes, fiches " +
+          "de contrôle et bilan. Il ne sera plus localisable. Irréversible.",
+      )
+    ) {
+      return;
+    }
+    setErreur("");
+    try {
+      await supprimerSession({ entrepriseId, id: sessionId }).unwrap();
+      // Retour à la sélection par défaut (l'actif, ou le plus récent restant).
+      setSessionId("");
+    } catch (err) {
+      setErreur(err?.data?.message || "Suppression refusée.");
+    }
+  };
 
   const chercher = async () => {
     const c = code.trim();
@@ -184,6 +215,16 @@ const AdminLocalisationInventaireScreen = () => {
                         onClick={() => setRenommage(inventaire.nom || "")}
                       >
                         <HiPencil />
+                      </button>
+                    )}
+                    {isAdmin && inventaire && inventaire.statut !== "actif" && (
+                      <button
+                        className="li-btn-ico li-danger"
+                        title="Supprimer cet inventaire archivé et toutes ses données (bipages, fiches, bilan) — irréversible"
+                        disabled={suppressionEnCours}
+                        onClick={supprimerInventaire}
+                      >
+                        <HiTrash />
                       </button>
                     )}
                   </>
