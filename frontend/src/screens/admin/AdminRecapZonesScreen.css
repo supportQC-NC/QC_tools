@@ -356,6 +356,27 @@
   border-radius: 50%;
 }
 
+/* Pastilles d'allée (1re lettre du code) : la lettre en gros, le compteur
+   en petit — une rangée entière de lettres doit rester compacte. */
+.rz-chip-lettre {
+  padding: 6px 10px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  min-width: 38px;
+  justify-content: center;
+}
+
+.rz-chip-lettre.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rz-chip-n {
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
 .rz-toolbar-right {
   display: flex;
   align-items: center;

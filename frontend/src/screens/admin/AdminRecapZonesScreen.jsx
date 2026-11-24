@@ -101,6 +101,7 @@ const AdminRecapZonesScreen = () => {
   const [search, setSearch] = useState("");
   const [filtre, setFiltre] = useState("tous"); // "tous" | clé de STATUTS
   const [emplFiltre, setEmplFiltre] = useState("tous"); // "tous" | "MAGASIN" | "DOCK"
+  const [lettreFiltre, setLettreFiltre] = useState("tous"); // "tous" | 1re lettre du code
   const rootRef = useRef(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [enDirect, setEnDirect] = useState(false);
@@ -222,6 +223,28 @@ const AdminRecapZonesScreen = () => {
     );
   }, [zonesAvecStatut]);
 
+  // Allée = PREMIÈRE lettre du code de zone (A_1, A_2d… → « A »), en
+  // majuscule. Les codes qui ne commencent pas par une lettre (rare) sont
+  // regroupés sous « # » plutôt qu'éclatés chiffre par chiffre.
+  const lettreOf = (z) => {
+    const c = String(z?.code || "")
+      .trim()
+      .charAt(0)
+      .toUpperCase();
+    return /[A-Z]/.test(c) ? c : "#";
+  };
+
+  // Lettres réellement présentes (avec compteurs), triées — un bouton par
+  // allée, inutile quand tout l'inventaire tient sur une seule.
+  const lettres = useMemo(() => {
+    const c = new Map();
+    for (const { z } of zonesAvecStatut) {
+      const l = lettreOf(z);
+      c.set(l, (c.get(l) || 0) + 1);
+    }
+    return [...c.entries()].sort((a, b) => a[0].localeCompare(b[0], "fr"));
+  }, [zonesAvecStatut]);
+
   // Avancement par emplacement (mêmes règles que le serveur) : affiché dans
   // le bandeau pour lire d'un coup d'œil où en est CHAQUE emplacement.
   const parEmplacement = useMemo(
@@ -234,6 +257,7 @@ const AdminRecapZonesScreen = () => {
     const lot = zonesAvecStatut.filter(({ z, statut }) => {
       if (filtre !== "tous" && statut !== filtre) return false;
       if (emplFiltre !== "tous" && emplOf(z) !== emplFiltre) return false;
+      if (lettreFiltre !== "tous" && lettreOf(z) !== lettreFiltre) return false;
       if (!q) return true;
       return [z.code, z.libelle, z.type].some((v) =>
         (v || "").toLowerCase().includes(q),
@@ -247,13 +271,17 @@ const AdminRecapZonesScreen = () => {
         numeric: true,
       }),
     );
-  }, [zonesAvecStatut, search, filtre, emplFiltre]);
+  }, [zonesAvecStatut, search, filtre, emplFiltre, lettreFiltre]);
 
   const filtreActif =
-    filtre !== "tous" || emplFiltre !== "tous" || search.trim() !== "";
+    filtre !== "tous" ||
+    emplFiltre !== "tous" ||
+    lettreFiltre !== "tous" ||
+    search.trim() !== "";
   const resetFiltres = () => {
     setFiltre("tous");
     setEmplFiltre("tous");
+    setLettreFiltre("tous");
     setSearch("");
   };
 
@@ -473,6 +501,37 @@ const AdminRecapZonesScreen = () => {
                       }
                     >
                       {e} ({n})
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Filtre par allée : PREMIÈRE lettre du code de zone (toutes
+                  les « A… », les « B… »…). Dynamique : un bouton par lettre
+                  présente dans la session. */}
+              {lettres.length > 1 && (
+                <div className="rz-chips">
+                  <span className="rz-filter-lbl">Allée :</span>
+                  <button
+                    className={`rz-chip rz-chip-lettre ${
+                      lettreFiltre === "tous" ? "on" : ""
+                    }`}
+                    onClick={() => setLettreFiltre("tous")}
+                  >
+                    Toutes
+                  </button>
+                  {lettres.map(([l, n]) => (
+                    <button
+                      key={l}
+                      className={`rz-chip rz-chip-lettre ${
+                        lettreFiltre === l ? "on" : ""
+                      }`}
+                      onClick={() =>
+                        setLettreFiltre(lettreFiltre === l ? "tous" : l)
+                      }
+                      title={`${n} zone${n > 1 ? "s" : ""} dont le code commence par « ${l} »`}
+                    >
+                      {l}
+                      <span className="rz-chip-n">{n}</span>
                     </button>
                   ))}
                 </div>
