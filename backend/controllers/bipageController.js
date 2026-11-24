@@ -115,10 +115,12 @@ const buildFilter = (session, query) => {
 };
 
 /**
- * Métadonnées des zones présentes dans les lignes : une entrée par PAIRE
+ * Métadonnées des zones de l'inventaire : une entrée par PAIRE
  * (code, emplacement) réellement bipée → deux zones de même code à des
  * emplacements différents apparaissent bien SÉPARÉMENT. Repli sur le snapshot
- * de session pour les anciennes lignes sans zoneType.
+ * de session pour les anciennes lignes sans zoneType. Les zones du snapshot
+ * SANS ligne sont incluses aussi (24/11/2026) : leur type doit être filtrable
+ * et « Ajouter une ligne » doit pouvoir les viser.
  */
 const buildZonesMeta = async (session, entreprise = null) => {
   const typeByCode = {};
@@ -137,6 +139,21 @@ const buildZonesMeta = async (session, entreprise = null) => {
     const code = p._id.code || "";
     if (!code) continue;
     const type = p._id.type || typeByCode[code] || "";
+    const key = `${code} ${type}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    zonesMeta.push({ code, type });
+  }
+  // + les zones du SNAPSHOT de la session, même SANS ligne bipée
+  // (24/11/2026) : une zone ajoutée à la main avec un type inédit
+  // (ex. DOCK_DQ chez QC) n'était ni au dictionnaire ni dans les lignes —
+  // son type n'apparaissait nulle part et « Ajouter une ligne » ne pouvait
+  // pas la viser. Les zones neutralisées restent exclues (hors inventaire).
+  for (const z of session.zones || []) {
+    if (z.neutralisee) continue;
+    const code = String(z.code || "").trim();
+    if (!code) continue;
+    const type = z.type || "";
     const key = `${code} ${type}`;
     if (seen.has(key)) continue;
     seen.add(key);
