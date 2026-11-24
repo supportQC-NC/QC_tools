@@ -75,6 +75,10 @@ const MAX_LIGNES_COMPARAISON = 50;
 const AdminInventaireBilansScreen = () => {
   const entrepriseId = useSelector(selectGlobalEntrepriseId) || "";
   const skip = { skip: !entrepriseId };
+  // Figer / clôturer / supprimer un bilan : ADMIN SEULEMENT (le serveur
+  // refuse de toute façon). Les responsables consultent bilans et comparaison.
+  const { userInfo } = useSelector((state) => state.auth);
+  const isAdmin = userInfo?.role === "admin";
 
   const bilansQ = useGetBilansInventaireQuery(entrepriseId, skip);
   const compQ = useGetComparaisonBilansQuery(entrepriseId, skip);
@@ -192,6 +196,7 @@ const AdminInventaireBilansScreen = () => {
               <b>{active.nom}</b>
               <span>démarré le {fmtDate(active.createdAt)}</span>
             </div>
+            {isAdmin && (
             <div className="invb-actions">
               <button
                 className="invb-btn"
@@ -215,6 +220,7 @@ const AdminInventaireBilansScreen = () => {
                 </span>
               )}
             </div>
+            )}
           </div>
         )}
         {feedback && (
@@ -330,6 +336,7 @@ const AdminInventaireBilansScreen = () => {
                       >
                         <HiDocumentText /> PDF
                       </button>
+                      {isAdmin && (
                       <button
                         className="invb-mini-btn invb-mini-danger"
                         title="Supprimer ce bilan"
@@ -337,6 +344,7 @@ const AdminInventaireBilansScreen = () => {
                       >
                         <HiTrash />
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))}

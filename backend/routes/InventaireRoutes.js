@@ -9,7 +9,7 @@ import {
   setPhaseManuelle,
   deleteSession,
 } from "../controllers/inventaireZoneController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, admin } from "../middleware/authMiddleware.js";
 import {
   checkEntrepriseAccess,
   checkModuleAccess,
@@ -19,12 +19,15 @@ const router = express.Router();
 
 const canRead = checkModuleAccess("inventaire", "read");
 const canWrite = checkModuleAccess("inventaire", "write");
-const canDelete = checkModuleAccess("inventaire", "delete");
 
 // Toutes les routes : module "inventaire" + accès entreprise (param :entrepriseId)
+// ⚠️ Routeur hérité (clone des routes de zones, audit §3.2) : le CYCLE DE VIE
+// (init, suppression de session) est aligné sur /api/inventaires-zones —
+// ADMIN SEULEMENT (décision client du 24/11/2026). Sans cet alignement, un
+// droit de module suffirait ici à créer ou supprimer un inventaire.
 
 // Initialisation (archive l'actif puis crée)
-router.post("/init/:entrepriseId", protect, canWrite, checkEntrepriseAccess, initInventaireZone);
+router.post("/init/:entrepriseId", protect, admin, checkEntrepriseAccess, initInventaireZone);
 
 // Bip d'un code-barres
 router.post("/:entrepriseId/bip", protect, canWrite, checkEntrepriseAccess, biperZone);
@@ -42,6 +45,6 @@ router.get("/:entrepriseId/historique", protect, canRead, checkEntrepriseAccess,
 router.put("/:entrepriseId/zone/:code/:phase", protect, canWrite, checkEntrepriseAccess, setPhaseManuelle);
 
 // Suppression d'une session archivée
-router.delete("/:entrepriseId/:id", protect, canDelete, checkEntrepriseAccess, deleteSession);
+router.delete("/:entrepriseId/:id", protect, admin, checkEntrepriseAccess, deleteSession);
 
 export default router;

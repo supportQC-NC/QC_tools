@@ -271,9 +271,20 @@ sélectionnables au scan d'un coupon d'inventaire
 (`GET /api/inventaires-zones/:entrepriseId/agents-possibles`) renvoie **tous** les
 comptes actifs, pas seulement ceux de la société — un inventaire est
 régulièrement renforcé par du personnel d'une autre société du groupe, qui doit
-pouvoir être crédité de son travail. La route reste `admin` +
-`checkEntrepriseAccess` et ne renvoie que l'identité (nom, e-mail) : aucun droit,
-aucune donnée société.
+pouvoir être crédité de son travail. La route est gardée par le module
+`inventaire` (write) + `checkEntrepriseAccess` et ne renvoie que l'identité
+(nom, e-mail) : aucun droit, aucune donnée société.
+
+**Accès à l'inventaire par zones (décision client du 24/11/2026)** : les routes
+de `/api/inventaires-zones` ne sont plus toutes `admin`. Trois niveaux —
+consultation en `checkModuleAccess("inventaire", "read")`, actions de terrain
+(coupon, phase manuelle, neutralisation, filtre proformas) en `write`, et le
+**cycle de vie reste admin seulement** (init, annuler, supprimer une session,
+générer/supprimer un bilan). Un responsable à qui l'admin accorde le module
+suit et pilote donc l'inventaire sans pouvoir le créer ni l'annuler ; les
+écrans Progression et Bilans masquent ces boutons aux non-admins. Le clone
+hérité `/api/inventaires` (§3.2) a été aligné sur ce verrou pour `init` et la
+suppression de session.
 
 Chaque compte y porte en plus **`aAccesEntreprise`** (accès à la société de CET
 inventaire, même règle que `getAccessibleEntreprises` — `allEntreprises`, société

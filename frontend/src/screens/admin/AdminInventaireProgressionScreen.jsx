@@ -118,6 +118,12 @@ const zoneStatut = (z) => {
 
 const AdminInventaireProgressionScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
+  // Cycle de vie (initialiser / réinitialiser / annuler) : ADMIN SEULEMENT.
+  // Les responsables suivent et pilotent l'inventaire (module « inventaire »)
+  // mais ne le créent ni ne l'annulent — le serveur refuse de toute façon,
+  // on ne leur montre pas des boutons qui finiraient en 403.
+  const { userInfo } = useSelector((state) => state.auth);
+  const isAdmin = userInfo?.role === "admin";
   const [bipCode, setBipCode] = useState("");
   // Désignation de l'agent : elle a lieu APRÈS le scan. Le coupon ne porte
   // aucune identité, donc le scan ne fait que RÉSOUDRE le code (rien n'est
@@ -711,13 +717,17 @@ const AdminInventaireProgressionScreen = () => {
               <span>{bipFeedback.message}</span>
             </div>
           )}
-          <button
-            className="btn-primary"
-            onClick={() => setShowInitConfirm(true)}
-            disabled={initializing}
-          >
-            <HiPlay /> Initialiser un inventaire
-          </button>
+          {isAdmin ? (
+            <button
+              className="btn-primary"
+              onClick={() => setShowInitConfirm(true)}
+              disabled={initializing}
+            >
+              <HiPlay /> Initialiser un inventaire
+            </button>
+          ) : (
+            <p>Seul un administrateur peut initialiser un inventaire.</p>
+          )}
           <button
             className="btn-secondary"
             onClick={() => setShowHistorique(true)}
@@ -1127,7 +1137,10 @@ const AdminInventaireProgressionScreen = () => {
           {/* ZONE DE DANGER — réinitialisation et annulation de l'inventaire
               EN COURS. Volontairement isolée en bas d'écran, cerclée de rouge
               et doublée de confirmations renforcées : ni l'une ni l'autre ne
-              doit pouvoir être déclenchée par erreur pendant un inventaire. */}
+              doit pouvoir être déclenchée par erreur pendant un inventaire.
+              ADMIN SEULEMENT : le cycle de vie n'est pas ouvert aux
+              responsables (le serveur refuse de toute façon). */}
+          {isAdmin && (
           <div className="danger-zone">
             <div className="danger-zone-head">
               <h2>
@@ -1181,6 +1194,7 @@ const AdminInventaireProgressionScreen = () => {
               </button>
             </div>
           </div>
+          )}
         </>
       )}
 
