@@ -4,11 +4,12 @@
 // trouver un article en magasin, d'après les bipages d'un inventaire — l'actif
 // ou un archivé (« Localisation inventaire 2026 », 2027…).
 //
-// L'agent choisit l'inventaire et l'emplacement (types des fiches
-// d'inventaire : MAGASIN, DOCK…), tape ou douche un code (NART ou gencod,
-// zéros de tête tolérés), et obtient CHAQUE zone où l'article a été bipé,
-// avec les 3 articles bipés AVANT et APRÈS dans la même séquence de scan :
-// les voisins physiques de rayon, les repères pour le retrouver des yeux.
+// L'agent choisit l'inventaire, tape ou douche un code (NART ou gencod, zéros
+// de tête tolérés), et obtient CHAQUE zone où l'article a été bipé avec les
+// 3 articles bipés AVANT et APRÈS dans la même séquence de scan : les voisins
+// physiques de rayon. Le filtre par EMPLACEMENT (MAGASIN/DOCK…) s'applique
+// SUR les résultats, en un clic, sans relancer la recherche — la recherche
+// serveur ramène toujours tous les emplacements.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -24,7 +25,6 @@ import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import {
   useGetInventairesLocalisationQuery,
-  useGetEmplacementsLocalisationQuery,
   useLazyRechercherLocalisationQuery,
   useRenommerInventaireLocalisationMutation,
 } from "../../slices/localisationInventaireApiSlice";
@@ -47,8 +47,9 @@ const AdminLocalisationInventaireScreen = () => {
   const entrepriseObj = entreprises?.find((e) => e._id === entrepriseId);
 
   const [sessionId, setSessionId] = useState("");
-  const [emplacement, setEmplacement] = useState("tous");
   const [code, setCode] = useState("");
+  // Filtre d'emplacement APPLIQUÉ AUX RÉSULTATS (pas à la requête).
+  const [emplFiltre, setEmplFiltre] = useState("tous");
   const [renommage, setRenommage] = useState(null); // null | texte en cours
   const [erreur, setErreur] = useState("");
   const inputRef = useRef(null);
@@ -60,7 +61,7 @@ const AdminLocalisationInventaireScreen = () => {
   // lignes. Resélectionnée au changement de société.
   useEffect(() => {
     setSessionId("");
-    setEmplacement("tous");
+    setEmplFiltre("tous");
     setErreur("");
   }, [entrepriseId]);
   useEffect(() => {
@@ -76,11 +77,6 @@ const AdminLocalisationInventaireScreen = () => {
     [inventaires, sessionId],
   );
 
-  const { data: emplacements } = useGetEmplacementsLocalisationQuery(
-    { entrepriseId, sessionId },
-    { skip: !entrepriseId || !sessionId },
-  );
-
   const [lancerRecherche, { data: resultat, isFetching: recherche }] =
     useLazyRechercherLocalisationQuery();
   const [renommer, { isLoading: renommageEnCours }] =
@@ -90,13 +86,9 @@ const AdminLocalisationInventaireScreen = () => {
     const c = code.trim();
     setErreur("");
     if (!c || !sessionId) return;
+    setEmplFiltre("tous");
     try {
-      await lancerRecherche({
-        entrepriseId,
-        sessionId,
-        code: c,
-        emplacement: emplacement === "tous" ? "" : emplacement,
-      }).unwrap();
+      await lancerRecherche({ entrepriseId, sessionId, code: c }).unwrap();
     } catch (err) {
       setErreur(err?.data?.message || "Recherche impossible.");
     }
@@ -118,6 +110,35 @@ const AdminLocalisationInventaireScreen = () => {
     }
   };
 
+  // ── Filtrage des résultats par emplacement (instantané, côté client) ──
+  const occurrences = resultat?.occurrences || [];
+  const emplacementsResultat = useMemo(() => {
+    // Un bouton par emplacement présent dans les résultats, avec le nombre
+    // de ZONES concernées (pas de séquences : c'est la question de l'agent).
+    const parEmpl = new Map();
+    for (const z of resultat?.totalParZone || []) {
+      parEmpl.set(z.zoneType, (parEmpl.get(z.zoneType) || 0) + 1);
+    }
+    return [...parEmpl.entries()].sort((a, b) =>
+      a[0].localeCompare(b[0], "fr"),
+    );
+  }, [resultat]);
+
+  const zonesAffichees = useMemo(
+    () =>
+      (resultat?.totalParZone || []).filter(
+        (z) => emplFiltre === "tous" || z.zoneType === emplFiltre,
+      ),
+    [resultat, emplFiltre],
+  );
+  const occurrencesAffichees = useMemo(
+    () =>
+      occurrences.filter(
+        (o) => emplFiltre === "tous" || o.zoneType === emplFiltre,
+      ),
+    [occurrences, emplFiltre],
+  );
+
   const libelleInventaire = (i) =>
     `${i.nom || "Inventaire"} — ${i.annee}${
       i.statut === "actif" ? " (en cours)" : ""
@@ -138,8 +159,8 @@ const AdminLocalisationInventaireScreen = () => {
         </div>
       ) : (
         <>
-          {/* ── Choix de l'inventaire + emplacement ── */}
-          <div className="li-criteres">
+          {/* ── Barre inventaire + recherche : une seule bande, l'essentiel ── */}
+          <div className="li-bandeau">
             <div className="li-critere">
               <label>Inventaire</label>
               <div className="li-inv-select">
@@ -197,66 +218,40 @@ const AdminLocalisationInventaireScreen = () => {
                   </>
                 )}
               </div>
-              {inventaire && !inventaire.nbLignes && (
-                <small className="li-avert">
-                  Cet inventaire n'a aucune ligne de bipage en base (antérieur à
-                  la conservation, ou jamais bipé) : rien ne pourra être
-                  localisé.
-                </small>
-              )}
             </div>
 
-            <div className="li-critere">
-              <label>Emplacement</label>
-              <div className="li-chips">
+            <div className="li-critere li-critere-recherche">
+              <label>Article</label>
+              <div className="li-recherche">
+                <div className="li-search">
+                  <HiSearch />
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    placeholder="NART ou code-barres…"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && chercher()}
+                    disabled={!sessionId}
+                  />
+                </div>
                 <button
-                  className={`li-chip ${emplacement === "tous" ? "on" : ""}`}
-                  onClick={() => setEmplacement("tous")}
+                  className="li-btn-localiser"
+                  onClick={chercher}
+                  disabled={!code.trim() || !sessionId || recherche}
                 >
-                  Tous
+                  {recherche ? "Recherche…" : "Localiser"}
                 </button>
-                {(emplacements || []).map((e) => (
-                  <button
-                    key={e.emplacement}
-                    className={`li-chip ${
-                      emplacement === e.emplacement ? "on" : ""
-                    }`}
-                    onClick={() =>
-                      setEmplacement(
-                        emplacement === e.emplacement ? "tous" : e.emplacement,
-                      )
-                    }
-                  >
-                    {e.emplacement}{" "}
-                    <span className="li-chip-n">{e.nbZones}</span>
-                  </button>
-                ))}
               </div>
             </div>
           </div>
 
-          {/* ── Recherche ── */}
-          <div className="li-recherche">
-            <div className="li-search">
-              <HiSearch />
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="NART ou code-barres de l'article…"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && chercher()}
-                disabled={!sessionId}
-              />
-            </div>
-            <button
-              className="btn-primary"
-              onClick={chercher}
-              disabled={!code.trim() || !sessionId || recherche}
-            >
-              {recherche ? "Recherche…" : "Localiser"}
-            </button>
-          </div>
+          {inventaire && !inventaire.nbLignes && (
+            <p className="li-avert">
+              Cet inventaire n'a aucune ligne de bipage en base (antérieur à la
+              conservation, ou jamais bipé) : rien ne pourra être localisé.
+            </p>
+          )}
 
           {erreur && (
             <p className="li-erreur">
@@ -267,13 +262,10 @@ const AdminLocalisationInventaireScreen = () => {
           {/* ── Résultats ── */}
           {resultat && !recherche && (
             <>
-              {resultat.occurrences.length === 0 ? (
+              {occurrences.length === 0 ? (
                 <div className="li-placeholder">
                   <p>
                     « {resultat.code} » n'a pas été bipé dans cet inventaire
-                    {emplacement !== "tous"
-                      ? ` (emplacement ${emplacement})`
-                      : ""}
                     {entrepriseObj?.trigramme
                       ? ` chez ${entrepriseObj.trigramme}`
                       : ""}
@@ -282,50 +274,86 @@ const AdminLocalisationInventaireScreen = () => {
                 </div>
               ) : (
                 <>
-                  {/* Fiche de l'article trouvé : codes COMPLETS, jamais
-                      tronqués — c'est ce que l'agent recopie ou rescanne. */}
+                  {/* Fiche de l'article : codes COMPLETS, jamais tronqués. */}
                   <div className="li-synthese">
                     <div className="li-article">
-                      <strong>
-                        {resultat.occurrences[0].designation || "Article"}
-                      </strong>
+                      <strong>{occurrences[0].designation || "Article"}</strong>
                       <div className="li-article-codes">
                         <span className="li-code-chip">
                           <label>NART</label>
-                          {resultat.occurrences[0].nart || "—"}
+                          {occurrences[0].nart || "—"}
                         </span>
-                        {resultat.occurrences[0].gencod && (
+                        {occurrences[0].gencod && (
                           <span className="li-code-chip">
                             <label>GENCODE</label>
-                            {resultat.occurrences[0].gencod}
+                            {occurrences[0].gencod}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="li-zones-resume">
-                      {resultat.totalParZone.map((z) => (
-                        <div
-                          key={`${z.zoneCode}||${z.zoneType}`}
-                          className="li-zone-pill"
+                  </div>
+
+                  {/* Filtre par EMPLACEMENT — appliqué aux résultats, en un
+                      clic, sans relancer la recherche. */}
+                  {emplacementsResultat.length > 1 && (
+                    <div className="li-empl-filtre">
+                      <span className="li-empl-filtre-lbl">Emplacement :</span>
+                      <button
+                        className={`li-chip li-chip-grande ${
+                          emplFiltre === "tous" ? "on" : ""
+                        }`}
+                        onClick={() => setEmplFiltre("tous")}
+                      >
+                        Tous
+                        <span className="li-chip-n">
+                          {resultat.totalParZone.length} zone
+                          {resultat.totalParZone.length > 1 ? "s" : ""}
+                        </span>
+                      </button>
+                      {emplacementsResultat.map(([empl, nb]) => (
+                        <button
+                          key={empl}
+                          className={`li-chip li-chip-grande ${
+                            emplFiltre === empl ? "on" : ""
+                          }`}
+                          onClick={() =>
+                            setEmplFiltre(emplFiltre === empl ? "tous" : empl)
+                          }
                         >
-                          <b>{z.zoneCode}</b>
-                          <span>{z.zoneLibelle || "—"}</span>
-                          <em>{z.zoneType}</em>
-                        </div>
+                          {empl}
+                          <span className="li-chip-n">
+                            {nb} zone{nb > 1 ? "s" : ""}
+                          </span>
+                        </button>
                       ))}
                     </div>
+                  )}
+
+                  {/* Zones où l'article a été trouvé — LARGES et lisibles. */}
+                  <div className="li-zones-resume">
+                    {zonesAffichees.map((z) => (
+                      <div
+                        key={`${z.zoneCode}||${z.zoneType}`}
+                        className="li-zone-pill"
+                      >
+                        <b>{z.zoneCode}</b>
+                        <span>{z.zoneLibelle || "—"}</span>
+                        <em>{z.zoneType}</em>
+                      </div>
+                    ))}
                   </div>
+
                   {resultat.tronque && (
                     <p className="li-avert">
                       Résultats tronqués : ce code sort dans un très grand
-                      nombre de zones, affinez avec l'emplacement.
+                      nombre de zones.
                     </p>
                   )}
 
-                  {/* Une carte par séquence de bipage : la cible au milieu de
-                      ses voisins de scan (= ses voisins physiques de rayon). */}
+                  {/* Une carte PLEINE LARGEUR par séquence de bipage : la
+                      cible au milieu de ses voisins de rayon. */}
                   <div className="li-occurrences">
-                    {resultat.occurrences.map((o) => (
+                    {occurrencesAffichees.map((o) => (
                       <div className="li-occ" key={o.ligneId}>
                         <div className="li-occ-head">
                           <div className="li-occ-zone">

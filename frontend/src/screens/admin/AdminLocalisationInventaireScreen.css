@@ -1,6 +1,8 @@
 /* src/screens/admin/AdminLocalisationInventaireScreen.css
-   Localisation inventaire : critères, recherche, zones et voisins de rayon.
-   Charte globale (--bg-*, --text-*, --border, --accent). */
+   Localisation inventaire : bandeau inventaire + recherche, filtre
+   d'emplacement sur les résultats, zones larges, voisins de rayon pleine
+   largeur. Charte globale (--bg-*, --text-*, --border, --accent), avec un
+   accent mis sur le CONTRASTE fond / texte (écran lu debout, en rayon). */
 
 .loc-inv {
   padding: 24px 16px 48px;
@@ -28,6 +30,7 @@
   padding: 48px 16px;
   text-align: center;
   color: var(--text-secondary);
+  font-size: 1rem;
 }
 
 .li-placeholder svg {
@@ -35,30 +38,36 @@
   color: var(--text-muted);
 }
 
-/* ── Critères (inventaire + emplacement) ── */
-.li-criteres {
+/* ── Bandeau : inventaire + recherche sur une seule bande ── */
+.li-bandeau {
   display: flex;
   flex-wrap: wrap;
-  gap: 18px;
-  padding: 14px 16px;
+  gap: 20px 32px;
+  align-items: flex-end;
+  padding: 16px 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  margin-bottom: 14px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
 .li-critere {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 260px;
+  gap: 7px;
+  min-width: 280px;
+}
+
+.li-critere-recherche {
+  flex: 1;
 }
 
 .li-critere > label {
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--text-secondary);
 }
 
@@ -70,25 +79,27 @@
 
 .li-inv-select select,
 .li-inv-select input {
-  padding: 8px 10px;
+  padding: 11px 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-primary);
-  font-size: 0.9rem;
-  min-width: 240px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-width: 250px;
 }
 
 .li-btn-ico {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 11px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
+  font-size: 1rem;
 }
 
 .li-btn-ico:hover {
@@ -100,70 +111,35 @@
   color: var(--success);
 }
 
-.li-avert {
-  color: #f59e0b;
-  font-size: 0.8rem;
-}
-
-.li-chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.li-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.li-chip:hover {
-  color: var(--text-primary);
-}
-
-.li-chip.on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--bg-secondary);
-}
-
-.li-chip-n {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
 /* ── Recherche ── */
 .li-recherche {
   display: flex;
   gap: 10px;
-  align-items: center;
+  align-items: stretch;
   flex-wrap: wrap;
-  margin-bottom: 16px;
 }
 
 .li-search {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: 10px;
+  padding: 0 14px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 9px;
-  min-width: 300px;
+  border-radius: 10px;
+  min-width: 280px;
   flex: 1;
-  max-width: 480px;
+  max-width: 560px;
+}
+
+.li-search:focus-within {
+  border-color: var(--accent);
 }
 
 .li-search svg {
   color: var(--text-muted);
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .li-search input {
@@ -171,8 +147,38 @@
   background: transparent;
   color: var(--text-primary);
   outline: none;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   width: 100%;
+  padding: 11px 0;
+}
+
+.li-btn-localiser {
+  padding: 0 26px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #0f0f1a;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.li-btn-localiser:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.li-btn-localiser:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.li-avert {
+  color: #f59e0b;
+  font-size: 0.88rem;
+  margin: 0 0 12px;
 }
 
 .li-erreur {
@@ -180,36 +186,31 @@
   align-items: center;
   gap: 6px;
   color: #ff6b6b;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   margin: 0 0 12px;
 }
 
 /* ── Fiche de l'article trouvé ── */
 .li-synthese {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  align-items: flex-start;
-  justify-content: space-between;
   padding: 18px 20px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
   border-radius: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
 .li-article {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 260px;
-  flex: 1;
+  gap: 12px;
 }
 
 .li-article strong {
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   line-height: 1.3;
+  color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
@@ -217,75 +218,141 @@
 .li-article-codes {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .li-code-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: 8px 14px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  color: var(--text-primary);
 }
 
 .li-code-chip label {
   font-family: inherit;
-  font-size: 0.65rem;
+  font-size: 0.66rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--accent);
 }
 
-.li-zones-resume {
+/* ── Filtre par emplacement — SUR les résultats, instantané ── */
+.li-empl-filtre {
   display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.li-empl-filtre-lbl {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+}
+
+.li-chip {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.li-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.li-chip.on {
+  border-color: var(--accent);
+  color: #0f0f1a;
+  background: var(--accent);
+}
+
+.li-chip.on .li-chip-n {
+  color: #0f0f1a;
+  opacity: 0.75;
+}
+
+.li-chip-grande {
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.li-chip-n {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+/* ── Zones où l'article est trouvé : tuiles LARGES et lisibles ── */
+.li-zones-resume {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .li-zone-pill {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 14px;
-  background: var(--bg-tertiary);
+  gap: 4px;
+  padding: 14px 18px;
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 10px;
-  min-width: 130px;
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .li-zone-pill b {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
+  color: var(--accent);
 }
 
 .li-zone-pill span {
-  font-size: 0.78rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
 .li-zone-pill em {
   font-style: normal;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.07em;
   color: var(--text-secondary);
 }
 
-/* ── Occurrences (une carte par séquence de bipage) ──
-   Cartes LARGES : les désignations et gencods sortent en entier, jamais
-   tronqués — c'est toute la valeur de l'écran. */
+/* ── Occurrences : UNE carte PLEINE LARGEUR par séquence de bipage ──
+   Les désignations et gencods sortent en entier, jamais tronqués. */
 .li-occurrences {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
@@ -294,7 +361,7 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
 }
 
 .li-occ-head {
@@ -302,46 +369,46 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--bg-tertiary);
+  gap: 8px 16px;
+  padding: 14px 18px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-tertiary));
   border-bottom: 1px solid var(--border);
 }
 
 .li-occ-zone {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .li-occ-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   color: var(--accent);
 }
 
 .li-occ-lib {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
 .li-occ-empl {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  letter-spacing: 0.07em;
+  color: var(--text-primary);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 3px 10px;
+  padding: 4px 12px;
 }
 
 .li-occ-meta {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
 }
 
@@ -351,15 +418,15 @@
 .li-voisins {
   list-style: none;
   margin: 0;
-  padding: 8px 0;
+  padding: 10px 0;
 }
 
 .li-voisins li {
   display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 12px;
+  grid-template-columns: 56px 1fr;
+  gap: 16px;
   align-items: center;
-  padding: 8px 16px;
+  padding: 10px 18px;
 }
 
 .li-voisins li + li {
@@ -370,54 +437,59 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 28px;
-  border-radius: 8px;
+  width: 46px;
+  height: 34px;
+  border-radius: 10px;
   background: var(--bg-tertiary);
-  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 800;
 }
 
 .li-v-infos {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
 .li-v-des {
-  font-size: 0.92rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   line-height: 1.35;
+  color: var(--text-primary);
   overflow-wrap: anywhere;
   white-space: normal;
 }
 
 .li-v-codes {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  opacity: 0.85;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px 12px;
   overflow-wrap: anywhere;
 }
 
 .li-v-codes em {
   font-style: normal;
-  font-size: 0.62rem;
+  font-size: 0.64rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  color: var(--accent);
   align-self: center;
 }
 
 /* La ligne CIBLE : l'article recherché, mis en évidence franche. */
 .li-voisins li.cible {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-left: 3px solid var(--accent);
-  padding-left: 13px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-left: 4px solid var(--accent);
+  padding-left: 14px;
   border-top-color: transparent;
 }
 
@@ -427,15 +499,16 @@
 
 .li-voisins li.cible .li-v-pos {
   background: var(--accent);
+  border-color: var(--accent);
   color: #0f0f1a;
-  font-size: 1rem;
+  font-size: 1.15rem;
 }
 
 .li-voisins li.cible .li-v-des {
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 1.2rem;
 }
 
 .li-voisins li.cible .li-v-codes {
-  color: var(--text-primary);
+  opacity: 1;
 }
