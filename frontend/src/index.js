@@ -64,6 +64,7 @@ import AdminSuiviPreparationScreen from "./screens/admin/AdminSuiviPreparationSc
 import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
 import AdminInventaireDashboardScreen from "./screens/admin/AdminInventaireDashboardScreen";
 import AdminLocalisationInventaireScreen from "./screens/admin/AdminLocalisationInventaireScreen";
+import AdminVerificationPointRougeScreen from "./screens/admin/AdminVerificationPointRougeScreen";
 import AdminInventaireBilansScreen from "./screens/admin/AdminInventaireBilansScreen";
 import AdminZonesRetoucheesScreen from "./screens/admin/AdminZonesRetoucheesScreen";
 import AdminEcartsZonesScreen from "./screens/admin/AdminEcartsZonesScreen";
@@ -492,6 +493,15 @@ const router = createBrowserRouter(
         <Route
           path="/admin/localisation-inventaire"
           element={<AdminLocalisationInventaireScreen />}
+        />
+      </Route>
+
+      {/* Terrain · Vérification point rouge -> module "verification_inventaire"
+          (module à part entière ; version collecteur à venir). */}
+      <Route element={<ModuleRoute module="verification_inventaire" />}>
+        <Route
+          path="/admin/verification-point-rouge"
+          element={<AdminVerificationPointRougeScreen />}
         />
       </Route>
 

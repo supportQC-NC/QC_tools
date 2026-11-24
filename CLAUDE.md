@@ -817,6 +817,22 @@ zones où l'article a été bipé (inventaire au choix, « Localisation inventai
 (`LigneBipage.ordre`) — les voisins physiques de rayon. Renommage du nom
 d'affichage d'une session possible (jamais le slug du dossier).
 
+**Vérification point rouge (module `verification_inventaire`, 24/11/2026)** :
+dernière passe de l'inventaire — au papillonnage la quantité comptée est
+écrite sur un scotch, au bipage un point rouge est collé après chaque scan ;
+quand TOUTES les zones d'une **allée** (1re lettre du code) sont contrôlées,
+un agent bipe les scotchs sans point rouge (écran
+`/admin/verification-point-rouge`, API `/api/verification-inventaire`,
+version collecteur à venir). Croisement à l'ALLÉE : trouvé à la bonne
+quantité → « conforme » **tracé** (`VerificationInventaireModel`) ; absent ou
+quantité différente → **le scotch fait foi**, ligne de delta (négatif
+accepté) dans `LigneBipage`, source **`verification`**, rangée en fin de la
+zone désignée. ⚠️ Ces lignes ne touchent **ni les fiches de contrôle ni les
+`.dat` de zones** (aucune régénération/impression — `datFileName` vide) mais
+comptent dans la feuille d'écarts, le récap/bilan (`ecartsZonesService`) et
+l'intégration Stock XL ; elles sont filtrables dans le Détail des bipages
+(provenance « Vérif point rouge », pastille rouge).
+
 Les demandes de bipage se créent depuis une **proforma**, un **gisement**, un
 **groupe** (famille d'articles), la liste **« rayon vide »** ou un panier manuel — une demande par gisement /
 par groupe, pour que deux agents puissent se partager le travail. ⚠️ La sélection

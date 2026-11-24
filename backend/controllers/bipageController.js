@@ -90,21 +90,29 @@ const buildFilter = (session, query) => {
   }
 
   // Provenance : ne garder que ce qui a été touché à la main.
-  //   ajoutees   : lignes créées depuis un écran (source "manuel" OU
-  //                "controle" — les deux sont des saisies à la main) ;
-  //   controle   : seulement les ajouts de l'écran « Ajout contrôle
-  //                inventaire » (provenance distincte, demande client) ;
-  //   modifiees  : lignes issues du terrain dont le NART ou la quantité a été
-  //                corrigé ;
-  //   touchees   : le tout — « tout ce qui n'est pas brut de
-  //                collecteur », la question qu'on se pose en fin d'inventaire.
+  //   ajoutees     : lignes créées depuis un écran (source "manuel",
+  //                  "controle" ou "verification" — des saisies à la main) ;
+  //   controle     : seulement les ajouts de l'écran « Ajout contrôle
+  //                  inventaire » (provenance distincte, demande client) ;
+  //   verification : seulement les ajouts de la VÉRIFICATION POINT ROUGE
+  //                  (24/11/2026) — à relire séparément pour les contrôler ;
+  //   modifiees    : lignes issues du terrain dont le NART ou la quantité a
+  //                  été corrigé ;
+  //   touchees     : le tout — « tout ce qui n'est pas brut de
+  //                  collecteur », la question qu'on se pose en fin
+  //                  d'inventaire.
   if (query.marque === "ajoutees")
-    clauses.push({ source: { $in: ["manuel", "controle"] } });
+    clauses.push({ source: { $in: ["manuel", "controle", "verification"] } });
   else if (query.marque === "controle") clauses.push({ source: "controle" });
+  else if (query.marque === "verification")
+    clauses.push({ source: "verification" });
   else if (query.marque === "modifiees") clauses.push({ modifie: true });
   else if (query.marque === "touchees") {
     clauses.push({
-      $or: [{ source: { $in: ["manuel", "controle"] } }, { modifie: true }],
+      $or: [
+        { source: { $in: ["manuel", "controle", "verification"] } },
+        { modifie: true },
+      ],
     });
   }
 
@@ -2819,4 +2827,7 @@ export {
   importProformasBipage,
   modeleExcelBipage,
   importExcelBipage,
+  // Réutilisée par la Vérification point rouge (verificationInventaire…) :
+  // même résolution de code que partout (zéros de tête, renvois GENDOUBL).
+  resoudreArticleActif,
 };

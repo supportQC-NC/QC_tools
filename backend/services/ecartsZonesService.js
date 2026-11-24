@@ -146,7 +146,10 @@ export const calculerEcartsZones = async (entreprise, session) => {
     const lignesImport = await LigneBipage.find({
       session: session._id,
       $or: [
-        { source: { $in: ["proforma", "excel"] } },
+        // "verification" = ajouts de la Vérification point rouge : jamais
+        // portés par une collecte ni par un .dat, ils n'existent que dans
+        // LigneBipage — sans eux le récap et le bilan perdraient ces comptages.
+        { source: { $in: ["proforma", "excel", "verification"] } },
         {
           source: { $in: [null, ""] },
           datFileName: { $regex: /^(?:deduction |excel |proforma )/ },

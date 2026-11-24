@@ -60,6 +60,8 @@ import inventaireZoneRoutes from "./routes/inventaireZoneRoutes.js";
 import inventaireCollecteRoutes from "./routes/inventaireCollecteRoutes.js";
 // ========== ROUTES LOCALISATION INVENTAIRE ==========
 import localisationInventaireRoutes from "./routes/localisationInventaireRoutes.js";
+// ========== ROUTES VÉRIFICATION POINT ROUGE ==========
+import verificationInventaireRoutes from "./routes/verificationInventaireRoutes.js";
 // ========== ROUTES FICHES DE CONTRÔLE (.DAT) ==========
 import ficheControleRoutes from "./routes/ficheControleRoutes.js";
 // ========== ROUTES DÉTAIL DES BIPAGES ==========
@@ -235,6 +237,8 @@ app.use("/api/inventaires-zones", inventaireZoneRoutes);
 app.use("/api/inventaires-collecte", inventaireCollecteRoutes);
 // ========== ROUTES LOCALISATION INVENTAIRE ==========
 app.use("/api/localisation-inventaire", localisationInventaireRoutes);
+// ========== ROUTES VÉRIFICATION POINT ROUGE ==========
+app.use("/api/verification-inventaire", verificationInventaireRoutes);
 // ========== ROUTES FICHES DE CONTRÔLE (.DAT) ==========
 app.use("/api/fiches-controle", ficheControleRoutes);
 // ========== ROUTES DÉTAIL DES BIPAGES ==========

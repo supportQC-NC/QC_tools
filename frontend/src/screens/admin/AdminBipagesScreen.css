@@ -944,6 +944,11 @@
   color: #22c55e;
 }
 
+/* Vérif point rouge : la couleur DU point rouge, évidemment. */
+.marq-verification {
+  color: #ff6b6b;
+}
+
 /* ── Ajout manuel d'une ligne ──────────────────────────────────────────── */
 .ajout-bar {
   display: flex;

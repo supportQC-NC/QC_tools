@@ -65,9 +65,16 @@ const ligneBipageSchema = new mongoose.Schema(
     // la saisie, repliée sur la pseudo-zone "CONTROLE". Provenance distincte
     // de "manuel" (demande client) : on doit pouvoir relire les ajouts de
     // contrôle séparément des reprises faites zone par zone.
+    // "verification" : ligne issue de la VÉRIFICATION POINT ROUGE (24/11/2026,
+    // module verification_inventaire) — un scotch sans point rouge dont le
+    // code ne correspondait à aucun bipage de l'ALLÉE (ou pas à la bonne
+    // quantité : la ligne porte alors le DELTA, le scotch fait foi). ⚠️ Ces
+    // lignes n'alimentent NI les fiches de contrôle NI les .dat de zones
+    // (décision client) : elles comptent dans les écarts et l'intégration
+    // Stock XL seulement, et doivent rester filtrables séparément.
     source: {
       type: String,
-      enum: ["dat", "proforma", "excel", "manuel", "controle"],
+      enum: ["dat", "proforma", "excel", "manuel", "controle", "verification"],
       default: "dat",
     },
     // N° de proforma ou nom du fichier Excel d'origine.

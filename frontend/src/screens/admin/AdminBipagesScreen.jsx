@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   HiClipboardList,
   HiClipboardCheck,
+  HiBadgeCheck,
   HiDownload,
   HiDocumentReport,
   HiTable,
@@ -86,7 +87,9 @@ const CelluleCodeBipe = ({ ligne }) => {
             ? "Saisi à la main depuis cet écran"
             : ligne.source === "controle"
               ? "Saisi depuis l'écran Ajout contrôle inventaire"
-              : "Code réellement bipé par le collecteur"
+              : ligne.source === "verification"
+                ? "Bipé pendant la Vérification point rouge (scotch sans point)"
+                : "Code réellement bipé par le collecteur"
         }
       >
         {scanne}
@@ -1058,6 +1061,7 @@ const AdminBipagesScreen = () => {
               <option value="">Toutes les lignes</option>
               <option value="ajoutees">Ajoutées à la main</option>
               <option value="controle">Ajouts contrôle</option>
+              <option value="verification">Vérif point rouge</option>
               <option value="modifiees">Modifiées</option>
               <option value="touchees">Ajoutées + modifiées</option>
             </select>
@@ -1491,7 +1495,9 @@ const AdminBipagesScreen = () => {
                       className={`${l.found ? "" : "row-unknown"} ${
                         l.modeImport === "deduction" ? "row-deduction" : ""
                       } ${
-                        l.source === "manuel" || l.source === "controle"
+                        l.source === "manuel" ||
+                        l.source === "controle" ||
+                        l.source === "verification"
                           ? "row-manuelle"
                           : ""
                       } ${l.modifie ? "row-modifiee" : ""}`.trim()}
@@ -1514,6 +1520,14 @@ const AdminBipagesScreen = () => {
                             title={`Bipage ajouté au CONTRÔLE (écran Ajout contrôle inventaire)${
                               l.agentNom ? ` par ${l.agentNom}` : ""
                             }`}
+                          />
+                        )}
+                        {l.source === "verification" && (
+                          <HiBadgeCheck
+                            className="marq marq-verification"
+                            title={`VÉRIF POINT ROUGE : scotch sans point rouge, le scotch fait foi (${
+                              l.sourceRef || "allée ?"
+                            })${l.agentNom ? ` — ${l.agentNom}` : ""}. Ni fiche ni .dat régénérés.`}
                           />
                         )}
                         {l.modifie && (

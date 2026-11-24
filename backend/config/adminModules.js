@@ -23,6 +23,11 @@ export const PERMISSION_MODULES = [
     label: "Localisation inventaire",
     group: "gestion",
   },
+  {
+    key: "verification_inventaire",
+    label: "Vérification point rouge",
+    group: "gestion",
+  },
   { key: "reapro", label: "Reapro", group: "gestion" },
   { key: "demande_reappro", label: "Listes de réappro", group: "gestion" },
   { key: "proforma", label: "Proformas", group: "gestion" },

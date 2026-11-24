@@ -17,6 +17,7 @@ export const apiSlice = createApi({
     "InventaireZone",
     "InventaireBilan",
     "LocalisationInventaire",
+    "VerificationInventaire",
     "FicheControle",
     "Surveillance",
     "Bipage",

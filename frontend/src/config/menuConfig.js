@@ -34,7 +34,8 @@ import {
   HiPhotograph,
   HiPresentationChartBar,
   HiArchive,
-  HiLocationMarker
+  HiLocationMarker,
+  HiBadgeCheck
 } from "react-icons/hi";
 import { moduleForPath, estCommercial } from "./adminModules";
 
@@ -192,6 +193,13 @@ export const moduleMenuStructure = [
         label: "Localisation inventaire",
         path: "/admin/localisation-inventaire",
         icon: HiLocationMarker,
+      },
+      {
+        // Balayage des scotchs sans point rouge en fin d'inventaire :
+        // croisement avec les bipages de l'allée, ajout des oublis.
+        label: "Vérification point rouge",
+        path: "/admin/verification-point-rouge",
+        icon: HiBadgeCheck,
       },
       {
         // Affichage MURAL (TV) : avancement global + par emplacement, en
@@ -765,6 +773,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
   "/admin/localisation-inventaire":
     "Où trouver un article en magasin : zones où il a été bipé à l'inventaire, avec les articles voisins de rayon.",
+  "/admin/verification-point-rouge":
+    "Fin d'inventaire : biper les scotchs sans point rouge d'une allée contrôlée, croiser avec les bipages et rattraper les oublis.",
   "/admin/suivi-inventaire":
     "Affichage mural plein écran : avancement de l'inventaire par emplacement, actualisé en continu.",
   "/admin/inventaire-bilans":
@@ -961,8 +971,12 @@ const DOSSIER_TERRAIN = [
     icon: "truck",
     parent: null,
     // La localisation d'articles est un outil du quotidien, pas un écran de
-    // pilotage d'inventaire : elle vit à la racine de Terrain.
-    items: ["/admin/localisation-inventaire"],
+    // pilotage d'inventaire : elle vit à la racine de Terrain, comme la
+    // vérification point rouge (dernière passe de l'inventaire, au bipeur).
+    items: [
+      "/admin/localisation-inventaire",
+      "/admin/verification-point-rouge",
+    ],
   },
   {
     key: "terrain_reappro",

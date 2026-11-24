@@ -34,6 +34,12 @@ const permissionSchema = new mongoose.Schema(
         write: { type: Boolean, default: false },
         delete: { type: Boolean, default: false },
       },
+      // Vérification point rouge (balayage des scotchs en fin d'inventaire)
+      verification_inventaire: {
+        read: { type: Boolean, default: false },
+        write: { type: Boolean, default: false },
+        delete: { type: Boolean, default: false },
+      },
       // Reapro
       reapro: {
         read: { type: Boolean, default: false },
