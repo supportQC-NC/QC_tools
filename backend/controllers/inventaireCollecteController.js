@@ -1248,6 +1248,9 @@ const resoudreZone = asyncHandler(async (req, res) => {
   // clé par (code + type) pour ne pas confondre MAGASIN et DOCK.
   const zones = [];
   for (const z of zonesFound) {
+    // ⚠️ Bornée par SESSION (audit 24/11/2026) : les collectes des inventaires
+    // archivés restent en base — sans cette borne, une collecte « en cours »
+    // oubliée l'an dernier serait proposée en reprise cette année.
     // eslint-disable-next-line no-await-in-loop
     const enCours = await InventaireCollecte.findOne({
       entreprise: entreprise._id,
@@ -1255,6 +1258,7 @@ const resoudreZone = asyncHandler(async (req, res) => {
       zoneCode: z.code,
       zoneType: z.type,
       status: "en_cours",
+      session: sessionActive ? sessionActive._id : null,
     });
     // La zone a-t-elle DÉJÀ été déposée (par n'importe quel agent) ? L'app
     // avertit alors « zone déjà bipée, voulez-vous continuer ? » : si l'agent
@@ -1324,12 +1328,23 @@ const createCollecte = asyncHandler(async (req, res) => {
     throw new Error("Zone non trouvée");
   }
 
+  // Session active éventuelle — chargée AVANT la reprise : elle borne la
+  // recherche de collecte en cours (audit 24/11/2026). Sans cette borne, une
+  // collecte « en_cours » oubliée d'un inventaire ARCHIVÉ serait reprise, puis
+  // réétiquetée sur la session active au dépôt : des quantités de l'an dernier
+  // partiraient dans le .dat de cette année.
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
   // Reprise si une collecte est déjà en cours pour cette zone (code + emplacement)
   const enCoursQuery = {
     entreprise: entreprise._id,
     user: req.user._id,
     zoneCode: zone.code,
     status: "en_cours",
+    session: session ? session._id : null,
   };
   if (emplacement) enCoursQuery.zoneType = zone.type;
   const enCours = await InventaireCollecte.findOne(enCoursQuery);
@@ -1337,12 +1352,6 @@ const createCollecte = asyncHandler(async (req, res) => {
     articleCacheService.preload(entreprise).catch(() => {});
     return res.json(enCours);
   }
-
-  // Session active éventuelle (pour mémoriser le dossier de dépôt)
-  const session = await InventaireZoneSession.findOne({
-    entreprise: entreprise._id,
-    statut: "actif",
-  });
 
   // RE-BIPAGE : la zone a-t-elle déjà été déposée ? On ne refuse PAS (l'app a
   // déjà demandé confirmation à l'agent au scan du QR) : on ouvre une collecte
@@ -1395,10 +1404,19 @@ const createCollecte = asyncHandler(async (req, res) => {
 const getCollectesEnCours = asyncHandler(async (req, res) => {
   const { entrepriseId } = req.params;
 
+  // Bornée par la session ACTIVE (audit 24/11/2026) : sans elle, la liste de
+  // reprise de l'agent se remplirait de zones fantômes des inventaires
+  // archivés, année après année.
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entrepriseId,
+    statut: "actif",
+  });
+
   const collectes = await InventaireCollecte.find({
     entreprise: entrepriseId,
     user: req.user._id,
     status: "en_cours",
+    session: session ? session._id : null,
   }).sort({ updatedAt: -1 });
 
   res.json(collectes.map(collecteResume));
@@ -1947,12 +1965,23 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
     throw new Error("La zone est vide");
   }
 
+  // Session active — chargée tôt : elle borne AUSSI le dédoublonnage
+  // `offlineId` ci-dessous (audit 24/11/2026). Les collectes archivées restant
+  // en base, un offlineId réutilisé par l'app d'une année sur l'autre
+  // (compteur local réinitialisé, restauration…) avalerait sinon un dépôt
+  // légitime en silence — « Zone déjà reçue » alors que rien n'a été compté.
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+
   // Déjà reçu (retry réseau) : on répond succès sans recréer quoi que ce soit.
   const idOffline = String(offlineId || "").trim();
   if (idOffline) {
     const existante = await InventaireCollecte.findOne({
       entreprise: entreprise._id,
       offlineId: idOffline,
+      session: session ? session._id : null,
     });
     if (existante) {
       return res.json({
@@ -1976,11 +2005,6 @@ const depotHorsLigne = asyncHandler(async (req, res) => {
         type: new RegExp(`^${escapeRegex(type)}$`, "i"),
       }))) ||
     (await Zone.findOne({ entreprise: entreprise._id, code: rxCode }));
-
-  const session = await InventaireZoneSession.findOne({
-    entreprise: entreprise._id,
-    statut: "actif",
-  });
 
   // Même règle qu'en ligne : une zone déjà déposée n'est pas un refus, la
   // collecte hors ligne devient un COMPLÉMENT et le .DAT portera le cumul.
@@ -2373,8 +2397,10 @@ const getSuiviBipage = asyncHandler(async (req, res) => {
     throw new Error("Entreprise non trouvée");
   }
 
-  // Sessions connues (sélecteur de l'écran). ⚠️ Réinitialiser un inventaire
-  // purge les collectes : en pratique seule la session courante a des bipages.
+  // Sessions connues (sélecteur de l'écran). ⚠️ Depuis le 24/11/2026 la
+  // réinitialisation NE PURGE PLUS les collectes : chaque session archivée
+  // garde ses bipages, et « Tous les inventaires » (?session=toutes) cumule
+  // donc RÉELLEMENT plusieurs années — totaux et synthèse par agent compris.
   const sessions = await InventaireZoneSession.find({ entreprise: entreprise._id })
     .select("nom statut createdAt archivedAt")
     .sort({ createdAt: -1 })

@@ -33,7 +33,8 @@ import {
   HiCog,
   HiPhotograph,
   HiPresentationChartBar,
-  HiArchive
+  HiArchive,
+  HiLocationMarker
 } from "react-icons/hi";
 import { moduleForPath, estCommercial } from "./adminModules";
 
@@ -184,6 +185,13 @@ export const moduleMenuStructure = [
         label: "Récap par zone",
         path: "/admin/recap-zones",
         icon: HiViewGrid,
+      },
+      {
+        // Où trouver un article, d'après les bipages d'un inventaire (actif
+        // ou archivé). Rangé par défaut dans le dossier Terrain.
+        label: "Localisation inventaire",
+        path: "/admin/localisation-inventaire",
+        icon: HiLocationMarker,
       },
       {
         // Affichage MURAL (TV) : avancement global + par emplacement, en
@@ -755,6 +763,8 @@ export const DEFAULT_MENU_HINTS = {
   "/admin/zones": "Fiches d'inventaire par zone.",
   "/admin/inventaire-progression": "Progression de l'inventaire en cours.",
   "/admin/recap-zones": "Récapitulatif de l'inventaire par zone.",
+  "/admin/localisation-inventaire":
+    "Où trouver un article en magasin : zones où il a été bipé à l'inventaire, avec les articles voisins de rayon.",
   "/admin/suivi-inventaire":
     "Affichage mural plein écran : avancement de l'inventaire par emplacement, actualisé en continu.",
   "/admin/inventaire-bilans":
@@ -945,7 +955,15 @@ export const getMenuCatalog = () => {
 // Les onglets cités ici sont retirés des chapitres dérivés de la structure code
 // (sinon ils apparaîtraient deux fois).
 const DOSSIER_TERRAIN = [
-  { key: "terrain", label: "Terrain", icon: "truck", parent: null, items: [] },
+  {
+    key: "terrain",
+    label: "Terrain",
+    icon: "truck",
+    parent: null,
+    // La localisation d'articles est un outil du quotidien, pas un écran de
+    // pilotage d'inventaire : elle vit à la racine de Terrain.
+    items: ["/admin/localisation-inventaire"],
+  },
   {
     key: "terrain_reappro",
     label: "Réappro",

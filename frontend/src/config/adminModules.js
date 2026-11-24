@@ -19,6 +19,11 @@ export const PERMISSION_MODULES = [
   // et ▸ Fournisseurs, ainsi que la recherche article de l'app mobile.
   { key: "stock", label: "Articles & stock", group: "gestion" },
   { key: "inventaire", label: "Inventaire", group: "gestion" },
+  {
+    key: "localisation_inventaire",
+    label: "Localisation inventaire",
+    group: "gestion",
+  },
   { key: "reapro", label: "Reapro", group: "gestion" },
   { key: "demande_reappro", label: "Listes de réappro", group: "gestion" },
   { key: "proforma", label: "Proformas", group: "gestion" },
@@ -146,6 +151,7 @@ export const PATH_MODULE_MAP = [
   { path: "/admin/inventaire-bilans", key: "inventaire" },
   { path: "/admin/suivi-bipage", key: "inventaire" },
   { path: "/admin/agents-inventaire", key: "inventaire" },
+  { path: "/admin/localisation-inventaire", key: "localisation_inventaire" },
   { path: "/admin/bipages", key: "bipage" },
   { path: "/admin/ajout-controle-inventaire", key: "bipage" },
   { path: "/admin/demandes-bipage", key: "bipage" },

@@ -782,7 +782,9 @@ filiale) exactement pour ça. État au 11/09/2026 : 0 article mère perdu,
 Repères pour situer un écran / un routeur. Les préfixes API sont sous `/api/`.
 
 **Gestion (terrain)** — `stock` (recherche article), `inventaire` (zones,
-progression, récap, suivi bipage, agents de l'inventaire, fiches de contrôle), `reapro`,
+progression, récap, suivi bipage, agents de l'inventaire, fiches de contrôle),
+`localisation_inventaire` (où trouver un article, d'après les bipages
+conservés), `reapro`,
 `demande_reappro` (+ `reapro` pour **Réappro Mécalac**, entrepôt → rayon),
 `proforma`, `ctr_commande`, `reception` + `reception_manuelle`,
 `prep_commande` + `prep_commande_manuelle`, `envoi_cde_fournisseur`,
@@ -794,9 +796,26 @@ coexistent et ne doivent pas être confondus : `/admin/suivi-demandes-bipage`
 (module `bipage`) suit les **demandes envoyées aux collecteurs** depuis le web
 — qui a bipé quoi, combien de lignes, en combien de temps — et vit avec les
 documents `DemandeBipage` ; `/admin/suivi-bipage` (module `inventaire`) suit le
-**comptage d'inventaire par zone** et se vide à chaque réinitialisation
-d'inventaire. Le premier est dans le dossier Terrain ▸ Bipage, le second dans
-Inventaire Zones.
+**comptage d'inventaire par zone**. Le premier est dans le dossier Terrain ▸
+Bipage, le second dans Inventaire Zones.
+
+**Conservation des bipages & Localisation inventaire (24/11/2026)** : la
+réinitialisation d'un inventaire **ne purge plus** `InventaireCollecte` ni
+`LigneBipage` — chaque session archivée garde ses lignes (seule la photo de
+stock figé reste purgée, et « Annuler un inventaire » reste une table rase **de
+sa session**). Conséquences : toute requête sur ces collections doit être
+**bornée par session** (un filtre « entreprise seule » mélange les années —
+audit appliqué le 24/11 : reprise de collecte, liste en-cours, `offlineId`
+hors ligne, correction de ligne) ; « Tous les inventaires » du suivi bipage
+cumule désormais réellement plusieurs années. ⚠️ Le bucket `session: null`
+(collectes sans session active) n'est plus borné dans le temps. Ces données
+alimentent le module **`localisation_inventaire`** (écran
+`/admin/localisation-inventaire`, dossier Terrain, API
+`/api/localisation-inventaire`) : taper un NART / doucher un gencod → les
+zones où l'article a été bipé (inventaire au choix, « Localisation inventaire
+2026, 2027… »), avec les 3 lignes bipées avant/après dans la même séquence
+(`LigneBipage.ordre`) — les voisins physiques de rayon. Renommage du nom
+d'affichage d'une session possible (jamais le slug du dossier).
 
 Les demandes de bipage se créent depuis une **proforma**, un **gisement**, un
 **groupe** (famille d'articles), la liste **« rayon vide »** ou un panier manuel — une demande par gisement /

@@ -1,9 +1,12 @@
 // backend/models/InventaireBilanModel.js
 //
 // BILAN DE CLÔTURE d'un inventaire par zones (axe validé par le client le
-// 23/11/2026) : la réinitialisation PURGE les collectes, les LigneBipage et le
-// suivi bipage — sans ce document, l'histoire d'un inventaire disparaît à
-// l'inventaire suivant. Le bilan FIGE donc, en Mongo, la synthèse complète au
+// 23/11/2026). À l'origine la réinitialisation purgeait collectes et
+// LigneBipage ; depuis le 24/11/2026 elles sont CONSERVÉES par session
+// (module Localisation inventaire) — le bilan garde tout son sens : c'est la
+// SYNTHÈSE figée et valorisée au moment de la clôture (le stock théorique,
+// lui, continue de bouger, et l'annulation d'inventaire supprime toujours
+// tout). Le bilan FIGE donc, en Mongo, la synthèse complète au
 // moment de la clôture : progression, agents et temps, écarts valorisés par
 // zone et par emplacement, top anomalies, zones recomptées. Les fichiers
 // Excel/PDF sont REGÉNÉRÉS à la demande depuis ce document (pas besoin du

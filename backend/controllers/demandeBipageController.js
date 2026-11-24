@@ -378,9 +378,9 @@ const getDemandes = asyncHandler(async (req, res) => {
 // @route   GET /api/demande-bipage/:nomDossierDBF/suivi?statut=&jours=
 //
 // ⚠️ À ne pas confondre avec « Suivi bipage » (/admin/suivi-bipage), qui suit le
-// bipage d'INVENTAIRE par zone (LigneBipage, vidé à chaque réinitialisation
-// d'inventaire). Ici on suit les demandes envoyées aux collecteurs depuis le
-// web : deux cycles de vie différents, deux écrans.
+// bipage d'INVENTAIRE par zone (LigneBipage, conservé par session — y compris
+// archivée — depuis le 24/11/2026). Ici on suit les demandes envoyées aux
+// collecteurs depuis le web : deux cycles de vie différents, deux écrans.
 //
 // L'agrégation renvoie les COMPTEURS (nombre de lignes bipées, unités) sans
 // jamais faire transiter les tableaux `articles` / `lignesRealisees` : une

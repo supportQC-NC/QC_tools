@@ -63,6 +63,7 @@ import AdminSuiviReapproScreen from "./screens/admin/AdminSuiviReapproScreen";
 import AdminSuiviPreparationScreen from "./screens/admin/AdminSuiviPreparationScreen";
 import AdminAgentsInventaireScreen from "./screens/admin/AdminAgentsInventaireScreen";
 import AdminInventaireDashboardScreen from "./screens/admin/AdminInventaireDashboardScreen";
+import AdminLocalisationInventaireScreen from "./screens/admin/AdminLocalisationInventaireScreen";
 import AdminInventaireBilansScreen from "./screens/admin/AdminInventaireBilansScreen";
 import AdminZonesRetoucheesScreen from "./screens/admin/AdminZonesRetoucheesScreen";
 import AdminEcartsZonesScreen from "./screens/admin/AdminEcartsZonesScreen";
@@ -481,6 +482,16 @@ const router = createBrowserRouter(
         <Route
           path="/admin/agents-inventaire"
           element={<AdminAgentsInventaireScreen />}
+        />
+      </Route>
+
+      {/* Terrain · Localisation inventaire -> module "localisation_inventaire"
+          (module À PART ENTIÈRE, distinct d'« inventaire » : il sera aussi
+          porté sur l'app mobile). */}
+      <Route element={<ModuleRoute module="localisation_inventaire" />}>
+        <Route
+          path="/admin/localisation-inventaire"
+          element={<AdminLocalisationInventaireScreen />}
         />
       </Route>
 

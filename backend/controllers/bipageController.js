@@ -1230,9 +1230,22 @@ const exportEcartsBipage = asyncHandler(async (req, res) => {
  */
 const updateBipage = asyncHandler(async (req, res) => {
   const entreprise = req.entreprise;
+  // Bornée à la session ACTIVE (audit 24/11/2026) : les lignes des inventaires
+  // archivés restent en base — sans cette borne, un onglet resté ouvert sur
+  // l'inventaire précédent pourrait corriger une ligne HISTORIQUE et fausser
+  // la régénération des fiches archivées. Même garde que chargerLigneControle.
+  const session = await InventaireZoneSession.findOne({
+    entreprise: entreprise._id,
+    statut: "actif",
+  });
+  if (!session) {
+    res.status(400);
+    throw new Error("Aucun inventaire actif.");
+  }
   const ligne = await LigneBipage.findOne({
     _id: req.params.id,
     entreprise: entreprise._id,
+    session: session._id,
   });
   if (!ligne) {
     res.status(404);

@@ -212,7 +212,9 @@ const AdminSuiviBipageScreen = () => {
               title="Inventaire concerné"
             >
               <option value="active">Inventaire en cours</option>
-              <option value="toutes">Tous les inventaires</option>
+              {/* Depuis la conservation des bipages archivés (24/11/2026),
+                  « toutes » cumule RÉELLEMENT plusieurs années. */}
+              <option value="toutes">Tous les inventaires (cumul)</option>
               {(data?.sessions || []).map((s) => (
                 <option key={s._id} value={s._id}>
                   {s.nom} {s.statut === "archive" ? "(archivé)" : ""}

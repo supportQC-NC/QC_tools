@@ -18,6 +18,11 @@ export const PERMISSION_MODULES = [
   // ── Gestion (utilisateur + écrans données partagés) ───────────────────────
   { key: "stock", label: "Recherche Article", group: "gestion" },
   { key: "inventaire", label: "Inventaire", group: "gestion" },
+  {
+    key: "localisation_inventaire",
+    label: "Localisation inventaire",
+    group: "gestion",
+  },
   { key: "reapro", label: "Reapro", group: "gestion" },
   { key: "demande_reappro", label: "Listes de réappro", group: "gestion" },
   { key: "proforma", label: "Proformas", group: "gestion" },

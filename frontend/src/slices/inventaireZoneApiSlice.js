@@ -20,10 +20,16 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
           ...(destination && { destination }),
         },
       }),
-      // L'init purge aussi LigneBipage / collectes / fiches : sans « Bipage »
-      // et « SuiviBipage », l'écran Détail des bipages ressert son cache
-      // d'avant l'initialisation ({active:false} → « Aucun inventaire actif »).
-      invalidatesTags: ["InventaireZone", "Bipage", "SuiviBipage"],
+      // L'init archive la session courante (les bipages sont CONSERVÉS par
+      // session depuis le 24/11/2026, plus purgés) : sans « Bipage » et
+      // « SuiviBipage », l'écran Détail des bipages ressert son cache d'avant
+      // l'initialisation au lieu de basculer sur le nouvel inventaire vierge.
+      invalidatesTags: [
+        "InventaireZone",
+        "Bipage",
+        "SuiviBipage",
+        "LocalisationInventaire",
+      ],
     }),
 
     // Correction de cette sélection en cours d'inventaire.
@@ -42,9 +48,14 @@ export const inventaireZoneApiSlice = apiSlice.injectEndpoints({
         url: `${BASE}/${entrepriseId}/annuler`,
         method: "POST",
       }),
-      // Même raison que l'init : table rase des bipages → tous les écrans qui
-      // les affichent doivent refetcher.
-      invalidatesTags: ["InventaireZone", "Bipage", "SuiviBipage"],
+      // Même raison que l'init : table rase des bipages de CETTE session →
+      // tous les écrans qui les affichent doivent refetcher.
+      invalidatesTags: [
+        "InventaireZone",
+        "Bipage",
+        "SuiviBipage",
+        "LocalisationInventaire",
+      ],
     }),
 
     // Biper un code-barres.

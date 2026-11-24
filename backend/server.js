@@ -58,6 +58,8 @@ import zoneRoutes from "./routes/zoneRoutes.js";
 import inventaireZoneRoutes from "./routes/inventaireZoneRoutes.js";
 // ========== ROUTES COLLECTE INVENTAIRE (AGENT TERRAIN) ==========
 import inventaireCollecteRoutes from "./routes/inventaireCollecteRoutes.js";
+// ========== ROUTES LOCALISATION INVENTAIRE ==========
+import localisationInventaireRoutes from "./routes/localisationInventaireRoutes.js";
 // ========== ROUTES FICHES DE CONTRÔLE (.DAT) ==========
 import ficheControleRoutes from "./routes/ficheControleRoutes.js";
 // ========== ROUTES DÉTAIL DES BIPAGES ==========
@@ -231,6 +233,8 @@ app.use("/api/zones", zoneRoutes);
 app.use("/api/inventaires-zones", inventaireZoneRoutes);
 // ========== ROUTES COLLECTE INVENTAIRE (AGENT TERRAIN) ==========
 app.use("/api/inventaires-collecte", inventaireCollecteRoutes);
+// ========== ROUTES LOCALISATION INVENTAIRE ==========
+app.use("/api/localisation-inventaire", localisationInventaireRoutes);
 // ========== ROUTES FICHES DE CONTRÔLE (.DAT) ==========
 app.use("/api/fiches-controle", ficheControleRoutes);
 // ========== ROUTES DÉTAIL DES BIPAGES ==========

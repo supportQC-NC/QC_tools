@@ -1,0 +1,353 @@
+/* src/screens/admin/AdminLocalisationInventaireScreen.css
+   Localisation inventaire : critères, recherche, zones et voisins de rayon.
+   Charte globale (--bg-*, --text-*, --border, --accent). */
+
+.loc-inv {
+  padding: 24px 16px 48px;
+  color: var(--text-primary);
+}
+
+.li-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 18px;
+}
+
+.li-header h1 svg {
+  color: var(--accent);
+}
+
+.li-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.li-placeholder svg {
+  font-size: 40px;
+  color: var(--text-muted);
+}
+
+/* ── Critères (inventaire + emplacement) ── */
+.li-criteres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.li-critere {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 260px;
+}
+
+.li-critere > label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.li-inv-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.li-inv-select select,
+.li-inv-select input {
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  min-width: 240px;
+}
+
+.li-btn-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.li-btn-ico:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.li-btn-ico.li-ok {
+  color: var(--success);
+}
+
+.li-avert {
+  color: #f59e0b;
+  font-size: 0.8rem;
+}
+
+.li-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.li-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.li-chip:hover {
+  color: var(--text-primary);
+}
+
+.li-chip.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-secondary);
+}
+
+.li-chip-n {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* ── Recherche ── */
+.li-recherche {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.li-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  min-width: 300px;
+  flex: 1;
+  max-width: 480px;
+}
+
+.li-search svg {
+  color: var(--text-muted);
+}
+
+.li-search input {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+  font-size: 1rem;
+  width: 100%;
+}
+
+.li-erreur {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+
+/* ── Synthèse ── */
+.li-synthese {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.li-article {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+}
+
+.li-article strong {
+  font-size: 1.05rem;
+}
+
+.li-article span {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.li-zones-resume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.li-zone-pill {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  min-width: 120px;
+}
+
+.li-zone-pill b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+}
+
+.li-zone-pill span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.li-zone-pill em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ── Occurrences (une carte par séquence de bipage) ── */
+.li-occurrences {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.li-occ {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.li-occ-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.li-occ-zone {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.li-occ-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 800;
+  font-size: 1.15rem;
+}
+
+.li-occ-lib {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.li-occ-empl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+
+.li-occ-meta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.li-occ-meta b {
+  color: var(--accent);
+  font-size: 0.95rem;
+}
+
+/* Les voisins de scan : liste ordonnée, la cible en surbrillance. */
+.li-voisins {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.li-voisins li {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 14px;
+  font-size: 0.85rem;
+}
+
+.li-voisins li.cible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-left: 3px solid var(--accent);
+  padding-left: 11px;
+  font-weight: 700;
+}
+
+.li-v-nart {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-secondary);
+}
+
+.li-voisins li.cible .li-v-nart {
+  color: var(--accent);
+}
+
+.li-v-des {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.li-v-qte {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}

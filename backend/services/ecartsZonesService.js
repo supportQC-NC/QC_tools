@@ -24,9 +24,12 @@ import articleCacheService from "./articleService.js";
  *          est l'agrégat global.
  */
 export const calculerEcartsZones = async (entreprise, session) => {
-  // Collectes de la session. Si aucune session, on prend les collectes non
-  // rattachées à une session archivée (sécurité : on borne par session si elle
-  // existe).
+  // Collectes de la session. Si aucune session, on prend les collectes hors
+  // session (session: null). ⚠️ Depuis que la réinitialisation ne purge plus
+  // rien (24/11/2026), ce bucket null n'est PAS borné dans le temps : des
+  // collectes hors session de plusieurs périodes peuvent s'y côtoyer — seule
+  // l'annulation d'inventaire le vide encore. Le flux normal (session active)
+  // reste étanche.
   const filtreCollecte = { entreprise: entreprise._id };
   filtreCollecte.session = session ? session._id : null;
   // ⚠️ Les collectes ANNULÉES par « Recommencer la zone » sont exclues : leur

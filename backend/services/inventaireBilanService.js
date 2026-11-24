@@ -76,7 +76,9 @@ const fmtDate = (d) =>
 
 /**
  * Construit l'objet bilan d'une session (sans rien écrire).
- * ⚠️ À appeler AVANT toute purge : il lit les collectes et LigneBipage.
+ * Il lit les collectes et LigneBipage de la session — conservées même après
+ * archivage depuis le 24/11/2026 (un bilan reste donc regénérable a
+ * posteriori ; seule l'annulation d'inventaire supprime encore ces lignes).
  */
 export const construireBilan = async (
   entreprise,
