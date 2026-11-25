@@ -133,6 +133,69 @@
   cursor: not-allowed;
 }
 
+/* ── Rayon en cours : le croisement est strict sur le rayon bipé ── */
+.vpr-rayon {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 14px;
+}
+
+.vpr-rayon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-tertiary));
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.vpr-rayon-chip svg {
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+.vpr-rayon-chip b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.05rem;
+}
+
+.vpr-rayon-chip small {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.vpr-btn-rayon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vpr-btn-rayon:hover {
+  border-color: var(--accent);
+}
+
+.vpr-rayon-ambigu {
+  border-color: #f59e0b;
+}
+
 /* ── Bip ── */
 .vpr-scan {
   display: flex;

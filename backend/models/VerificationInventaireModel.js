@@ -2,13 +2,16 @@
 //
 // JOURNAL DE LA VÉRIFICATION POINT ROUGE (24/11/2026) : en fin d'inventaire,
 // un agent repère les scotchs SANS point rouge dans une allée contrôlée, bipe
-// l'article, et le système croise avec les bipages de l'ALLÉE. Chaque bip de
-// vérification est tracé ici (décision client : le « conforme » se trace
-// aussi), qu'il ait ou non produit une ligne de bipage.
+// le QR du RAYON puis l'article, et le système croise avec les bipages de CE
+// RAYON (croisement strict par zone depuis le 26/11/2026 — un article peut
+// être à plusieurs endroits de la même allée, le total de l'allée faisait
+// mentir le verdict). Chaque bip de vérification est tracé ici (décision
+// client : le « conforme » se trace aussi), qu'il ait ou non produit une
+// ligne de bipage.
 //
-//   conforme : l'article était bien bipé dans l'allée à la bonne quantité —
+//   conforme : l'article était bien bipé dans le rayon à la bonne quantité —
 //              l'agent de bipage avait juste oublié le point rouge ;
-//   ajout    : article jamais bipé dans l'allée → ligne créée (qté du scotch) ;
+//   ajout    : article jamais bipé dans le rayon → ligne créée (qté du scotch) ;
 //   ecart    : bipé mais pas à la quantité du scotch → ligne de DELTA créée
 //              (le scotch fait foi, delta négatif accepté).
 
@@ -48,7 +51,11 @@ const verificationInventaireSchema = new mongoose.Schema(
     qteTrouvee: { type: Number, default: 0 },
     delta: { type: Number, default: 0 },
 
-    // Zone choisie pour l'ajout (la ligne créée, le cas échéant).
+    // RAYON BIPÉ par l'agent (QR de l'étiquette de zone) : le croisement et
+    // la ligne de delta éventuelle s'y rattachent. Vide sur les verdicts
+    // antérieurs au croisement par zone (26/11/2026), où seule l'allée était
+    // connue (la zone n'était renseignée que sur les ajouts, désignée à la
+    // main).
     zoneCode: { type: String, default: "" },
     zoneType: { type: String, default: "" },
     ligneBipage: {

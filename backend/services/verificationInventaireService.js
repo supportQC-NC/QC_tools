@@ -3,9 +3,17 @@
 // VÉRIFICATION POINT ROUGE — la mécanique de croisement. Au papillonnage,
 // l'agent écrit la quantité comptée sur un scotch ; au bipage, un point rouge
 // est collé après chaque scan. Quand TOUTES les zones d'une allée sont
-// contrôlées, un agent balaye l'allée : chaque scotch SANS point rouge est
-// bipé, et on cherche dans les bipages de l'ALLÉE si l'article y est, à la
-// bonne quantité.
+// contrôlées, un agent balaye l'allée RAYON PAR RAYON : il bipe d'abord le QR
+// du rayon (l'étiquette de zone), puis chaque scotch SANS point rouge, et on
+// cherche dans les bipages de CE RAYON si l'article y est, à la bonne quantité.
+//
+// ⚠️ Croisement STRICT PAR ZONE (demande client du 26/11/2026, remplace le
+// croisement au niveau de l'allée entière) : un même article peut être à
+// PLUSIEURS endroits de la même allée (scotch « 5 » en A_1 et « 3 » en A_3).
+// Comparer un scotch au total de l'allée faisait mentir le verdict (5 ≠ 8 →
+// faux écart) et la ligne de delta partait dans une zone choisie à la main.
+// Chaque scotch se compare donc aux bipages du rayon bipé, et c'est là que la
+// ligne de delta s'écrit — un article bipé dans une zone voisine ne compte pas.
 //
 // L'allée = PREMIÈRE lettre du code de zone (même convention que le filtre du
 // Récap par zone : A_1, A_2d… → « A » ; un code ne commençant pas par une
@@ -51,6 +59,54 @@ export const construireAllees = (session) => {
     .sort((a, b) => a.lettre.localeCompare(b.lettre, "fr"));
 };
 
+/**
+ * Résout le QR de rayon bipé vers une (ou deux) zone(s) de l'ALLÉE, dans le
+ * SNAPSHOT de la session (les EAN y sont figés à l'init, comme pour les
+ * coupons). Priorités — mêmes conventions que `resoudreZone` du collecteur :
+ *   1. EAN principal exact (le QR de la fiche de zone encode `eanPrincipal`) ;
+ *   2. EAN de phase (papillonnage / bipage / contrôle — tolérance au mauvais
+ *      coupon bipé) ;
+ *   3. forme « code|emplacement » des fiches de zone ;
+ *   4. code brut : TOUTES les correspondances (ambigu MAGASIN/DOCK — le client
+ *      fait choisir l'emplacement quand il y en a plusieurs).
+ */
+export const resoudreZoneAllee = ({ session, allee, code }) => {
+  const c = String(code || "").trim();
+  if (!c) return [];
+  const cMaj = c.toUpperCase();
+
+  const zones = (session.zones || []).filter(
+    (z) => !z.neutralisee && lettreAllee(z.code) === allee,
+  );
+  const resume = (z) => ({
+    code: z.code,
+    libelle: z.libelle || "",
+    type: String(z.type || "").trim(),
+  });
+
+  let m = zones.filter((z) => z.eanPrincipal && z.eanPrincipal === c);
+  if (m.length) return m.map(resume);
+
+  m = zones.filter((z) =>
+    [z.eanPapillonnage, z.eanBipage, z.eanControle].filter(Boolean).includes(c),
+  );
+  if (m.length) return m.map(resume);
+
+  const idx = cMaj.indexOf("|");
+  if (idx > 0) {
+    const codeZone = cMaj.slice(0, idx).trim();
+    const type = cMaj.slice(idx + 1).trim();
+    m = zones.filter(
+      (z) =>
+        z.code.toUpperCase() === codeZone &&
+        String(z.type || "").trim().toUpperCase() === type,
+    );
+    if (m.length) return m.map(resume);
+  }
+
+  return zones.filter((z) => z.code.toUpperCase() === cMaj).map(resume);
+};
+
 // Toutes les écritures équivalentes du code bipé + celles du NART résolu :
 // la ligne stockée peut porter le gencod OU le nart, sous n'importe laquelle
 // de leurs formes (zéros de tête).
@@ -63,14 +119,14 @@ const variantesRecherche = (code, nartResolu) => {
 };
 
 /**
- * Cherche le code dans les bipages de l'ALLÉE (toutes zones dont le code
- * commence par la lettre, tous emplacements confondus) : lignes trouvées et
- * total — un article re-bipé sort en plusieurs lignes, c'est le TOTAL que
- * l'agent compare au scotch.
+ * Cherche le code dans les bipages du RAYON bipé (zone = code + emplacement) :
+ * lignes trouvées et total — un article re-bipé sort en plusieurs lignes,
+ * c'est le TOTAL de la zone que l'agent compare au scotch.
  */
-export const rechercherDansAllee = async ({
+export const rechercherDansZone = async ({
   session,
-  allee,
+  zoneCode,
+  zoneType,
   code,
   nartResolu,
 }) => {
@@ -79,6 +135,8 @@ export const rechercherDansAllee = async ({
 
   const lignes = await LigneBipage.find({
     session: session._id,
+    zoneCode,
+    zoneType,
     $or: [
       { nart: { $in: variantes } },
       { gencod: { $in: variantes } },
@@ -89,13 +147,10 @@ export const rechercherDansAllee = async ({
     .select("zoneCode zoneType qteScan source agentNom designation nart gencod")
     .lean();
 
-  // Filtre d'allée EN MÉMOIRE (une poignée de lignes par article) : la
-  // première lettre n'est pas indexable proprement côté Mongo.
-  const dansAllee = lignes.filter((l) => lettreAllee(l.zoneCode) === allee);
   const totalQte =
     Math.round(
-      dansAllee.reduce((s, l) => s + (Number(l.qteScan) || 0), 0) * 1000,
+      lignes.reduce((s, l) => s + (Number(l.qteScan) || 0), 0) * 1000,
     ) / 1000;
 
-  return { lignes: dansAllee, totalQte };
+  return { lignes, totalQte };
 };

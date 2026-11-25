@@ -8,6 +8,7 @@
 import express from "express";
 import {
   getContexte,
+  resoudreRayon,
   verifierCode,
   confirmerCode,
   ajouterAuBipage,
@@ -32,6 +33,7 @@ const write = [
 ];
 
 router.get("/:entrepriseId/contexte", read, getContexte);
+router.get("/:entrepriseId/rayon", read, resoudreRayon);
 router.get("/:entrepriseId/verifier", read, verifierCode);
 router.post("/:entrepriseId/confirmer", write, confirmerCode);
 router.post("/:entrepriseId/ajouter", write, ajouterAuBipage);

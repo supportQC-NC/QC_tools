@@ -1,7 +1,8 @@
 // frontend/src/slices/verificationInventaireApiSlice.js
 //
 // Module Vérification point rouge : balayage des scotchs sans point rouge en
-// fin d'inventaire, croisement avec les bipages de l'allée.
+// fin d'inventaire, rayon par rayon — l'agent bipe le QR du rayon puis chaque
+// scotch, le croisement est STRICT sur le rayon bipé (26/11/2026).
 import { apiSlice } from "./apiSlice";
 
 const BASE = "/api/verification-inventaire";
@@ -14,25 +15,35 @@ export const verificationInventaireApiSlice = apiSlice.injectEndpoints({
       providesTags: ["VerificationInventaire"],
     }),
 
-    // Croisement d'un code bipé avec les bipages de l'allée
-    verifierCodeAllee: builder.query({
+    // Résolution du QR de rayon bipé vers une zone de l'allée (plusieurs
+    // correspondances possibles sur un code brut : MAGASIN/DOCK à choisir)
+    resoudreRayonVerification: builder.query({
       query: ({ entrepriseId, allee, code }) => ({
-        url: `${BASE}/${entrepriseId}/verifier`,
+        url: `${BASE}/${entrepriseId}/rayon`,
         params: { allee, code },
+      }),
+    }),
+
+    // Croisement d'un code bipé avec les bipages du rayon
+    verifierCodeAllee: builder.query({
+      query: ({ entrepriseId, allee, zoneCode, zoneType, code }) => ({
+        url: `${BASE}/${entrepriseId}/verifier`,
+        params: { allee, zoneCode, zoneType, code },
       }),
     }),
 
     // Conforme : point rouge oublié, on trace
     confirmerVerification: builder.mutation({
-      query: ({ entrepriseId, allee, code }) => ({
+      query: ({ entrepriseId, allee, zoneCode, zoneType, code }) => ({
         url: `${BASE}/${entrepriseId}/confirmer`,
         method: "POST",
-        body: { allee, code },
+        body: { allee, zoneCode, zoneType, code },
       }),
       invalidatesTags: ["VerificationInventaire"],
     }),
 
-    // Oubli / écart : la quantité du scotch fait foi → ligne au bipage
+    // Oubli / écart : la quantité du scotch fait foi → ligne au bipage,
+    // rattachée au rayon bipé
     ajouterAuBipage: builder.mutation({
       query: ({
         entrepriseId,
@@ -55,6 +66,7 @@ export const verificationInventaireApiSlice = apiSlice.injectEndpoints({
 
 export const {
   useGetContexteVerificationQuery,
+  useLazyResoudreRayonVerificationQuery,
   useLazyVerifierCodeAlleeQuery,
   useConfirmerVerificationMutation,
   useAjouterAuBipageMutation,

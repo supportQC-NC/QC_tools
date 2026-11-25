@@ -824,15 +824,25 @@ quand TOUTES les zones d'une **allée** (1re lettre du code) sont contrôlées,
 un agent bipe les scotchs sans point rouge (écran
 `/admin/verification-point-rouge`, API `/api/verification-inventaire`,
 version collecteur `VerificationPointRougeScreen` dans l'onglet Inventaire
-de QcApp depuis le 25/11/2026 — même parcours allée → bip → verdict). Croisement à l'ALLÉE : trouvé à la bonne
-quantité → « conforme » **tracé** (`VerificationInventaireModel`) ; absent ou
-quantité différente → **le scotch fait foi**, ligne de delta (négatif
-accepté) dans `LigneBipage`, source **`verification`**, rangée en fin de la
-zone désignée. ⚠️ Ces lignes ne touchent **ni les fiches de contrôle ni les
-`.dat` de zones** (aucune régénération/impression — `datFileName` vide) mais
-comptent dans la feuille d'écarts, le récap/bilan (`ecartsZonesService`) et
-l'intégration Stock XL ; elles sont filtrables dans le Détail des bipages
-(provenance « Vérif point rouge », pastille rouge).
+de QcApp depuis le 25/11/2026 — même parcours des deux côtés). **Croisement
+STRICT PAR ZONE depuis le 26/11/2026** (demande client, remplace le
+croisement à l'allée entière) : parcours allée → **bip du QR du rayon**
+(l'étiquette de zone — OBLIGATOIRE, `resoudreZoneAllee` le résout dans le
+snapshot de la session : EAN principal, EAN de phase, « code|emplacement »,
+code brut avec choix MAGASIN/DOCK) → bip des scotchs. Un article peut être à
+**plusieurs endroits de la même allée** (scotch « 5 » en A_1 et « 3 » en
+A_3) : le total de l'allée faisait mentir le verdict (faux écart 5 ≠ 8) et
+la zone de l'ajout était désignée à la main. Trouvé à la bonne quantité dans
+**ce rayon** → « conforme » **tracé** (`VerificationInventaireModel`, qui
+porte désormais le rayon aussi sur les conformes) ; absent ou quantité
+différente → **le scotch fait foi**, ligne de delta (négatif accepté) dans
+`LigneBipage`, source **`verification`**, rangée en fin du **rayon bipé**.
+Une app qui appelle encore `/verifier` sans zone reçoit un 400 explicite
+(mise à jour requise). ⚠️ Ces lignes ne touchent **ni les fiches de contrôle
+ni les `.dat` de zones** (aucune régénération/impression — `datFileName`
+vide) mais comptent dans la feuille d'écarts, le récap/bilan
+(`ecartsZonesService`) et l'intégration Stock XL ; elles sont filtrables dans
+le Détail des bipages (provenance « Vérif point rouge », pastille rouge).
 
 Les demandes de bipage se créent depuis une **proforma**, un **gisement**, un
 **groupe** (famille d'articles), la liste **« rayon vide »** ou un panier manuel — une demande par gisement /
