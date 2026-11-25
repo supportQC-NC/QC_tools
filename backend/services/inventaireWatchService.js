@@ -121,6 +121,17 @@ const traiterFichier = async (
   // Un fichier déjà rangé dans un sous-dossier a été renommé au passage
   // précédent : son nom ne porte plus que le code, et l'emplacement vient du
   // dossier qui le contient.
+  //
+  // ⚠️ Le dépôt remplace les "_" de l'EMPLACEMENT par des "-" dans le nom de
+  // fichier ("_" est le séparateur code/emplacement, cf. nomFichierZone) : un
+  // type personnalisé « DOCK_DQ » arrive donc en « DOCK-DQ ». Chaque "-" du
+  // jeton doit matcher "-" OU "_" du type en base, sinon la découpe échoue,
+  // la zone part en zone_non_trouvee et NI fiche NI LigneBipage ne sortent
+  // (constaté le 25/11/2026 sur l'emplacement DOCK_DQ de DQ — la fiche de
+  // contrôle n'apparaissait jamais).
+  const regexEmplacement = (token) =>
+    new RegExp(`^${escapeRegex(token).replace(/-/g, "[-_]")}$`, "i");
+
   const rawZoneToken = extraireCodeZone(fileName) || "";
   let zoneCode = rawZoneToken;
   let emplacement = folderName || "";
@@ -135,7 +146,7 @@ const traiterFichier = async (
       // suffixe ("stock.dat A_1") serait charcuté en zone "A" / emplacement "1".
       const emplacementConnu = await Zone.exists({
         entreprise: entreprise._id,
-        type: new RegExp(`^${escapeRegex(empCandidat)}$`, "i"),
+        type: regexEmplacement(empCandidat),
       });
       if (emplacementConnu) {
         zoneCode = codeCandidat;
@@ -143,6 +154,53 @@ const traiterFichier = async (
       }
     }
   }
+
+  // ── LA ZONE EXISTE-T-ELLE ? ──────────────────────────────────────────────
+  // Résolue AVANT le rangement : le sous-dossier doit porter le type RÉEL de
+  // la zone, pas le jeton du nom de fichier — « DOCK-DQ » doit être rangé dans
+  // « DOCK_DQ », le dossier qu'utilisent la réimpression, le miroir FTP et
+  // « Recommencer la zone » (tous passent par emplacementDir(zoneType)).
+  let zone = await Zone.findOne(
+    emplacement
+      ? { entreprise: entreprise._id, code: zoneCode, type: emplacement }
+      : { entreprise: entreprise._id, code: zoneCode },
+  );
+  if (!zone) {
+    // Repli insensible à la casse (et aux "-"/"_" de l'emplacement) avant de
+    // déclarer la zone introuvable.
+    const rx = new RegExp(`^${escapeRegex(zoneCode)}$`, "i");
+    zone = await Zone.findOne(
+      emplacement
+        ? {
+            entreprise: entreprise._id,
+            code: rx,
+            type: regexEmplacement(emplacement),
+          }
+        : { entreprise: entreprise._id, code: rx },
+    );
+  }
+
+  if (!zone) {
+    const zoneInconnue = path.join(base, config.zoneInconnueDirName);
+    try {
+      deplacerVers(filePath, zoneInconnue);
+      return {
+        status: "zone_inconnue",
+        message: `zone "${zoneCode || "?"}"${
+          emplacement ? ` (${emplacement})` : ""
+        } introuvable → déplacé dans ${config.zoneInconnueDirName}`,
+      };
+    } catch (err) {
+      return {
+        status: "erreur",
+        message: `zone "${zoneCode || "?"}" introuvable, déplacement IMPOSSIBLE : ${err.message}`,
+      };
+    }
+  }
+
+  // Le type réel de la zone fait foi pour la suite (dossier, clé logique) :
+  // le jeton du fichier peut en différer par la casse ou les "-"/"_".
+  emplacement = String(zone.type || "").trim() || emplacement;
 
   // ── RANGEMENT : bon dossier d'emplacement + nom réduit au code de zone ────
   const dossierEmplacement = emplacement
@@ -162,45 +220,6 @@ const traiterFichier = async (
       return {
         status: "erreur",
         message: `Rangement dans "${dossierEmplacement}" impossible : ${err.message}`,
-      };
-    }
-  }
-
-  // ── LA ZONE EXISTE-T-ELLE ? ──────────────────────────────────────────────
-  // Oui → le fichier reste où il vient d'être rangé. Non → zone_non_trouvee.
-  let zone = await Zone.findOne(
-    emplacement
-      ? { entreprise: entreprise._id, code: zoneCode, type: emplacement }
-      : { entreprise: entreprise._id, code: zoneCode },
-  );
-  if (!zone) {
-    // Repli insensible à la casse avant de déclarer la zone introuvable.
-    const rx = new RegExp(`^${escapeRegex(zoneCode)}$`, "i");
-    zone = await Zone.findOne(
-      emplacement
-        ? {
-            entreprise: entreprise._id,
-            code: rx,
-            type: new RegExp(`^${escapeRegex(emplacement)}$`, "i"),
-          }
-        : { entreprise: entreprise._id, code: rx },
-    );
-  }
-
-  if (!zone) {
-    const zoneInconnue = path.join(base, config.zoneInconnueDirName);
-    try {
-      deplacerVers(workFilePath, zoneInconnue);
-      return {
-        status: "zone_inconnue",
-        message: `zone "${zoneCode || "?"}"${
-          emplacement ? ` (${emplacement})` : ""
-        } introuvable → déplacé dans ${config.zoneInconnueDirName}`,
-      };
-    } catch (err) {
-      return {
-        status: "erreur",
-        message: `zone "${zoneCode || "?"}" introuvable, déplacement IMPOSSIBLE : ${err.message}`,
       };
     }
   }
