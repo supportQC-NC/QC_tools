@@ -17,6 +17,7 @@ import {
   HiPresentationChartBar,
   HiClipboardCheck,
   HiArrowsExpand,
+  HiViewGrid,
   HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
@@ -115,7 +116,6 @@ const AnneauPct = ({ pct, size = 180 }) => {
 
 const AdminSuiviInventaireScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
-  const rootRef = useRef(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [horloge, setHorloge] = useState(() => new Date());
 
@@ -331,18 +331,40 @@ const AdminSuiviInventaireScreen = () => {
 
   // Plein écran : on suit l'état réel du navigateur (Échap, F11…) plutôt que
   // notre propre booléen — c'est `fullscreenchange` qui fait foi.
+  // ⚠️ Le plein écran est demandé sur `document.documentElement`, PAS sur le
+  // div de l'écran : un élément démonté par la navigation fait sortir le
+  // navigateur du mode, alors que la racine survit au changement de route —
+  // c'est ce qui permet de basculer Suivi ↔ Récap sans quitter le plein écran
+  // (le bouton « Récap zones » du bandeau). L'écran se superpose alors au
+  // layout via `.si-fs` (position fixed). Préfixes webkit : la borne du récap
+  // est un iPad, et on peut arriver ici depuis elle.
+  // L'appel immédiat de onChange couvre l'arrivée DEPUIS l'autre écran déjà
+  // en plein écran (aucun `fullscreenchange` ne sera émis au montage).
   useEffect(() => {
-    const onChange = () =>
-      setFullscreen(document.fullscreenElement === rootRef.current);
+    const onChange = () => {
+      const el =
+        document.fullscreenElement || document.webkitFullscreenElement || null;
+      setFullscreen(el === document.documentElement);
+    };
+    onChange();
     document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
   }, []);
 
   const toggleFullscreen = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.();
+    const actif =
+      document.fullscreenElement || document.webkitFullscreenElement;
+    if (actif) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(
+        document,
+      );
     } else {
-      rootRef.current?.requestFullscreen?.();
+      const el = document.documentElement;
+      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
     }
   };
 
@@ -352,7 +374,7 @@ const AdminSuiviInventaireScreen = () => {
   });
 
   return (
-    <div className={`suivi-inv${fullscreen ? " si-fs" : ""}`} ref={rootRef}>
+    <div className={`suivi-inv${fullscreen ? " si-fs" : ""}`}>
       {/* Bandeau : identité + horloge + plein écran */}
       <div className="si-topbar">
         <h1>
@@ -369,6 +391,15 @@ const AdminSuiviInventaireScreen = () => {
             <i /> en direct
           </span>
           <span className="si-horloge">{heure}</span>
+          {/* Bascule vers le Récap par zone SANS quitter le plein écran :
+              navigation react-router, le documentElement reste fullscreen. */}
+          <Link
+            className="si-fs-btn"
+            to="/admin/recap-zones"
+            title="Basculer sur le Récap par zone (le plein écran est conservé)"
+          >
+            <HiViewGrid /> Récap zones
+          </Link>
           <button
             className="si-fs-btn"
             onClick={toggleFullscreen}

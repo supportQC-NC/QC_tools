@@ -823,7 +823,8 @@ dernière passe de l'inventaire — au papillonnage la quantité comptée est
 quand TOUTES les zones d'une **allée** (1re lettre du code) sont contrôlées,
 un agent bipe les scotchs sans point rouge (écran
 `/admin/verification-point-rouge`, API `/api/verification-inventaire`,
-version collecteur à venir). Croisement à l'ALLÉE : trouvé à la bonne
+version collecteur `VerificationPointRougeScreen` dans l'onglet Inventaire
+de QcApp depuis le 25/11/2026 — même parcours allée → bip → verdict). Croisement à l'ALLÉE : trouvé à la bonne
 quantité → « conforme » **tracé** (`VerificationInventaireModel`) ; absent ou
 quantité différente → **le scotch fait foi**, ligne de delta (négatif
 accepté) dans `LigneBipage`, source **`verification`**, rangée en fin de la

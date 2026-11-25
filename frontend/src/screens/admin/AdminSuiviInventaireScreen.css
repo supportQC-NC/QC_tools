@@ -14,7 +14,14 @@
   min-height: 100%;
 }
 
+/* Plein écran : il est demandé sur document.documentElement (pour survivre à
+   la bascule Suivi ↔ Récap), le layout de l'app reste donc rendu derrière —
+   l'écran se superpose en fixed au-dessus de la sidebar/header (z-index 4000
+   max côté sidebar). */
 .suivi-inv.si-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
   padding: clamp(14px, 2vh, 32px) clamp(20px, 2.5vw, 48px);
   overflow: auto;
 }
@@ -96,7 +103,10 @@
   color: var(--text-primary);
 }
 
+/* Aussi porté par le lien « Récap zones » (bascule sans quitter le plein
+   écran) : neutraliser le soulignement d'ancre. */
 .si-fs-btn {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;

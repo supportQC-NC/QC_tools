@@ -2,7 +2,8 @@
 //
 // VÉRIFICATION POINT ROUGE — module de permission à part entière
 // (`verification_inventaire`, 24/11/2026), distinct d'`inventaire` et de
-// `bipage` : il sera aussi porté sur l'app mobile.
+// `bipage`. Deux clients : l'écran web /admin/verification-point-rouge et
+// l'app collecteur (VerificationPointRougeScreen, 25/11/2026) — mêmes routes.
 
 import express from "express";
 import {

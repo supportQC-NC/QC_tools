@@ -85,7 +85,10 @@
   color: var(--text-primary);
 }
 
+/* Aussi porté par le lien « Suivi inventaire » (bascule sans quitter le plein
+   écran) : neutraliser le soulignement d'ancre. */
 .rz-fs-btn {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -540,9 +543,15 @@
    overflow, rien ne défile) et le navigateur peint un fond noir derrière :
    le fond doit être posé explicitement. Typographie en clamp() : lisible de
    loin sur un iPad géant, sans casser un plein écran sur petit moniteur. */
+/* Le plein écran est demandé sur document.documentElement (pour survivre à la
+   bascule Récap ↔ Suivi inventaire), le layout de l'app reste donc rendu
+   derrière — l'écran se superpose en fixed au-dessus de la sidebar/header
+   (z-index 4000 max côté sidebar). */
 .recap-zones.rz-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
   background: var(--bg-primary);
-  height: 100%;
   overflow-y: auto;
   padding: 24px 32px 60px;
 }

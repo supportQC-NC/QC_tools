@@ -17,7 +17,7 @@
 //   - en plein écran : typographie en clamp(), filtres agrandis pour le doigt,
 //     barre de filtres collante, horloge.
 
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   HiViewGrid,
@@ -26,6 +26,7 @@ import {
   HiClipboardCheck,
   HiCheck,
   HiArrowsExpand,
+  HiPresentationChartBar,
   HiX,
 } from "react-icons/hi";
 import { useSelector } from "react-redux";
@@ -102,7 +103,6 @@ const AdminRecapZonesScreen = () => {
   const [filtre, setFiltre] = useState("tous"); // "tous" | clé de STATUTS
   const [emplFiltre, setEmplFiltre] = useState("tous"); // "tous" | "MAGASIN" | "DOCK"
   const [lettreFiltre, setLettreFiltre] = useState("tous"); // "tous" | 1re lettre du code
-  const rootRef = useRef(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [enDirect, setEnDirect] = useState(false);
   const [horloge, setHorloge] = useState(() => new Date());
@@ -150,12 +150,21 @@ const AdminRecapZonesScreen = () => {
   // ── Plein écran ──
   // L'état réel du navigateur fait foi (Échap, F11…). Préfixes webkit : la
   // borne cible est un iPad, où Safari ne connaît que webkitFullscreen*.
+  // ⚠️ Le plein écran est demandé sur `document.documentElement`, PAS sur le
+  // div de l'écran : un élément démonté par la navigation fait sortir le
+  // navigateur du mode, alors que la racine survit au changement de route —
+  // c'est ce qui permet de basculer Récap ↔ Suivi inventaire sans quitter le
+  // plein écran (bouton « Suivi inventaire » du bandeau). L'écran se
+  // superpose alors au layout via `.rz-fs` (position fixed). L'appel immédiat
+  // de onChange couvre l'arrivée DEPUIS l'autre écran déjà en plein écran
+  // (aucun `fullscreenchange` ne sera émis au montage).
   useEffect(() => {
     const onChange = () => {
       const el =
         document.fullscreenElement || document.webkitFullscreenElement || null;
-      setFullscreen(el === rootRef.current);
+      setFullscreen(el === document.documentElement);
     };
+    onChange();
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
     return () => {
@@ -172,8 +181,7 @@ const AdminRecapZonesScreen = () => {
         document,
       );
     } else {
-      const el = rootRef.current;
-      if (!el) return;
+      const el = document.documentElement;
       (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
     }
   };
@@ -291,7 +299,7 @@ const AdminRecapZonesScreen = () => {
   });
 
   return (
-    <div className={`recap-zones${fullscreen ? " rz-fs" : ""}`} ref={rootRef}>
+    <div className={`recap-zones${fullscreen ? " rz-fs" : ""}`}>
       {/* En-tête */}
       <div className="rz-header">
         <h1>
@@ -314,6 +322,15 @@ const AdminRecapZonesScreen = () => {
             </span>
           )}
           {fullscreen && <span className="rz-horloge">{heure}</span>}
+          {/* Bascule vers le Suivi inventaire SANS quitter le plein écran :
+              navigation react-router, le documentElement reste fullscreen. */}
+          <Link
+            className="rz-fs-btn"
+            to="/admin/suivi-inventaire"
+            title="Basculer sur le Suivi inventaire (le plein écran est conservé)"
+          >
+            <HiPresentationChartBar /> Suivi inventaire
+          </Link>
           <button
             className="btn-icon"
             onClick={refetch}
