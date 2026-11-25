@@ -820,8 +820,8 @@ d'affichage d'une session possible (jamais le slug du dossier).
 **Vérification point rouge (module `verification_inventaire`, 24/11/2026)** :
 dernière passe de l'inventaire — au papillonnage la quantité comptée est
 écrite sur un scotch, au bipage un point rouge est collé après chaque scan ;
-quand TOUTES les zones d'une **allée** (1re lettre du code) sont contrôlées,
-un agent bipe les scotchs sans point rouge (écran
+quand TOUTES les zones d'une **allée** sont contrôlées, un agent bipe les
+scotchs sans point rouge (écran
 `/admin/verification-point-rouge`, API `/api/verification-inventaire`,
 version collecteur `VerificationPointRougeScreen` dans l'onglet Inventaire
 de QcApp depuis le 25/11/2026 — même parcours des deux côtés). **Croisement
@@ -838,7 +838,12 @@ porte désormais le rayon aussi sur les conformes) ; absent ou quantité
 différente → **le scotch fait foi**, ligne de delta (négatif accepté) dans
 `LigneBipage`, source **`verification`**, rangée en fin du **rayon bipé**.
 Une app qui appelle encore `/verifier` sans zone reçoit un 400 explicite
-(mise à jour requise). ⚠️ Ces lignes ne touchent **ni les fiches de contrôle
+(mise à jour requise). **L'allée** (`cleAllee`) = 1re lettre du code pour les
+codes « lettre + repère » (`A_1` de QC, `B22` de DQ) — mais une zone au
+préfixe de **2 lettres ou plus** (`DOCK_DQ`, `SAV`) est **sa propre allée**,
+vérifiable dès qu'elle est contrôlée (constaté en prod le 26/11/2026 :
+rangée dans « D » 1/50, `DOCK_DQ` contrôlée restait invérifiable).
+⚠️ Ces lignes ne touchent **ni les fiches de contrôle
 ni les `.dat` de zones** (aucune régénération/impression — `datFileName`
 vide) mais comptent dans la feuille d'écarts, le récap/bilan
 (`ecartsZonesService`) et l'intégration Stock XL ; elles sont filtrables dans

@@ -31,7 +31,7 @@ import {
   construireAllees,
   resoudreZoneAllee,
   rechercherDansZone,
-  lettreAllee,
+  cleAllee,
 } from "../services/verificationInventaireService.js";
 
 const round3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
@@ -87,7 +87,7 @@ const zoneDeLAllee = (session, allee, zoneCode, zoneType, res) => {
       z.code === zoneCode &&
       String(z.type || "").trim() === zoneType,
   );
-  if (!zone || lettreAllee(zone.code) !== allee) {
+  if (!zone || cleAllee(zone.code) !== allee) {
     res.status(400);
     throw new Error(
       `Zone ${zoneCode} (${zoneType}) absente de l'allée ${allee}.`,

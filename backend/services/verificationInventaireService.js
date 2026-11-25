@@ -15,19 +15,27 @@
 // Chaque scotch se compare donc aux bipages du rayon bipé, et c'est là que la
 // ligne de delta s'écrit — un article bipé dans une zone voisine ne compte pas.
 //
-// L'allée = PREMIÈRE lettre du code de zone (même convention que le filtre du
-// Récap par zone : A_1, A_2d… → « A » ; un code ne commençant pas par une
-// lettre tombe dans « # »).
+// L'allée = la PREMIÈRE lettre du code de zone pour les codes qui suivent la
+// convention « lettre + repère » (A_1, A_2d, B22… → « A », « B », même esprit
+// que le filtre du Récap par zone), SAUF pour les zones dont le code commence
+// par PLUSIEURS lettres (DOCK_DQ, SAV…) : celles-là sont leur PROPRE allée.
+// Constaté en prod le 26/11/2026 : la zone DOCK_DQ de QC, contrôlée, restait
+// invisible — rangée dans l'allée « D » (1/50), elle ne serait devenue
+// vérifiable qu'une fois les 49 rayons D_* contrôlés, ce qui n'a pas de sens
+// pour une zone à part. Un code ne commençant pas par une lettre tombe dans
+// « # ».
 
 import LigneBipage from "../models/LigneBipageModel.js";
 import { variantesCodeBarres, variantesNart } from "../utils/codeBarres.js";
 
-export const lettreAllee = (code) => {
-  const c = String(code || "")
-    .trim()
-    .charAt(0)
-    .toUpperCase();
-  return /[A-Z]/.test(c) ? c : "#";
+export const cleAllee = (code) => {
+  const c = String(code || "").trim().toUpperCase();
+  const lettres = c.match(/^[A-Z]+/);
+  if (!lettres) return "#";
+  // Préfixe de 2 lettres ou plus = zone hors convention : son allée est son
+  // code entier, elle s'ouvre à la vérification dès qu'ELLE est contrôlée.
+  if (lettres[0].length > 1) return c;
+  return lettres[0];
 };
 
 /**
@@ -39,7 +47,7 @@ export const construireAllees = (session) => {
   const parLettre = new Map();
   for (const z of session.zones || []) {
     if (z.neutralisee) continue;
-    const lettre = lettreAllee(z.code);
+    const lettre = cleAllee(z.code);
     let a = parLettre.get(lettre);
     if (!a) {
       a = { lettre, nbZones: 0, nbControlees: 0, zones: [] };
@@ -76,7 +84,7 @@ export const resoudreZoneAllee = ({ session, allee, code }) => {
   const cMaj = c.toUpperCase();
 
   const zones = (session.zones || []).filter(
-    (z) => !z.neutralisee && lettreAllee(z.code) === allee,
+    (z) => !z.neutralisee && cleAllee(z.code) === allee,
   );
   const resume = (z) => ({
     code: z.code,
