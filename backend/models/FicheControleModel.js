@@ -43,13 +43,19 @@ const ficheControleSchema = new mongoose.Schema(
     bipePar: { type: String, default: "" },
 
     // Marque de RÉÉDITION portée dans le titre du PDF (demande client du
-    // 27/11/2026) : "" = première édition ; « RÉÉDITION - AJOUT » quand la
+    // 27/11/2026) : "" = première édition ; « RÉÉDITION (n) - AJOUT » quand la
     // fiche a été régénérée après un complément de bipage (zone re-bipée,
-    // collecte `estComplement`) ; « RÉÉDITION » quand le .DAT a changé sans
+    // collecte `estComplement`) ; « RÉÉDITION (n) » quand le .DAT a changé sans
     // complément (« Recommencer la zone », fichier reposé à la main). Figée
     // ici pour que la régénération à la volée (assurerPdfFiche) ressorte le
     // même titre que l'impression.
     reedition: { type: String, default: "" },
+    // Compteur de rééditions : 0 = première édition, 1 = première réédition…
+    // C'est lui qui donne le « (n) » du titre ; la chaîne `reedition` le porte
+    // déjà cuit, le compteur ne sert qu'à calculer le suivant. Les fiches
+    // antérieures au champ qui portent une marque `reedition` non vide sont
+    // comptées pour 1 (on ne peut pas savoir mieux).
+    reeditionNum: { type: Number, default: 0 },
 
     // PDF généré
     pdfFileName: { type: String, default: "" },

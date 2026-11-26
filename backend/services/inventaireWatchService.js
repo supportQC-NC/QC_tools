@@ -419,10 +419,17 @@ const traiterFichier = async (
   // pour ce .DAT → la fiche imprimée est remplacée. Avec un complément de
   // bipage dans le cumul (`estComplement`), le titre porte « - AJOUT » ; sans
   // (« Recommencer la zone », fichier reposé à la main), simple « RÉÉDITION ».
+  // Le numéro de version suit les retraitements : (1) pour la première
+  // réédition, (2) pour la deuxième… Une fiche antérieure au compteur qui
+  // porte déjà une marque `reedition` compte pour 1 — `||` et pas `??` :
+  // Mongoose sert le défaut 0 même quand le champ n'existe pas en base.
+  const reeditionNum = existing
+    ? (existing.reeditionNum || (existing.reedition ? 1 : 0)) + 1
+    : 0;
   const reedition = existing
     ? collectes.some((c) => c.estComplement)
-      ? "RÉÉDITION - AJOUT"
-      : "RÉÉDITION"
+      ? `RÉÉDITION (${reeditionNum}) - AJOUT`
+      : `RÉÉDITION (${reeditionNum})`
     : "";
   const header = {
     zoneCode,
@@ -478,6 +485,7 @@ const traiterFichier = async (
         zoneType: header.zoneType,
         bipePar,
         reedition,
+        reeditionNum,
         pdfFileName,
         pdfPath: finalPath,
         date,

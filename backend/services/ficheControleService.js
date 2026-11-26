@@ -489,7 +489,9 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
   const PDFDocument = mod.default;
 
   const margin = 30;
-  const doc = new PDFDocument({ size: "A4", margin });
+  // bufferPages : les pages restent en mémoire jusqu'au doc.end(), pour
+  // pouvoir y repasser écrire « Page i / n » une fois le total connu.
+  const doc = new PDFDocument({ size: "A4", margin, bufferPages: true });
   const stream = fs.createWriteStream(outPath);
   doc.pipe(stream);
 
@@ -780,6 +782,26 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
     .lineTo(milieu - 10, y + visaH - 14)
     .stroke();
   doc.font("Helvetica-Bold").fontSize(8).text("Signature :", milieu + 4, y + 24);
+
+  // ---- Numérotation des pages (bas à droite, demande client du 27/11/2026) ----
+  const pages = doc.bufferedPageRange();
+  for (let i = pages.start; i < pages.start + pages.count; i += 1) {
+    doc.switchToPage(i);
+    // Écrire SOUS la marge basse sans déclencher l'ajout automatique d'une
+    // page : pdfkit ajoute une page dès qu'un texte dépasse margins.bottom.
+    const margeBasse = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc
+      .fillColor("#000")
+      .font("Helvetica")
+      .fontSize(8)
+      .text(`Page ${i + 1} / ${pages.count}`, left, doc.page.height - 20, {
+        width: right - left,
+        align: "right",
+        lineBreak: false,
+      });
+    doc.page.margins.bottom = margeBasse;
+  }
 
   doc.end();
   await new Promise((resolve, reject) => {
