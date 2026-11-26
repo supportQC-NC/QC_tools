@@ -415,22 +415,22 @@ const traiterFichier = async (
   // « Bipé par » : TOUS les agents du cumul de la zone (une zone re-bipée par
   // un second agent porte les deux), repli sur l'agent de la dernière collecte.
   const bipePar = (cumul.agents || []).join(" / ") || agentNom;
-  // RÉÉDITION (demande client du 27/11/2026) : une FicheControle existait déjà
-  // pour ce .DAT → la fiche imprimée est remplacée. Avec un complément de
-  // bipage dans le cumul (`estComplement`), le titre porte « - AJOUT » ; sans
-  // (« Recommencer la zone », fichier reposé à la main), simple « RÉÉDITION ».
-  // Le numéro de version suit les retraitements : (1) pour la première
-  // réédition, (2) pour la deuxième… Une fiche antérieure au compteur qui
-  // porte déjà une marque `reedition` compte pour 1 — `||` et pas `??` :
-  // Mongoose sert le défaut 0 même quand le champ n'existe pas en base.
-  const reeditionNum = existing
-    ? (existing.reeditionNum || (existing.reedition ? 1 : 0)) + 1
-    : 0;
-  const reedition = existing
-    ? collectes.some((c) => c.estComplement)
-      ? `RÉÉDITION (${reeditionNum}) - AJOUT`
-      : `RÉÉDITION (${reeditionNum})`
-    : "";
+  // RÉÉDITION (précision client du 27/11/2026, remplace la règle du matin) :
+  // la marque ne sort QUE quand une fiche déjà générée est remplacée parce que
+  // la zone a été re-bipée EN AJOUT (collecte `estComplement` dans le cumul).
+  // ⚠️ Ne PAS la déduire de « une FicheControle existe déjà » : le document est
+  // aussi créé par le verrou de réservation et le même .DAT peut être retraité
+  // sans nouveau bipage (déplacement qui change le mtime, double passage,
+  // re-dépôt de l'app sur timeout) — toutes les PREMIÈRES fiches sortaient
+  // « RÉÉDITION (1) - AJOUT ». « Recommencer la zone » et un fichier reposé à
+  // la main ne marquent pas non plus : table rase = nouvelle première édition.
+  // Le numéro de version est le RANG de l'ajout — compté sur les collectes,
+  // donc déterministe : le même cumul retraité redonne le même titre.
+  // (1) = premier complément, (2) = deuxième…
+  const complements = collectes.filter((c) => c.estComplement).length;
+  const dejaEditee = Boolean(existing && existing.pdfFileName);
+  const reeditionNum = dejaEditee && complements > 0 ? complements : 0;
+  const reedition = reeditionNum ? `RÉÉDITION (${reeditionNum}) - AJOUT` : "";
   const header = {
     zoneCode,
     zoneLibelle: zone.libelle || "",
