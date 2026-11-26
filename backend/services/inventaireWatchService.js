@@ -415,12 +415,22 @@ const traiterFichier = async (
   // « Bipé par » : TOUS les agents du cumul de la zone (une zone re-bipée par
   // un second agent porte les deux), repli sur l'agent de la dernière collecte.
   const bipePar = (cumul.agents || []).join(" / ") || agentNom;
+  // RÉÉDITION (demande client du 27/11/2026) : une FicheControle existait déjà
+  // pour ce .DAT → la fiche imprimée est remplacée. Avec un complément de
+  // bipage dans le cumul (`estComplement`), le titre porte « - AJOUT » ; sans
+  // (« Recommencer la zone », fichier reposé à la main), simple « RÉÉDITION ».
+  const reedition = existing
+    ? collectes.some((c) => c.estComplement)
+      ? "RÉÉDITION - AJOUT"
+      : "RÉÉDITION"
+    : "";
   const header = {
     zoneCode,
     zoneLibelle: zone.libelle || "",
     zoneType: zone.type || "",
     date,
     bipePar,
+    reedition,
   };
 
   // Le PDF prend le nom FINAL du .DAT (donc sans le suffixe d'emplacement) et
@@ -467,6 +477,7 @@ const traiterFichier = async (
         zoneLibelle: header.zoneLibelle,
         zoneType: header.zoneType,
         bipePar,
+        reedition,
         pdfFileName,
         pdfPath: finalPath,
         date,

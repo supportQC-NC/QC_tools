@@ -508,6 +508,21 @@ export const ecrirePDF = async ({ header, rows, outPath, legende }) => {
 
   let y = margin + 30;
 
+  // RÉÉDITION : cette fiche REMPLACE une fiche déjà générée/imprimée pour la
+  // même zone (« RÉÉDITION - AJOUT » quand un complément de bipage s'est
+  // ajouté) — le contrôleur doit savoir que le papier précédent ne vaut plus.
+  if (header.reedition) {
+    doc
+      .fontSize(11)
+      .fillColor("#c00000")
+      .text(header.reedition, left, margin + 22, {
+        width: right - left,
+        align: "center",
+      })
+      .fillColor("#000");
+    y = margin + 44;
+  }
+
   // ---- Bloc en-tête (Zone/Type, Libellé/Date) ----
   const infoH = 18;
   const colA = left;
@@ -1000,6 +1015,9 @@ export const assurerPdfFiche = async (fiche, entreprise, surchargeEntete = null)
       bipePar:
         surchargeEntete?.bipePar ??
         (String(fiche.bipePar || "").trim() || (agents || []).join(" / ")),
+      // Marque de réédition figée sur la fiche (watcher) : la régénération à
+      // la volée doit ressortir le même titre que le papier imprimé.
+      reedition: surchargeEntete?.reedition ?? (fiche.reedition || ""),
     },
     rows,
     outPath,
