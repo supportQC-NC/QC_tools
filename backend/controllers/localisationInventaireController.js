@@ -10,6 +10,8 @@ import {
   listerInventaires,
   listerEmplacements,
   rechercherArticle,
+  suggererArticles,
+  construirePlan,
 } from "../services/localisationInventaireService.js";
 
 // Charge une session en vérifiant qu'elle appartient bien à la société de la
@@ -56,6 +58,28 @@ export const rechercher = asyncHandler(async (req, res) => {
     code,
     ...resultat,
   });
+});
+
+// GET /api/localisation-inventaire/:entrepriseId/inventaires/:sessionId/suggestions
+//   ?q=<début de code OU mots de la désignation>
+// Recherche ASSISTÉE : on ne sait pas toujours le code de l'article qu'on a en
+// main. Renvoie des articles bipés dans CET inventaire, avec leurs zones.
+export const getSuggestions = asyncHandler(async (req, res) => {
+  const q = String(req.query.q || "").trim();
+  if (!q) {
+    res.json({ suggestions: [] });
+    return;
+  }
+  const session = await chargerSession(req, res);
+  res.json(await suggererArticles({ session, q }));
+});
+
+// GET /api/localisation-inventaire/:entrepriseId/inventaires/:sessionId/plan
+// Plan SCHÉMATIQUE de l'inventaire : emplacements → allées → zones, dans
+// l'ordre de parcours, avec le nombre de lignes bipées par zone.
+export const getPlan = asyncHandler(async (req, res) => {
+  const session = await chargerSession(req, res);
+  res.json(await construirePlan(session));
 });
 
 // PATCH /api/localisation-inventaire/:entrepriseId/inventaires/:sessionId/nom

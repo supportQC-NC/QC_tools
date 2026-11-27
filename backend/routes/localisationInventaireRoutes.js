@@ -9,6 +9,8 @@ import {
   getInventaires,
   getEmplacements,
   rechercher,
+  getSuggestions,
+  getPlan,
   renommerInventaire,
 } from "../controllers/localisationInventaireController.js";
 import { protect } from "../middleware/authMiddleware.js";
@@ -41,6 +43,14 @@ router.get(
   read,
   rechercher,
 );
+// Suggestions de la barre de recherche (code partiel ou mots de la désignation)
+router.get(
+  "/:entrepriseId/inventaires/:sessionId/suggestions",
+  read,
+  getSuggestions,
+);
+// Plan schématique : emplacements → allées → zones, ordre de parcours
+router.get("/:entrepriseId/inventaires/:sessionId/plan", read, getPlan);
 // Renommage du NOM d'affichage d'un inventaire (jamais le slug du dossier).
 router.patch(
   "/:entrepriseId/inventaires/:sessionId/nom",

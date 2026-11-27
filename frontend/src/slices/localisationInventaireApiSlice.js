@@ -28,6 +28,25 @@ export const localisationInventaireApiSlice = apiSlice.injectEndpoints({
       }),
     }),
 
+    // Suggestions de la barre de recherche : code partiel OU mots de la
+    // désignation (« marteau »), avec les zones de chaque article proposé.
+    // `keepUnusedDataFor` court : la frappe produit une requête par saisie
+    // stabilisée, inutile de garder longtemps des résultats intermédiaires.
+    getSuggestionsLocalisation: builder.query({
+      query: ({ entrepriseId, sessionId, q }) => ({
+        url: `${BASE}/${entrepriseId}/inventaires/${sessionId}/suggestions`,
+        params: { q },
+      }),
+      keepUnusedDataFor: 30,
+    }),
+
+    // Plan schématique de l'inventaire : emplacements → allées → zones
+    getPlanLocalisation: builder.query({
+      query: ({ entrepriseId, sessionId }) =>
+        `${BASE}/${entrepriseId}/inventaires/${sessionId}/plan`,
+      providesTags: ["LocalisationInventaire"],
+    }),
+
     // Renommer un inventaire (nom d'affichage seulement, jamais le slug)
     renommerInventaireLocalisation: builder.mutation({
       query: ({ entrepriseId, sessionId, nom }) => ({
@@ -44,5 +63,7 @@ export const {
   useGetInventairesLocalisationQuery,
   useGetEmplacementsLocalisationQuery,
   useLazyRechercherLocalisationQuery,
+  useGetSuggestionsLocalisationQuery,
+  useGetPlanLocalisationQuery,
   useRenommerInventaireLocalisationMutation,
 } = localisationInventaireApiSlice;

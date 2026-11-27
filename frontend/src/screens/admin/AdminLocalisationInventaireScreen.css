@@ -1,12 +1,25 @@
 /* src/screens/admin/AdminLocalisationInventaireScreen.css
-   Localisation inventaire : bandeau inventaire + recherche, filtre
-   d'emplacement sur les résultats, zones larges, voisins de rayon pleine
-   largeur. Charte globale (--bg-*, --text-*, --border, --accent), avec un
-   accent mis sur le CONTRASTE fond / texte (écran lu debout, en rayon). */
+   Localisation inventaire — refonte du 27/11/2026.
+
+   Trois blocs : la RECHERCHE (barre haute + suggestions), le PLAN
+   schématique (emplacement > allée > zones) et les SÉQUENCES de bipage.
+   Charte globale (--bg-*, --text-*, --border, --accent, --warning, --danger),
+   avec un accent mis sur le CONTRASTE : l'écran est lu debout, en rayon,
+   souvent sur un portable posé sur un chariot. */
 
 .loc-inv {
-  padding: 24px 16px 48px;
+  padding: 24px 16px 64px;
   color: var(--text-primary);
+}
+
+/* ── En-tête : titre + inventaire interrogé sur une ligne ── */
+.li-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 18px;
 }
 
 .li-header h1 {
@@ -15,7 +28,7 @@
   gap: 10px;
   font-size: 1.5rem;
   font-weight: 800;
-  margin: 0 0 18px;
+  margin: 0;
 }
 
 .li-header h1 svg {
@@ -26,11 +39,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 48px 16px;
+  gap: 10px;
+  padding: 40px 16px;
   text-align: center;
   color: var(--text-secondary);
   font-size: 1rem;
+}
+
+.li-placeholder p {
+  margin: 0;
 }
 
 .li-placeholder svg {
@@ -38,37 +55,23 @@
   color: var(--text-muted);
 }
 
-/* ── Bandeau : inventaire + recherche sur une seule bande ── */
-.li-bandeau {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px 32px;
-  align-items: flex-end;
-  padding: 16px 20px;
+.li-placeholder-vide {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--warning);
   border-radius: 14px;
+  padding: 26px 20px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
-.li-critere {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-width: 280px;
+.li-placeholder-vide svg {
+  color: var(--warning);
 }
 
-.li-critere-recherche {
-  flex: 1;
-}
-
-.li-critere > label {
-  font-size: 0.75rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-secondary);
+.li-placeholder-aide {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  max-width: 62ch;
 }
 
 .li-inv-select {
@@ -79,12 +82,12 @@
 
 .li-inv-select select,
 .li-inv-select input {
-  padding: 11px 12px;
+  padding: 10px 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 600;
   min-width: 250px;
 }
@@ -93,7 +96,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 11px;
+  padding: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg-tertiary);
@@ -112,38 +115,49 @@
 }
 
 .li-btn-ico.li-danger:hover {
-  color: #ff6b6b;
-  border-color: #ff6b6b;
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
-/* ── Recherche ── */
-.li-recherche {
+/* ══ RECHERCHE ══════════════════════════════════════════════════════════ */
+.li-hero {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: stretch;
   flex-wrap: wrap;
+  padding: 18px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.16);
+  margin-bottom: 12px;
+}
+
+/* `position: relative` porte le menu de suggestions. */
+.li-hero-champ {
+  position: relative;
+  flex: 1;
+  min-width: 280px;
 }
 
 .li-search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px;
+  gap: 12px;
+  padding: 0 16px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  min-width: 280px;
-  flex: 1;
-  max-width: 560px;
+  border-radius: 12px;
 }
 
 .li-search:focus-within {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.li-search svg {
+.li-search > svg {
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   flex-shrink: 0;
 }
 
@@ -152,23 +166,48 @@
   background: transparent;
   color: var(--text-primary);
   outline: none;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   width: 100%;
-  padding: 11px 0;
+  padding: 14px 0;
+  min-width: 0;
+}
+
+.li-search input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.98rem;
+}
+
+.li-vider {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.15rem;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.li-vider:hover {
+  color: var(--text-primary);
 }
 
 .li-btn-localiser {
-  padding: 0 26px;
+  padding: 0 30px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--accent);
   color: #0f0f1a;
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 800;
   cursor: pointer;
   transition: filter 0.15s ease;
+  min-height: 52px;
 }
 
 .li-btn-localiser:hover:not(:disabled) {
@@ -180,8 +219,154 @@
   cursor: default;
 }
 
+/* ── Suggestions : désignation + codes + zones, lisibles d'un coup d'œil ── */
+.li-suggestions {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+
+.li-suggestions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "des zones"
+    "codes zones";
+  gap: 2px 16px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.li-suggestions li.on {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.li-sug-info {
+  display: block !important;
+  padding: 14px 12px !important;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  cursor: default !important;
+}
+
+.li-sug-des {
+  grid-area: des;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.li-sug-codes {
+  grid-area: codes;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.li-sug-codes em {
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  align-self: center;
+}
+
+/* Les zones déjà dans la suggestion : souvent la réponse, sans valider. */
+.li-sug-zones {
+  grid-area: zones;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 50%;
+}
+
+.li-sug-zones b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px 8px;
+}
+
+.li-sug-zones i {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.li-sug-zones u {
+  text-decoration: none;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* ── Historique local ── */
+.li-recents {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  color: var(--text-muted);
+}
+
+.li-recents > svg {
+  font-size: 1rem;
+}
+
+.li-recents-lbl {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin-right: 2px;
+}
+
+.li-recents-vider {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 4px;
+}
+
+.li-recents-vider:hover {
+  color: var(--danger);
+}
+
 .li-avert {
-  color: #f59e0b;
+  color: var(--warning);
   font-size: 0.88rem;
   margin: 0 0 12px;
 }
@@ -190,14 +375,19 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 0.9rem;
   margin: 0 0 12px;
 }
 
-/* ── Fiche de l'article trouvé ── */
+/* ══ FICHE DE L'ARTICLE TROUVÉ ══════════════════════════════════════════ */
 .li-synthese {
-  padding: 18px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 28px;
+  padding: 18px 22px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-left: 4px solid var(--accent);
@@ -210,6 +400,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .li-article strong {
@@ -249,20 +441,103 @@
   color: var(--accent);
 }
 
-/* ── Filtre par emplacement — SUR les résultats, instantané ── */
+.li-synthese-chiffres {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.li-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 104px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.li-kpi b {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1.1;
+}
+
+.li-kpi span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ══ BARRE DE VUES + FILTRE D'EMPLACEMENT ══════════════════════════════ */
+.li-barre-vues {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+}
+
+.li-vues {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  gap: 4px;
+}
+
+.li-vue {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.li-vue svg {
+  font-size: 1.05rem;
+}
+
+.li-vue:hover:not(:disabled):not(.on) {
+  color: var(--text-primary);
+}
+
+.li-vue.on {
+  background: var(--accent);
+  color: #0f0f1a;
+}
+
+.li-vue:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .li-empl-filtre {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
 }
 
 .li-empl-filtre-lbl {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   color: var(--text-secondary);
 }
 
@@ -270,14 +545,14 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 14px;
+  padding: 8px 15px;
   border: 1px solid var(--border);
   border-radius: 20px;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
 }
 
 .li-chip:hover {
@@ -296,22 +571,328 @@
   opacity: 0.75;
 }
 
-.li-chip-grande {
-  padding: 10px 18px;
-  font-size: 0.95rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
 .li-chip-n {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
   color: var(--text-muted);
 }
 
-/* ── Zones où l'article est trouvé : tuiles LARGES et lisibles ── */
+.li-chip-recent {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+/* ══ PLAN SCHÉMATIQUE ══════════════════════════════════════════════════ */
+.li-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* La note dit que le plan est DÉDUIT des codes : sans elle, un utilisateur
+   lirait la grille comme la géométrie réelle du magasin. */
+.li-plan-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.li-plan-note svg {
+  color: var(--accent);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.li-plan-note b {
+  color: var(--text-primary);
+}
+
+.li-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
+
+.li-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.li-pastille {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.li-pastille.trouve {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.li-pastille.comptee {
+  background: var(--bg-tertiary);
+  border-color: var(--text-muted);
+}
+
+.li-pastille.vide {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--warning);
+}
+
+.li-pastille.neutre {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bg-tertiary) 0 3px,
+    transparent 3px 6px
+  );
+}
+
+/* ── Un bloc par emplacement (MAGASIN, DOCK…) ── */
+.li-plan-empl {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.14);
+}
+
+.li-plan-empl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 13px 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.li-plan-empl-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.li-plan-empl-head h2 svg {
+  color: var(--accent);
+}
+
+.li-plan-empl-head span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* ── Une rangée par allée : l'étiquette d'allée, puis ses zones dans
+      l'ordre du parcours. Les zones DÉBORDENT horizontalement plutôt que de
+      se replier : une allée doit se lire comme une allée. ── */
+.li-allees {
+  display: flex;
+  flex-direction: column;
+}
+
+.li-allee {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.li-allee + .li-allee {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.li-allee-lbl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 6px;
+  background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+  border-right: 1px solid var(--border);
+}
+
+.li-allee-lbl b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.li-allee-lbl span {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* L'allée qui porte l'article : repérable au premier regard sur 50 allées. */
+.li-allee.porte-article .li-allee-lbl {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.li-allee.porte-article .li-allee-lbl b {
+  color: var(--accent);
+}
+
+.li-allee-zones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  min-width: 0;
+}
+
+/* ── Une zone = une tuile cliquable ── */
+.li-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  min-width: 112px;
+  max-width: 190px;
+  padding: 9px 12px;
+  text-align: left;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  cursor: default;
+  font: inherit;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.li-zone-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.li-zone-lib {
+  font-size: 0.74rem;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Densité de bipage (hors recherche) : une zone à 0 n'a pas été comptée. */
+.li-zone-n {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Zone où l'article a été compté : accent franc + épingle + quantité. */
+.li-zone.trouve {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f0f1a;
+  cursor: pointer;
+  padding-left: 30px;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.li-zone.trouve:hover {
+  transform: translateY(-2px);
+}
+
+.li-zone.trouve .li-zone-lib {
+  color: rgba(15, 15, 26, 0.75);
+}
+
+.li-zone-pin {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  font-size: 1.1rem;
+  color: #0f0f1a;
+}
+
+.li-zone-qte {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #0f0f1a;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+/* Aucun bipage enregistré : bordure pointillée d'alerte — c'est souvent LA
+   réponse quand un article reste introuvable. */
+.li-zone.vide {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warning) 60%, var(--border));
+  background: transparent;
+}
+
+.li-zone.neutre {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bg-tertiary) 0 4px,
+    transparent 4px 8px
+  );
+  color: var(--text-muted);
+}
+
+.li-zone.neutre .li-zone-code {
+  text-decoration: line-through;
+}
+
+/* Recherche active : tout ce qui n'est pas la cible s'efface, sans
+   disparaître (le contexte de l'allée reste lisible). */
+.li-zone.estompe {
+  opacity: 0.4;
+}
+
+.li-zone.estompe:hover {
+  opacity: 0.75;
+}
+
+/* ══ SÉQUENCES DE BIPAGE ═══════════════════════════════════════════════ */
+/* Rappel des zones trouvées : réponse courte, cliquable pour descendre. */
 .li-zones-resume {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
@@ -324,11 +905,19 @@
   flex-direction: column;
   gap: 4px;
   padding: 14px 18px;
+  text-align: left;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-left: 4px solid var(--accent);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-primary);
+}
+
+.li-zone-pill:hover {
+  border-color: var(--accent);
 }
 
 .li-zone-pill b {
@@ -349,12 +938,12 @@
   font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
 }
 
-/* ── Occurrences : UNE carte PLEINE LARGEUR par séquence de bipage ──
-   Les désignations et gencods sortent en entier, jamais tronqués. */
+/* UNE carte PLEINE LARGEUR par séquence de bipage. Les désignations et
+   gencods sortent en entier, jamais tronqués. */
 .li-occurrences {
   display: flex;
   flex-direction: column;
@@ -367,6 +956,13 @@
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+  scroll-margin-top: 90px;
+}
+
+/* Carte amenée sous les yeux depuis le plan ou le rappel de zones. */
+.li-occ.focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .li-occ-head {
@@ -400,7 +996,8 @@
   color: var(--text-primary);
 }
 
-.li-occ-empl {
+.li-occ-empl,
+.li-occ-source {
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -410,6 +1007,12 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 4px 12px;
+}
+
+/* Provenance autre qu'un bipage de terrain : signalée, pas masquée. */
+.li-occ-source {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
 }
 
 .li-occ-meta {
@@ -428,7 +1031,7 @@
 
 .li-voisins li {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 10px 18px;
@@ -490,6 +1093,16 @@
   align-self: center;
 }
 
+/* Quantité comptée de chaque voisin : décimales conservées (articles au
+   mètre), alignée à droite pour se comparer d'une ligne à l'autre. */
+.li-v-qte {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* La ligne CIBLE : l'article recherché, mis en évidence franche. */
 .li-voisins li.cible {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -516,4 +1129,43 @@
 
 .li-voisins li.cible .li-v-codes {
   opacity: 1;
+}
+
+.li-voisins li.cible .li-v-qte {
+  color: var(--accent);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+/* ── Écrans étroits : le plan garde sa structure, les tuiles rétrécissent ── */
+@media (max-width: 720px) {
+  .li-allee {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .li-zone {
+    min-width: 96px;
+  }
+
+  .li-suggestions li {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "des"
+      "codes"
+      "zones";
+  }
+
+  .li-sug-zones {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .li-voisins li {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .li-v-qte {
+    grid-column: 2;
+    text-align: right;
+  }
 }

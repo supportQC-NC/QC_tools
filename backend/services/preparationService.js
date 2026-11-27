@@ -22,6 +22,7 @@ import {
   buildIndexRayons,
   lookupRayon,
 } from "./dictionnaireRayonsService.js";
+import { comparerCodeGisement } from "../utils/codeGisement.js";
 
 const safeTrim = (v) => (v == null ? "" : String(v)).trim();
 const num = (v) => {
@@ -111,59 +112,12 @@ export const ordonnerMagasin = (lignes) => {
   return lignes;
 };
 
-/**
- * Comparateur de CODES DE GISEMENT, pour ranger une zone dans l'ordre du
- * parcours physique.
- *
- * Le code se lit en deux parties séparées par le PREMIER « _ » : ce qui
- * précède est l'allée (A, B, I, A2…), ce qui suit le repère dans l'allée
- * (1, 2d, 10, 12g…). Chaque partie est comparée en ordre NATUREL — lettres
- * dans l'ordre alphabétique, nombres dans l'ordre numérique.
- *
- * ⚠️ Un `localeCompare` sur le code entier (l'ancien tri) donne
- * « A_1, A_10, A_11, A_12d, A_2d » : l'agent redescend l'allée au lieu de la
- * parcourir. Ici on obtient « A_1, A_2d, A_9, A_10, A_11, A_12d ».
- */
-const segmentsNaturels = (v) =>
-  String(v || "")
-    .toUpperCase()
-    .split(/(\d+)/)
-    .filter((x) => x !== "")
-    .map((x) => (/^\d+$/.test(x) ? Number(x) : x));
-
-const comparerNaturel = (a, b) => {
-  const sa = segmentsNaturels(a);
-  const sb = segmentsNaturels(b);
-  for (let i = 0; i < Math.max(sa.length, sb.length); i += 1) {
-    const x = sa[i];
-    const y = sb[i];
-    if (x === undefined) return -1; // « A » avant « A2 »
-    if (y === undefined) return 1;
-    const xNum = typeof x === "number";
-    const yNum = typeof y === "number";
-    if (xNum && yNum) {
-      if (x !== y) return x - y;
-    } else if (xNum !== yNum) {
-      return xNum ? -1 : 1; // un nombre avant une lettre à rang égal
-    } else if (x !== y) {
-      return x.localeCompare(y, "fr", { sensitivity: "base" });
-    }
-  }
-  return 0;
-};
-
-export const comparerCodeGisement = (a, b) => {
-  const couper = (v) => {
-    const s = String(v || "").trim();
-    const i = s.indexOf("_");
-    return i === -1 ? [s, ""] : [s.slice(0, i), s.slice(i + 1)];
-  };
-  const [alleeA, repereA] = couper(a);
-  const [alleeB, repereB] = couper(b);
-  return (
-    comparerNaturel(alleeA, alleeB) || comparerNaturel(repereA, repereB)
-  );
-};
+// Comparateur de CODES DE GISEMENT (ordre du parcours physique : « A_1,
+// A_2d, A_9, A_10 » et pas « A_1, A_10, A_2d »). Vit dans `utils/codeGisement.js`
+// depuis le 27/11/2026, pour être partagé avec la localisation inventaire sans
+// risque de divergence ; RÉEXPORTÉ ici car les appelants historiques
+// (etiquetteController…) l'importent de ce service.
+export { comparerCodeGisement };
 
 /**
  * Gisement de la zone DOCK d'une ligne : GISM2 et la priorité qui en découle.
