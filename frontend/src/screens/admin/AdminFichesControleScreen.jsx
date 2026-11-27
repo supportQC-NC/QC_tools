@@ -26,9 +26,12 @@ import {
   telechargerFichePdf,
 } from "../../slices/ficheControleApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
+import useInventaireMaj from "../../hooks/useInventaireMaj";
 import "./AdminFichesControleScreen.css";
 
-const POLL = 5000;
+// Une fiche traitée par le watcher émet `inventaire:maj` : le socket fait le
+// temps réel (useInventaireMaj), le polling n'est que le filet.
+const POLL = 15000;
 
 // Origine d'une fiche, lue dans sa référence (datFileName). Depuis le
 // 16/11/2026 les imports d'une zone partagent UNE fiche groupée
@@ -66,11 +69,17 @@ const AdminFichesControleScreen = () => {
     pollingInterval: selectedEntreprise ? POLL : 0,
   });
 
+  // Un dépôt de collecte précède de quelques secondes la fiche générée par le
+  // watcher : le refetch socket raccourcit d'autant l'attente. ⚠️ En prod le
+  // watcher tourne dans le print-agent, qui n'émet PAS de socket : le polling
+  // ci-dessus reste indispensable pour voir les fiches arriver.
+  useInventaireMaj(selectedEntreprise, refetch);
+
   const [scanFiches, { isLoading: scanning }] = useScanFichesMutation();
   const [deleteFiche] = useDeleteFicheMutation();
 
   const { data: watchStatus } = useGetWatchStatusQuery(undefined, {
-    pollingInterval: 5000,
+    pollingInterval: 15000,
   });
   const [startWatch, { isLoading: starting }] = useStartWatchMutation();
   const [stopWatch, { isLoading: stopping }] = useStopWatchMutation();

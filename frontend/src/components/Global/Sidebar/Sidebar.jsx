@@ -1,5 +1,5 @@
 // src/components/Global/Sidebar/Sidebar.jsx
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { NavLink } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { getMenuHint, buildSidebar } from "../../../config/menuConfig";
@@ -37,7 +37,15 @@ const Sidebar = () => {
   const activeLayout = useCustom ? myLayout : menuLayout;
 
   // Menus = chapitres du layout actif (ou défaut code), filtrés par permissions.
-  const menus = buildSidebar(userInfo, activeLayout, menuHints);
+  // Mémoïsé : la Sidebar re-rend à chaque tick des compteurs de notifications
+  // et à chaque navigation — reconstruire tout le catalogue (Maps, Sets,
+  // filtrage par permissions) à chaque fois se sentait sur les machines
+  // modestes. Les trois entrées viennent de RTK Query / Redux : identité
+  // stable tant que rien n'a changé.
+  const menus = useMemo(
+    () => buildSidebar(userInfo, activeLayout, menuHints),
+    [userInfo, activeLayout, menuHints],
+  );
 
   const switchMode = (custom) => {
     if (custom === useCustom) return;

@@ -16,6 +16,7 @@ import {
   normaliserConfig,
   invaliderMasque,
 } from "../services/dbfChampsService.js";
+import { invaliderPermission } from "../services/permissionCacheService.js";
 
 // GET /tables
 const getTables = asyncHandler(async (req, res) => {
@@ -67,8 +68,10 @@ const setConfigUtilisateur = asyncHandler(async (req, res) => {
   );
 
   // Le masque est mis en cache 1 min : on le purge pour que le retrait d'un
-  // droit s'applique immédiatement.
+  // droit s'applique immédiatement. Idem pour le cache des Permissions
+  // (middlewares d'accès) : le document vient d'être réécrit.
   invaliderMasque(userId);
+  invaliderPermission(userId);
 
   const nbTables = Object.keys(champsDbf).length;
   const nbMasques = Object.values(champsDbf).reduce(

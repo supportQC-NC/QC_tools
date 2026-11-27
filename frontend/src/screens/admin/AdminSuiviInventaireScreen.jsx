@@ -29,6 +29,7 @@ import {
 import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { getSocket } from "../../socketClient";
+import Horloge from "../../components/Global/Horloge";
 import {
   PHASES,
   PHASE_META,
@@ -117,7 +118,12 @@ const AnneauPct = ({ pct, size = 180 }) => {
 const AdminSuiviInventaireScreen = () => {
   const selectedEntreprise = useSelector(selectGlobalEntrepriseId) || "";
   const [fullscreen, setFullscreen] = useState(false);
-  const [horloge, setHorloge] = useState(() => new Date());
+  // Minute courante (pour les durées relatives / ETA). Le tick est à la
+  // seconde mais le setState renvoie la MÊME valeur tant que la minute n'a
+  // pas changé : React saute alors le re-rendu — l'écran entier ne se
+  // redessine plus qu'une fois par minute, l'horloge affichée étant un
+  // composant autonome (<Horloge />).
+  const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60000));
 
   const { data: entreprises } = useGetMyEntreprisesQuery();
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
@@ -214,10 +220,8 @@ const AdminSuiviInventaireScreen = () => {
     refetchAgents();
   }, [totalPhasesFaites, selectedEntreprise, refetchAgents]);
 
-  // Minute courante : les durées relatives et l'ETA n'ont pas besoin de bouger
-  // à la seconde — caler leurs useMemo sur l'horloge brute les recalculerait
-  // 60 fois par minute pour rien.
-  const minute = Math.floor(horloge.getTime() / 60000);
+  // `minute` vient directement du state (voir plus haut) : les durées
+  // relatives et l'ETA n'ont pas besoin de bouger à la seconde.
 
   // ── Projection de fin ──
   // Date de complétion d'une zone = le moment où sa DERNIÈRE phase a été faite
@@ -323,9 +327,13 @@ const AdminSuiviInventaireScreen = () => {
     return tops;
   }, [agentsData]);
 
-  // Horloge du mur d'affichage : elle montre aussi que l'écran est vivant.
+  // Tick : à la seconde, mais le re-rendu n'a lieu qu'au changement de minute
+  // (setState à valeur identique = re-rendu sauté par React).
   useEffect(() => {
-    const t = setInterval(() => setHorloge(new Date()), 1000);
+    const t = setInterval(
+      () => setMinute(Math.floor(Date.now() / 60000)),
+      1000,
+    );
     return () => clearInterval(t);
   }, []);
 
@@ -368,11 +376,6 @@ const AdminSuiviInventaireScreen = () => {
     }
   };
 
-  const heure = horloge.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
   return (
     <div className={`suivi-inv${fullscreen ? " si-fs" : ""}`}>
       {/* Bandeau : identité + horloge + plein écran */}
@@ -390,7 +393,7 @@ const AdminSuiviInventaireScreen = () => {
           >
             <i /> en direct
           </span>
-          <span className="si-horloge">{heure}</span>
+          <Horloge className="si-horloge" />
           {/* Bascule vers le Récap par zone SANS quitter le plein écran :
               navigation react-router, le documentElement reste fullscreen. */}
           <Link

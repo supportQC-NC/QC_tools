@@ -2417,7 +2417,19 @@ const getSuiviBipage = asyncHandler(async (req, res) => {
   }
   if (statut === "en_cours" || statut === "exporte") filtre.status = statut;
 
+  // `lignes.scannedAt` SEUL (27/11/2026) : le calcul du temps actif a besoin
+  // des horodatages ligne à ligne, mais pas du reste du sous-document
+  // (nart, gencod, désignation, quantités…) — qui faisait transiter TOUTES
+  // les lignes scannées de chaque collecte pour un écran qui n'en affiche
+  // aucune. Sur « Tous les inventaires » (cumul pluriannuel), la réponse
+  // était massive à chaque tour de polling.
   const collectes = await InventaireCollecte.find(filtre)
+    .select(
+      "zoneCode zoneLibelle zoneType sessionNom status user observationPar " +
+        "createdAt exportedAt totalArticles totalQuantite estComplement " +
+        "annulee fichierExport observationAgent observation observationAt " +
+        "lignes.scannedAt",
+    )
     .populate("user", "nom prenom email")
     .populate("observationPar", "nom prenom email")
     .sort({ createdAt: -1 })

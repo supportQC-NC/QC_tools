@@ -14,7 +14,11 @@ const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(apiSlice.middleware),
-  devTools: true,
+  // DevTools en développement SEULEMENT : avec l'extension installée, chaque
+  // action sérialise tout le state — qui porte les gros datasets RTK Query
+  // (5 000 lignes de bipage, classeurs CA…). En production c'était un
+  // ralentissement global pour quiconque a l'extension.
+  devTools: process.env.NODE_ENV !== "production",
 });
 
 export default store;

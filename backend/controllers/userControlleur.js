@@ -31,6 +31,7 @@ import {
   genererCartesPDF,
   nomAffiche as nomBadge,
 } from "../services/badgeUtilisateurService.js";
+import { invaliderPermission } from "../services/permissionCacheService.js";
 
 // Périmètre EFFECTIF de l'acteur pour l'atténuation des permissions accordées.
 // Un admin (rôle) possède TOUS les modules (cohérent avec checkModuleAccess) ;
@@ -679,6 +680,9 @@ const createUser = asyncHandler(async (req, res) => {
       allModules: isAdminRole,
     });
   }
+  // Cache d'accès : le nouveau compte ne doit pas retomber sur un
+  // « pas de Permission » resté en cache.
+  invaliderPermission(user._id);
 
   // Rattachement effectif aux équipes demandées (après la Permission, pour que
   // le nouveau membre arrive complet dans les salons/compteurs d'équipe).
@@ -969,6 +973,9 @@ const updateUser = asyncHandler(async (req, res) => {
       new: true,
       upsert: true,
     });
+    // Le cache d'accès doit voir le changement IMMÉDIATEMENT (un droit retiré
+    // ne doit pas survivre au TTL de 60 s quand l'écriture passe par ici).
+    invaliderPermission(user._id);
   }
 
   const permissions = await Permission.findOne({ user: user._id }).populate(
@@ -1013,6 +1020,7 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
 
   await Permission.deleteOne({ user: user._id });
+  invaliderPermission(user._id);
   await User.deleteOne({ _id: user._id });
 
   res.json({ message: "Utilisateur supprimé" });

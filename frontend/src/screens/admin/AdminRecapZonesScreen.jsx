@@ -35,6 +35,7 @@ import { useGetMyEntreprisesQuery } from "../../slices/entrepriseApiSlice";
 import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import { progressionParEmplacement } from "../../utils/progressionInventaire";
 import { getSocket } from "../../socketClient";
+import Horloge from "../../components/Global/Horloge";
 import "./AdminRecapZonesScreen.css";
 
 // Filet derrière le socket (reconnexion, et PROD : les coches posées par le
@@ -105,7 +106,6 @@ const AdminRecapZonesScreen = () => {
   const [lettreFiltre, setLettreFiltre] = useState("tous"); // "tous" | 1re lettre du code
   const [fullscreen, setFullscreen] = useState(false);
   const [enDirect, setEnDirect] = useState(false);
-  const [horloge, setHorloge] = useState(() => new Date());
 
   const { data: entreprises } = useGetMyEntreprisesQuery();
   const entrepriseObj = entreprises?.find((e) => e._id === selectedEntreprise);
@@ -186,13 +186,8 @@ const AdminRecapZonesScreen = () => {
     }
   };
 
-  // Horloge affichée en mode borne uniquement — pas de tick hors plein écran.
-  useEffect(() => {
-    if (!fullscreen) return undefined;
-    setHorloge(new Date());
-    const t = setInterval(() => setHorloge(new Date()), 1000);
-    return () => clearInterval(t);
-  }, [fullscreen]);
+  // L'horloge du mode borne est un composant AUTONOME (<Horloge />) : son
+  // tick d'une seconde ne re-rend plus la grille des 600+ zones.
 
   const session = activeData?.active || null;
   const progress = activeData?.progress || null;
@@ -293,11 +288,6 @@ const AdminRecapZonesScreen = () => {
     setSearch("");
   };
 
-  const heure = horloge.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
   return (
     <div className={`recap-zones${fullscreen ? " rz-fs" : ""}`}>
       {/* En-tête */}
@@ -321,7 +311,7 @@ const AdminRecapZonesScreen = () => {
               <i /> {enDirect ? "en direct" : "différé"}
             </span>
           )}
-          {fullscreen && <span className="rz-horloge">{heure}</span>}
+          {fullscreen && <Horloge className="rz-horloge" />}
           {/* Bascule vers le Suivi inventaire SANS quitter le plein écran :
               navigation react-router, le documentElement reste fullscreen. */}
           <Link

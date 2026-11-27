@@ -28,6 +28,7 @@ import {
   useGetSuiviBipageQuery,
   useUpdateObservationBipageMutation,
 } from "../../slices/inventaireCollecteApiSlice";
+import useInventaireMaj from "../../hooks/useInventaireMaj";
 import "./AdminSuiviBipageScreen.css";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -92,10 +93,14 @@ const AdminSuiviBipageScreen = () => {
 
   const { data, isLoading, isFetching, refetch } = useGetSuiviBipageQuery(
     { entrepriseId: selectedEntreprise, session, statut, search },
-    // Un inventaire est une opération vivante : on rafraîchit tout seul, comme
-    // l'écran de progression.
-    { skip: !selectedEntreprise, pollingInterval: 15000 },
+    // Un inventaire est une opération vivante : le TEMPS RÉEL vient du socket
+    // `inventaire:maj` (ci-dessous) ; ce polling n'est que le filet de
+    // sécurité quand le socket décroche.
+    { skip: !selectedEntreprise, pollingInterval: 30000 },
   );
+
+  // Dépôt / reprise d'une collecte → refetch immédiat.
+  useInventaireMaj(selectedEntreprise, refetch);
 
   const [updateObservation] = useUpdateObservationBipageMutation();
 

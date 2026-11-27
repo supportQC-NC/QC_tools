@@ -450,3 +450,14 @@ optgroup {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
+
+/* Repli affiché le temps du téléchargement d'un chunk d'écran (React.lazy,
+   App.js) : discret, centré, sans spinner agressif. */
+.chargement-ecran {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  color: var(--text-secondary, #a0a0b8);
+  font-size: 0.95rem;
+}

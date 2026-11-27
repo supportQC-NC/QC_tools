@@ -3,6 +3,7 @@ import "./loadEnv.js"; // ⬅️ DOIT rester la toute première ligne (charge do
 import path from "path";
 import http from "http";
 import express from "express";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import fs from "fs";
@@ -158,6 +159,12 @@ const PORT = process.env.PORT || 8000;
 connectDB();
 
 const app = express();
+
+// Compression gzip de TOUTES les réponses (27/11/2026) : le JSON de l'API
+// (une liste de 5 000 lignes de bipage passe de ~2 Mo à ~200 Ko) comme le
+// build du front servi plus bas. L'app est consommée derrière un tunnel :
+// chaque octet non compressé était du temps d'attente.
+app.use(compression());
 
 // CORS middleware - IMPORTANT: configurer avec credentials pour les cookies
 app.use(
@@ -342,7 +349,20 @@ if (process.env.NODE_ENV === "production") {
     path.join(__dirname, "frontend", "build");
 
   if (fs.existsSync(buildPath)) {
-    app.use(express.static(buildPath));
+    // Les assets CRA sont HACHÉS (main.<hash>.js) : cache long + immutable,
+    // le navigateur ne les redemande plus. `index.html` reste en no-cache
+    // (c'est lui qui pointe vers les nouveaux hashes à chaque déploiement).
+    app.use(
+      express.static(buildPath, {
+        maxAge: "30d",
+        immutable: true,
+        setHeaders: (res, p) => {
+          if (p.endsWith("index.html")) {
+            res.setHeader("Cache-Control", "no-cache");
+          }
+        },
+      }),
+    );
     // Toute route hors /api et /uploads -> index.html (routing côté client)
     app.get(/^(?!\/api|\/uploads).*/, (req, res) => {
       res.sendFile(path.join(buildPath, "index.html"));

@@ -35,9 +35,14 @@ import { selectGlobalEntrepriseId } from "../../slices/entrepriseGlobalSlice";
 import ImportComptageZone from "../../components/Admin/ImportComptageZone";
 import UserPicker from "../../components/ui/UserPicker/UserPicker";
 import { useLazyGetUserParBadgeQuery } from "../../slices/userApiSlice";
+import useInventaireMaj from "../../hooks/useInventaireMaj";
 import "./AdminProgressionScreen.css";
 
-const POLL = 4000;
+// Le TEMPS RÉEL vient du socket `inventaire:maj` (useInventaireMaj, refetch à
+// la seconde sur chaque dépôt/phase) : le polling n'est plus qu'un FILET de
+// sécurité — à 4 s, chaque navigateur ouvert martelait un GET qui relit la
+// session complète (600+ zones, 4 populate) toutes les 4 secondes.
+const POLL = 15000;
 
 const PHASES = ["papillonnage", "bipage", "controle"];
 const PHASE_META = {
@@ -216,6 +221,10 @@ const AdminInventaireProgressionScreen = () => {
     skip: !selectedEntreprise,
     pollingInterval: selectedEntreprise ? POLL : 0,
   });
+
+  // Temps réel : dépôt de collecte, phase validée, fiche traitée → refetch
+  // immédiat par le socket (le polling ci-dessus reste le filet).
+  useInventaireMaj(selectedEntreprise, refetch);
 
   const { data: historiqueData } = useGetZoneHistoriqueQuery(
     selectedEntreprise,

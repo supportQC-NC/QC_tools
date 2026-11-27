@@ -180,20 +180,39 @@ const buildZonesMeta = async (session, entreprise = null) => {
   // dictionnaire, il doit rester filtrable.
   const typesVus = new Set(zonesMeta.map((z) => z.type).filter(Boolean));
   if (entreprise) {
-    try {
-      const { rows } = await readDictionnaire(entreprise);
-      for (const r of rows || []) {
-        const t = String(r?.emplacement || "").trim();
-        if (t) typesVus.add(t);
-      }
-    } catch {
-      // Dictionnaire illisible (partage injoignable) : on se contente des
-      // types présents dans les lignes, le filtre reste utilisable.
-    }
+    for (const t of await typesDictionnaire(entreprise)) typesVus.add(t);
   }
   const types = [...typesVus].sort((a, b) => a.localeCompare(b, "fr"));
 
   return { zonesMeta, types };
+};
+
+// Types d'emplacement du dictionnaire des rayons, cachés 5 min par société :
+// `readDictionnaire` lit un fichier Excel sur le PARTAGE RÉSEAU, et la liste
+// des emplacements (MAGASIN, DOCK…) ne bouge quasiment jamais — la payer à
+// chaque affichage de l'écran (et à chaque frappe de recherche) n'avait pas
+// de sens. Un type tout juste ajouté apparaît en ≤ 5 min ; en attendant, les
+// types réellement présents dans les lignes restent filtrables (logique
+// ci-dessus, inchangée).
+const TTL_TYPES_DICO = 5 * 60 * 1000;
+const cacheTypesDico = new Map(); // entrepriseId -> { at, types: string[] }
+const typesDictionnaire = async (entreprise) => {
+  const cle = String(entreprise._id);
+  const hit = cacheTypesDico.get(cle);
+  if (hit && Date.now() - hit.at < TTL_TYPES_DICO) return hit.types;
+  const types = [];
+  try {
+    const { rows } = await readDictionnaire(entreprise);
+    for (const r of rows || []) {
+      const t = String(r?.emplacement || "").trim();
+      if (t && !types.includes(t)) types.push(t);
+    }
+  } catch {
+    // Dictionnaire illisible (partage injoignable) : liste vide, cachée
+    // aussi — sans ça chaque GET repaierait le timeout du partage.
+  }
+  cacheTypesDico.set(cle, { at: Date.now(), types });
+  return types;
 };
 
 /**
@@ -201,8 +220,18 @@ const buildZonesMeta = async (session, entreprise = null) => {
  * l'emplacement est déjà présent en préfixe du `datFileName` logique
  * ("<emplacement>/<nom>"). Idempotent : ne touche que les lignes à zoneType vide
  * dont le datFileName contient un "/". (Pipeline d'update, supporté par Atlas.)
+ *
+ * ⚠️ UNE SEULE passe par session et par processus (27/11/2026) : toute ligne
+ * écrite aujourd'hui porte `zoneType`, des lignes héritées ne peuvent pas
+ * réapparaître après le passage. Le relancer à chaque GET était une ÉCRITURE
+ * (updateMany à regex non ancrée, inindexable) payée par chaque affichage de
+ * l'écran — y compris chaque frappe de recherche. Le redémarrage du serveur
+ * refait une passe : c'est le filet de sécurité, et il est gratuit.
  */
+const sessionsBackfillees = new Set();
 const backfillZoneType = async (session) => {
+  const cle = String(session._id);
+  if (sessionsBackfillees.has(cle)) return;
   try {
     await LigneBipage.updateMany(
       {
@@ -218,6 +247,8 @@ const backfillZoneType = async (session) => {
         },
       ],
     );
+    // Marquée APRÈS le succès seulement : un échec retentera au prochain GET.
+    sessionsBackfillees.add(cle);
   } catch {
     /* best-effort : si l'update pipeline échoue, on n'empêche pas la lecture */
   }
@@ -237,19 +268,28 @@ const backfillZoneType = async (session) => {
 const completerGencod = async (entreprise, lignes) => {
   const aResoudre = lignes.filter((l) => !l.gencod && l.nart);
   if (!aResoudre.length) return;
+  // Le cache est chargé UNE fois puis interrogé en synchrone (27/11/2026) :
+  // `findByNart` repasse par `getArticles`, dont le contrôle de validité fait
+  // un fs.statSync sur le DBF du partage réseau — un stat réseau PAR LIGNE à
+  // résoudre, c'était l'essentiel du coût. `lookupNart` et non
+  // `indexByNart.get` en direct : zéros de tête du NART tolérés (CLAUDE.md).
+  let cache = null;
+  try {
+    cache = await articleCacheService.getArticles(entreprise);
+  } catch {
+    return; // cache indisponible : les gencods manquants restent vides
+  }
   const dejaVu = new Map();
   for (const l of aResoudre) {
     const cle = String(l.nart).trim().toUpperCase();
     if (!dejaVu.has(cle)) {
-      let gencod = "";
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const rec = await articleCacheService.findByNart(entreprise, l.nart);
-        if (rec) gencod = String(rec.GENCOD || "").trim();
-      } catch {
-        gencod = "";
-      }
-      dejaVu.set(cle, gencod);
+      const idx = articleCacheService.lookupNart(cache, l.nart);
+      dejaVu.set(
+        cle,
+        idx !== undefined
+          ? String(cache.records[idx].GENCOD || "").trim()
+          : "",
+      );
     }
     l.gencod = dejaVu.get(cle);
   }
@@ -343,10 +383,24 @@ const getBipages = asyncHandler(async (req, res) => {
 
   const filter = buildFilter(session, req.query);
   // Tri Mongo large (il borne le limit), puis remise dans l'ordre des fiches.
+  // `.select()` : seuls les champs consommés par l'écran, le tri des fiches et
+  // le résumé de correction — les ~30 champs complets doublaient la réponse.
+  // `limit(PLAFOND + 1)` : la ligne excédentaire ne sert qu'à détecter la
+  // troncature (`tronque`), pour que l'écran puisse la DIRE au lieu de
+  // masquer silencieusement la fin de l'inventaire.
+  const PLAFOND_LIGNES = 5000;
   let lignes = await LigneBipage.find(filter)
+    .select(
+      "zoneCode zoneType ordre codeScanne eanArticle gencod qteScan nart " +
+        "designation found stock agentCode agentNom observation source " +
+        "sourceRef modeImport modifie modifieAt modifieParNom " +
+        "qteScanOrigine nartOrigine datFileName createdAt",
+    )
     .sort({ zoneType: 1, zoneCode: 1, datFileName: 1, ordre: 1 })
-    .limit(5000)
+    .limit(PLAFOND_LIGNES + 1)
     .lean();
+  const tronque = lignes.length > PLAFOND_LIGNES;
+  if (tronque) lignes = lignes.slice(0, PLAFOND_LIGNES);
 
   // Filtre SUR-COMPTAGE (?surstock=1) : ne garder que les lignes des articles
   // dont la somme bipée sur TOUTE la session (toutes zones confondues — un
@@ -354,15 +408,39 @@ const getBipages = asyncHandler(async (req, res) => {
   // Stock théorique = la photo du stock figé quand elle existe, sinon le
   // stock réel du cache — même référence que la feuille d'écarts.
   if (req.query.surstock === "1" && lignes.length) {
-    const toutes = await LigneBipage.find({ session: session._id })
-      .select("nart eanArticle qteScan")
-      .lean();
-    const sommes = new Map();
-    for (const l of toutes) {
-      const cle = String(l.nart || l.eanArticle || "").trim().toUpperCase();
-      if (!cle) continue;
-      sommes.set(cle, (sommes.get(cle) || 0) + (Number(l.qteScan) || 0));
-    }
+    // Les sommes par article sont agrégées PAR MONGO (27/11/2026) : relire
+    // toutes les lignes de la session côté Node doublait la requête
+    // principale. La clé reproduit exactement l'ancien
+    // `String(l.nart || l.eanArticle || "").trim().toUpperCase()` — y compris
+    // le repli sur eanArticle quand le NART TRIMÉ est vide (un `$ifNull` seul
+    // ne replierait pas sur un nart "" ou "   ").
+    const aggr = await LigneBipage.aggregate([
+      { $match: { session: session._id } },
+      {
+        $project: {
+          qteScan: 1,
+          cle: {
+            $toUpper: {
+              $let: {
+                vars: {
+                  nartTrim: { $trim: { input: { $ifNull: ["$nart", ""] } } },
+                },
+                in: {
+                  $cond: [
+                    { $gt: [{ $strLenCP: "$$nartTrim" }, 0] },
+                    "$$nartTrim",
+                    { $trim: { input: { $ifNull: ["$eanArticle", ""] } } },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      { $match: { cle: { $ne: "" } } },
+      { $group: { _id: "$cle", somme: { $sum: { $ifNull: ["$qteScan", 0] } } } },
+    ]);
+    const sommes = new Map(aggr.map((r) => [r._id, r.somme]));
 
     const fige = await chargerStockFige(session);
     let acache = null;
@@ -411,6 +489,10 @@ const getBipages = asyncHandler(async (req, res) => {
     zones: zonesMeta.map((z) => z.code), // rétro-compatibilité (liste de codes)
     zonesMeta, // [{ code, type }]
     types, // liste des types distincts présents
+    // L'inventaire dépasse le plafond de lignes renvoyées : l'écran l'affiche
+    // (filtrer par zone/type fait retomber sous le plafond) au lieu de
+    // laisser croire que tout est là.
+    tronque,
     lignes,
   });
 });

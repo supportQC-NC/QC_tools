@@ -1,13 +1,20 @@
 // backend/middleware/checkEntrepriseAccess.js
 import asyncHandler from "./asyncHandler.js";
-import Entreprise from "../models/EntrepriseModel.js";
-import Permission from "../models/PermissionModel.js";
+import {
+  getPermissionLean,
+  getEntrepriseCachee,
+} from "../services/permissionCacheService.js";
 
 /**
  * Vérifie l'accès de l'utilisateur à une entreprise (param :entrepriseId ou
  * :nomDossierDBF). L'accès aux SOCIÉTÉS est TOUJOURS limité aux entreprises
  * explicitement accordées — Y COMPRIS pour les administrateurs (un admin a tous
  * les modules, mais seulement les sociétés qu'on lui attribue).
+ *
+ * Permission et Entreprise viennent du CACHE 60 s (permissionCacheService,
+ * 27/11/2026) : ce middleware tourne sur presque toutes les routes et chaque
+ * lecture Atlas coûte un aller-retour réseau. `req.entreprise` est un document
+ * PARTAGÉ entre requêtes : lecture seule (aucun contrôleur ne le mute).
  */
 const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
   const { entrepriseId, nomDossierDBF } = req.params;
@@ -15,9 +22,9 @@ const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
   // Trouver l'entreprise par ID ou nomDossierDBF
   let entreprise;
   if (entrepriseId) {
-    entreprise = await Entreprise.findById(entrepriseId);
+    entreprise = await getEntrepriseCachee({ id: entrepriseId });
   } else if (nomDossierDBF) {
-    entreprise = await Entreprise.findOne({ nomDossierDBF });
+    entreprise = await getEntrepriseCachee({ nomDossierDBF });
   }
 
   if (!entreprise) {
@@ -32,7 +39,7 @@ const checkEntrepriseAccess = asyncHandler(async (req, res, next) => {
   }
 
   // Permissions de l'utilisateur (admin compris : plus de bypass société).
-  const permission = await Permission.findOne({ user: req.user._id });
+  const permission = await getPermissionLean(req.user._id);
 
   if (!permission) {
     res.status(403);
@@ -76,7 +83,7 @@ const checkModuleAccess = (moduleName, action = "read") => {
       return next();
     }
 
-    const permission = await Permission.findOne({ user: req.user._id });
+    const permission = await getPermissionLean(req.user._id);
 
     if (!permission) {
       res.status(403);

@@ -41,6 +41,7 @@
     "basic-ftp": "^6.2.3",
     "bcryptjs": "^3.0.3",
     "colors": "^1.4.0",
+    "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dbffile": "^1.12.0",

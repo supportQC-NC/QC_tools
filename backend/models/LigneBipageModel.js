@@ -131,6 +131,21 @@ const ligneBipageSchema = new mongoose.Schema(
 
 ligneBipageSchema.index({ session: 1, zoneCode: 1 });
 ligneBipageSchema.index({ session: 1, datFileName: 1 });
+// Couvre le GET de l'écran Détail des bipages : égalité sur `session` (et,
+// en préfixe du tri, les filtres ?type= / ?zone=) puis le tri
+// { zoneType, zoneCode, datFileName, ordre } — sans lui, Mongo triait TOUTES
+// les lignes de la session en mémoire à chaque affichage et le limit(5000)
+// ne bornait rien. Les écritures arrivent par rafales du watcher (quelques
+// dizaines/centaines de lignes par dépôt de zone) : le coût d'entretien est
+// négligeable. Les champs de RECHERCHE (nart, gencod…) ne sont pas indexés :
+// la recherche est une regex non ancrée, inindexable par nature.
+ligneBipageSchema.index({
+  session: 1,
+  zoneType: 1,
+  zoneCode: 1,
+  datFileName: 1,
+  ordre: 1,
+});
 
 const LigneBipage = mongoose.model("LigneBipage", ligneBipageSchema);
 

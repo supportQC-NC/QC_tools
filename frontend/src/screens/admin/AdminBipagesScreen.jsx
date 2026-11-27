@@ -1,5 +1,11 @@
 // src/screens/admin/AdminBipagesScreen.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   HiClipboardList,
   HiClipboardCheck,
@@ -132,6 +138,153 @@ const CelluleGencode = ({ ligne }) => {
     </span>
   );
 };
+
+/**
+ * UNE ligne du tableau des bipages, mémoïsée (27/11/2026).
+ *
+ * L'écran peut porter jusqu'à 5 000 lignes : sans `React.memo`, chaque frappe
+ * dans une cellule reconstruisait les 5 000 `<tr>` (updateLocal remplace le
+ * tableau d'état) et la saisie devenait poussive. `updateLocal` préserve
+ * l'identité des objets non touchés (`prev.map` ne recrée QUE la ligne
+ * éditée) : seul le `<tr>` édité re-rend, à condition que les callbacks
+ * passés ici soient STABLES (useCallback côté parent) et que `resolution`
+ * soit un booléen (pas le Set entier).
+ */
+const LigneTableau = React.memo(function LigneTableau({
+  l,
+  resolution,
+  onChange,
+  onSave,
+  onKeyDown,
+}) {
+  return (
+    <tr
+      className={`${l.found ? "" : "row-unknown"} ${
+        l.modeImport === "deduction" ? "row-deduction" : ""
+      } ${
+        l.source === "manuel" ||
+        l.source === "controle" ||
+        l.source === "verification"
+          ? "row-manuelle"
+          : ""
+      } ${l.modifie ? "row-modifiee" : ""}`.trim()}
+    >
+      {/* Repères de la ligne. L'infobulle de la correction dit CE QUI a
+          changé : « corrigée » seul obligerait à rouvrir le .DAT pour le
+          savoir. */}
+      <td className="marq-cell">
+        {l.source === "manuel" && (
+          <HiPlusCircle
+            className="marq marq-manuelle"
+            title={`Ligne ajoutée à la main${
+              l.agentNom ? ` par ${l.agentNom}` : ""
+            }`}
+          />
+        )}
+        {l.source === "controle" && (
+          <HiClipboardCheck
+            className="marq marq-controle"
+            title={`Bipage ajouté au CONTRÔLE (écran Ajout contrôle inventaire)${
+              l.agentNom ? ` par ${l.agentNom}` : ""
+            }`}
+          />
+        )}
+        {l.source === "verification" && (
+          <HiBadgeCheck
+            className="marq marq-verification"
+            title={`VÉRIF POINT ROUGE : scotch sans point rouge, le scotch fait foi (${
+              l.sourceRef || "allée ?"
+            })${l.agentNom ? ` — ${l.agentNom}` : ""}. Ni fiche ni .dat régénérés.`}
+          />
+        )}
+        {l.modifie && (
+          <HiPencilAlt className="marq marq-modifiee" title={resumeCorrection(l)} />
+        )}
+      </td>
+      <td className="zone-cell">{l.zoneCode}</td>
+      <td className="zone-cell">{l.zoneType || "—"}</td>
+      {/* NL = `ordre`, posé par le watcher depuis la numérotation de
+          construireLignes (n = index + 1) : c'est LE numéro imprimé sur la
+          fiche de contrôle. Les anciennes lignes sans ordre affichent « — »
+          plutôt qu'un faux 0. */}
+      <td className="nl-cell">{Number(l.ordre) > 0 ? l.ordre : "—"}</td>
+      <td className="mono">
+        <CelluleCodeBipe ligne={l} />
+      </td>
+      <td className="mono">
+        {resolution ? <PointsChargement /> : <CelluleGencode ligne={l} />}
+      </td>
+      <td>
+        <input
+          className="cell-input num"
+          type="number"
+          step="any"
+          value={l.qteScan ?? ""}
+          onChange={(e) => onChange(l._id, "qteScan", e.target.value)}
+          onBlur={() => onSave(l._id)}
+          onKeyDown={onKeyDown}
+        />
+      </td>
+      <td>
+        <input
+          className="cell-input"
+          type="text"
+          value={l.nart ?? ""}
+          onChange={(e) => onChange(l._id, "nart", e.target.value)}
+          onBlur={() => onSave(l._id)}
+          onKeyDown={onKeyDown}
+        />
+      </td>
+      <td className="desig-cell">
+        {resolution ? <PointsChargement /> : l.designation}
+      </td>
+      <td className="agent-cell">
+        {l.agentNom || l.agentCode ? (
+          <>
+            {l.agentNom || `Code ${l.agentCode}`}
+            {l.source && l.source !== "dat" && (
+              <span
+                className={`src-badge${
+                  l.source === "manuel"
+                    ? " manuel"
+                    : l.source === "controle"
+                      ? " controle"
+                      : ""
+                }`}
+              >
+                {l.source === "proforma"
+                  ? "proforma"
+                  : l.source === "manuel"
+                    ? "ajout manuel"
+                    : l.source === "controle"
+                      ? "contrôle"
+                      : "excel"}
+              </span>
+            )}
+            {l.modeImport === "deduction" && (
+              <span className="src-badge deduction">déduction</span>
+            )}
+          </>
+        ) : (
+          "—"
+        )}
+      </td>
+      <td>
+        <input
+          className="cell-input"
+          type="text"
+          value={l.observation ?? ""}
+          onChange={(e) => onChange(l._id, "observation", e.target.value)}
+          onBlur={() => onSave(l._id)}
+          onKeyDown={onKeyDown}
+        />
+      </td>
+      <td className="num-cell">
+        {l.stock === null || l.stock === undefined ? "—" : l.stock}
+      </td>
+    </tr>
+  );
+});
 
 // ── Formatage du mode « Calcul des écarts » ─────────────────────────────────
 // Quantités à 3 décimales max (articles au mètre), montants XPF entiers —
@@ -318,7 +471,7 @@ const AdminBipagesScreen = () => {
   // MAGASIN et DOCK restent proposés même absents du dictionnaire : ils ont un
   // dépôt par défaut (S1 / S2) et un emplacement sans ligne ne produit
   // simplement aucun fichier.
-  const typesIntegration = (() => {
+  const typesIntegration = useMemo(() => {
     const vus = new Set();
     const liste = [];
     for (const t of [...(data?.types || []), "MAGASIN", "DOCK"]) {
@@ -328,7 +481,7 @@ const AdminBipagesScreen = () => {
       liste.push(t);
     }
     return liste;
-  })();
+  }, [data]);
   // Défauts métier : MAGASIN → S1, DOCK → S2, et un emplacement spécial
   // S3/S4/S5 (zones importées par proforma) part dans SON dépôt.
   const depotPour = (t) => {
@@ -390,26 +543,35 @@ const AdminBipagesScreen = () => {
     setLignes(data?.lignes || []);
     dirty.current = new Set();
   }, [data]);
+  // Miroir de `lignes` lisible par des callbacks STABLES : `saveLine` ne doit
+  // pas dépendre de `lignes` (il serait recréé à chaque frappe et casserait le
+  // React.memo des <LigneTableau>).
+  const lignesRef = useRef([]);
+  lignesRef.current = lignes;
 
   const active = data?.active;
   const types = data?.types || [];
-  const zonesMeta = data?.zonesMeta || [];
+  const zonesMeta = data?.zonesMeta;
 
   // Options de zones filtrées par le type sélectionné (codes distincts).
-  const zoneOptions = [
-    ...new Set(
-      (type ? zonesMeta.filter((z) => z.type === type) : zonesMeta).map(
-        (z) => z.code,
+  const zoneOptions = useMemo(
+    () => [
+      ...new Set(
+        (type
+          ? (zonesMeta || []).filter((z) => z.type === type)
+          : zonesMeta || []
+        ).map((z) => z.code),
       ),
-    ),
-  ];
+    ],
+    [zonesMeta, type],
+  );
 
   const onTypeChange = (e) => {
     setType(e.target.value);
     setZone(""); // une zone choisie peut ne plus appartenir au nouveau type
   };
 
-  const updateLocal = (id, field, value) => {
+  const updateLocal = useCallback((id, field, value) => {
     dirty.current.add(id);
     // Seul le NART entraîne une re-résolution côté serveur : changer la
     // quantité ou l'observation ne doit pas faire clignoter les colonnes.
@@ -417,47 +579,53 @@ const AdminBipagesScreen = () => {
     setLignes((prev) =>
       prev.map((l) => (l._id === id ? { ...l, [field]: value } : l)),
     );
-  };
+  }, []);
 
-  const marquerResolution = (id, actif) =>
-    setEnResolution((prev) => {
-      const n = new Set(prev);
-      if (actif) n.add(id);
-      else n.delete(id);
-      return n;
-    });
+  const marquerResolution = useCallback(
+    (id, actif) =>
+      setEnResolution((prev) => {
+        const n = new Set(prev);
+        if (actif) n.add(id);
+        else n.delete(id);
+        return n;
+      }),
+    [],
+  );
 
-  const saveLine = async (id) => {
-    if (!dirty.current.has(id)) return;
-    dirty.current.delete(id);
-    const ligne = lignes.find((l) => l._id === id);
-    if (!ligne) return;
-    // Le NART a changé : désignation et code-barres vont être re-résolus dans
-    // le catalogue. On le montre plutôt que de laisser l'ancienne valeur à
-    // l'écran, qui donnerait l'impression que rien ne s'est passé.
-    const resout = nartModifie.current.delete(id);
-    if (resout) marquerResolution(id, true);
-    try {
-      const res = await updateBipage({
-        entrepriseId: selectedEntreprise,
-        id,
-        body: {
-          qteScan: ligne.qteScan,
-          nart: ligne.nart,
-          observation: ligne.observation,
-        },
-      }).unwrap();
-      setLignes((prev) => prev.map((l) => (l._id === id ? res : l)));
-    } catch {
-      /* on garde la saisie locale ; l'admin peut réessayer */
-    } finally {
-      if (resout) marquerResolution(id, false);
-    }
-  };
+  const saveLine = useCallback(
+    async (id) => {
+      if (!dirty.current.has(id)) return;
+      dirty.current.delete(id);
+      const ligne = lignesRef.current.find((l) => l._id === id);
+      if (!ligne) return;
+      // Le NART a changé : désignation et code-barres vont être re-résolus dans
+      // le catalogue. On le montre plutôt que de laisser l'ancienne valeur à
+      // l'écran, qui donnerait l'impression que rien ne s'est passé.
+      const resout = nartModifie.current.delete(id);
+      if (resout) marquerResolution(id, true);
+      try {
+        const res = await updateBipage({
+          entrepriseId: selectedEntreprise,
+          id,
+          body: {
+            qteScan: ligne.qteScan,
+            nart: ligne.nart,
+            observation: ligne.observation,
+          },
+        }).unwrap();
+        setLignes((prev) => prev.map((l) => (l._id === id ? res : l)));
+      } catch {
+        /* on garde la saisie locale ; l'admin peut réessayer */
+      } finally {
+        if (resout) marquerResolution(id, false);
+      }
+    },
+    [selectedEntreprise, updateBipage, marquerResolution],
+  );
 
-  const onCellKeyDown = (e) => {
+  const onCellKeyDown = useCallback((e) => {
     if (e.key === "Enter") e.target.blur();
-  };
+  }, []);
 
   // ── Ajout manuel ─────────────────────────────────────────────────────────
   // Règle métier : on n'ajoute une ligne QUE dans une zone déjà filtrée, avec
@@ -1132,6 +1300,18 @@ const AdminBipagesScreen = () => {
 
           {msg ? <div className="bipages-msg">{msg}</div> : null}
 
+          {/* Le serveur plafonne à 5 000 lignes par réponse : au-delà, la fin
+              de l'inventaire était masquée EN SILENCE. On le dit, avec la
+              parade (filtrer resserre la fenêtre sous le plafond). */}
+          {data?.tronque && !modeEcarts && (
+            <div className="bipages-msg warn">
+              <HiInformationCircle /> Affichage limité aux 5 000 premières
+              lignes — l'inventaire en compte davantage. Filtrez par
+              emplacement ou par zone pour voir le reste ; l'export CSV, lui,
+              est complet.
+            </div>
+          )}
+
           {/* ── Ajout manuel d'une ligne ──────────────────────────────────
               Le bouton n'apparaît QUE si l'écran est filtré sur un
               emplacement ET une zone : la ligne créée appartiendra à ce
@@ -1490,153 +1670,14 @@ const AdminBipagesScreen = () => {
                   </tr>
                 ) : (
                   lignes.map((l) => (
-                    <tr
+                    <LigneTableau
                       key={l._id}
-                      className={`${l.found ? "" : "row-unknown"} ${
-                        l.modeImport === "deduction" ? "row-deduction" : ""
-                      } ${
-                        l.source === "manuel" ||
-                        l.source === "controle" ||
-                        l.source === "verification"
-                          ? "row-manuelle"
-                          : ""
-                      } ${l.modifie ? "row-modifiee" : ""}`.trim()}
-                    >
-                      {/* Repères de la ligne. L'infobulle de la correction dit
-                          CE QUI a changé : « corrigée » seul obligerait à
-                          rouvrir le .DAT pour le savoir. */}
-                      <td className="marq-cell">
-                        {l.source === "manuel" && (
-                          <HiPlusCircle
-                            className="marq marq-manuelle"
-                            title={`Ligne ajoutée à la main${
-                              l.agentNom ? ` par ${l.agentNom}` : ""
-                            }`}
-                          />
-                        )}
-                        {l.source === "controle" && (
-                          <HiClipboardCheck
-                            className="marq marq-controle"
-                            title={`Bipage ajouté au CONTRÔLE (écran Ajout contrôle inventaire)${
-                              l.agentNom ? ` par ${l.agentNom}` : ""
-                            }`}
-                          />
-                        )}
-                        {l.source === "verification" && (
-                          <HiBadgeCheck
-                            className="marq marq-verification"
-                            title={`VÉRIF POINT ROUGE : scotch sans point rouge, le scotch fait foi (${
-                              l.sourceRef || "allée ?"
-                            })${l.agentNom ? ` — ${l.agentNom}` : ""}. Ni fiche ni .dat régénérés.`}
-                          />
-                        )}
-                        {l.modifie && (
-                          <HiPencilAlt
-                            className="marq marq-modifiee"
-                            title={resumeCorrection(l)}
-                          />
-                        )}
-                      </td>
-                      <td className="zone-cell">{l.zoneCode}</td>
-                      <td className="zone-cell">{l.zoneType || "—"}</td>
-                      {/* NL = `ordre`, posé par le watcher depuis la numérotation
-                          de construireLignes (n = index + 1) : c'est LE numéro
-                          imprimé sur la fiche de contrôle. Les anciennes lignes
-                          sans ordre affichent « — » plutôt qu'un faux 0. */}
-                      <td className="nl-cell">
-                        {Number(l.ordre) > 0 ? l.ordre : "—"}
-                      </td>
-                      <td className="mono">
-                        <CelluleCodeBipe ligne={l} />
-                      </td>
-                      <td className="mono">
-                        {enResolution.has(l._id) ? (
-                          <PointsChargement />
-                        ) : (
-                          <CelluleGencode ligne={l} />
-                        )}
-                      </td>
-                      <td>
-                        <input
-                          className="cell-input num"
-                          type="number"
-                          step="any"
-                          value={l.qteScan ?? ""}
-                          onChange={(e) =>
-                            updateLocal(l._id, "qteScan", e.target.value)
-                          }
-                          onBlur={() => saveLine(l._id)}
-                          onKeyDown={onCellKeyDown}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="cell-input"
-                          type="text"
-                          value={l.nart ?? ""}
-                          onChange={(e) =>
-                            updateLocal(l._id, "nart", e.target.value)
-                          }
-                          onBlur={() => saveLine(l._id)}
-                          onKeyDown={onCellKeyDown}
-                        />
-                      </td>
-                      <td className="desig-cell">
-                        {enResolution.has(l._id) ? (
-                          <PointsChargement />
-                        ) : (
-                          l.designation
-                        )}
-                      </td>
-                      <td className="agent-cell">
-                        {l.agentNom || l.agentCode ? (
-                          <>
-                            {l.agentNom || `Code ${l.agentCode}`}
-                            {l.source && l.source !== "dat" && (
-                              <span
-                                className={`src-badge${
-                                  l.source === "manuel"
-                                    ? " manuel"
-                                    : l.source === "controle"
-                                      ? " controle"
-                                      : ""
-                                }`}
-                              >
-                                {l.source === "proforma"
-                                  ? "proforma"
-                                  : l.source === "manuel"
-                                    ? "ajout manuel"
-                                    : l.source === "controle"
-                                      ? "contrôle"
-                                      : "excel"}
-                              </span>
-                            )}
-                            {l.modeImport === "deduction" && (
-                              <span className="src-badge deduction">déduction</span>
-                            )}
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td>
-                        <input
-                          className="cell-input"
-                          type="text"
-                          value={l.observation ?? ""}
-                          onChange={(e) =>
-                            updateLocal(l._id, "observation", e.target.value)
-                          }
-                          onBlur={() => saveLine(l._id)}
-                          onKeyDown={onCellKeyDown}
-                        />
-                      </td>
-                      <td className="num-cell">
-                        {l.stock === null || l.stock === undefined
-                          ? "—"
-                          : l.stock}
-                      </td>
-                    </tr>
+                      l={l}
+                      resolution={enResolution.has(l._id)}
+                      onChange={updateLocal}
+                      onSave={saveLine}
+                      onKeyDown={onCellKeyDown}
+                    />
                   ))
                 )}
               </tbody>

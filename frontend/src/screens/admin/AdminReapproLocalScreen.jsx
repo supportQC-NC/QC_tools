@@ -59,7 +59,9 @@ const AdminReapproLocalScreen = () => {
       }
     };
     poll();
-    pollRef.current = setInterval(poll, 700);
+    // 1,5 s : la barre reste fluide, mais chaque tour traverse toute la pile
+    // d'auth serveur — 700 ms doublait la charge pour un confort invisible.
+    pollRef.current = setInterval(poll, 1500);
     return () => {
       cancelled = true;
       if (pollRef.current) {

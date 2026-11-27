@@ -37,47 +37,87 @@ export const calculerEcartsZones = async (entreprise, session) => {
   // doublait les quantités dès que la zone était re-bipée.
   filtreCollecte.annulee = { $ne: true };
 
-  const collectes = await InventaireCollecte.find(filtreCollecte).sort({
-    zoneCode: 1,
-    updatedAt: 1,
-  });
+  // `.lean()` + projection (27/11/2026) : seuls les champs consommés par le
+  // calcul — hydrater des documents Mongoose complets (lignes scannées avec
+  // tous leurs champs) pour un parcours en lecture pure pesait sur chaque
+  // récap, feuille d'écarts et bilan.
+  const collectes = await InventaireCollecte.find(filtreCollecte)
+    .select(
+      "zoneCode zoneType zoneLibelle lignes.nart lignes.gencod " +
+        "lignes.quantite lignes.designation lignes.isRenvoi lignes.isUnknown",
+    )
+    .sort({ zoneCode: 1, updatedAt: 1 })
+    .lean();
 
-  // Pré-charge le cache article (lecture O(1) ensuite). Tolérant aux erreurs.
+  // Le cache articles est chargé UNE fois puis interrogé en SYNCHRONE :
+  // `findByNart`/`findByCode` repassent par `getArticles`, dont le contrôle de
+  // validité fait un fs.statSync sur le DBF du partage réseau — un stat
+  // réseau PAR LIGNE bipée, c'était l'essentiel du coût du calcul.
+  let cacheArticles = null;
   try {
     await articleCacheService.preload(entreprise);
+    cacheArticles = await articleCacheService.getArticles(entreprise);
   } catch (e) {
-    // on continue : findByNart rechargera au besoin
+    // on continue : sans cache, tous les articles sortent « non trouvés »
   }
 
   // Infos article (stock S1..S5, prix d'achat PACHAT, fournisseur FOURN)
-  // via NART puis repli GENCOD.
-  const getInfosArticle = async (nart, gencod) => {
+  // via NART puis repli GENCOD — lookups mémoïsés par couple.
+  const memoInfos = new Map();
+  const getInfosArticle = (nart, gencod) => {
+    const cleMemo = `${nart || ""}|${gencod || ""}`;
+    const hit = memoInfos.get(cleMemo);
+    if (hit) return hit;
     let record = null;
-    if (nart && String(nart).trim()) {
-      record = await articleCacheService.findByNart(
-        entreprise,
-        String(nart).trim(),
-      );
+    if (cacheArticles) {
+      if (nart && String(nart).trim()) {
+        const idx = articleCacheService.lookupNart(
+          cacheArticles,
+          String(nart).trim(),
+        );
+        if (idx !== undefined) record = cacheArticles.records[idx];
+      }
+      if (!record && gencod && String(gencod).trim()) {
+        // Même séquence que `findByCode` : GENCOD d'abord, puis le même code
+        // essayé comme NART (un code bipé peut être l'un ou l'autre).
+        const code = String(gencod).trim();
+        let idx = articleCacheService.lookupGencod(cacheArticles, code);
+        if (idx === undefined) {
+          idx = articleCacheService.lookupNart(cacheArticles, code);
+        }
+        if (idx !== undefined) record = cacheArticles.records[idx];
+      }
     }
-    if (!record && gencod && String(gencod).trim()) {
-      record = await articleCacheService.findByCode(
-        entreprise,
-        String(gencod).trim(),
-      );
-    }
-    if (!record) {
-      return { stock: 0, prixAchat: 0, fourn: "", trouve: false };
-    }
-    return {
-      stock: articleCacheService.calculateStockTotal(record),
-      prixAchat: parseFloat(record.PACHAT) || 0,
-      fourn: (record.FOURN ? String(record.FOURN) : "").trim(),
-      trouve: true,
-    };
+    const infos = record
+      ? {
+          stock: articleCacheService.calculateStockTotal(record),
+          prixAchat: parseFloat(record.PACHAT) || 0,
+          fourn: (record.FOURN ? String(record.FOURN) : "").trim(),
+          trouve: true,
+        }
+      : { stock: 0, prixAchat: 0, fourn: "", trouve: false };
+    memoInfos.set(cleMemo, infos);
+    return infos;
   };
 
   // Regroupement par zone
   const zonesMap = new Map();
+  // Index des lignes par zone : remplace les `lignes.find(...)` linéaires qui
+  // rendaient le cumul quadratique sur les grosses zones. Deux formes de clé
+  // (brute pour les collectes, NART trimé pour les imports) pointant sur le
+  // même objet, pour préserver exactement les deux prédicats historiques.
+  const indexParZone = new Map(); // cle zone -> Map(cle ligne -> ligne)
+  const enregistrerLigne = (cleZone, l) => {
+    const idx = indexParZone.get(cleZone);
+    const brute = `${l.nart}|${l.gencod || ""}`;
+    const trimee = `${String(l.nart || "").trim()}|${l.gencod || ""}`;
+    if (!idx.has(brute)) idx.set(brute, l);
+    if (!idx.has(trimee)) idx.set(trimee, l);
+  };
+  const creerZone = (cle, props) => {
+    zonesMap.set(cle, { ...props, lignes: [] });
+    indexParZone.set(cle, new Map());
+  };
 
   for (const collecte of collectes) {
     const code = collecte.zoneCode || "(sans zone)";
@@ -89,17 +129,17 @@ export const calculerEcartsZones = async (entreprise, session) => {
     // emplacement rencontré.
     const cle = `${code}|${type}`;
     if (!zonesMap.has(cle)) {
-      zonesMap.set(cle, {
+      creerZone(cle, {
         zoneCode: code,
         zoneLibelle: collecte.zoneLibelle || "",
         zoneType: type,
-        lignes: [],
       });
     }
     const zoneEntry = zonesMap.get(cle);
+    const index = indexParZone.get(cle);
 
     for (const ligne of collecte.lignes) {
-      const { stock, prixAchat, fourn, trouve } = await getInfosArticle(
+      const { stock, prixAchat, fourn, trouve } = getInfosArticle(
         ligne.nart,
         ligne.gencod,
       );
@@ -108,15 +148,13 @@ export const calculerEcartsZones = async (entreprise, session) => {
       const ecartXpf = ecart * prixAchat;
 
       // Cumul si le même article (nart) revient dans la même zone
-      const existante = zoneEntry.lignes.find(
-        (l) => l.nart === ligne.nart && l.gencod === (ligne.gencod || ""),
-      );
+      const existante = index.get(`${ligne.nart}|${ligne.gencod || ""}`);
       if (existante) {
         existante.qteBipee += qteBipee;
         existante.ecart = existante.qteBipee - existante.stockTheorique;
         existante.ecartXpf = existante.ecart * existante.prixAchat;
       } else {
-        zoneEntry.lignes.push({
+        const nouvelle = {
           nart: ligne.nart,
           gencod: ligne.gencod || "",
           designation: ligne.designation || "",
@@ -129,7 +167,9 @@ export const calculerEcartsZones = async (entreprise, session) => {
           articleTrouve: trouve,
           isRenvoi: !!ligne.isRenvoi,
           isUnknown: !!ligne.isUnknown,
-        });
+        };
+        zoneEntry.lignes.push(nouvelle);
+        enregistrerLigne(cle, nouvelle);
       }
     }
   }
@@ -172,33 +212,31 @@ export const calculerEcartsZones = async (entreprise, session) => {
       const type = String(ligne.zoneType || "").trim();
       const cle = `${code}|${type}`;
       if (!zonesMap.has(cle)) {
-        zonesMap.set(cle, {
+        creerZone(cle, {
           zoneCode: code,
           zoneLibelle: libelles.get(cle) || "",
           zoneType: type,
-          lignes: [],
         });
       }
       const zoneEntry = zonesMap.get(cle);
+      const index = indexParZone.get(cle);
 
       const nart = String(ligne.nart || "").trim();
       const gencod = String(ligne.gencod || "").trim();
-      const { stock, prixAchat, fourn, trouve } = await getInfosArticle(
+      const { stock, prixAchat, fourn, trouve } = getInfosArticle(
         nart,
         gencod || ligne.eanArticle,
       );
       // Les déductions sont stockées en négatif : le cumul donne le NET.
       const qteBipee = parseFloat(ligne.qteScan) || 0;
 
-      const existante = zoneEntry.lignes.find(
-        (l) => String(l.nart || "").trim() === nart && (l.gencod || "") === gencod,
-      );
+      const existante = index.get(`${nart}|${gencod}`);
       if (existante) {
         existante.qteBipee += qteBipee;
         existante.ecart = existante.qteBipee - existante.stockTheorique;
         existante.ecartXpf = existante.ecart * existante.prixAchat;
       } else {
-        zoneEntry.lignes.push({
+        const nouvelle = {
           nart,
           gencod,
           designation: ligne.designation || "",
@@ -211,7 +249,9 @@ export const calculerEcartsZones = async (entreprise, session) => {
           articleTrouve: trouve,
           isRenvoi: false,
           isUnknown: !ligne.found,
-        });
+        };
+        zoneEntry.lignes.push(nouvelle);
+        enregistrerLigne(cle, nouvelle);
       }
     }
   }

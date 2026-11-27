@@ -17,6 +17,12 @@ import asyncHandler from "./asyncHandler.js";
 import Permission from "../models/PermissionModel.js";
 import Team from "../models/TeamModel.js";
 import User from "../models/UserModel.js";
+// Lecture de LA permission d'un utilisateur : TOUJOURS via le cache 60 s
+// (permissionCacheService) — ces helpers s'appellent en cascade et relisaient
+// le même document à chaque étage, sur un Atlas distant. Les `Permission.find`
+// par entreprises (périmètres d'équipe) restent des lectures directes : leur
+// résultat dépend d'autres utilisateurs, pas d'un seul document cachable.
+import { getPermissionLean } from "../services/permissionCacheService.js";
 
 /**
  * Renvoie le périmètre d'entreprises accessible à un utilisateur.
@@ -27,7 +33,7 @@ import User from "../models/UserModel.js";
 export const getAccessibleEntreprises = async (user) => {
   if (!user) return { all: false, ids: [] };
 
-  const permission = await Permission.findOne({ user: user._id });
+  const permission = await getPermissionLean(user._id);
 
   // Admin hérité sans permissions -> super-admin ; user sans permissions -> rien.
   if (!permission) {
@@ -48,7 +54,7 @@ export const getAccessibleEntreprises = async (user) => {
  */
 export const isSuperAdmin = async (user) => {
   if (!user || user.role !== "admin") return false;
-  const permission = await Permission.findOne({ user: user._id });
+  const permission = await getPermissionLean(user._id);
   if (!permission) return true; // admin hérité
   return permission.allEntreprises === true;
 };
@@ -62,7 +68,7 @@ export const superAdmin = asyncHandler(async (req, res, next) => {
     res.status(403);
     throw new Error("Réservé aux administrateurs");
   }
-  const permission = await Permission.findOne({ user: req.user._id });
+  const permission = await getPermissionLean(req.user._id);
   const ok = !permission || permission.allEntreprises === true;
   if (!ok) {
     res.status(403);
@@ -110,7 +116,7 @@ export const FILIALE_RESEAUX = ["DQ", "QC", "LD"];
  */
 export const hasAnalyseAccess = async (user, key) => {
   if (!user) return false;
-  const permission = await Permission.findOne({ user: user._id });
+  const permission = await getPermissionLean(user._id);
   // Super-admin : admin + toutes entreprises (ou admin hérité sans permissions).
   if (user.role === "admin" && (!permission || permission.allEntreprises === true)) {
     return true;
@@ -125,7 +131,7 @@ export const hasAnalyseAccess = async (user, key) => {
 /** Accès à UN réseau précis de l'analyse Filiales (DQ | QC | LD). */
 export const hasFilialeReseauAccess = async (user, reseau) => {
   if (!user) return false;
-  const permission = await Permission.findOne({ user: user._id });
+  const permission = await getPermissionLean(user._id);
   if (user.role === "admin" && (!permission || permission.allEntreprises === true)) {
     return true;
   }
@@ -164,7 +170,7 @@ export const checkFilialeReseauAccess = asyncHandler(async (req, res, next) => {
  */
 export const getCommerciauxCodes = async (user, entrepriseId) => {
   if (!user) return [];
-  const permission = await Permission.findOne({ user: user._id });
+  const permission = await getPermissionLean(user._id);
   // Super-admin (admin + toutes entreprises, ou admin hérité) : tout.
   if (user.role === "admin" && (!permission || permission.allEntreprises === true)) {
     return null;
@@ -195,7 +201,7 @@ export const getManageableUserScope = async (actor) => {
 
   // Détenteur du module users_admin (ou allModules) sans être admin/responsable :
   // il gère aussi les utilisateurs de ses sociétés (il a explicitement ce droit).
-  const permission = await Permission.findOne({ user: actor._id });
+  const permission = await getPermissionLean(actor._id);
   const hasUsersAdmin = !!(
     permission?.allModules || permission?.modules?.users_admin?.read
   );
@@ -354,7 +360,7 @@ export const allowUserManagement = (action = "read") =>
     if (req.user.role === "admin" || req.user.role === "responsable") {
       return next();
     }
-    const permission = await Permission.findOne({ user: req.user._id });
+    const permission = await getPermissionLean(req.user._id);
     if (permission?.allModules || permission?.modules?.users_admin?.[action]) {
       return next();
     }

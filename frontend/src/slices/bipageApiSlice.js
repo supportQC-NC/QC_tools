@@ -3,6 +3,16 @@ import { apiSlice } from "./apiSlice";
 
 const BASE = "/api/bipages";
 
+// Invalidations CIBLÉES par société (27/11/2026) : le tag nu "Bipage"
+// refetchait TOUTES les queries du module (liste + chaque combinaison de
+// filtres en cache + feuille d'écarts + stats + contexte contrôle), sur un
+// backend où chacune coûte cher. Chaque facette porte un id par société ;
+// une invalidation du TYPE nu (init/annulation d'inventaire, vérification
+// point rouge) continue de tout rafraîchir — c'est voulu, c'est une table
+// rase. `updateBipage` reste SANS invalidation (mise à jour locale).
+const tagsBipage = (entrepriseId, ...facettes) =>
+  facettes.map((f) => ({ type: "Bipage", id: `${f}-${entrepriseId}` }));
+
 /** URL d'export CSV (relative à BASE_URL). Inclut zone, type et search. */
 export const getBipagesCsvUrl = (
   entrepriseId,
@@ -33,7 +43,9 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         const qs = params.toString();
         return `${BASE}/${entrepriseId}${qs ? `?${qs}` : ""}`;
       },
-      providesTags: ["Bipage"],
+      providesTags: (r, e, arg) => [
+        { type: "Bipage", id: `LISTE-${arg.entrepriseId}` },
+      ],
     }),
 
     // Classement des zones les plus retouchées à la main, par emplacement.
@@ -43,13 +55,17 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
     getStatsZonesRetouchees: builder.query({
       query: ({ entrepriseId, tout = false }) =>
         `${BASE}/${entrepriseId}/stats-zones${tout ? "?tout=1" : ""}`,
-      providesTags: ["Bipage"],
+      providesTags: (r, e, arg) => [
+        { type: "Bipage", id: `STATS-${arg.entrepriseId}` },
+      ],
     }),
 
     // Proformas intégrées par zone sur l'inventaire actif (tableau de bord).
     getStatsProformasZones: builder.query({
       query: ({ entrepriseId }) => `${BASE}/${entrepriseId}/stats-proformas-zones`,
-      providesTags: ["Bipage"],
+      providesTags: (r, e, arg) => [
+        { type: "Bipage", id: `STATS-${arg.entrepriseId}` },
+      ],
     }),
 
     updateBipage: builder.mutation({
@@ -71,7 +87,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS"),
     }),
 
     // ─── Ajout contrôle inventaire ────────────────────────────────────────
@@ -79,7 +96,9 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
     // emplacements (mêmes types que le filtre du Détail des bipages).
     getContexteControle: builder.query({
       query: (entrepriseId) => `${BASE}/${entrepriseId}/controle-contexte`,
-      providesTags: ["Bipage"],
+      providesTags: (r, e, entrepriseId) => [
+        { type: "Bipage", id: `CONTEXTE-${entrepriseId}` },
+      ],
     }),
 
     // Résolution dynamique du code saisi (NART ou gencode, renvois GENDOUBL
@@ -99,7 +118,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS"),
     }),
 
     // Correction d'un ajout de contrôle saisi par erreur (code re-résolu,
@@ -111,7 +131,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         method: "PUT",
         body,
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS"),
     }),
 
     // Suppression d'un ajout de contrôle saisi par erreur.
@@ -120,7 +141,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         url: `${BASE}/${entrepriseId}/ligne-controle/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS"),
     }),
 
     // « Recommencer » une zone : efface lignes + statut imprimé + fichiers .DAT/PDF,
@@ -131,7 +153,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         method: "POST",
         body: { zoneCode },
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS"),
     }),
 
     // Figer / défiger / reprendre le stock : photo de la base article pour que
@@ -146,7 +169,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         method: "POST",
         body: { mode, actif: mode !== "defiger" },
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS"),
     }),
 
     // Mode « Calcul des écarts » : la feuille d'écarts en JSON (mêmes filtres
@@ -178,7 +202,9 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         if (marque) params.set("marque", marque);
         return `${BASE}/${entrepriseId}/ecarts?${params.toString()}`;
       },
-      providesTags: ["Bipage"],
+      providesTags: (r, e, arg) => [
+        { type: "Bipage", id: `ECARTS-${arg.entrepriseId}` },
+      ],
     }),
 
     // Correction du TOTAL bipé d'un article dans UN gisement (mode « Calcul
@@ -190,7 +216,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         method: "PUT",
         body: { cle, zoneCode, zoneType, qte },
       }),
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS"),
     }),
 
     // Attributs artplus (groupe/famille/sous-famille) de la société :
@@ -218,7 +245,8 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
           method: "POST",
         };
       },
-      invalidatesTags: ["Bipage"],
+      invalidatesTags: (r, e, arg) =>
+        tagsBipage(arg.entrepriseId, "LISTE", "ECARTS"),
     }),
 
     // Gisements d'un emplacement, lus dans la fiche article (zones proposées
@@ -262,7 +290,10 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
         body: { zoneCode, emplacement, items, mode },
       }),
       // La session porte les phases : un import peut les cocher automatiquement.
-      invalidatesTags: ["Bipage", "InventaireZone"],
+      invalidatesTags: (r, e, arg) => [
+        ...tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS", "CONTEXTE"),
+        "InventaireZone",
+      ],
     }),
 
     // ─── Import depuis un fichier Excel ───────────────────────────────────
@@ -284,7 +315,10 @@ export const bipageApiSlice = apiSlice.injectEndpoints({
           body: formData,
         };
       },
-      invalidatesTags: ["Bipage", "InventaireZone"],
+      invalidatesTags: (r, e, arg) => [
+        ...tagsBipage(arg.entrepriseId, "LISTE", "ECARTS", "STATS", "CONTEXTE"),
+        "InventaireZone",
+      ],
     }),
   }),
 });

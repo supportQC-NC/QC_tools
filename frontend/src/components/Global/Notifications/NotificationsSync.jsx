@@ -28,7 +28,11 @@ import {
   useMarkTasksSeenMutation,
 } from "../../../slices/notificationApiSlice";
 
-const POLL_MS = 30000;
+// Le poll n'est qu'un FILET DE SÉCURITÉ : le temps réel vient du socket
+// (notif:message / notif:task plus bas, qui invalident le tag Notif à chaque
+// événement). À 30 s, c'était ~8 requêtes Mongo par utilisateur connecté et
+// par tour, en permanence, pour un compteur déjà tenu à jour par le socket.
+const POLL_MS = 120000;
 
 const NotificationsSync = () => {
   const dispatch = useDispatch();

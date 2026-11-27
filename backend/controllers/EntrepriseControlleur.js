@@ -2,6 +2,7 @@ import asyncHandler from "../middleware/asyncHandler.js";
 import Entreprise from "../models/EntrepriseModel.js";
 import Permission from "../models/PermissionModel.js";
 import { getAccessibleEntreprises } from "../middleware/accessControl.js";
+import { invaliderEntreprise } from "../services/permissionCacheService.js";
 import factureCacheService from "../services/factureCacheService.js";
 
 const TYPES_VENDEUR = ["commercial", "vendeur", "autre"];
@@ -435,6 +436,9 @@ const updateEntreprise = asyncHandler(async (req, res) => {
   }
 
   const updatedEntreprise = await entreprise.save();
+  // Les middlewares d'accès servent l'Entreprise depuis un cache 60 s : une
+  // fiche modifiée (chemins, mappings…) doit être revue immédiatement.
+  invaliderEntreprise();
 
   res.json(updatedEntreprise);
 });
@@ -457,6 +461,7 @@ const deleteEntreprise = asyncHandler(async (req, res) => {
   );
 
   await Entreprise.deleteOne({ _id: entreprise._id });
+  invaliderEntreprise();
 
   res.json({ message: "Entreprise supprimée" });
 });
@@ -474,6 +479,9 @@ const toggleEntrepriseActive = asyncHandler(async (req, res) => {
 
   entreprise.isActive = !entreprise.isActive;
   await entreprise.save();
+  // Une société DÉSACTIVÉE doit être refusée tout de suite par
+  // checkEntrepriseAccess, pas au bout du TTL du cache.
+  invaliderEntreprise();
 
   res.json({
     _id: entreprise._id,

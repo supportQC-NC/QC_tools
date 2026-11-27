@@ -934,7 +934,12 @@ const slug = (s) =>
 
 // Catalogue = TOUS les onglets connus du code (hors espace perso), avec leur
 // permission (moduleKey explicite sinon déduite du path).
+// Construit UNE FOIS par chargement de l'app (singleton) : les structures
+// source sont des constantes de module, le recalculer à chaque rendu de la
+// sidebar (navigation, tick des compteurs) était du travail jeté.
+let catalogueMenu = null;
 export const getMenuCatalog = () => {
+  if (catalogueMenu) return catalogueMenu;
   const out = [];
   const seen = new Set();
   const add = (item) => {
@@ -953,6 +958,7 @@ export const getMenuCatalog = () => {
     );
   walk(adminMenuStructure);
   walk(moduleMenuStructure);
+  catalogueMenu = out;
   return out;
 };
 

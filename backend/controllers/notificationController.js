@@ -21,7 +21,20 @@ import {
 
 // Salons de chat visibles par l'utilisateur (mêmes règles que EspaceEquipeScreen :
 // « global » + une room par équipe accessible). Renvoie la liste des noms de room.
+//
+// ⚠️ CACHÉE 60 s par utilisateur (27/11/2026) : cette liste coûte ~4 requêtes
+// Mongo et /counts est appelé par TOUS les utilisateurs connectés, en poll ET
+// à chaque message socket — c'était le bruit de fond permanent de la base.
+// Les équipes/conversations changent rarement : une room toute neuve entre
+// dans le compteur en ≤ 60 s, et les compteurs des rooms connues restent
+// exacts à la seconde (le countDocuments, lui, n'est pas caché).
+const TTL_ROOMS = 60 * 1000;
+const cacheRooms = new Map(); // userId -> { at, rooms }
 const accessibleChatRooms = async (user) => {
+  const cle = String(user._id);
+  const hit = cacheRooms.get(cle);
+  if (hit && Date.now() - hit.at < TTL_ROOMS) return hit.rooms;
+
   let teamFilter;
   if (await isSuperAdmin(user)) {
     teamFilter = {};
@@ -42,11 +55,13 @@ const accessibleChatRooms = async (user) => {
       { equipe: { $in: teams.map((t) => t._id) } },
     ],
   }).select("_id");
-  return [
+  const rooms = [
     "global",
     ...teams.map((t) => `team:${t._id}`),
     ...convs.map((c) => `conv:${c._id}`),
   ];
+  cacheRooms.set(cle, { at: Date.now(), rooms });
+  return rooms;
 };
 
 // @desc    Compteurs de notifications (messages non lus + tâches non vues)

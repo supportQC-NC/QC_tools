@@ -7,10 +7,13 @@
 // Un administrateur également rattaché à un code vendeur garde le tableau de
 // bord général — il atteint son espace par le menu (« Espace commercial »).
 
+import { lazy } from "react";
 import { Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { estCommercial } from "../../config/adminModules";
-import UserDashboard from "../../screens/user/userDashboardScreen";
+// Chargé à la demande comme tous les écrans (index.js) : un import statique
+// ici le remettrait dans le bundle principal.
+const UserDashboard = lazy(() => import("../../screens/user/userDashboardScreen"));
 
 const AccueilRoute = () => {
   const { userInfo } = useSelector((state) => state.auth);
